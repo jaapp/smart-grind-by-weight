@@ -92,6 +92,8 @@ ${YELLOW}Usage:${NC} $0 <command> [options]
 
 ${YELLOW}Build & Upload Commands:${NC}
   build                 Build firmware using PlatformIO
+  flash [port]          Build and flash firmware via USB
+                       (auto-detects port if not specified)
   upload [firmware]     Upload firmware via BLE OTA
                        (finds latest .bin if no firmware specified)
   build-upload         Build firmware and upload via BLE
@@ -121,6 +123,8 @@ ${YELLOW}Common Options:${NC}
   --help, -h           Show this help message
 
 ${YELLOW}Examples:${NC}
+  $0 flash                     # Build and flash via USB (auto-detect port)
+  $0 flash /dev/cu.usbmodem14301 # Build and flash via specific USB port
   $0 build-upload              # Build and upload firmware
   $0 build-upload --force-full # Build and force full firmware update
   $0 analyze                   # Export data and show interactive report
@@ -132,6 +136,25 @@ ${YELLOW}Examples:${NC}
 EOF
 }
 
+# Helper function to detect ESP32 USB port
+detect_usb_port() {
+    local port
+    port=$("$VENV_PYTHON" -m platformio device list | grep -A3 "USB.*303A:1001" | grep "^/" | head -1)
+    if [[ -n "$port" ]]; then
+        echo "$port"
+        return 0
+    fi
+
+    # Fallback: look for any ESP32-like device
+    port=$("$VENV_PYTHON" -m platformio device list | grep -E "^/dev/(cu\.usbmodem|ttyUSB|ttyACM)" | head -1)
+    if [[ -n "$port" ]]; then
+        echo "$port"
+        return 0
+    fi
+
+    return 1
+}
+
 # Command implementations
 cmd_build() {
     print_header "Building Firmware"
@@ -140,6 +163,29 @@ cmd_build() {
     # Use PlatformIO from the project venv to avoid global `pio` differences
     "$VENV_PYTHON" -m platformio run -e waveshare-esp32s3-touch-amoled-164
     print_success "Firmware build completed"
+}
+
+cmd_flash() {
+    local port="$1"
+
+    if [[ -z "$port" ]]; then
+        print_info "Auto-detecting USB port..."
+        port=$(detect_usb_port)
+        if [[ -z "$port" ]]; then
+            print_error "No ESP32 device found on USB"
+            print_info "Please connect your ESP32 device and try again"
+            print_info "Or specify port manually: $0 flash /dev/cu.usbmodem14301"
+            exit 1
+        fi
+        print_info "Detected ESP32 at: $port"
+    fi
+
+    print_header "Building and Flashing Firmware via USB"
+    check_venv
+    cd "$PROJECT_DIR"
+    # Use PlatformIO from the project venv to build and upload via USB
+    "$VENV_PYTHON" -m platformio run -e waveshare-esp32s3-touch-amoled-164 --target upload --upload-port "$port"
+    print_success "Firmware flashed successfully"
 }
 
 cmd_upload() {
@@ -270,6 +316,9 @@ cmd_clean() {
 case "${1:-}" in
     "build")
         cmd_build "${@:2}"
+        ;;
+    "flash")
+        cmd_flash "${@:2}"
         ;;
     "upload")
         cmd_upload "${@:2}"
