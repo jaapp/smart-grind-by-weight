@@ -53,6 +53,8 @@ flowchart LR
 3. **Follow the assembly video** - [Complete Eureka build process](https://youtu.be/-kfKjiwJsGM)
 4. **Flash firmware & calibrate** - Uses standard PlatformIO build system
 
+**Design Files:** The complete Fusion 360 design is available at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for modification and adaptation to other grinder models.
+
 **Ready to build?** → See **[DOC.md](DOC.md)** for complete build instructions, parts list, and usage guide.
 
 ---
