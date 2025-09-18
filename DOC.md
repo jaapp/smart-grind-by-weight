@@ -236,6 +236,7 @@ Main Screen (swipe left/right between tabs)
     |
     +-- Settings
     |   |-- Bluetooth toggle (30m timer)
+    |   |-- Bluetooth startup toggle (configurable auto-enable)
     |   |-- Brightness sliders
     |   |-- Purge data button (clears logged grind sessions)
     |   \-- Reset settings button
@@ -253,8 +254,10 @@ During Grinding:
 
 ## 🔵 Bluetooth Connectivity
 
-### Auto-Enable
-- **Bluetooth automatically enables for 5 minutes** after power on
+### Startup Behavior
+- **Bluetooth startup is configurable** in **Settings → Settings tab → Startup**
+- When enabled: **Bluetooth automatically enables for 5 minutes** after power on
+- When disabled: Bluetooth remains off at startup (can still be enabled manually)
 - Indicated by blue Bluetooth symbol in top-right corner
 
 ### Manual Control
