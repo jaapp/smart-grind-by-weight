@@ -94,7 +94,11 @@ void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {
         case EventType::BLE_TOGGLE:
             ui_manager->handle_ble_toggle();
             break;
-            
+
+        case EventType::BLE_STARTUP_TOGGLE:
+            ui_manager->handle_ble_startup_toggle();
+            break;
+
         case EventType::BRIGHTNESS_NORMAL_SLIDER:
             ui_manager->handle_brightness_normal_slider();
             break;

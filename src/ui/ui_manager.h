@@ -131,6 +131,7 @@ public:
     void handle_cal_plus(lv_event_code_t code);
     void handle_cal_minus(lv_event_code_t code);
     void handle_ble_toggle();
+    void handle_ble_startup_toggle();
     void handle_brightness_normal_slider();
     void handle_brightness_normal_slider_released();
     void handle_brightness_screensaver_slider();

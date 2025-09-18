@@ -28,6 +28,7 @@ private:
     
     // Settings tab elements
     lv_obj_t* ble_toggle;
+    lv_obj_t* ble_startup_toggle;
     lv_obj_t* ble_status_label;
     lv_obj_t* ble_timer_label;
     lv_obj_t* brightness_normal_slider;
@@ -67,6 +68,7 @@ public:
     void hide_taring_overlay();
     void update_brightness_sliders();
     void update_brightness_labels();
+    void update_bluetooth_startup_toggle();
     
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
@@ -78,6 +80,7 @@ public:
     lv_obj_t* get_tare_button() const { return tare_button; }
     lv_obj_t* get_back_button() const { return back_button; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
+    lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
     lv_obj_t* get_refresh_stats_button() const { return refresh_stats_button; }
     lv_obj_t* get_brightness_normal_slider() const { return brightness_normal_slider; }
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
@@ -88,4 +91,5 @@ private:
     void create_tools_page(lv_obj_t* parent);
     void create_reset_page(lv_obj_t* parent);
     void create_back_button();
+    lv_obj_t* create_separator(lv_obj_t* parent, const char* text);
 };

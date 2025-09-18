@@ -244,7 +244,12 @@ void BluetoothManager::enable(unsigned long timeout_ms) {
 }
 
 void BluetoothManager::enable_during_bootup() {
-    enable(BLE_BOOTUP_AUTO_DISABLE_TIMEOUT_MS);
+    Preferences prefs;
+    prefs.begin("bluetooth", true);
+    if (prefs.getBool("startup", true)) {
+        enable(BLE_BOOTUP_AUTO_DISABLE_TIMEOUT_MS);
+    }
+    prefs.end();
 }
 
 void BluetoothManager::disable() {

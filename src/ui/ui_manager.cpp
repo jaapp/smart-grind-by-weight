@@ -192,6 +192,7 @@ void UIManager::setup_event_handlers() {
     lv_obj_add_event_cb(settings_screen.get_back_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_BACK));
     lv_obj_add_event_cb(settings_screen.get_refresh_stats_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_REFRESH_STATS));
     lv_obj_add_event_cb(settings_screen.get_ble_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BLE_TOGGLE));
+    lv_obj_add_event_cb(settings_screen.get_ble_startup_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BLE_STARTUP_TOGGLE));
     lv_obj_add_event_cb(settings_screen.get_brightness_normal_slider(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BRIGHTNESS_NORMAL_SLIDER));
     lv_obj_add_event_cb(settings_screen.get_brightness_normal_slider(), EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED, EVENT_DATA(BRIGHTNESS_NORMAL_SLIDER_RELEASED));
     lv_obj_add_event_cb(settings_screen.get_brightness_screensaver_slider(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BRIGHTNESS_SCREENSAVER_SLIDER));
@@ -485,6 +486,10 @@ void UIManager::handle_cal_cancel() {
 
 void UIManager::handle_ble_toggle() {
     settings_handler->handle_ble_toggle();
+}
+
+void UIManager::handle_ble_startup_toggle() {
+    settings_handler->handle_ble_startup_toggle();
 }
 
 void UIManager::handle_brightness_normal_slider() {

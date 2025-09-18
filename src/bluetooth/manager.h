@@ -106,7 +106,7 @@ private:
     
     // Queue to marshal UI status messages to UI task context
     QueueHandle_t ui_status_queue;
-    
+
     // Private methods
     void update_ui_status(const char* status);
     void enqueue_ui_status(const char* status);

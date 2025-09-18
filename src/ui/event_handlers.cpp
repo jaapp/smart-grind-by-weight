@@ -303,6 +303,21 @@ void SettingsEventHandler::handle_ble_toggle() {
     ui_manager->settings_screen.update_ble_status();
 }
 
+void SettingsEventHandler::handle_ble_startup_toggle() {
+    if (!ui_manager->settings_screen.get_ble_startup_toggle()) return;
+
+    // Get the current state of the toggle
+    bool startup_enabled = lv_obj_has_state(ui_manager->settings_screen.get_ble_startup_toggle(), LV_STATE_CHECKED);
+
+    // Save to preferences
+    Preferences prefs;
+    prefs.begin("bluetooth", false); // read-write
+    prefs.putBool("startup", startup_enabled);
+    prefs.end();
+
+    DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
+}
+
 void SettingsEventHandler::handle_brightness_normal_slider() {
     if (!ui_manager->hardware_manager) return;
     
