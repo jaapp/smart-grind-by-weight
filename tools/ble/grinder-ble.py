@@ -343,13 +343,16 @@ class GrinderBLETool:
             patch_path = patch_file.name
             patch_file.close()
             
-            env = os.environ.copy()
-            env['PATH'] = env.get('PATH', '') + ':' + str(Path.home() / '.local/bin')
-            
-            cmd = ['detools', 'create_patch', '-c', 'heatshrink', str(old_firmware_path), new_firmware_path, patch_path]
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-            
-            if result.returncode != 0: return None
+            # Use detools from the project venv
+            venv_dir = Path(__file__).parent.parent / "venv"
+            detools_cmd = str(venv_dir / "bin" / "detools")
+
+            cmd = [detools_cmd, 'create_patch', '-c', 'heatshrink', str(old_firmware_path), new_firmware_path, patch_path]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                print(f"[DEBUG] detools failed: {result.stderr}")
+                return None
             with open(patch_path, 'rb') as f: patch_data = f.read()
             
             os.unlink(new_firmware_path)
@@ -1054,7 +1057,7 @@ async def main():
             if args.command == 'upload':
                 firmware_path = args.firmware or tool.find_firmware_file()
                 if not firmware_path:
-                    self.safe_print("[ERROR] No firmware file found.")
+                    tool.safe_print("[ERROR] No firmware file found.")
                     return 1
                 await tool.upload_firmware(firmware_path, args.force_full)
             elif args.command == 'export':
@@ -1064,7 +1067,7 @@ async def main():
                 # analyze_data handles its own disconnection after data export
                 return 0
             elif args.command == 'connect':
-                self.safe_print("[OK] Connected to device.")
+                tool.safe_print("[OK] Connected to device.")
             elif args.command == 'debug':
                 await tool.debug_monitor()
             elif args.command == 'info':
@@ -1074,7 +1077,7 @@ async def main():
             await tool.disconnect()
             
     except KeyboardInterrupt:
-        self.safe_print("\n[INFO] Interrupted by user")
+        tool.safe_print("\n[INFO] Interrupted by user")
     finally:
         if tool.connected: await tool.disconnect()
 
