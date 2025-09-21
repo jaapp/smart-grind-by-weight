@@ -6,9 +6,8 @@
 <tr>
 <td width="50%">
 
-<video width="100%" controls muted>
-  <source src="https://github.com/jaapp/smart-grind-by-weight/raw/main/media/demo_small.mp4" type="video/mp4">
-</video>
+https://github.com/user-attachments/assets/e20ce3e2-417e-4a3b-bb48-05591fce9418
+
 
 </td>
 <td width="50%">
