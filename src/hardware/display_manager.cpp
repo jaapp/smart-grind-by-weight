@@ -37,6 +37,10 @@ void DisplayManager::init() {
 
     draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
         32, buffer_size * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!draw_buffer) {
+        draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
+        32, buffer_size * sizeof(uint16_t), MALLOC_CAP_8BIT);
+    }
 
     lvgl_display = lv_display_create(screen_width, screen_height);
     lv_display_set_flush_cb(lvgl_display, display_flush_cb);
@@ -81,7 +85,11 @@ void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area,
     uint32_t w = lv_area_get_width(area);
     uint32_t h = lv_area_get_height(area);
 
-    g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+    if (LV_COLOR_16_SWAP){
+        g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+    } else {
+        g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+    }
 
     lv_display_flush_ready(disp);
 }
