@@ -32,19 +32,21 @@ void DisplayManager::init() {
     screen_width = gfx_device->width();
     screen_height = gfx_device->height();
 
-    buffer_size = screen_width * screen_height;  // Full screen buffer, but only partial updates used
+    // Full screen buffer, but only partial updates used
+    // RGB565 format (16bit per pixel)
+    buffer_size = screen_width * screen_height * sizeof(u_int16_t);  
 
     draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
-        32, buffer_size * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        LV_DRAW_BUF_ALIGN, buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!draw_buffer) {
         draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
-        32, buffer_size * sizeof(uint16_t), MALLOC_CAP_8BIT);
+        LV_DRAW_BUF_ALIGN, buffer_size, MALLOC_CAP_8BIT);
     }
 
     lvgl_display = lv_display_create(screen_width, screen_height);
     lv_display_set_flush_cb(lvgl_display, display_flush_cb);
     lv_display_set_buffers(lvgl_display, draw_buffer, NULL,
-                          buffer_size * sizeof(u_int16_t) , LV_DISPLAY_RENDER_MODE_PARTIAL);
+                          buffer_size , LV_DISPLAY_RENDER_MODE_PARTIAL);
 
     lv_display_add_event_cb(lvgl_display, display_rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     
