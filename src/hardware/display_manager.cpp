@@ -24,7 +24,7 @@ void DisplayManager::init() {
         return;
     }
     
-    gfx_device->fillScreen(RGB565_RED);
+    gfx_device->fillScreen(RGB565_BLACK);
     
     // Initialize LVGL
     lv_init();
