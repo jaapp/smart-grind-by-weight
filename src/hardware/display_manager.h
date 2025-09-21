@@ -21,7 +21,6 @@ private:
 public:
     void init();
     void update();
-    void flush();
     void set_brightness(float brightness);
     
     uint32_t get_width() const { return screen_width; }

@@ -65,11 +65,6 @@ void DisplayManager::update() {
     lv_timer_handler();
 }
 
-void DisplayManager::flush() {
-    if (!initialized) return;
-    // gfx_device->flush();
-}
-
 // Update the refresh area to be full width
 // This avoids weird artifacts when partial row updates are used
 void DisplayManager::display_rounder_cb(lv_event_t* e) {
