@@ -35,6 +35,41 @@ from pathlib import Path
 # Add tools directory to path for shared modules
 sys.path.insert(0, str(Path(__file__).parent))
 
+def ensure_venv_requirements():
+    """Ensure all required packages are installed in the project venv"""
+    venv_dir = Path(__file__).parent.parent / "venv"
+    requirements_file = Path(__file__).parent.parent / "requirements.txt"
+    
+    if not venv_dir.exists():
+        print(f"[ERROR] Virtual environment not found at {venv_dir}")
+        print("Run: python3 -m venv tools/venv && source tools/venv/bin/activate && pip install -r tools/requirements.txt")
+        return False
+    
+    pip_cmd = str(venv_dir / "bin" / "pip")
+    
+    # Check if requirements.txt exists
+    if not requirements_file.exists():
+        print(f"[WARNING] Requirements file not found at {requirements_file}")
+        return True
+    
+    # Check and install missing requirements
+    try:
+        print("[INFO] Checking venv dependencies...")
+        result = subprocess.run([pip_cmd, "install", "-r", str(requirements_file)], 
+                              capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"[WARNING] Some dependencies may not be installed: {result.stderr}")
+        else:
+            print("[OK] All venv dependencies verified")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to check dependencies: {e}")
+        return False
+
+# Ensure dependencies before imports
+if not ensure_venv_requirements():
+    sys.exit(1)
+
 try:
     from bleak import BleakClient, BleakScanner, BleakError
     from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -343,7 +378,7 @@ class GrinderBLETool:
             patch_path = patch_file.name
             patch_file.close()
             
-            # Use detools from the project venv
+            # Use detools from the project venv (ensured by ensure_venv_requirements)
             venv_dir = Path(__file__).parent.parent / "venv"
             detools_cmd = str(venv_dir / "bin" / "detools")
 
@@ -351,7 +386,8 @@ class GrinderBLETool:
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode != 0:
-                print(f"[DEBUG] detools failed: {result.stderr}")
+                print(f"[ERROR] detools patch creation failed: {result.stderr}")
+                print("[INFO] If detools is missing, the dependency check should have installed it")
                 return None
             with open(patch_path, 'rb') as f: patch_data = f.read()
             
