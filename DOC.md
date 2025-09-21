@@ -37,7 +37,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 - **Angled pin headers** (not the straight kind)
 - **JST-PH 4 pin male connector** (optional - if you don't want to solder to Eureka)
 
-[<img src="images/waveshare_board_wired_up_1.jpg" alt="Wired Waveshare Board" width="30%">](images/waveshare_board_wired_up_1.jpg)
+[<img src="media/waveshare_board_wired_up_1.jpg" alt="Wired Waveshare Board" width="30%">](media/waveshare_board_wired_up_1.jpg)
 
 ### 3D Printed Parts
 
@@ -65,7 +65,7 @@ Watch the complete Eureka Mignon Specialita assembly process: **[YouTube Assembl
 
 ## 🔌 Installation & Wiring
 
-[<img src="images/wiring_diagram.png" alt="Wiring Diagram" width="50%">](images/wiring_diagram.png)
+[<img src="media/wiring_diagram.png" alt="Wiring Diagram" width="50%">](media/wiring_diagram.png)
 
 ### Pin Configuration
 
@@ -81,9 +81,9 @@ ESP32-S3 GND       →    HX711 GND
 
 ⚠️ **CRITICAL WARNING:** Always verify your specific Eureka's wiring independently! Wire colors vary between units and cannot be trusted. Use the numbered pin positions shown in the reference image.
 
-Using the 4-pin Eureka plug pinout (see `images/4-pin_Eureka_plug_pinout.png`), counting from left to right with the plug oriented with 'ribs' towards you:
+Using the 4-pin Eureka plug pinout (see `media/4-pin_Eureka_plug_pinout.png`), counting from left to right with the plug oriented with 'ribs' towards you:
 
-[<img src="images/4-pin_Eureka_plug_pinout.png" alt="4-Pin Eureka Plug Pinout" width="50%">](images/4-pin_Eureka_plug_pinout.png)
+[<img src="media/4-pin_Eureka_plug_pinout.png" alt="4-Pin Eureka Plug Pinout" width="50%">](media/4-pin_Eureka_plug_pinout.png)
 
 ```
 ESP32-S3 5V        →    Pin 1 (5V power)

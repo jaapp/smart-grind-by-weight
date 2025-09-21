@@ -2,7 +2,22 @@
 
 **Turn any grinder into a precision smart grind-by-weight system**
 
-[<img src="images/smart-grind-by-weight-render.PNG" alt="Smart Grind-by-Weight Modification" width="35%">](images/smart-grind-by-weight-render.PNG)
+<table>
+<tr>
+<td width="50%">
+
+<video width="100%" controls muted>
+  <source src="https://github.com/jaapp/smart-grind-by-weight/raw/main/media/demo_small.mp4" type="video/mp4">
+</video>
+
+</td>
+<td width="50%">
+
+[<img src="media/smart-grind-by-weight-render.PNG" alt="Smart Grind-by-Weight Modification" width="100%">](media/smart-grind-by-weight-render.PNG)
+
+</td>
+</tr>
+</table>
 
 > **⚠️ Newly Released Mod - Buyer Beware!**  
 > This is a **recently released modification project** that transforms grinders into smart grind-by-weight systems. While functional and free/open source, it's an **experimental mod** that requires technical skill to build and may have rough edges. **Build at your own risk** - this is not a polished commercial product!
@@ -61,7 +76,7 @@ flowchart LR
 
 ## 📊 Analytics Dashboard
 
-[<img src="images/analytics.png" alt="Analytics Dashboard" width="50%">](images/analytics.png)
+[<img src="media/analytics.png" alt="Analytics Dashboard" width="50%">](media/analytics.png)
 
 Export your grind data and analyze it with the included Streamlit dashboard:
 
