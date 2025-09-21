@@ -8,11 +8,9 @@ class DisplayManager {
 private:
     Arduino_DataBus* bus;
     Arduino_GFX* gfx_device;
-    Arduino_Canvas* canvas;
     lv_display_t* lvgl_display;
     lv_indev_t* lvgl_input;
     lv_color_t* draw_buffer;
-    lv_color_t* draw_buffer2;
     TouchDriver touch_driver;
     
     uint32_t screen_width;
@@ -33,6 +31,7 @@ public:
     
 private:
     static void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
+    static void display_rounder_cb(lv_event_t* e);
     static void touchpad_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
     static uint32_t millis_cb();
 };

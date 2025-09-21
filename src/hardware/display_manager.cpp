@@ -18,14 +18,13 @@ void DisplayManager::init() {
     gfx_device = new Arduino_CO5300(
         bus, HW_DISPLAY_RESET_PIN, HW_DISPLAY_ROTATION_DEG, HW_DISPLAY_WIDTH_PX, HW_DISPLAY_HEIGHT_PX,
         HW_DISPLAY_COLOR_ORDER, HW_DISPLAY_OFFSET_X_PX, HW_DISPLAY_IPS_INVERT_X, HW_DISPLAY_IPS_INVERT_Y);
-    
-    // canvas = new Arduino_Canvas(HW_DISPLAY_WIDTH_PX, HW_DISPLAY_HEIGHT_PX, gfx_device, HW_DISPLAY_OFFSET_X_PX, HW_DISPLAY_OFFSET_Y_PX, HW_DISPLAY_ROTATION_DEG);
+
     
     if (!gfx_device->begin()) {
         return;
     }
     
-    gfx_device->fillScreen(RGB565_BLUE);
+    gfx_device->fillScreen(RGB565_RED);
     
     // Initialize LVGL
     lv_init();
@@ -33,16 +32,18 @@ void DisplayManager::init() {
     
     screen_width = gfx_device->width();
     screen_height = gfx_device->height();
-    // Use smaller buffer for reliable partial rendering
-    buffer_size = screen_width * screen_height;  // 64 rows should be enough for most UI elements
+
+    buffer_size = screen_width * screen_height;  // Full screen buffer, but only partial updates used
 
     draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
-        8, buffer_size * 2, MALLOC_CAP_8BIT);
+        32, buffer_size * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
     lvgl_display = lv_display_create(screen_width, screen_height);
     lv_display_set_flush_cb(lvgl_display, display_flush_cb);
     lv_display_set_buffers(lvgl_display, draw_buffer, NULL,
-                          buffer_size * 2 , LV_DISPLAY_RENDER_MODE_PARTIAL);
+                          buffer_size * sizeof(u_int16_t) , LV_DISPLAY_RENDER_MODE_PARTIAL);
+
+    lv_display_add_event_cb(lvgl_display, display_rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     
     // Initialize touch
     touch_driver.init();
@@ -65,6 +66,14 @@ void DisplayManager::flush() {
     // gfx_device->flush();
 }
 
+// Update the refresh area to be full width
+// This avoids weird artifacts when partial row updates are used
+void DisplayManager::display_rounder_cb(lv_event_t* e) {
+    lv_area_t* area = (lv_area_t*)lv_event_get_param(e);
+    
+    area->x1 = 0;
+    area->x2 = g_display_manager->screen_width - 1;
+}
 
 void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
     if (!g_display_manager || !g_display_manager->gfx_device) return;
@@ -72,29 +81,8 @@ void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area,
     uint32_t w = lv_area_get_width(area);
     uint32_t h = lv_area_get_height(area);
 
-    // Calculate stride based on LVGL's 4-byte alignment (LV_DRAW_BUF_STRIDE_ALIGN = 4)
-    // LVGL aligns stride in bytes, not pixels
-    uint32_t stride_bytes = (w * 2 + 3) & ~3;  // Round width*2 up to next 4-byte boundary
-    uint32_t stride_pixels = stride_bytes / 2;  // Convert back to pixels
+    g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
 
-    uint16_t* src = (uint16_t*)px_map;
-    Arduino_CO5300* display = static_cast<Arduino_CO5300*>(g_display_manager->gfx_device);
-
-    display->startWrite();
-
-    if (stride_pixels == w || h == 1) {
-        // No padding or single row - use fast path
-        display->setAddrWindow(area->x1, area->y1, w, h);
-        display->writePixels(src, w * h);
-    } else {
-        // Handle stride padding row by row
-        for (uint32_t y = 0; y < h; y++) {
-            display->setAddrWindow(area->x1, area->y1 + y, w, 1);
-            display->writePixels(src + (y * stride_pixels), w);
-        }
-    }
-
-    display->endWrite();
     lv_display_flush_ready(disp);
 }
 
