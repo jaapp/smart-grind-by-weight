@@ -98,7 +98,7 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 - **Pin 3**: Motor control signal
 - **Pin 4**: Ground
 
-⚠️ **VERIFICATION REQUIRED:** Before connecting, use a multimeter to verify your specific grinder's pin functions. Wire colors are unreliable and vary between units!
+⚠️ **VERIFY 5V:** Use a multimeter to confirm 5V pin - wire colors vary between units! The Waveshare board has reverse polarity protection, and button/motor wires can be swapped without risk of damage.
 
 ### Installation Steps
 
