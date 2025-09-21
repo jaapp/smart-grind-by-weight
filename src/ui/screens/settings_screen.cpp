@@ -565,7 +565,7 @@ void SettingsScreen::refresh_statistics() {
     lv_label_set_text(measurements_label, "Measurements: Loading...");
     
     // Force a UI update to show loading text
-    lv_task_handler();
+    lv_timer_handler();
     
     // Perform the expensive IO operations
     uint32_t session_count = grind_logger.get_total_flash_sessions();
