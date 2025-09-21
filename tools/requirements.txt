@@ -14,5 +14,7 @@ plotly>=5.15.0
 # Build system (use PlatformIO from the venv, not global `pio`)
 platformio>=6.0.0
 
+detools>=0.53.0
+
 # Cross-platform color support
 colorama>=0.4.0
