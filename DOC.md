@@ -46,6 +46,11 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 
 All parts designed to print **without supports**. Keep the orientation of the STL files. Some holes are covered with thin plastic layers that you can easily remove.
 
+**Print Settings:**
+- **Material**: PETG (preferred) - Flexible enough for snap fits to work properly
+- **Layer Height**: 0.2mm
+- **Alternative**: PLA might work but will offer a reduced experience due to brittleness
+
 > **📅 Update 21-09-2025:** Important fit tweak for T70 load cell users. Updated Cup holder.stl and Back plate.stl to accommodate T70 load cells. All users with T70 load cells must use the latest 3D files for proper fit.
 
 - **[Screen adapter](3d_files/Waveshare%20AMOLED%201_64%20adapter.stl)** - Mounts Waveshare screen to Eureka location
