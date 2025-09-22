@@ -29,8 +29,11 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 - **MAVIN or T70 load cell** (0.3 - 1KG range) - Don't use cheap unshielded small load cells, you'll hurt the accuracy
   - **0.3kg**: Suitable for dosing cups only
   - **1kg**: Recommended if adapting for portafilter holder use
-  - Examples: [AliExpress T70](https://nl.aliexpress.com/item/1005009409460619.html)
-  - [TinyTronics MAVIN](https://www.tinytronics.nl/en/sensors/weight-pressure-force/load-cells/mavin-load-cell-0.3kg)
+  - Examples: 
+    - [AliExpress T70](https://nl.aliexpress.com/item/1005009409460619.html)
+    - [TinyTronics MAVIN](https://www.tinytronics.nl/en/sensors/weight-pressure-force/load-cells/mavin-load-cell-0.3kg)
+    - [Mavin 0.3 or 1kg](https://www.alibaba.com/product-detail/subject_1601564701384.html)
+    - [T70 1kg](https://nl.aliexpress.com/item/1005008658337192.html)
 - **6× M3 screws** (±10mm long)
 - **1000μF capacitor** (10V) - Power filtering
 - **Wires and dupont connectors**
