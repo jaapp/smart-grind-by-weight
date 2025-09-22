@@ -354,7 +354,7 @@ void GrindController::pulse_control(const GrindLoopData& loop_data) {
         coast_time_ms = SYS_TIMEOUT_MEDIUM_MS;
     }
     
-    if (target_weight - current_weight <= USER_GRIND_ACCURACY_TOLERANCE_G || pulse_attempts >= USER_GRIND_MAX_PULSE_ATTEMPTS) {
+    if (target_weight - current_weight < USER_GRIND_ACCURACY_TOLERANCE_G || pulse_attempts >= USER_GRIND_MAX_PULSE_ATTEMPTS) {
         switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
         return;
     }
