@@ -39,11 +39,11 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     // Transparent background
     lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
 
-    // Add tabs in order: Tools -> Info -> Settings -> Reset (Info will be default)
-    tools_tab = lv_tabview_add_tab(tabview, "Tools");
-    info_tab = lv_tabview_add_tab(tabview, "Info");
+    // Add tabs in order: Info -> Settings -> Tools -> Data (Settings will be default)
+    info_tab = lv_tabview_add_tab(tabview, "System Info");
     settings_tab = lv_tabview_add_tab(tabview, "Settings");
-    reset_tab = lv_tabview_add_tab(tabview, "Reset");
+    tools_tab = lv_tabview_add_tab(tabview, "Tools");
+    reset_tab = lv_tabview_add_tab(tabview, "Data");
 
     // Create pages
     create_tools_page(tools_tab);
@@ -51,7 +51,7 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     create_settings_page(settings_tab);
     create_reset_page(reset_tab);
     
-    // Set Info page as default (middle tab)
+    // Set Settings page as default (index 1)
     lv_tabview_set_act(tabview, 1, LV_ANIM_OFF);
     
     // Create taring overlay (initially hidden)
@@ -148,45 +148,7 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
     lv_label_set_long_mode(build_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(build_label, LV_TEXT_ALIGN_LEFT, 0);
 
-    // Sessions info (number of recorded grind sessions)
-    sessions_label = lv_label_create(parent);
-    lv_label_set_text(sessions_label, "Sessions: --");
-    lv_obj_set_style_text_font(sessions_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(sessions_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(sessions_label, 280);
-    lv_label_set_long_mode(sessions_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(sessions_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Events info (total number of events across all sessions)
-    events_label = lv_label_create(parent);
-    lv_label_set_text(events_label, "Events: --");
-    lv_obj_set_style_text_font(events_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(events_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(events_label, 280);
-    lv_label_set_long_mode(events_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(events_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Measurements info (total number of measurements across all sessions)
-    measurements_label = lv_label_create(parent);
-    lv_label_set_text(measurements_label, "Measurements: --");
-    lv_obj_set_style_text_font(measurements_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(measurements_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(measurements_label, 280);
-    lv_label_set_long_mode(measurements_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(measurements_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Refresh statistics button
-    refresh_stats_button = lv_btn_create(parent);
-    lv_obj_set_size(refresh_stats_button, 200, 60);
-    lv_obj_set_style_bg_color(refresh_stats_button, lv_color_hex(THEME_COLOR_ACCENT), 0);
-    lv_obj_set_style_border_width(refresh_stats_button, 0, 0);
-    lv_obj_set_style_radius(refresh_stats_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* refresh_label = lv_label_create(refresh_stats_button);
-    lv_label_set_text(refresh_label, "REFRESH STATS");
-    lv_obj_set_style_text_font(refresh_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(refresh_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_center(refresh_label);
+    // Stats and refresh button moved to Data tab - Grind Logging section
 }
 
 void SettingsScreen::create_settings_page(lv_obj_t* parent) {
@@ -337,7 +299,7 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     // Tare button
     tare_button = lv_btn_create(parent);
     lv_obj_set_size(tare_button, 240, 80);
-    lv_obj_set_style_bg_color(tare_button, lv_color_hex(THEME_COLOR_SUCCESS), 0);
+    lv_obj_set_style_bg_color(tare_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     lv_obj_set_style_border_width(tare_button, 0, 0);
     lv_obj_set_style_radius(tare_button, THEME_CORNER_RADIUS_PX, 0);
     
@@ -349,7 +311,7 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     // Calibration button
     cal_button = lv_btn_create(parent);
     lv_obj_set_size(cal_button, 240, 80);
-    lv_obj_set_style_bg_color(cal_button, lv_color_hex(THEME_COLOR_WARNING), 0);
+    lv_obj_set_style_bg_color(cal_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     lv_obj_set_style_border_width(cal_button, 0, 0);
     lv_obj_set_style_radius(cal_button, THEME_CORNER_RADIUS_PX, 0);
     
@@ -361,7 +323,7 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     // Motor test button
     motor_test_button = lv_btn_create(parent);
     lv_obj_set_size(motor_test_button, 240, 80);
-    lv_obj_set_style_bg_color(motor_test_button, lv_color_hex(THEME_COLOR_ERROR), 0);
+    lv_obj_set_style_bg_color(motor_test_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     lv_obj_set_style_border_width(motor_test_button, 0, 0);
     lv_obj_set_style_radius(motor_test_button, THEME_CORNER_RADIUS_PX, 0);
     
@@ -374,24 +336,89 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
 void SettingsScreen::create_reset_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 30, 0);
-    lv_obj_set_style_pad_top(parent, 40, 0);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(parent, 20, 0);
+    lv_obj_set_style_pad_top(parent, 20, 0);
     
-    // Disable scrolling on the page container itself
-    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_OFF);
+    // Enable vertical scrolling on the reset page
+    lv_obj_set_scroll_dir(parent, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
     // Title
     lv_obj_t* title = lv_label_create(parent);
-    lv_label_set_text(title, "Reset & Clear");
+    lv_label_set_text(title, "Data");
     lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
+
+    // Grind Logging separator
+    create_separator(parent, "Grind Logging");
+
+    // Logging Toggle
+    lv_obj_t* logging_container = lv_obj_create(parent);
+    lv_obj_set_size(logging_container, 260, 80);
+    lv_obj_set_layout(logging_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(logging_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(logging_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_color(logging_container, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+    lv_obj_set_style_border_width(logging_container, 0, 0);
+    lv_obj_set_style_radius(logging_container, 8, 0);
+    lv_obj_clear_flag(logging_container, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* logging_label = lv_label_create(logging_container);
+    lv_label_set_text(logging_label, "Logging");
+    lv_obj_set_style_text_font(logging_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(logging_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+
+    logging_toggle = lv_switch_create(logging_container);
+    lv_obj_set_size(logging_toggle, 100, 60);
+
+    // Sessions info (number of recorded grind sessions)
+    sessions_label = lv_label_create(parent);
+    lv_label_set_text(sessions_label, "Sessions: --");
+    lv_obj_set_style_text_font(sessions_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(sessions_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_width(sessions_label, 280);
+    lv_label_set_long_mode(sessions_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(sessions_label, LV_TEXT_ALIGN_LEFT, 0);
+
+    // Events info (total number of events across all sessions)
+    events_label = lv_label_create(parent);
+    lv_label_set_text(events_label, "Events: --");
+    lv_obj_set_style_text_font(events_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(events_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_width(events_label, 280);
+    lv_label_set_long_mode(events_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(events_label, LV_TEXT_ALIGN_LEFT, 0);
+
+    // Measurements info (total number of measurements across all sessions)
+    measurements_label = lv_label_create(parent);
+    lv_label_set_text(measurements_label, "Measurements: --");
+    lv_obj_set_style_text_font(measurements_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(measurements_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_width(measurements_label, 280);
+    lv_label_set_long_mode(measurements_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(measurements_label, LV_TEXT_ALIGN_LEFT, 0);
+
+    // Refresh statistics button (gray color)
+    refresh_stats_button = lv_btn_create(parent);
+    lv_obj_set_size(refresh_stats_button, 200, 60);
+    lv_obj_set_style_bg_color(refresh_stats_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+    lv_obj_set_style_border_width(refresh_stats_button, 0, 0);
+    lv_obj_set_style_radius(refresh_stats_button, THEME_CORNER_RADIUS_PX, 0);
+    
+    lv_obj_t* refresh_label = lv_label_create(refresh_stats_button);
+    lv_label_set_text(refresh_label, "REFRESH STATS");
+    lv_obj_set_style_text_font(refresh_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(refresh_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_center(refresh_label);
+
+    // Reset separator
+    create_separator(parent, "Reset");
 
     // Purge Grind History button
     purge_button = lv_btn_create(parent);
     lv_obj_set_size(purge_button, 260, 80);
-    lv_obj_set_style_bg_color(purge_button, lv_color_hex(THEME_COLOR_WARNING), 0);
+    lv_obj_set_style_bg_color(purge_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     lv_obj_set_style_border_width(purge_button, 0, 0);
     lv_obj_set_style_radius(purge_button, THEME_CORNER_RADIUS_PX, 0);
     
@@ -404,7 +431,7 @@ void SettingsScreen::create_reset_page(lv_obj_t* parent) {
     // Factory Reset button
     reset_button = lv_btn_create(parent);
     lv_obj_set_size(reset_button, 260, 80);
-    lv_obj_set_style_bg_color(reset_button, lv_color_hex(THEME_COLOR_ERROR), 0);
+    lv_obj_set_style_bg_color(reset_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     lv_obj_set_style_border_width(reset_button, 0, 0);
     lv_obj_set_style_radius(reset_button, THEME_CORNER_RADIUS_PX, 0);
     
@@ -436,6 +463,7 @@ void SettingsScreen::show() {
     update_ble_status();
     update_brightness_sliders();
     update_bluetooth_startup_toggle();
+    update_logging_toggle();
 }
 
 void SettingsScreen::hide() {
@@ -648,5 +676,24 @@ void SettingsScreen::update_bluetooth_startup_toggle() {
         lv_obj_add_state(ble_startup_toggle, LV_STATE_CHECKED);
     } else {
         lv_obj_clear_state(ble_startup_toggle, LV_STATE_CHECKED);
+    }
+}
+
+void SettingsScreen::update_logging_toggle() {
+    if (!logging_toggle) return;
+
+    // Read from the "logging" namespace using a local Preferences instance
+    Preferences prefs;
+    prefs.begin("logging", true); // read-only
+
+    // Load logging enabled value from preferences (default to false)
+    bool logging_enabled = prefs.getBool("enabled", false);
+    prefs.end();
+
+    // Update toggle state
+    if (logging_enabled) {
+        lv_obj_add_state(logging_toggle, LV_STATE_CHECKED);
+    } else {
+        lv_obj_clear_state(logging_toggle, LV_STATE_CHECKED);
     }
 }

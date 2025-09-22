@@ -318,6 +318,21 @@ void SettingsEventHandler::handle_ble_startup_toggle() {
     DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
 }
 
+void SettingsEventHandler::handle_logging_toggle() {
+    if (!ui_manager->settings_screen.get_logging_toggle()) return;
+
+    // Get the current state of the toggle
+    bool logging_enabled = lv_obj_has_state(ui_manager->settings_screen.get_logging_toggle(), LV_STATE_CHECKED);
+
+    // Save to preferences
+    Preferences prefs;
+    prefs.begin("logging", false); // read-write
+    prefs.putBool("enabled", logging_enabled);
+    prefs.end();
+
+    DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
+}
+
 void SettingsEventHandler::handle_brightness_normal_slider() {
     if (!ui_manager->hardware_manager) return;
     

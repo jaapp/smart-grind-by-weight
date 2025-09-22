@@ -104,9 +104,19 @@ void GrindLogger::end_grind_session(const char* final_result, float final_weight
     bool is_abnormal_termination = (strcmp(final_result, "STOPPED_BY_USER") == 0) ||
                                    (strcmp(final_result, "TIMEOUT") == 0);
     
-    if (!is_abnormal_termination) {
+    // Check if logging is enabled before saving to flash
+    Preferences logging_prefs;
+    logging_prefs.begin("logging", true); // read-only
+    bool logging_enabled = logging_prefs.getBool("enabled", false);
+    logging_prefs.end();
+    
+    if (!is_abnormal_termination && logging_enabled) {
         flush_session_to_flash();
         BLE_LOG("Ended session %lu: final=%.1fg, error=%+.2fg, %s (saved)\n",
+                      current_session->session_id, final_weight, 
+                      current_session->error_grams, final_result);
+    } else if (!is_abnormal_termination && !logging_enabled) {
+        BLE_LOG("Ended session %lu: final=%.1fg, error=%+.2fg, %s (not saved - logging disabled)\n",
                       current_session->session_id, final_weight, 
                       current_session->error_grams, final_result);
     } else {

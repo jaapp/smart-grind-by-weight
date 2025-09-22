@@ -31,6 +31,7 @@ private:
     lv_obj_t* ble_startup_toggle;
     lv_obj_t* ble_status_label;
     lv_obj_t* ble_timer_label;
+    lv_obj_t* logging_toggle;
     lv_obj_t* brightness_normal_slider;
     lv_obj_t* brightness_screensaver_slider;
     lv_obj_t* brightness_normal_label;
@@ -69,6 +70,7 @@ public:
     void update_brightness_sliders();
     void update_brightness_labels();
     void update_bluetooth_startup_toggle();
+    void update_logging_toggle();
     
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
@@ -81,6 +83,7 @@ public:
     lv_obj_t* get_back_button() const { return back_button; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
     lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
+    lv_obj_t* get_logging_toggle() const { return logging_toggle; }
     lv_obj_t* get_refresh_stats_button() const { return refresh_stats_button; }
     lv_obj_t* get_brightness_normal_slider() const { return brightness_normal_slider; }
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }

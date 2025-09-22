@@ -233,26 +233,32 @@ Main Screen (swipe left/right between tabs)
 |
 \-- Settings (swipe left/right between sub-tabs)
     |
+    +-- System Info
+    |   |-- Firmware version & build number
+    |   \-- System information
+    |
+    +-- Settings (default tab)
+    |   |-- Bluetooth toggle (30m timer)
+    |   |-- Bluetooth startup toggle (configurable auto-enable)
+    |   \-- Brightness sliders
+    |
     +-- Tools
     |   |-- Calibrate button
     |   |-- Motor test button
     |   \-- Tare button
     |
-    +-- Info (default tab)
-    |   |-- System information
-    |   |-- Build version & uptime
-    |   |-- Memory & statistics
-    |   \-- Refresh stats button
-    |
-    +-- Settings
-    |   |-- Bluetooth toggle (30m timer)
-    |   |-- Bluetooth startup toggle (configurable auto-enable)
-    |   |-- Brightness sliders
-    |   |-- Purge data button (clears logged grind sessions)
-    |   \-- Reset settings button
-    |
-    \-- Reset
-        \-- Factory reset options
+    \-- Data
+        |
+        +-- Grind Logging
+        |   |-- Logging toggle (enable/disable session file writing)
+        |   |-- Sessions count
+        |   |-- Events count
+        |   |-- Measurements count
+        |   \-- Refresh stats button
+        |
+        \-- Reset
+            |-- Purge data button (clears logged grind sessions)
+            \-- Factory reset button
 
 During Grinding:
 |-- Weight display & progress
@@ -275,6 +281,12 @@ During Grinding:
 - **30-minute timer** when manually enabled
 - Toggle on/off as needed
 
+### Grind Data Logging
+- **Grind session logging is configurable** in **Settings → Data tab → Grind Logging**
+- When enabled: Grind sessions are saved to flash storage for analysis
+- When disabled: Real-time grinding still works, but no session files are written to disk
+- Default setting: **Disabled** (to prevent unnecessary flash storage usage)
+
 ### Uses
 - **BLE OTA firmware updates** - Wireless firmware flashing
 - **Data export** - Transfer grind session data to computer
@@ -284,6 +296,13 @@ During Grinding:
 ---
 
 ## 📊 Analytics & Data Export
+
+⚠️ **Important**: Grind session logging is **disabled by default** to prevent unnecessary flash wear. To analyze grind data:
+
+1. **Enable logging** in **Settings → Data tab → Grind Logging** before grinding
+2. Perform your grind sessions (data will be saved to flash storage)
+3. **Export and analyze** the data using the tools below
+4. **Disable logging** again when analysis is complete (recommended for daily use)
 
 ### Launch Interactive Dashboard
 ```bash
