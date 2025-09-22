@@ -28,7 +28,7 @@
 
 /** Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888) */
 #define LV_COLOR_DEPTH 16
-
+#define LV_COLOR_16_SWAP 1
 /*=========================
    STDLIB WRAPPER SETTINGS
  *=========================*/
@@ -126,10 +126,10 @@
  *========================*/
 
 /** Align stride of all layers and images to this bytes */
-#define LV_DRAW_BUF_STRIDE_ALIGN                1
+#define LV_DRAW_BUF_STRIDE_ALIGN                4
 
 /** Align start address of draw_buf addresses to this bytes*/
-#define LV_DRAW_BUF_ALIGN                       4
+#define LV_DRAW_BUF_ALIGN                       32
 
 /** Using matrix for transformations.
  * Requirements:

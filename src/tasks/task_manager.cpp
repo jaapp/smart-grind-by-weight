@@ -430,10 +430,9 @@ void TaskManager::ui_render_task_impl() {
             ui_manager->update();
         }
         
-        // LVGL processing and display update - this contains lv_task_handler()
+        // LVGL processing and display update - this contains lv_timer_handler()
         if (hardware_manager) {
             hardware_manager->get_display()->update();
-            hardware_manager->get_display()->flush();
         }
         
         uint32_t end_time = millis();

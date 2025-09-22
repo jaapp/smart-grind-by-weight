@@ -17,34 +17,38 @@ void DisplayManager::init() {
     gfx_device = new Arduino_CO5300(
         bus, HW_DISPLAY_RESET_PIN, HW_DISPLAY_ROTATION_DEG, HW_DISPLAY_WIDTH_PX, HW_DISPLAY_HEIGHT_PX,
         HW_DISPLAY_COLOR_ORDER, HW_DISPLAY_OFFSET_X_PX, HW_DISPLAY_IPS_INVERT_X, HW_DISPLAY_IPS_INVERT_Y);
+
     
-    canvas = new Arduino_Canvas(HW_DISPLAY_WIDTH_PX, HW_DISPLAY_HEIGHT_PX, gfx_device, HW_DISPLAY_OFFSET_X_PX, HW_DISPLAY_OFFSET_Y_PX, HW_DISPLAY_ROTATION_DEG);
-    
-    if (!canvas->begin()) {
+    if (!gfx_device->begin()) {
         return;
     }
     
-    canvas->fillScreen(RGB565_BLACK);
+    gfx_device->fillScreen(RGB565_BLACK);
     
     // Initialize LVGL
     lv_init();
     lv_tick_set_cb(millis_cb);
     
-    screen_width = canvas->width();
-    screen_height = canvas->height();
-    buffer_size = screen_width * 40;
-    
-    draw_buffer = (lv_color_t*)heap_caps_malloc(
-        buffer_size * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    screen_width = gfx_device->width();
+    screen_height = gfx_device->height();
+
+    // Full screen buffer, but only partial updates used
+    // RGB565 format (16bit per pixel)
+    buffer_size = screen_width * screen_height * sizeof(u_int16_t);  
+
+    draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
+        LV_DRAW_BUF_ALIGN, buffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!draw_buffer) {
-        draw_buffer = (lv_color_t*)heap_caps_malloc(
-            buffer_size * 2, MALLOC_CAP_8BIT);
+        draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
+        LV_DRAW_BUF_ALIGN, buffer_size, MALLOC_CAP_8BIT);
     }
-    
+
     lvgl_display = lv_display_create(screen_width, screen_height);
     lv_display_set_flush_cb(lvgl_display, display_flush_cb);
-    lv_display_set_buffers(lvgl_display, draw_buffer, NULL, 
-                          buffer_size * 2, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_buffers(lvgl_display, draw_buffer, NULL,
+                          buffer_size , LV_DISPLAY_RENDER_MODE_PARTIAL);
+
+    lv_display_add_event_cb(lvgl_display, display_rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     
     // Initialize touch
     touch_driver.init();
@@ -59,23 +63,31 @@ void DisplayManager::update() {
     if (!initialized) return;
     
     touch_driver.update();
-    lv_task_handler();
+    lv_timer_handler();
 }
 
-void DisplayManager::flush() {
-    if (!initialized) return;
-    canvas->flush();
+// Update the refresh area to be full width
+// This avoids weird artifacts when partial row updates are used
+void DisplayManager::display_rounder_cb(lv_event_t* e) {
+    lv_area_t* area = (lv_area_t*)lv_event_get_param(e);
+    
+    area->x1 = 0;
+    area->x2 = g_display_manager->screen_width - 1;
 }
 
 void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
-    if (!g_display_manager || !g_display_manager->canvas) return;
+    if (!g_display_manager || !g_display_manager->gfx_device) return;
     
     uint32_t w = lv_area_get_width(area);
     uint32_t h = lv_area_get_height(area);
-    g_display_manager->canvas->draw16bitRGBBitmap(
-        area->x1, area->y1, (uint16_t*)px_map, w, h);
     
-    lv_disp_flush_ready(disp);
+    if (LV_COLOR_16_SWAP){
+        g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+    } else {
+        g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+    }
+    
+    lv_display_flush_ready(disp);
 }
 
 void DisplayManager::touchpad_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
