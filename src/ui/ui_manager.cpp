@@ -250,7 +250,6 @@ void UIManager::setup_event_handlers() {
     lv_obj_add_event_cb(settings_screen.get_reset_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_RESET));
     lv_obj_add_event_cb(settings_screen.get_motor_test_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_MOTOR_TEST));
     lv_obj_add_event_cb(settings_screen.get_tare_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_TARE));
-    lv_obj_add_event_cb(settings_screen.get_back_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_BACK));
     lv_obj_add_event_cb(settings_screen.get_refresh_stats_button(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(SETTINGS_REFRESH_STATS));
     lv_obj_add_event_cb(settings_screen.get_ble_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BLE_TOGGLE));
     lv_obj_add_event_cb(settings_screen.get_ble_startup_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BLE_STARTUP_TOGGLE));

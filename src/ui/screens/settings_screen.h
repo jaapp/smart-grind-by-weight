@@ -9,9 +9,10 @@ class GrindingScreen;  // Forward declaration
 class SettingsScreen {
 private:
     lv_obj_t* screen;
-    lv_obj_t* tabview;
+    lv_obj_t* menu;
     lv_obj_t* info_tab;
-    lv_obj_t* settings_tab;
+    lv_obj_t* bluetooth_tab;
+    lv_obj_t* display_tab;
     lv_obj_t* tools_tab;
     lv_obj_t* reset_tab;
     
@@ -47,7 +48,6 @@ private:
     lv_obj_t* taring_label;
     
     // Common elements
-    lv_obj_t* back_button;
     bool visible;
     
     BluetoothManager* bluetooth_manager;
@@ -74,13 +74,12 @@ public:
     
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
-    lv_obj_t* get_tabview() const { return tabview; }
+    lv_obj_t* get_tabview() const { return menu; }
     lv_obj_t* get_cal_button() const { return cal_button; }
     lv_obj_t* get_purge_button() const { return purge_button; }
     lv_obj_t* get_reset_button() const { return reset_button; }
     lv_obj_t* get_motor_test_button() const { return motor_test_button; }
     lv_obj_t* get_tare_button() const { return tare_button; }
-    lv_obj_t* get_back_button() const { return back_button; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
     lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
     lv_obj_t* get_logging_toggle() const { return logging_toggle; }
@@ -90,9 +89,10 @@ public:
     
 private:
     void create_info_page(lv_obj_t* parent);
-    void create_settings_page(lv_obj_t* parent);
+    void create_bluetooth_page(lv_obj_t* parent);
+    void create_display_page(lv_obj_t* parent);
     void create_tools_page(lv_obj_t* parent);
     void create_reset_page(lv_obj_t* parent);
-    void create_back_button();
     lv_obj_t* create_separator(lv_obj_t* parent, const char* text);
+    lv_obj_t* create_menu_item(lv_obj_t* parent, const char* text);
 };

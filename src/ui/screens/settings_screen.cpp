@@ -6,6 +6,18 @@
 #include "../../logging/grind_logging.h"
 #include "../../hardware/hardware_manager.h"
 #include "grinding_screen.h"
+#include "../event_bridge_lvgl.h"
+
+static void back_event_handler(lv_event_t * e)
+{
+    lv_obj_t * obj = lv_event_get_target_obj(e);
+    lv_obj_t * menu = (lv_obj_t *)lv_event_get_user_data(e);
+
+    if(lv_menu_back_button_is_root(menu, obj)) {
+        // Call the EventBridge handle_event directly with SETTINGS_BACK event
+        EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SETTINGS_BACK, e);
+    }
+}
 
 void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr) {
     bluetooth_manager = bluetooth;
@@ -20,39 +32,83 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
 
-    // Create tabview for pagination
-    tabview = lv_tabview_create(screen);
-    lv_obj_set_size(tabview, LV_PCT(100), LV_PCT(80));
-    lv_obj_align(tabview, LV_ALIGN_TOP_MID, 0, 0);
-    
-    // Only disable vertical scrolling on tabview content, keep horizontal for page swiping
-    lv_obj_t* content = lv_tabview_get_content(tabview);
-    if (content) {
-        lv_obj_set_scroll_dir(content, LV_DIR_HOR);  // Only allow horizontal scrolling
-        lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_OFF);  // Hide scrollbars
+    // Create menu instead of tabview
+    menu = lv_menu_create(screen);
+    lv_obj_set_size(menu, LV_PCT(100), LV_PCT(100));
+    lv_obj_align(menu, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_bg_opa(menu, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(menu, 0, 0);
+    lv_menu_set_mode_root_back_button(menu, LV_MENU_ROOT_BACK_BUTTON_ENABLED);
+    lv_obj_add_event_cb(menu, back_event_handler, LV_EVENT_CLICKED, menu);
+
+    // Get header and set up flex layout
+    lv_obj_t* header = lv_menu_get_main_header(menu);
+    lv_obj_set_layout(header, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_bottom(header, 10, 0);
+
+    // Get the header label
+    lv_obj_t* header_label = lv_obj_get_child(header, -1);
+    if (header_label) {
+        lv_obj_set_style_text_align(header_label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_style_text_font(header_label, &lv_font_montserrat_36, 0);
+        lv_obj_set_style_text_color(header_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
     }
+    // Get and style the chevron first
+    lv_obj_t* back_chevron = lv_menu_get_main_header_back_button(menu);
+    lv_obj_set_style_text_font(back_chevron, &lv_font_montserrat_32, 0);
+    lv_obj_set_ext_click_area(back_chevron, 200);
+    lv_obj_set_style_text_color(back_chevron, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
 
-    // Hide tab buttons for swipe-only interface
-    lv_obj_t* tab_btns = lv_tabview_get_tab_btns(tabview);
-    lv_obj_add_flag(tab_btns, LV_OBJ_FLAG_HIDDEN);
+    // Force layout update to get proper chevron dimensions
+    lv_obj_update_layout(header);
 
-    // Transparent background
-    lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
+    // Create spacer using chevron's actual size
+    // Spacer is used to center name of the page name in the header
+    lv_obj_t* spacer = lv_obj_create(header);
+    lv_obj_set_size(spacer, lv_obj_get_width(back_chevron), lv_obj_get_height(back_chevron));
+    lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(spacer, 0, 0);
+    lv_obj_clear_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Add tabs in order: Info -> Settings -> Tools -> Data (Settings will be default)
-    info_tab = lv_tabview_add_tab(tabview, "System Info");
-    settings_tab = lv_tabview_add_tab(tabview, "Settings");
-    tools_tab = lv_tabview_add_tab(tabview, "Tools");
-    reset_tab = lv_tabview_add_tab(tabview, "Data");
+    // Create main page last
+    lv_obj_t* main_page = lv_menu_page_create(menu, "Settings");
 
-    // Create pages
-    create_tools_page(tools_tab);
+    // Create sub-pages with titles
+    info_tab = lv_menu_page_create(menu, "Info");
     create_info_page(info_tab);
-    create_settings_page(settings_tab);
+
+    bluetooth_tab = lv_menu_page_create(menu, "Bluetooth");
+    create_bluetooth_page(bluetooth_tab);
+
+    display_tab = lv_menu_page_create(menu, "Display");
+    create_display_page(display_tab);
+
+    tools_tab = lv_menu_page_create(menu, "Tools");
+    create_tools_page(tools_tab);
+
+    reset_tab = lv_menu_page_create(menu, "Data");
     create_reset_page(reset_tab);
-    
-    // Set Settings page as default (index 1)
-    lv_tabview_set_act(tabview, 1, LV_ANIM_OFF);
+
+    // Create menu items and link to sub-pages
+    lv_obj_t* info_item = create_menu_item(main_page, "System Info");
+    lv_menu_set_load_page_event(menu, info_item, info_tab);
+
+    lv_obj_t* bluetooth_item = create_menu_item(main_page, "Bluetooth");
+    lv_menu_set_load_page_event(menu, bluetooth_item, bluetooth_tab);
+
+    lv_obj_t* display_item = create_menu_item(main_page, "Display");
+    lv_menu_set_load_page_event(menu, display_item, display_tab);
+
+    lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
+    lv_menu_set_load_page_event(menu, tools_item, tools_tab);
+
+    lv_obj_t* data_item = create_menu_item(main_page, "Data");
+    lv_menu_set_load_page_event(menu, data_item, reset_tab);
+
+    // Set main page as active (menu will be the landing page)
+    lv_menu_set_page(menu, main_page);
     
     // Create taring overlay (initially hidden)
     taring_overlay = lv_obj_create(screen);
@@ -75,7 +131,7 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     lv_obj_add_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
     
     // Create back button (common to all pages)
-    create_back_button();
+    // create_back_button();
 
     visible = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -92,11 +148,11 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // Title
-    lv_obj_t* title = lv_label_create(parent);
-    lv_label_set_text(title, "System Info");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
+    // // Title
+    // lv_obj_t* title = lv_label_create(parent);
+    // lv_label_set_text(title, "System Info");
+    // lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
+    // lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
 
     // Load cell info
     info_label = lv_label_create(parent);
@@ -151,7 +207,8 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
     // Stats and refresh button moved to Data tab - Grind Logging section
 }
 
-void SettingsScreen::create_settings_page(lv_obj_t* parent) {
+
+void SettingsScreen::create_bluetooth_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -161,15 +218,6 @@ void SettingsScreen::create_settings_page(lv_obj_t* parent) {
     // Enable vertical scrolling on the settings page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
-
-    // Title
-    lv_obj_t* title = lv_label_create(parent);
-    lv_label_set_text(title, "Settings");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
-
-    // Bluetooth separator
-    create_separator(parent, "Bluetooth");
 
     // BLE OTA Toggle
     lv_obj_t* ble_container = lv_obj_create(parent);
@@ -222,9 +270,18 @@ void SettingsScreen::create_settings_page(lv_obj_t* parent) {
     lv_obj_set_style_text_font(ble_timer_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(ble_timer_label, lv_color_hex(THEME_COLOR_WARNING), 0);
     lv_obj_clear_flag(ble_timer_label, LV_OBJ_FLAG_SCROLLABLE);
+}
 
-    // Display separator
-    create_separator(parent, "Display");
+void SettingsScreen::create_display_page(lv_obj_t* parent) {
+    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(parent, 15, 0);
+    lv_obj_set_style_pad_top(parent, 20, 0);
+
+    // Enable vertical scrolling on the settings page
+    lv_obj_set_scroll_dir(parent, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
     // Normal Brightness Slider
     lv_obj_t* brightness_normal_container = lv_obj_create(parent);
@@ -277,7 +334,6 @@ void SettingsScreen::create_settings_page(lv_obj_t* parent) {
     lv_obj_set_style_bg_color(brightness_screensaver_slider, lv_color_hex(THEME_COLOR_BACKGROUND), LV_PART_MAIN);
     lv_obj_set_style_bg_color(brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING), LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(brightness_screensaver_slider, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), LV_PART_KNOB);
-
 }
 
 void SettingsScreen::create_tools_page(lv_obj_t* parent) {
@@ -290,11 +346,11 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_OFF);
 
-    // Title
-    lv_obj_t* title = lv_label_create(parent);
-    lv_label_set_text(title, "Tools");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
+    // // Title
+    // lv_obj_t* title = lv_label_create(parent);
+    // lv_label_set_text(title, "Tools");
+    // lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
+    // lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
 
     // Tare button
     tare_button = lv_btn_create(parent);
@@ -344,14 +400,14 @@ void SettingsScreen::create_reset_page(lv_obj_t* parent) {
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // Title
-    lv_obj_t* title = lv_label_create(parent);
-    lv_label_set_text(title, "Data");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
+    // // Title
+    // lv_obj_t* title = lv_label_create(parent);
+    // lv_label_set_text(title, "Data");
+    // lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
+    // lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
 
-    // Grind Logging separator
-    create_separator(parent, "Grind Logging");
+    // // Grind Logging separator
+    // create_separator(parent, "Grind Logging");
 
     // Logging Toggle
     lv_obj_t* logging_container = lv_obj_create(parent);
@@ -440,21 +496,6 @@ void SettingsScreen::create_reset_page(lv_obj_t* parent) {
     lv_obj_set_style_text_font(reset_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(reset_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     lv_obj_center(reset_label);
-}
-
-void SettingsScreen::create_back_button() {
-    back_button = lv_btn_create(screen);
-    lv_obj_set_size(back_button, LV_PCT(100), LV_PCT(20));
-    lv_obj_align(back_button, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_bg_color(back_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(back_button, 0, 0);
-    lv_obj_set_style_radius(back_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* back_label = lv_label_create(back_button);
-    lv_label_set_text(back_label, "BACK");
-    lv_obj_set_style_text_font(back_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(back_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_center(back_label);
 }
 
 void SettingsScreen::show() {
@@ -696,4 +737,34 @@ void SettingsScreen::update_logging_toggle() {
     } else {
         lv_obj_clear_state(logging_toggle, LV_STATE_CHECKED);
     }
+}
+
+lv_obj_t* SettingsScreen::create_menu_item(lv_obj_t* parent, const char* text) {
+    lv_obj_t* cont = lv_menu_cont_create(parent);
+
+    // Apply styling directly
+    lv_obj_set_style_radius(cont, THEME_CORNER_RADIUS_PX, 0);
+    lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(cont, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+    lv_obj_set_style_text_color(cont, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_style_text_font(cont, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_pad_hor(cont, 20, 0);
+
+    lv_obj_set_style_margin_bottom(cont, 10, 0);
+    lv_obj_set_style_width(cont, 260, 0);
+    lv_obj_set_style_height(cont, 80, 0);
+
+    // Set layout
+    lv_obj_set_layout(cont, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t* label = lv_label_create(cont);
+    lv_label_set_text(label, text);
+
+    lv_obj_t* chevron = lv_label_create(cont);
+    lv_label_set_text(chevron, LV_SYMBOL_RIGHT);
+    lv_obj_set_style_text_color(chevron, lv_color_hex(THEME_COLOR_SECONDARY), 0);
+
+    return cont;
 }
