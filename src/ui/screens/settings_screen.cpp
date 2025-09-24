@@ -303,11 +303,12 @@ void SettingsScreen::create_data_page(lv_obj_t* parent) {
     lv_obj_set_style_text_align(measurements_label, LV_TEXT_ALIGN_LEFT, 0);
 
     refresh_stats_button = create_button(parent, "Refresh Stats");
+    lv_obj_add_flag(refresh_stats_button, LV_OBJ_FLAG_HIDDEN); // Refresh button is not used anymore
     // Reset separator
     create_separator(parent, "Reset");
 
     purge_button = create_button(parent, "Purge History", lv_color_hex(THEME_COLOR_WARNING));
-    lv_obj_set_style_margin_bottom(purge_button, 20, 0); 
+    lv_obj_set_style_margin_bottom(purge_button, 10, 0); 
     reset_button = create_button(parent, "Factory Reset", lv_color_hex(THEME_COLOR_ERROR));
 }
 
@@ -485,6 +486,7 @@ lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
     lv_obj_set_layout(separator_container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(separator_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(separator_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(separator_container, LV_OBJ_FLAG_SCROLLABLE);
 
     // Create left line
     lv_obj_t* left_line = lv_obj_create(separator_container);
@@ -600,7 +602,7 @@ lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, 
     lv_obj_set_layout(row_container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(row_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(row_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(row_container, 20, 0);
+    lv_obj_set_style_pad_gap(row_container, 14, 0);
     lv_obj_set_style_pad_all(row_container, 20, 0);
 
     *label = lv_label_create(row_container);
@@ -613,7 +615,6 @@ lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, 
     lv_obj_set_style_bg_color(*slider, lv_color_hex(THEME_COLOR_BACKGROUND), LV_PART_MAIN);
     lv_obj_set_style_bg_color(*slider, slider_color, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(*slider, LV_OPA_TRANSP, LV_PART_KNOB);
-
     
     return row_container;
 }
