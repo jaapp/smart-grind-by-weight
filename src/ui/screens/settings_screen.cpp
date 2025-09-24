@@ -3,6 +3,7 @@
 #include "../../config/build_info.h"
 #include "../../config/git_info.h"
 #include "../../config/constants.h"
+#include "../../config/hardware_config.h"
 #include "../../logging/grind_logging.h"
 #include "../../hardware/hardware_manager.h"
 #include "grinding_screen.h"
@@ -89,7 +90,7 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     create_tools_page(tools_tab);
 
     reset_tab = lv_menu_page_create(menu, "Data");
-    create_reset_page(reset_tab);
+    create_data_page(reset_tab);
 
     // Create menu items and link to sub-pages
     lv_obj_t* info_item = create_menu_item(main_page, "System Info");
@@ -212,50 +213,13 @@ void SettingsScreen::create_bluetooth_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 15, 0);
-    lv_obj_set_style_pad_top(parent, 20, 0);
 
     // Enable vertical scrolling on the settings page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // BLE OTA Toggle
-    lv_obj_t* ble_container = lv_obj_create(parent);
-    lv_obj_set_size(ble_container, 260, 80);
-    lv_obj_set_layout(ble_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(ble_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(ble_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(ble_container, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(ble_container, 0, 0);
-    lv_obj_set_style_radius(ble_container, 8, 0);
-    lv_obj_clear_flag(ble_container, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t* ble_label = lv_label_create(ble_container);
-    lv_label_set_text(ble_label, "Enabled");
-    lv_obj_set_style_text_font(ble_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(ble_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-
-    ble_toggle = lv_switch_create(ble_container);
-    lv_obj_set_size(ble_toggle, 100, 60);
-
-    // BLE Startup Toggle
-    lv_obj_t* ble_startup_container = lv_obj_create(parent);
-    lv_obj_set_size(ble_startup_container, 260, 80);
-    lv_obj_set_layout(ble_startup_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(ble_startup_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(ble_startup_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(ble_startup_container, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(ble_startup_container, 0, 0);
-    lv_obj_set_style_radius(ble_startup_container, 8, 0);
-    lv_obj_clear_flag(ble_startup_container, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t* ble_startup_label = lv_label_create(ble_startup_container);
-    lv_label_set_text(ble_startup_label, "Startup");
-    lv_obj_set_style_text_font(ble_startup_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(ble_startup_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-
-    ble_startup_toggle = lv_switch_create(ble_startup_container);
-    lv_obj_set_size(ble_startup_toggle, 100, 60);
+    create_toggle_row(parent, "Enabled", &ble_toggle);
+    create_toggle_row(parent, "Startup", &ble_startup_toggle);
 
     // BLE Status label
     ble_status_label = lv_label_create(parent);
@@ -276,64 +240,12 @@ void SettingsScreen::create_display_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 15, 0);
-    lv_obj_set_style_pad_top(parent, 20, 0);
-
     // Enable vertical scrolling on the settings page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // Normal Brightness Slider
-    lv_obj_t* brightness_normal_container = lv_obj_create(parent);
-    lv_obj_set_size(brightness_normal_container, 260, 104);
-    lv_obj_set_layout(brightness_normal_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(brightness_normal_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(brightness_normal_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(brightness_normal_container, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(brightness_normal_container, 0, 0);
-    lv_obj_set_style_radius(brightness_normal_container, 8, 0);
-    lv_obj_set_style_pad_all(brightness_normal_container, 10, 0);
-    lv_obj_set_style_pad_gap(brightness_normal_container, 8, 0);
-
-    brightness_normal_label = lv_label_create(brightness_normal_container);
-    lv_label_set_text(brightness_normal_label, "Brightness: 100%");
-    lv_obj_set_style_pad_bottom(brightness_normal_label, 4, 0);
-    lv_obj_set_style_text_font(brightness_normal_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(brightness_normal_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-
-    brightness_normal_slider = lv_slider_create(brightness_normal_container);
-    lv_obj_set_size(brightness_normal_slider, 210, 40);
-    lv_slider_set_range(brightness_normal_slider, 15, 100); // 15% minimum to prevent inoperability
-    lv_slider_set_value(brightness_normal_slider, 100, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(brightness_normal_slider, lv_color_hex(THEME_COLOR_BACKGROUND), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(brightness_normal_slider, lv_color_hex(THEME_COLOR_ACCENT), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(brightness_normal_slider, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), LV_PART_KNOB);
-
-    // Screensaver Brightness Slider
-    lv_obj_t* brightness_screensaver_container = lv_obj_create(parent);
-    lv_obj_set_size(brightness_screensaver_container, 260, 104);
-    lv_obj_set_layout(brightness_screensaver_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(brightness_screensaver_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(brightness_screensaver_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(brightness_screensaver_container, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(brightness_screensaver_container, 0, 0);
-    lv_obj_set_style_radius(brightness_screensaver_container, 8, 0);
-    lv_obj_set_style_pad_all(brightness_screensaver_container, 10, 0);
-    lv_obj_set_style_pad_gap(brightness_screensaver_container, 8, 0);
-
-    brightness_screensaver_label = lv_label_create(brightness_screensaver_container);
-    lv_label_set_text(brightness_screensaver_label, "Dimmed: 35%");
-    lv_obj_set_style_pad_bottom(brightness_screensaver_label, 4, 0);
-    lv_obj_set_style_text_font(brightness_screensaver_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(brightness_screensaver_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-
-    brightness_screensaver_slider = lv_slider_create(brightness_screensaver_container);
-    lv_obj_set_size(brightness_screensaver_slider, 210, 40);
-    lv_slider_set_range(brightness_screensaver_slider, 15, 100); // 15% minimum to prevent inoperability
-    lv_slider_set_value(brightness_screensaver_slider, 35, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(brightness_screensaver_slider, lv_color_hex(THEME_COLOR_BACKGROUND), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(brightness_screensaver_slider, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), LV_PART_KNOB);
+    create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
+    create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
 }
 
 void SettingsScreen::create_tools_page(lv_obj_t* parent) {
@@ -346,87 +258,22 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_OFF);
 
-    // // Title
-    // lv_obj_t* title = lv_label_create(parent);
-    // lv_label_set_text(title, "Tools");
-    // lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    // lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
-
-    // Tare button
-    tare_button = lv_btn_create(parent);
-    lv_obj_set_size(tare_button, 240, 80);
-    lv_obj_set_style_bg_color(tare_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(tare_button, 0, 0);
-    lv_obj_set_style_radius(tare_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* tare_label = lv_label_create(tare_button);
-    lv_label_set_text(tare_label, "TARE SCALE");
-    lv_obj_set_style_text_font(tare_label, &lv_font_montserrat_24, 0);
-    lv_obj_center(tare_label);
-
-    // Calibration button
-    cal_button = lv_btn_create(parent);
-    lv_obj_set_size(cal_button, 240, 80);
-    lv_obj_set_style_bg_color(cal_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(cal_button, 0, 0);
-    lv_obj_set_style_radius(cal_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* cal_label = lv_label_create(cal_button);
-    lv_label_set_text(cal_label, "CALIBRATE");
-    lv_obj_set_style_text_font(cal_label, &lv_font_montserrat_24, 0);
-    lv_obj_center(cal_label);
-
-    // Motor test button
-    motor_test_button = lv_btn_create(parent);
-    lv_obj_set_size(motor_test_button, 240, 80);
-    lv_obj_set_style_bg_color(motor_test_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(motor_test_button, 0, 0);
-    lv_obj_set_style_radius(motor_test_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* motor_test_label = lv_label_create(motor_test_button);
-    lv_label_set_text(motor_test_label, "MOTOR TEST");
-    lv_obj_set_style_text_font(motor_test_label, &lv_font_montserrat_24, 0);
-    lv_obj_center(motor_test_label);
+    tare_button = create_button(parent, "Tare Scale");
+    cal_button = create_button(parent, "Calibrate");
+    motor_test_button = create_button(parent, "Motor Test");
 }
 
-void SettingsScreen::create_reset_page(lv_obj_t* parent) {
+void SettingsScreen::create_data_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 20, 0);
-    lv_obj_set_style_pad_top(parent, 20, 0);
     
     // Enable vertical scrolling on the reset page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // // Title
-    // lv_obj_t* title = lv_label_create(parent);
-    // lv_label_set_text(title, "Data");
-    // lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    // lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
 
-    // // Grind Logging separator
-    // create_separator(parent, "Grind Logging");
-
-    // Logging Toggle
-    lv_obj_t* logging_container = lv_obj_create(parent);
-    lv_obj_set_size(logging_container, 260, 80);
-    lv_obj_set_layout(logging_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(logging_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(logging_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(logging_container, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(logging_container, 0, 0);
-    lv_obj_set_style_radius(logging_container, 8, 0);
-    lv_obj_clear_flag(logging_container, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t* logging_label = lv_label_create(logging_container);
-    lv_label_set_text(logging_label, "Logging");
-    lv_obj_set_style_text_font(logging_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(logging_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-
-    logging_toggle = lv_switch_create(logging_container);
-    lv_obj_set_size(logging_toggle, 100, 60);
+    create_toggle_row(parent, "Logging", &logging_toggle);
 
     // Sessions info (number of recorded grind sessions)
     sessions_label = lv_label_create(parent);
@@ -455,47 +302,13 @@ void SettingsScreen::create_reset_page(lv_obj_t* parent) {
     lv_label_set_long_mode(measurements_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(measurements_label, LV_TEXT_ALIGN_LEFT, 0);
 
-    // Refresh statistics button (gray color)
-    refresh_stats_button = lv_btn_create(parent);
-    lv_obj_set_size(refresh_stats_button, 200, 60);
-    lv_obj_set_style_bg_color(refresh_stats_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(refresh_stats_button, 0, 0);
-    lv_obj_set_style_radius(refresh_stats_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* refresh_label = lv_label_create(refresh_stats_button);
-    lv_label_set_text(refresh_label, "REFRESH STATS");
-    lv_obj_set_style_text_font(refresh_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(refresh_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_center(refresh_label);
-
+    refresh_stats_button = create_button(parent, "Refresh Stats");
     // Reset separator
     create_separator(parent, "Reset");
 
-    // Purge Grind History button
-    purge_button = lv_btn_create(parent);
-    lv_obj_set_size(purge_button, 260, 80);
-    lv_obj_set_style_bg_color(purge_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(purge_button, 0, 0);
-    lv_obj_set_style_radius(purge_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* purge_label = lv_label_create(purge_button);
-    lv_label_set_text(purge_label, "PURGE HISTORY");
-    lv_obj_set_style_text_font(purge_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(purge_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_center(purge_label);
-
-    // Factory Reset button
-    reset_button = lv_btn_create(parent);
-    lv_obj_set_size(reset_button, 260, 80);
-    lv_obj_set_style_bg_color(reset_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(reset_button, 0, 0);
-    lv_obj_set_style_radius(reset_button, THEME_CORNER_RADIUS_PX, 0);
-    
-    lv_obj_t* reset_label = lv_label_create(reset_button);
-    lv_label_set_text(reset_label, "FACTORY RESET");
-    lv_obj_set_style_text_font(reset_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(reset_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_center(reset_label);
+    purge_button = create_button(parent, "Purge History", lv_color_hex(THEME_COLOR_WARNING));
+    lv_obj_set_style_margin_bottom(purge_button, 20, 0); 
+    reset_button = create_button(parent, "Factory Reset", lv_color_hex(THEME_COLOR_ERROR));
 }
 
 void SettingsScreen::show() {
@@ -505,6 +318,7 @@ void SettingsScreen::show() {
     update_brightness_sliders();
     update_bluetooth_startup_toggle();
     update_logging_toggle();
+    refresh_statistics();
 }
 
 void SettingsScreen::hide() {
@@ -649,10 +463,18 @@ void SettingsScreen::update_brightness_sliders() {
 
 void SettingsScreen::update_brightness_labels() {
     if (!brightness_normal_label || !brightness_screensaver_label) return;
-    
+
     int normal_percent = lv_slider_get_value(brightness_normal_slider);
+    if (normal_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) {
+        normal_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+        lv_slider_set_value(brightness_normal_slider, HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT, LV_ANIM_OFF);
+    } 
+        
     int screensaver_percent = lv_slider_get_value(brightness_screensaver_slider);
-    
+    if (screensaver_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT){
+        screensaver_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+        lv_slider_set_value(brightness_screensaver_slider, HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT, LV_ANIM_OFF);
+    } 
     char normal_text[32];
     char screensaver_text[32];
     
@@ -669,7 +491,7 @@ lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
     lv_obj_set_size(separator_container, 280, 40);
     lv_obj_set_style_bg_opa(separator_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(separator_container, 0, 0);
-    lv_obj_set_style_pad_all(separator_container, 0, 0);
+    lv_obj_set_style_pad_ver(separator_container, 10, 0);
     lv_obj_set_layout(separator_container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(separator_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(separator_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -741,18 +563,8 @@ void SettingsScreen::update_logging_toggle() {
 
 lv_obj_t* SettingsScreen::create_menu_item(lv_obj_t* parent, const char* text) {
     lv_obj_t* cont = lv_menu_cont_create(parent);
-
-    // Apply styling directly
-    lv_obj_set_style_radius(cont, THEME_CORNER_RADIUS_PX, 0);
-    lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(cont, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_text_color(cont, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_style_text_font(cont, &lv_font_montserrat_28, 0);
-    lv_obj_set_style_pad_hor(cont, 20, 0);
-
+    style_as_button(cont);
     lv_obj_set_style_margin_bottom(cont, 10, 0);
-    lv_obj_set_style_width(cont, 260, 0);
-    lv_obj_set_style_height(cont, 80, 0);
 
     // Set layout
     lv_obj_set_layout(cont, LV_LAYOUT_FLEX);
@@ -768,3 +580,61 @@ lv_obj_t* SettingsScreen::create_menu_item(lv_obj_t* parent, const char* text) {
 
     return cont;
 }
+
+lv_obj_t* SettingsScreen::create_toggle_row(lv_obj_t* parent, const char* text, lv_obj_t** out_toggle) {
+    lv_obj_t* row_container = lv_obj_create(parent);
+    style_as_button(row_container);
+    lv_obj_set_style_margin_bottom(row_container, 10, 0);
+
+    // Set layout
+    lv_obj_set_layout(row_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t* label = lv_label_create(row_container);
+    lv_label_set_text(label, text);
+
+    *out_toggle = lv_switch_create(row_container);
+    lv_obj_set_size(*out_toggle, 80, 40);
+    lv_obj_set_ext_click_area(*out_toggle, 20);
+    
+    return row_container;
+}
+
+lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, lv_obj_t** label, lv_obj_t** slider, lv_color_t slider_color, uint32_t min, uint32_t max) {
+    lv_obj_t* row_container = lv_obj_create(parent);
+    style_as_button(row_container, 260, LV_SIZE_CONTENT);
+    lv_obj_set_style_margin_bottom(row_container, 10, 0);
+    // Set layout
+
+    lv_obj_set_layout(row_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(row_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(row_container, 20, 0);
+    lv_obj_set_style_pad_all(row_container, 20, 0);
+
+    *label = lv_label_create(row_container);
+    lv_label_set_text(*label, text);
+
+    *slider = lv_slider_create(row_container);
+    lv_obj_set_size(*slider, 220, 40);
+    lv_obj_set_ext_click_area(*slider, 20);
+    lv_slider_set_range(*slider, min, max);
+    lv_obj_set_style_bg_color(*slider, lv_color_hex(THEME_COLOR_BACKGROUND), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(*slider, slider_color, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(*slider, LV_OPA_TRANSP, LV_PART_KNOB);
+
+    
+    return row_container;
+}
+
+// lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* text) {
+//     lv_obj_t* label = lv_label_create(parent);
+//     lv_label_set_text(label, text);
+//     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
+//     lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+//     lv_obj_set_width(label, 280);
+//     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+//     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
+//     return label;
+// }

@@ -3,6 +3,7 @@
 #include "../../config/ui_theme.h"
 #include "../../bluetooth/manager.h"
 #include "../../controllers/grind_controller.h"
+#include "ui_helpers.h"
 
 class GrindingScreen;  // Forward declaration
 
@@ -92,7 +93,12 @@ private:
     void create_bluetooth_page(lv_obj_t* parent);
     void create_display_page(lv_obj_t* parent);
     void create_tools_page(lv_obj_t* parent);
-    void create_reset_page(lv_obj_t* parent);
+    void create_data_page(lv_obj_t* parent);
     lv_obj_t* create_separator(lv_obj_t* parent, const char* text);
     lv_obj_t* create_menu_item(lv_obj_t* parent, const char* text);
+    lv_obj_t *create_toggle_row(lv_obj_t *parent, const char *text,lv_obj_t **out_toggle);
+    lv_obj_t *create_slider_row(lv_obj_t *parent, const char *text,
+                                lv_obj_t **label, lv_obj_t **slider,
+                                lv_color_t slider_color = lv_color_hex(THEME_COLOR_ACCENT),
+                                uint32_t min = 0, uint32_t max = 100);
 };
