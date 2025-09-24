@@ -68,8 +68,8 @@ public:
     void refresh_statistics();
     void show_taring_overlay();
     void hide_taring_overlay();
+    void update_brightness_labels(int normal_percent = -1, int screensaver_percent = -1); // Use negative value to leave unchanged
     void update_brightness_sliders();
-    void update_brightness_labels();
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
     

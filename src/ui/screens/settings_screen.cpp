@@ -451,38 +451,28 @@ void SettingsScreen::update_brightness_sliders() {
     int screensaver_percent = (int)(screensaver_brightness * 100);
     
     // Ensure minimum 15%
-    if (normal_percent < 15) normal_percent = 15;
-    if (screensaver_percent < 15) screensaver_percent = 15;
+    if (normal_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) normal_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+    if (screensaver_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) screensaver_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
     
     // Update sliders
     lv_slider_set_value(brightness_normal_slider, normal_percent, LV_ANIM_OFF);
     lv_slider_set_value(brightness_screensaver_slider, screensaver_percent, LV_ANIM_OFF);
     
-    update_brightness_labels();
+    update_brightness_labels(normal_percent, screensaver_percent);
 }
 
-void SettingsScreen::update_brightness_labels() {
-    if (!brightness_normal_label || !brightness_screensaver_label) return;
+void SettingsScreen::update_brightness_labels(int normal_percent, int screensaver_percent) {
+    if (brightness_normal_label && normal_percent >= 0) {
+        char normal_text[32];
+        snprintf(normal_text, sizeof(normal_text), "Brightness: %d%%", normal_percent);
+        lv_label_set_text(brightness_normal_label, normal_text);
+    }
 
-    int normal_percent = lv_slider_get_value(brightness_normal_slider);
-    if (normal_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) {
-        normal_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
-        lv_slider_set_value(brightness_normal_slider, HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT, LV_ANIM_OFF);
-    } 
-        
-    int screensaver_percent = lv_slider_get_value(brightness_screensaver_slider);
-    if (screensaver_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT){
-        screensaver_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
-        lv_slider_set_value(brightness_screensaver_slider, HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT, LV_ANIM_OFF);
-    } 
-    char normal_text[32];
-    char screensaver_text[32];
-    
-    snprintf(normal_text, sizeof(normal_text), "Brightness: %d%%", normal_percent);
-    snprintf(screensaver_text, sizeof(screensaver_text), "Dimmed: %d%%", screensaver_percent);
-    
-    lv_label_set_text(brightness_normal_label, normal_text);
-    lv_label_set_text(brightness_screensaver_label, screensaver_text);
+    if (brightness_screensaver_label && screensaver_percent >= 0) {
+        char screensaver_text[32];
+        snprintf(screensaver_text, sizeof(screensaver_text), "Dimmed: %d%%", screensaver_percent);
+        lv_label_set_text(brightness_screensaver_label, screensaver_text);
+    }
 }
 
 lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
