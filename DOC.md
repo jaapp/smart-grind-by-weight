@@ -123,7 +123,7 @@ ESP32-S3 GND       →    Pin 4 (Ground)
    - Remove the button and store it (not needed)
    - Use JST-PH plug to connect to Waveshare board
    - **WARNING:** Wire colors vary significantly between Eureka units - always verify pin functions with a multimeter before connecting!
-   - Mount Waveshare screen using 3D printed adapter where original screen was
+   - Mount Waveshare screen using 3D printed adapter where original screen was (the Waveshare screen with adapter replaces the original screen and reuses the original mounting screws)
    - Fish HX711 wire through housing, exit via button hole
    - Mount load cell and HX711 to 3D printed back plate
    - Clip 3D printed back plate onto Eureka Mignon
