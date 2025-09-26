@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grind_mode.h"
+#include <cstdint>
 
 struct GrindSessionDescriptor {
     GrindMode mode = GrindMode::WEIGHT;
@@ -9,4 +10,3 @@ struct GrindSessionDescriptor {
     float tolerance = 0.0f;          // grams
     uint8_t profile_id = 0;          // active profile index
 };
-
