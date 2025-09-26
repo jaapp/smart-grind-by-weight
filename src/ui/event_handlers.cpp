@@ -186,14 +186,14 @@ void SettingsEventHandler::handle_settings_reset() {
     confirmation_ui_manager = ui_manager;
     ui_manager->show_confirmation(
         "FACTORY RESET",
-        "WARNING!\n\n"
-        "This will reset all settings\n"
-        "to factory defaults:\n\n"
+        "This will reset all settings to factory defaults:"
+        "\n\n"
         "• Profile weights\n"
         "• Calibration data\n"
-        "• Grind history\n\n"
+        "• Grind history"
+        "\n\n"
         "This action cannot be undone.",
-        LV_SYMBOL_REFRESH " RESET",
+        "RESET",
         lv_color_hex(THEME_COLOR_ERROR),
         factory_reset_callback
     );
@@ -203,13 +203,10 @@ void SettingsEventHandler::handle_settings_purge() {
     confirmation_ui_manager = ui_manager;
     ui_manager->show_confirmation(
         "PURGE GRIND HISTORY",
-        "WARNING!\n\n"
-        "This will permanently\n"
-        "delete all grind history\n"
-        "data from flash memory.\n\n"
-        "This action cannot\n"
-        "be undone.",
-        LV_SYMBOL_TRASH " PURGE",
+        "This will permanently delete all grind history data from flash memory."
+        "\n\n"
+        "This action cannot be undone.",
+        "PURGE",
         lv_color_hex(THEME_COLOR_ERROR),
         purge_grind_history_callback
     );
@@ -237,12 +234,10 @@ void SettingsEventHandler::handle_settings_motor_test() {
     confirmation_ui_manager = ui_manager;
     ui_manager->show_confirmation(
         "MOTOR TEST",
-        "WARNING!\n\n"
-        "Motor will be engaged\n"
-        "for 1 second.\n\n"
-        "Make sure grinder is\n"
-        "safe to run.",
-        LV_SYMBOL_PLAY " RUN",
+        "Motor will be engaged for 1 second."
+        "\n\n"
+        "Make sure grinder is safe to run.",
+        "RUN",
         lv_color_hex(THEME_COLOR_SUCCESS),
         motor_test_callback
     );

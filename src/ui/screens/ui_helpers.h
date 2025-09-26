@@ -10,7 +10,12 @@ inline void style_as_button(lv_obj_t* object, int32_t width = 260, int32_t heigh
     lv_obj_set_style_text_font(object, &lv_font_montserrat_28, 0);
     lv_obj_set_style_border_width(object, 0, 0);
     lv_obj_set_style_pad_hor(object, 20, 0);
-    lv_obj_set_style_size(object, width, height, 0);
+    if (width >= 0){
+        lv_obj_set_style_width(object, width, 0);
+    }
+    if (height >= 0){
+        lv_obj_set_style_height(object, height, 0);
+    }
     
     lv_obj_clear_flag(object, LV_OBJ_FLAG_SCROLLABLE);   
 }
