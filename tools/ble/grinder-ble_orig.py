@@ -907,10 +907,9 @@ class GrinderBLETool:
                 );""")
             
             # Insert data
-            
-            # Build placeholders dynamically to match column count
-            _cols_sessions = """session_id, session_timestamp, profile_id, grind_mode, target_weight, target_time_ms, tolerance, final_weight, start_weight, error_grams, time_error_ms, total_time_ms, total_motor_on_time_ms, pulse_count, max_pulse_attempts, termination_reason, latency_to_coast_ratio, flow_rate_threshold, pulse_duration_large, pulse_duration_medium, pulse_duration_small, pulse_duration_fine, large_error_threshold, medium_error_threshold, small_error_threshold, schema_version, result_status, checksum, session_size_bytes"""
-            _params_sessions = [
+            cursor.executemany(
+                "INSERT INTO grind_sessions (session_id, session_timestamp, profile_id, grind_mode, target_weight, target_time_ms, tolerance, final_weight, start_weight, error_grams, time_error_ms, total_time_ms, total_motor_on_time_ms, pulse_count, max_pulse_attempts, termination_reason, latency_to_coast_ratio, flow_rate_threshold, pulse_duration_large, pulse_duration_medium, pulse_duration_small, pulse_duration_fine, large_error_threshold, medium_error_threshold, small_error_threshold, schema_version, result_status, checksum, session_size_bytes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                [
                     (
                         s['session_id'], s['session_timestamp'], s['profile_id'], s.get('grind_mode', 0),
                         s['target_weight'], s.get('target_time_ms', 0), s['tolerance'],
@@ -925,11 +924,7 @@ class GrinderBLETool:
                     )
                     for s in sessions
                 ]
-            if _params_sessions:
-                _ph_sessions = "(" + ",".join(["?"] * len(_params_sessions[0])) + ")"
-                cursor.executemany(f"INSERT INTO grind_sessions ({_cols_sessions}) VALUES {_ph_sessions}", _params_sessions)
-            else:
-                pass
+            )
 
             cursor.executemany("INSERT INTO grind_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(e['session_id'], e['event_sequence_id'], e['timestamp_ms'], e['phase_id'], 

@@ -31,9 +31,10 @@ Update `tools/grinder-ble` parsing based on ESP32 debug output:
 
 ```python
 # Key structs to maintain alignment for:
-GRIND_SESSION_SIZE = 100  # Update based on sizeof(GrindSession)
-GRIND_EVENT_SIZE = 46     # Update based on sizeof(GrindEvent) 
-GRIND_MEASUREMENT_SIZE = 22  # Update based on sizeof(GrindMeasurement)
+LOG_SCHEMA_VERSION = 2    # Update when schema changes
+GRIND_SESSION_SIZE = 108  # Update based on sizeof(GrindSession)
+GRIND_EVENT_SIZE = 44     # Update based on sizeof(GrindEvent) 
+GRIND_MEASUREMENT_SIZE = 24  # Update based on sizeof(GrindMeasurement)
 
 # Binary parsing format strings
 GRIND_SESSION_FORMAT = '<IIffffff...'  # Update field by field
@@ -44,60 +45,98 @@ GRIND_SESSION_FORMAT = '<IIffffff...'  # Update field by field
 Essential debug output from ESP32 shows:
 ```
 === STRUCT LAYOUT DEBUG ===
-TimeSeriesSessionHeader: 20 bytes
-GrindSession: 100 bytes (current size)
-GrindEvent: 46 bytes  
-GrindMeasurement: 22 bytes
+TimeSeriesSessionHeader: 24 bytes
+GrindSession: 108 bytes (current size)
+GrindEvent: 44 bytes  
+GrindMeasurement: 24 bytes
 ```
 
 ## Current Struct Definitions (Reference)
 
-### GrindSession (100 bytes)
+### TimeSeriesSessionHeader (24 bytes)
+```cpp
+struct TimeSeriesSessionHeader {
+    uint32_t session_id;        // offset 0
+    uint32_t session_timestamp; // offset 4
+    uint32_t session_size;      // offset 8 (bytes of GrindSession + events + measurements)
+    uint32_t checksum;          // offset 12
+    uint16_t event_count;       // offset 16
+    uint16_t measurement_count; // offset 18
+    uint16_t schema_version;    // offset 20 (current LOG_SCHEMA_VERSION)
+    uint16_t reserved;          // offset 22 (future flags)
+};
+```
+
+### GrindSession (108 bytes)
 ```cpp
 struct GrindSession {
-    uint32_t session_id;           // 4 bytes, offset 0
-    uint32_t session_timestamp;    // 4 bytes, offset 4  
-    uint8_t profile_id;            // 1 byte,  offset 8
-    float target_weight;           // 4 bytes, offset 9
-    // ... (see grind_logging.h for complete definition)
-    char result_status[16];        // 16 bytes, offset 77
-    uint32_t total_motor_on_time_ms; // 4 bytes, offset 93
-    // Total: 100 bytes (97 + 3 padding)
+    uint32_t session_id;              // 0
+    uint32_t session_timestamp;       // 4
+    uint32_t target_time_ms;          // 8 (time-mode target)
+    uint32_t total_time_ms;           // 12 (session runtime)
+    uint32_t total_motor_on_time_ms;  // 16
+    int32_t  time_error_ms;           // 20 (motor_on_time - target_time)
+
+    float target_weight;              // 24
+    float tolerance;                  // 28
+    float final_weight;               // 32
+    float error_grams;                // 36 (zeroed for time mode)
+    float start_weight;               // 40 (pre-tare snapshot)
+
+    float initial_motor_stop_offset;  // 44
+    float latency_to_coast_ratio;     // 48
+    float flow_rate_threshold;        // 52
+    float pulse_duration_large;       // 56
+    float pulse_duration_medium;      // 60
+    float pulse_duration_small;       // 64
+    float pulse_duration_fine;        // 68
+    float large_error_threshold;      // 72
+    float medium_error_threshold;     // 76
+    float small_error_threshold;      // 80
+
+    uint8_t profile_id;               // 84
+    uint8_t grind_mode;               // 85 (enum GrindMode)
+    uint8_t max_pulse_attempts;       // 86
+    uint8_t pulse_count;              // 87
+    uint8_t termination_reason;       // 88 (enum GrindTerminationReason)
+    uint8_t reserved[3];              // 89-91
+
+    char    result_status[16];        // 92-107 (null-terminated)
 };
 ```
 
-### GrindEvent (46 bytes)  
+### GrindEvent (44 bytes)
 ```cpp
-struct __attribute__((packed)) GrindEvent {
-    uint32_t timestamp_ms;         // 4 bytes, offset 0
-    uint8_t  phase_id;            // 1 byte, offset 4
-    uint8_t  pulse_attempt_number; // 1 byte, offset 5
-    uint16_t event_sequence_id;    // 2 bytes, offset 6
-    uint32_t duration_ms;          // 4 bytes, offset 8
-    float    start_weight;         // 4 bytes, offset 12
-    float    end_weight;           // 4 bytes, offset 16
-    float    motor_stop_target_weight; // 4 bytes, offset 20
-    float    pulse_duration_ms;    // 4 bytes, offset 24
-    uint32_t grind_latency_ms;     // 4 bytes, offset 28
-    uint32_t settling_duration_ms; // 4 bytes, offset 32
-    float    pulse_flow_rate;      // 4 bytes, offset 36
-    uint16_t loop_count;           // 2 bytes, offset 40
-    char padding[4];               // 4 bytes padding
-    // Total: 46 bytes (42 bytes data + 4 bytes padding)
+struct GrindEvent {
+    uint32_t timestamp_ms;            // 0
+    uint32_t duration_ms;             // 4
+    uint32_t grind_latency_ms;        // 8
+    uint32_t settling_duration_ms;    // 12
+    float    start_weight;            // 16
+    float    end_weight;              // 20
+    float    motor_stop_target_weight;// 24
+    float    pulse_duration_ms;       // 28
+    float    pulse_flow_rate;         // 32
+    uint16_t event_sequence_id;       // 36
+    uint16_t loop_count;              // 38
+    uint8_t  phase_id;                // 40
+    uint8_t  pulse_attempt_number;    // 41
+    uint8_t  event_flags;             // 42 (bitmask metadata)
+    uint8_t  reserved;                // 43
 };
 ```
 
-### GrindMeasurement (22 bytes)
+### GrindMeasurement (24 bytes)
 ```cpp
-struct __attribute__((packed)) GrindMeasurement {
-    uint32_t timestamp_ms;         // 4 bytes
-    float    weight_grams;         // 4 bytes
-    float    weight_delta;         // 4 bytes
-    float    flow_rate_g_per_s;    // 4 bytes
-    uint8_t  motor_is_on;          // 1 byte
-    uint8_t  phase_id;            // 1 byte
-    float    motor_stop_target_weight; // 4 bytes
-    // Total: 22 bytes
+struct GrindMeasurement {
+    uint32_t timestamp_ms;            // 0
+    float    weight_grams;            // 4
+    float    weight_delta;            // 8
+    float    flow_rate_g_per_s;       // 12
+    float    motor_stop_target_weight;// 16
+    uint16_t sequence_id;             // 20 (monotonic counter)
+    uint8_t  motor_is_on;             // 22
+    uint8_t  phase_id;                // 23
 };
 ```
 

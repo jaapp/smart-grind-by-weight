@@ -26,12 +26,11 @@ struct FlashOpRequest {
     };
     
     Type operation_type;
+    GrindSessionDescriptor descriptor; // For START_GRIND_SESSION
     char result_string[32];  // "COMPLETE", "TIMEOUT", "OVERSHOOT", etc. (for END_GRIND_SESSION)
-    float target_weight;     // For START_GRIND_SESSION
+    float start_weight;      // For START_GRIND_SESSION (pre-tare snapshot)
     float final_weight;      // For END_GRIND_SESSION
-    uint8_t profile_id;      // For START_GRIND_SESSION
     uint8_t pulse_count;     // For END_GRIND_SESSION
-    float tolerance;         // For START_GRIND_SESSION
 };
 
 // Log message structure for Core 0 → Core 1 communication

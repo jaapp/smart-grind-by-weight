@@ -226,12 +226,18 @@ void GrindController::update() {
             break;
             
         case GrindPhase::SETUP: {
+            // Snapshot pre-tare weight so we can log the initial Cup state
+            float pre_tare_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
+
             // Start logging immediately (synchronous PSRAM setup only)
-            grind_logger.start_grind_session(target_weight, current_profile_id, tolerance);
-            
+            grind_logger.start_grind_session(session_descriptor, pre_tare_weight);
+
             // Initialize logging event for upcoming TARING phase
             memset(&event_in_progress, 0, sizeof(GrindEvent));
-            
+            if (session_descriptor.mode == GrindMode::TIME) {
+                event_in_progress.event_flags |= GRIND_EVENT_FLAG_TIME_MODE;
+            }
+
             switch_phase(GrindPhase::TARING, loop_data);
             break;
         }
@@ -489,6 +495,28 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
         event_in_progress.phase_id = (uint8_t)new_phase;
         event_in_progress.timestamp_ms = loop_data.timestamp_ms;  // Use pre-calculated timestamp for perfect alignment
         event_in_progress.start_weight = loop_data.current_weight;  // Use pre-calculated weight
+
+        if (session_descriptor.mode == GrindMode::TIME) {
+            event_in_progress.event_flags |= GRIND_EVENT_FLAG_TIME_MODE;
+        }
+
+        switch (new_phase) {
+            case GrindPhase::PREDICTIVE:
+            case GrindPhase::TIME_GRINDING:
+                event_in_progress.event_flags |= GRIND_EVENT_FLAG_MOTOR_ACTIVE;
+                break;
+            case GrindPhase::PULSE_EXECUTE:
+                event_in_progress.event_flags |= (GRIND_EVENT_FLAG_MOTOR_ACTIVE | GRIND_EVENT_FLAG_PULSE_PHASE);
+                break;
+            case GrindPhase::PULSE_SETTLING:
+                event_in_progress.event_flags |= GRIND_EVENT_FLAG_PULSE_PHASE;
+                break;
+            case GrindPhase::PULSE_DECISION:
+                // Motor state depends on strategy decision; leave flags unchanged
+                break;
+            default:
+                break;
+        }
     }
     
     // pulse_start_time no longer needed for RMT-based pulses
@@ -680,9 +708,11 @@ void GrindController::process_queued_flash_operations() {
         switch (request.operation_type) {
             case FlashOpRequest::START_GRIND_SESSION:
                 // Perform the blocking flash operation on Core 1
-                BLE_LOG("[%lums FLASH_OP] Processing START_GRIND_SESSION on Core 1: target=%.2fg, profile=%d, tolerance=%.3fg\n", 
-                        millis(), request.target_weight, request.profile_id, request.tolerance);
-                grind_logger.start_grind_session(request.target_weight, request.profile_id, request.tolerance);
+                BLE_LOG("[%lums FLASH_OP] Processing START_GRIND_SESSION on Core 1: mode=%s, profile=%d\n", 
+                        millis(),
+                        request.descriptor.mode == GrindMode::TIME ? "TIME" : "WEIGHT",
+                        request.descriptor.profile_id);
+                grind_logger.start_grind_session(request.descriptor, request.start_weight);
                 break;
                 
             case FlashOpRequest::END_GRIND_SESSION:

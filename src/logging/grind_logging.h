@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include "../config/constants.h"
 #include "../config/system_config.h"
+#include "../controllers/grind_session.h"
 
 // Forward declarations
 class WeightSensor;
@@ -28,33 +29,45 @@ class Grinder;
 #define GRIND_LOG_FILE "/grind_sessions.bin"                // Legacy single-file storage (deprecated)
 #define MAX_STORED_SESSIONS_FLASH 25                        // Maximum sessions to keep in flash (configurable)
 
+#pragma pack(push, 1)
+
+constexpr uint16_t GRIND_LOG_SCHEMA_VERSION = 2;
+
 // Time-series session header for flash file
 struct TimeSeriesSessionHeader {
-    uint32_t session_id;            // Session identifier
-    uint16_t event_count;           // Number of discrete events in this session
-    uint16_t measurement_count;     // Number of continuous measurements in this session
-    uint32_t session_timestamp;     // Unix timestamp when session started
-    uint32_t session_size;          // Total size of session, events, and measurements in bytes
-    uint32_t checksum;              // Checksum of all data
+    uint32_t session_id;           // Session identifier
+    uint32_t session_timestamp;    // Unix timestamp when session started
+    uint32_t session_size;         // Total size of session, events, and measurements in bytes
+    uint32_t checksum;             // Checksum of all data
+    uint16_t event_count;          // Number of discrete events in this session
+    uint16_t measurement_count;    // Number of continuous measurements in this session
+    uint16_t schema_version;       // Schema/version so Python tools can adapt
+    uint16_t reserved;             // Reserved for future use (alignment + versioned flags)
+};
+
+enum GrindEventFlags : uint8_t {
+    GRIND_EVENT_FLAG_TIME_MODE   = 1 << 0,  // Event recorded while grinding by time
+    GRIND_EVENT_FLAG_MOTOR_ACTIVE = 1 << 1, // Phase kept the motor running
+    GRIND_EVENT_FLAG_PULSE_PHASE = 1 << 2   // Phase represents a pulse or settling after a pulse
 };
 
 // Discrete, low-frequency events summarizing a phase.
-// Padded to a fixed size for simple binary parsing.
-struct __attribute__((packed)) GrindEvent {
-    uint32_t timestamp_ms;         // Relative to session start
-    uint8_t  phase_id;             // Numeric phase ID (see GrindPhaseId enum)
-    uint8_t  pulse_attempt_number; // Which pulse attempt (1-10), 0 if not a pulse
-    uint16_t event_sequence_id;    // **NEW**: Guaranteed unique ID for the event within the session
-    uint32_t duration_ms;          // How long this phase/event lasted
-    float    start_weight;         // Weight when phase started
-    float    end_weight;           // Weight when phase ended
-    float    motor_stop_target_weight; // Value at the end of this phase
-    float    pulse_duration_ms;    // For PULSE_EXECUTE phase
-    uint32_t grind_latency_ms;     // For PREDICTIVE phase
-    uint32_t settling_duration_ms; // For SETTLING phases
-    float    pulse_flow_rate;      // Flow rate from predictive phase used for pulse calculations
-    uint16_t loop_count;           // Number of loop iterations for this phase (performance tracking)
-    char     padding[4];           // **MODIFIED**: Pad to 46 bytes total size (42 bytes data + 4 bytes padding)
+struct GrindEvent {
+    uint32_t timestamp_ms;            // Relative to session start
+    uint32_t duration_ms;             // How long this phase/event lasted
+    uint32_t grind_latency_ms;        // For PREDICTIVE phase
+    uint32_t settling_duration_ms;    // For SETTLING phases
+    float    start_weight;            // Weight when phase started
+    float    end_weight;              // Weight when phase ended
+    float    motor_stop_target_weight;// Value at the end of this phase
+    float    pulse_duration_ms;       // For PULSE_EXECUTE phase
+    float    pulse_flow_rate;         // Flow rate from predictive phase used for pulse calculations
+    uint16_t event_sequence_id;       // Unique ID for the event within the session
+    uint16_t loop_count;              // Loop iterations while in this phase
+    uint8_t  phase_id;                // Numeric phase ID (see GrindPhase enum)
+    uint8_t  pulse_attempt_number;    // Which pulse attempt (1-10), 0 if not a pulse
+    uint8_t  event_flags;             // Additional event metadata flags
+    uint8_t  reserved;                // Alignment + future use
 
     GrindEvent() {
         memset(this, 0, sizeof(GrindEvent));
@@ -62,65 +75,78 @@ struct __attribute__((packed)) GrindEvent {
 };
 
 // Continuous, high-frequency time-series measurements.
-// Slim and optimized for high-volume logging.
-struct __attribute__((packed)) GrindMeasurement {
-    uint32_t timestamp_ms;         // Relative to session start
-    float    weight_grams;         // Current weight reading
-    float    weight_delta;         // Change since last measurement
-    float    flow_rate_g_per_s;    // Continuously calculated flow rate
-    uint8_t  motor_is_on;          // Motor state at time of measurement (using uint8_t for exact size)
-    uint8_t  phase_id;            // Current grinding phase ID (from GrindPhaseId enum)
-    float    motor_stop_target_weight; // Current motor stop target weight at time of measurement
+struct GrindMeasurement {
+    uint32_t timestamp_ms;            // Relative to session start
+    float    weight_grams;            // Current weight reading
+    float    weight_delta;            // Change since last measurement
+    float    flow_rate_g_per_s;       // Continuously calculated flow rate
+    float    motor_stop_target_weight;// Current motor stop target weight
+    uint16_t sequence_id;             // Sequence for data integrity checks
+    uint8_t  motor_is_on;             // Motor state at time of measurement
+    uint8_t  phase_id;                // Current grinding phase ID
 
     GrindMeasurement() {
         memset(this, 0, sizeof(GrindMeasurement));
     }
 };
 
+enum class GrindTerminationReason : uint8_t {
+    COMPLETED = 0,
+    TIMEOUT = 1,
+    OVERSHOOT = 2,
+    MAX_PULSES = 3,
+    UNKNOWN = 255
+};
 
 // Session metadata - configuration snapshot and results summary
 struct GrindSession {
-    // Primary Key
-    uint32_t session_id;           // Auto-increment ID
-    uint32_t session_timestamp;    // Unix timestamp (session start)
-    
-    // Profile & Configuration
-    uint8_t profile_id;            // From current system
-    float target_weight;           // From current system  
-    float tolerance;               // From current system (may override USER_GRIND_ACCURACY_TOLERANCE_G)
-    
-    // Grind Controller Configuration (snapshot at session start)
-    float initial_motor_stop_offset; // Starting motor stop offset (USER_GRIND_UNDERSHOOT_TARGET_G or dynamic)
-    uint8_t max_pulse_attempts;    // USER_GRIND_MAX_PULSE_ATTEMPTS config
-    float latency_to_coast_ratio;  // USER_LATENCY_TO_COAST_RATIO config
-    float flow_rate_threshold;     // USER_GRIND_FLOW_DETECTION_THRESHOLD_GPS config
-    
-    // Pulse Duration Configuration (active during this session)
-    float pulse_duration_large;    // HW_PULSE_LARGE_ERROR_MS config
-    float pulse_duration_medium;   // HW_PULSE_MEDIUM_ERROR_MS config  
-    float pulse_duration_small;    // HW_PULSE_SMALL_ERROR_MS config
-    float pulse_duration_fine;     // HW_PULSE_FINE_ERROR_MS config
-    
-    // Error Threshold Configuration
-    float large_error_threshold;   // SYS_GRIND_ERROR_LARGE_THRESHOLD_G config
-    float medium_error_threshold;  // SYS_GRIND_ERROR_MEDIUM_THRESHOLD_G config
-    float small_error_threshold;   // SYS_GRIND_ERROR_SMALL_THRESHOLD_G config
-    
-    // Results Summary (calculated from existing data)
-    float final_weight;            // From final_cup_weight
-    float error_grams;             // target - final 
-    uint32_t total_time_ms;        // From total_grind_time_ms
-    uint8_t pulse_count;           // From pulse_attempts_count
-    char result_status[16];        // From final_phase_result
-    
-    // Motor Summary
-    uint32_t total_motor_on_time_ms;  // Total motor on time for entire session
-    
-    // Constructor
+    // Primary
+    uint32_t session_id;              // Auto-increment ID
+    uint32_t session_timestamp;       // Unix timestamp (session start)
+    uint32_t target_time_ms;          // Requested grind duration for time mode
+    uint32_t total_time_ms;           // Session runtime (milliseconds)
+    uint32_t total_motor_on_time_ms;  // Motor on time
+    int32_t  time_error_ms;           // Signed difference between target and actual motor time
+
+    // Profile & configuration
+    float    target_weight;           // Target weight configured for session
+    float    tolerance;               // Allowed error tolerance
+    float    final_weight;            // Recorded final settled weight
+    float    error_grams;             // target - final
+    float    start_weight;            // Weight when logging started (pre-tare snapshot)
+
+    // Grind Controller snapshot
+    float    initial_motor_stop_offset;
+    float    latency_to_coast_ratio;
+    float    flow_rate_threshold;
+    float    pulse_duration_large;
+    float    pulse_duration_medium;
+    float    pulse_duration_small;
+    float    pulse_duration_fine;
+    float    large_error_threshold;
+    float    medium_error_threshold;
+    float    small_error_threshold;
+
+    // Compact fields and status
+    uint8_t  profile_id;              // Active profile index
+    uint8_t  grind_mode;              // Grind mode (GrindMode enum value)
+    uint8_t  max_pulse_attempts;      // Configured max pulse attempts
+    uint8_t  pulse_count;             // Pulses executed
+    uint8_t  termination_reason;      // See GrindTerminationReason
+    uint8_t  reserved[3];             // Alignment + future expansion
+    char     result_status[16];       // Null-terminated status string
+
     GrindSession() {
         memset(this, 0, sizeof(GrindSession));
     }
 };
+
+#pragma pack(pop)
+
+static_assert(sizeof(TimeSeriesSessionHeader) == 24, "Unexpected TimeSeriesSessionHeader size");
+static_assert(sizeof(GrindEvent) == 44, "Unexpected GrindEvent size");
+static_assert(sizeof(GrindMeasurement) == 24, "Unexpected GrindMeasurement size");
+static_assert(sizeof(GrindSession) == 108, "Unexpected GrindSession size");
 
 // Time-series grind logging manager
 class GrindLogger {
@@ -132,6 +158,7 @@ private:
     uint16_t event_count;                    // Current number of events in buffer
     uint16_t measurement_count;              // Current number of measurements in buffer
     uint16_t event_sequence_counter;         // **NEW**: Counter for unique event IDs
+    uint16_t measurement_sequence_counter;   // Sequence counter for continuous measurements
     
     char current_phase_name[16];             // Current grinding phase name
     bool logging_active;                     // Whether a grind session is active
@@ -153,7 +180,7 @@ public:
     void cleanup();                          // Free PSRAM buffer
     
     // Session management
-    void start_grind_session(float target_weight, uint8_t profile_id, float tolerance);
+    void start_grind_session(const GrindSessionDescriptor& descriptor, float start_weight);
     void end_grind_session(const char* final_result, float final_weight, uint8_t pulse_count);
     void discard_current_session();         // Discard current session without saving
     

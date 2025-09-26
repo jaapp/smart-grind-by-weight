@@ -461,7 +461,6 @@ if analysis_mode == "Single Session":
 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         avg_meas_per_sec = len(session_measurements) / grind_time_s if grind_time_s > 0 else 0
-        mode_name = MODE_MAP.get(session_data.get('grind_mode'), 'UNKNOWN')
         if mode_name == 'TIME':
             target_time_s = session_data.get('target_time_s', 0.0)
             time_error_s = session_data.get('time_error_s', 0.0)

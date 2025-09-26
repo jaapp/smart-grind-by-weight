@@ -17,26 +17,19 @@ enum class FileIOOperationType {
 
 // Generic file I/O request structure
 struct FileIORequest {
-    FileIOOperationType operation_type;
-    
-    union {
-        FlashOpRequest flash_op;           // For FLASH_OPERATION
-        LogMessage log_msg;                // For LOG_MESSAGE
-        struct {                          // For PREFERENCE_WRITE
-            char key[32];
-            char value[64];
-        } preference;
-        struct {                          // For DATA_EXPORT
-            char export_path[64];
-            uint32_t start_session_id;
-            uint32_t end_session_id;
-        } data_export;
-    } data;
-    
-    FileIORequest() {
-        operation_type = FileIOOperationType::LOG_MESSAGE;
-        memset(&data, 0, sizeof(data));
-    }
+    FileIOOperationType operation_type = FileIOOperationType::LOG_MESSAGE;
+
+    FlashOpRequest flash_op{};           // For FLASH_OPERATION
+    LogMessage log_msg{};                // For LOG_MESSAGE
+    struct {                            // For PREFERENCE_WRITE
+        char key[32];
+        char value[64];
+    } preference{};
+    struct {                            // For DATA_EXPORT
+        char export_path[64];
+        uint32_t start_session_id;
+        uint32_t end_session_id;
+    } data_export{};
 };
 
 /**

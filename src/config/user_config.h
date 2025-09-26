@@ -111,7 +111,7 @@
 //------------------------------------------------------------------------------
 // UI VISUAL FEEDBACK
 //------------------------------------------------------------------------------
-#define USER_ENABLE_GRINDER_BACKGROUND_INDICATOR 1                            // 0=disabled, 1=show background color during grinding/pulses
+#define USER_ENABLE_GRINDER_BACKGROUND_INDICATOR 0                            // 0=disabled, 1=show background color during grinding/pulses
 
 //------------------------------------------------------------------------------
 // BLUETOOTH TIMEOUTS

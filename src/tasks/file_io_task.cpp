@@ -182,24 +182,24 @@ void FileIOTask::process_file_io_operations() {
         
         switch (request.operation_type) {
             case FileIOOperationType::FLASH_OPERATION:
-                process_flash_operation(request.data.flash_op);
+                process_flash_operation(request.flash_op);
                 flash_operations_processed++;
                 break;
                 
             case FileIOOperationType::LOG_MESSAGE:
-                process_log_message(request.data.log_msg);
+                process_log_message(request.log_msg);
                 log_messages_processed++;
                 break;
                 
             case FileIOOperationType::PREFERENCE_WRITE:
-                process_preference_write(request.data.preference.key, request.data.preference.value);
+                process_preference_write(request.preference.key, request.preference.value);
                 preference_operations_processed++;
                 break;
                 
             case FileIOOperationType::DATA_EXPORT:
-                process_data_export(request.data.data_export.export_path, 
-                                  request.data.data_export.start_session_id,
-                                  request.data.data_export.end_session_id);
+                process_data_export(request.data_export.export_path, 
+                                  request.data_export.start_session_id,
+                                  request.data_export.end_session_id);
                 data_export_operations_processed++;
                 break;
                 
@@ -215,9 +215,10 @@ void FileIOTask::process_flash_operation(const FlashOpRequest& request) {
     // This is the existing flash operation processing extracted from GrindController
     switch (request.operation_type) {
         case FlashOpRequest::START_GRIND_SESSION:
-            BLE_LOG("[%lums FLASH_OP] Processing START_GRIND_SESSION: target=%.2fg, profile=%d, tolerance=%.3fg\n", 
-                    millis(), request.target_weight, request.profile_id, request.tolerance);
-            grind_logger.start_grind_session(request.target_weight, request.profile_id, request.tolerance);
+            BLE_LOG("[%lums FLASH_OP] Processing START_GRIND_SESSION: mode=%s, profile=%d\n", 
+                    millis(), request.descriptor.mode == GrindMode::TIME ? "TIME" : "WEIGHT",
+                    request.descriptor.profile_id);
+            grind_logger.start_grind_session(request.descriptor, request.start_weight);
             break;
             
         case FlashOpRequest::END_GRIND_SESSION:

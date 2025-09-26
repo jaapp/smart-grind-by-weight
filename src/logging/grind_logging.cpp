@@ -7,6 +7,31 @@
 #include "../config/system_config.h"
 #include "../config/logging.h"
 
+namespace {
+
+GrindTerminationReason classify_termination_reason(const char* final_result) {
+    if (!final_result) {
+        return GrindTerminationReason::UNKNOWN;
+    }
+
+    if (strcmp(final_result, "TIMEOUT") == 0) {
+        return GrindTerminationReason::TIMEOUT;
+    }
+    if (strcmp(final_result, "OVERSHOOT") == 0) {
+        return GrindTerminationReason::OVERSHOOT;
+    }
+    if (strcmp(final_result, "COMPLETE - MAX PULSES") == 0) {
+        return GrindTerminationReason::MAX_PULSES;
+    }
+    if (strcmp(final_result, "COMPLETE") == 0) {
+        return GrindTerminationReason::COMPLETED;
+    }
+
+    return GrindTerminationReason::UNKNOWN;
+}
+
+}
+
 GrindLogger grind_logger;
 
 bool GrindLogger::init(Preferences* prefs) {
@@ -54,80 +79,155 @@ void GrindLogger::cleanup() {
     if (measurement_buffer) heap_caps_free(measurement_buffer);
 }
 
-void GrindLogger::start_grind_session(float target_weight, uint8_t profile_id, float tolerance) {
-    if (!current_session || !event_buffer || !measurement_buffer) return;
-    
+void GrindLogger::start_grind_session(const GrindSessionDescriptor& descriptor, float start_weight) {
+    if (!current_session || !event_buffer || !measurement_buffer) {
+        return;
+    }
+
     clear_buffers();
     memset(current_session, 0, sizeof(GrindSession));
-    
+
     current_session->session_id = _next_session_id;
     _next_session_id++;
     _preferences->putUInt("next_session_id", _next_session_id);
 
     current_session->session_timestamp = millis() / 1000;
-    current_session->profile_id = profile_id;
-    current_session->target_weight = target_weight;
-    current_session->tolerance = tolerance;
-    
+    current_session->profile_id = descriptor.profile_id;
+    current_session->target_weight = descriptor.target_weight;
+    current_session->tolerance = descriptor.tolerance;
+    current_session->grind_mode = static_cast<uint8_t>(descriptor.mode);
+    current_session->target_time_ms = descriptor.target_time_ms;
+    current_session->start_weight = start_weight;
+    current_session->max_pulse_attempts = USER_GRIND_MAX_PULSE_ATTEMPTS;
+    current_session->time_error_ms = 0;
+    current_session->total_time_ms = 0;
+    current_session->total_motor_on_time_ms = 0;
+    current_session->termination_reason = static_cast<uint8_t>(GrindTerminationReason::UNKNOWN);
+
     initialize_session_config();
-    
+
     logging_active = true;
     session_start_time = millis();
-    
+
     // Initialize motor time tracking
     last_motor_state = false;
     motor_start_time = 0;
     total_motor_time_ms = 0;
-    
-    BLE_LOG("Started time-series session %lu: target=%.1fg, profile=%d\n", 
-                  current_session->session_id, target_weight, profile_id);
+
+    const char* mode_name = (descriptor.mode == GrindMode::TIME) ? "TIME" : "WEIGHT";
+    if (descriptor.mode == GrindMode::TIME) {
+        BLE_LOG("Started time-series session %lu: mode=%s, target_time=%lums, profile=%d\n",
+                current_session->session_id,
+                mode_name,
+                static_cast<unsigned long>(descriptor.target_time_ms),
+                descriptor.profile_id);
+    } else {
+        BLE_LOG("Started time-series session %lu: mode=%s, target=%.1fg, profile=%d\n",
+                current_session->session_id,
+                mode_name,
+                descriptor.target_weight,
+                descriptor.profile_id);
+    }
 }
 
 
 void GrindLogger::end_grind_session(const char* final_result, float final_weight, uint8_t pulse_count) {
-    if (!current_session || !logging_active) return;
-    
+    if (!current_session || !logging_active) {
+        return;
+    }
+
     current_session->final_weight = final_weight;
     current_session->error_grams = current_session->target_weight - final_weight;
     current_session->total_time_ms = millis() - session_start_time;
     current_session->pulse_count = pulse_count;
     strncpy(current_session->result_status, final_result, sizeof(current_session->result_status) - 1);
-    
+
     // Finalize motor time tracking - if motor is still on, count the final period
     uint32_t now = millis();
     if (last_motor_state && motor_start_time > 0) {
         total_motor_time_ms += (now - motor_start_time);
     }
     current_session->total_motor_on_time_ms = total_motor_time_ms;
-    
+
+    GrindMode mode = static_cast<GrindMode>(current_session->grind_mode);
+    if (mode == GrindMode::TIME) {
+        current_session->time_error_ms = static_cast<int32_t>(current_session->total_motor_on_time_ms) -
+                                         static_cast<int32_t>(current_session->target_time_ms);
+        // Weight error is not meaningful for time-based grinds
+        current_session->error_grams = 0.0f;
+    } else {
+        current_session->time_error_ms = 0;
+    }
+
+    GrindTerminationReason termination_reason = classify_termination_reason(final_result);
+    current_session->termination_reason = static_cast<uint8_t>(termination_reason);
+
     // Don't save sessions that were ended abnormally (e.g., cancelled or timed out).
     bool is_abnormal_termination = (strcmp(final_result, "STOPPED_BY_USER") == 0) ||
-                                   (strcmp(final_result, "TIMEOUT") == 0);
-    
+                                   (termination_reason == GrindTerminationReason::TIMEOUT);
+
     // Check if logging is enabled before saving to flash
     Preferences logging_prefs;
     logging_prefs.begin("logging", true); // read-only
     bool logging_enabled = logging_prefs.getBool("enabled", false);
     logging_prefs.end();
-    
+
+    const char* mode_name = (mode == GrindMode::TIME) ? "TIME" : "WEIGHT";
+
     if (!is_abnormal_termination && logging_enabled) {
         flush_session_to_flash();
-        BLE_LOG("Ended session %lu: final=%.1fg, error=%+.2fg, %s (saved)\n",
-                      current_session->session_id, final_weight, 
-                      current_session->error_grams, final_result);
+        if (mode == GrindMode::TIME) {
+            BLE_LOG("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (saved)\n",
+                    current_session->session_id,
+                    mode_name,
+                    final_weight,
+                    static_cast<long>(current_session->time_error_ms),
+                    final_result);
+        } else {
+            BLE_LOG("Ended session %lu: mode=%s, final=%.1fg, error=%+.2fg, %s (saved)\n",
+                    current_session->session_id,
+                    mode_name,
+                    final_weight,
+                    current_session->error_grams,
+                    final_result);
+        }
     } else if (!is_abnormal_termination && !logging_enabled) {
-        BLE_LOG("Ended session %lu: final=%.1fg, error=%+.2fg, %s (not saved - logging disabled)\n",
-                      current_session->session_id, final_weight, 
-                      current_session->error_grams, final_result);
+        if (mode == GrindMode::TIME) {
+            BLE_LOG("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (not saved - logging disabled)\n",
+                    current_session->session_id,
+                    mode_name,
+                    final_weight,
+                    static_cast<long>(current_session->time_error_ms),
+                    final_result);
+        } else {
+            BLE_LOG("Ended session %lu: mode=%s, final=%.1fg, error=%+.2fg, %s (not saved - logging disabled)\n",
+                    current_session->session_id,
+                    mode_name,
+                    final_weight,
+                    current_session->error_grams,
+                    final_result);
+        }
     } else {
-        BLE_LOG("Ended session %lu: final=%.1fg, error=%+.2fg, %s (not saved - abnormal termination)\n",
-                      current_session->session_id, final_weight, 
-                      current_session->error_grams, final_result);
+        if (mode == GrindMode::TIME) {
+            BLE_LOG("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (not saved - abnormal termination)\n",
+                    current_session->session_id,
+                    mode_name,
+                    final_weight,
+                    static_cast<long>(current_session->time_error_ms),
+                    final_result);
+        } else {
+            BLE_LOG("Ended session %lu: mode=%s, final=%.1fg, error=%+.2fg, %s (not saved - abnormal termination)\n",
+                    current_session->session_id,
+                    mode_name,
+                    final_weight,
+                    current_session->error_grams,
+                    final_result);
+        }
     }
-    
+
     // Clear buffers to ensure clean state for next session
     clear_buffers();
-    
+
     logging_active = false;
 }
 
@@ -148,6 +248,12 @@ void GrindLogger::log_event(GrindEvent& event) {
         return;
     }
     // **FIX**: Assign a unique, sequential ID to the event before logging
+    if (current_session) {
+        GrindMode mode = static_cast<GrindMode>(current_session->grind_mode);
+        if (mode == GrindMode::TIME) {
+            event.event_flags |= GRIND_EVENT_FLAG_TIME_MODE;
+        }
+    }
     event.event_sequence_id = event_sequence_counter++;
     event_buffer[event_count++] = event;
 }
@@ -165,9 +271,10 @@ void GrindLogger::log_continuous_measurement(uint32_t timestamp_ms, float weight
     measurement.weight_grams = weight_grams;
     measurement.weight_delta = weight_delta;
     measurement.flow_rate_g_per_s = flow_rate_g_per_s;
+    measurement.motor_stop_target_weight = motor_stop_target_weight;
+    measurement.sequence_id = measurement_sequence_counter++;
     measurement.motor_is_on = motor_is_on;
     measurement.phase_id = phase_id;
-    measurement.motor_stop_target_weight = motor_stop_target_weight;
     
     // Track motor time changes for session summary
     bool current_motor_state = (motor_is_on == 1);
@@ -324,6 +431,7 @@ void GrindLogger::clear_buffers() {
     event_count = 0;
     measurement_count = 0;
     event_sequence_counter = 0;
+    measurement_sequence_counter = 0;
     if (event_buffer) memset(event_buffer, 0, sizeof(GrindEvent) * EVENT_TEMP_BUFFER_SIZE);
     if (measurement_buffer) memset(measurement_buffer, 0, sizeof(GrindMeasurement) * MEASUREMENT_TEMP_BUFFER_SIZE);
 }
@@ -353,11 +461,14 @@ bool GrindLogger::write_time_series_session_to_flash(const GrindSession& session
     
     TimeSeriesSessionHeader header;
     header.session_id = session.session_id;
-    header.event_count = event_count;
-    header.measurement_count = measurement_count;
     header.session_timestamp = session.session_timestamp;
     header.session_size = sizeof(GrindSession) + (sizeof(GrindEvent) * event_count) + (sizeof(GrindMeasurement) * measurement_count);
-    
+    header.checksum = calculate_checksum((const uint8_t*)&session, header.session_size);
+    header.event_count = event_count;
+    header.measurement_count = measurement_count;
+    header.schema_version = GRIND_LOG_SCHEMA_VERSION;
+    header.reserved = 0;
+
     size_t written = 0;
     written += file.write((uint8_t*)&header, sizeof(TimeSeriesSessionHeader));
     written += file.write((uint8_t*)&session, sizeof(GrindSession));
@@ -750,11 +861,13 @@ void GrindLogger::print_struct_layout_debug() {
     BLE_LOG("\n--- TimeSeriesSessionHeader offsets ---\n");
     TimeSeriesSessionHeader* hdr = nullptr;
     BLE_LOG("session_id offset: %zu\n", (size_t)&hdr->session_id);
-    BLE_LOG("event_count offset: %zu\n", (size_t)&hdr->event_count);
-    BLE_LOG("measurement_count offset: %zu\n", (size_t)&hdr->measurement_count);
     BLE_LOG("session_timestamp offset: %zu\n", (size_t)&hdr->session_timestamp);
     BLE_LOG("session_size offset: %zu\n", (size_t)&hdr->session_size);
     BLE_LOG("checksum offset: %zu\n", (size_t)&hdr->checksum);
+    BLE_LOG("event_count offset: %zu\n", (size_t)&hdr->event_count);
+    BLE_LOG("measurement_count offset: %zu\n", (size_t)&hdr->measurement_count);
+    BLE_LOG("schema_version offset: %zu\n", (size_t)&hdr->schema_version);
+    BLE_LOG("reserved offset: %zu\n", (size_t)&hdr->reserved);
     
     // Yield to allow BLE transmission
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -763,15 +876,31 @@ void GrindLogger::print_struct_layout_debug() {
     GrindSession* sess = nullptr;
     BLE_LOG("session_id offset: %zu\n", (size_t)&sess->session_id);
     BLE_LOG("session_timestamp offset: %zu\n", (size_t)&sess->session_timestamp);
-    BLE_LOG("profile_id offset: %zu\n", (size_t)&sess->profile_id);
+    BLE_LOG("target_time_ms offset: %zu\n", (size_t)&sess->target_time_ms);
+    BLE_LOG("total_time_ms offset: %zu\n", (size_t)&sess->total_time_ms);
+    BLE_LOG("total_motor_on_time_ms offset: %zu\n", (size_t)&sess->total_motor_on_time_ms);
+    BLE_LOG("time_error_ms offset: %zu\n", (size_t)&sess->time_error_ms);
     BLE_LOG("target_weight offset: %zu\n", (size_t)&sess->target_weight);
     BLE_LOG("tolerance offset: %zu\n", (size_t)&sess->tolerance);
     BLE_LOG("final_weight offset: %zu\n", (size_t)&sess->final_weight);
     BLE_LOG("error_grams offset: %zu\n", (size_t)&sess->error_grams);
-    BLE_LOG("total_time_ms offset: %zu\n", (size_t)&sess->total_time_ms);
+    BLE_LOG("start_weight offset: %zu\n", (size_t)&sess->start_weight);
+    BLE_LOG("initial_motor_stop_offset offset: %zu\n", (size_t)&sess->initial_motor_stop_offset);
+    BLE_LOG("latency_to_coast_ratio offset: %zu\n", (size_t)&sess->latency_to_coast_ratio);
+    BLE_LOG("flow_rate_threshold offset: %zu\n", (size_t)&sess->flow_rate_threshold);
+    BLE_LOG("pulse_duration_large offset: %zu\n", (size_t)&sess->pulse_duration_large);
+    BLE_LOG("pulse_duration_medium offset: %zu\n", (size_t)&sess->pulse_duration_medium);
+    BLE_LOG("pulse_duration_small offset: %zu\n", (size_t)&sess->pulse_duration_small);
+    BLE_LOG("pulse_duration_fine offset: %zu\n", (size_t)&sess->pulse_duration_fine);
+    BLE_LOG("large_error_threshold offset: %zu\n", (size_t)&sess->large_error_threshold);
+    BLE_LOG("medium_error_threshold offset: %zu\n", (size_t)&sess->medium_error_threshold);
+    BLE_LOG("small_error_threshold offset: %zu\n", (size_t)&sess->small_error_threshold);
+    BLE_LOG("profile_id offset: %zu\n", (size_t)&sess->profile_id);
+    BLE_LOG("grind_mode offset: %zu\n", (size_t)&sess->grind_mode);
+    BLE_LOG("max_pulse_attempts offset: %zu\n", (size_t)&sess->max_pulse_attempts);
     BLE_LOG("pulse_count offset: %zu\n", (size_t)&sess->pulse_count);
+    BLE_LOG("termination_reason offset: %zu\n", (size_t)&sess->termination_reason);
     BLE_LOG("result_status offset: %zu\n", (size_t)&sess->result_status);
-    BLE_LOG("total_motor_on_time_ms offset: %zu\n", (size_t)&sess->total_motor_on_time_ms);
     
     // Yield to allow BLE transmission
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -779,18 +908,19 @@ void GrindLogger::print_struct_layout_debug() {
     BLE_LOG("\n--- GrindEvent offsets ---\n");
     GrindEvent* evt = nullptr;
     BLE_LOG("timestamp_ms offset: %zu\n", (size_t)&evt->timestamp_ms);
-    BLE_LOG("phase_id offset: %zu\n", (size_t)&evt->phase_id);
-    BLE_LOG("pulse_attempt_number offset: %zu\n", (size_t)&evt->pulse_attempt_number);
-    BLE_LOG("event_sequence_id offset: %zu\n", (size_t)&evt->event_sequence_id);
     BLE_LOG("duration_ms offset: %zu\n", (size_t)&evt->duration_ms);
+    BLE_LOG("grind_latency_ms offset: %zu\n", (size_t)&evt->grind_latency_ms);
+    BLE_LOG("settling_duration_ms offset: %zu\n", (size_t)&evt->settling_duration_ms);
     BLE_LOG("start_weight offset: %zu\n", (size_t)&evt->start_weight);
     BLE_LOG("end_weight offset: %zu\n", (size_t)&evt->end_weight);
     BLE_LOG("motor_stop_target_weight offset: %zu\n", (size_t)&evt->motor_stop_target_weight);
     BLE_LOG("pulse_duration_ms offset: %zu\n", (size_t)&evt->pulse_duration_ms);
-    BLE_LOG("grind_latency_ms offset: %zu\n", (size_t)&evt->grind_latency_ms);
-    BLE_LOG("settling_duration_ms offset: %zu\n", (size_t)&evt->settling_duration_ms);
     BLE_LOG("pulse_flow_rate offset: %zu\n", (size_t)&evt->pulse_flow_rate);
+    BLE_LOG("event_sequence_id offset: %zu\n", (size_t)&evt->event_sequence_id);
     BLE_LOG("loop_count offset: %zu\n", (size_t)&evt->loop_count);
+    BLE_LOG("phase_id offset: %zu\n", (size_t)&evt->phase_id);
+    BLE_LOG("pulse_attempt_number offset: %zu\n", (size_t)&evt->pulse_attempt_number);
+    BLE_LOG("event_flags offset: %zu\n", (size_t)&evt->event_flags);
     
     // Yield to allow BLE transmission
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -801,9 +931,10 @@ void GrindLogger::print_struct_layout_debug() {
     BLE_LOG("weight_grams offset: %zu\n", (size_t)&meas->weight_grams);
     BLE_LOG("weight_delta offset: %zu\n", (size_t)&meas->weight_delta);
     BLE_LOG("flow_rate_g_per_s offset: %zu\n", (size_t)&meas->flow_rate_g_per_s);
+    BLE_LOG("motor_stop_target_weight offset: %zu\n", (size_t)&meas->motor_stop_target_weight);
+    BLE_LOG("sequence_id offset: %zu\n", (size_t)&meas->sequence_id);
     BLE_LOG("motor_is_on offset: %zu\n", (size_t)&meas->motor_is_on);
     BLE_LOG("phase_id offset: %zu\n", (size_t)&meas->phase_id);
-    BLE_LOG("motor_stop_target_weight offset: %zu\n", (size_t)&meas->motor_stop_target_weight);
     
     // Yield to allow BLE transmission
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -1059,11 +1190,13 @@ bool GrindLogger::write_individual_session_file(uint32_t session_id, const Grind
     // Create and write session header (for compatibility with existing parsing)
     TimeSeriesSessionHeader header;
     header.session_id = session_id;
-    header.event_count = event_count;
-    header.measurement_count = measurement_count;
     header.session_timestamp = session.session_timestamp;
     header.session_size = total_data_size;
-    header.checksum = calculate_checksum((uint8_t*)&session, total_data_size);
+    header.checksum = calculate_checksum((const uint8_t*)&session, total_data_size);
+    header.event_count = event_count;
+    header.measurement_count = measurement_count;
+    header.schema_version = GRIND_LOG_SCHEMA_VERSION;
+    header.reserved = 0;
     
     // Write header, session, events, and measurements
     if (file.write((uint8_t*)&header, sizeof(header)) != sizeof(header) ||
