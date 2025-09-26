@@ -5,6 +5,10 @@
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
 #include "grind_mode.h"
+#include "grind_session.h"
+#include "grind_strategy.h"
+#include "weight_grind_strategy.h"
+#include "time_grind_strategy.h"
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <freertos/FreeRTOS.h>
@@ -77,6 +81,9 @@ struct PulseReport {
 // Controls the grinding process with predictive weight stopping and precision pulse corrections
 class GrindController {
 private:
+    friend class WeightGrindStrategy;
+    friend class TimeGrindStrategy;
+
     WeightSensor* weight_sensor;
     Grinder* grinder;
     Preferences* preferences;
@@ -122,7 +129,7 @@ private:
     float last_logged_weight;       // Previous weight for delta calculation
     unsigned long last_logged_time; // Previous timestamp for relative timing
     bool force_measurement_log;     // Flag to force measurement logging on next update cycle
-    
+
     // UI event system - thread-safe Core 0 → Core 1 communication
     QueueHandle_t ui_event_queue;
     
@@ -140,6 +147,12 @@ private:
     // Flag to prevent repeated flash operations for terminal phases (COMPLETED/TIMEOUT)
     bool session_end_flash_queued = false;
     char last_error_message[32];
+
+    GrindSessionDescriptor session_descriptor;
+    GrindStrategyContext strategy_context;
+    IGrindStrategy* active_strategy = nullptr;
+    WeightGrindStrategy weight_strategy;
+    TimeGrindStrategy time_strategy;
 
 public:
     void init(WeightSensor* lc, Grinder* gr, Preferences* prefs);
@@ -167,9 +180,10 @@ public:
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
     GrindMode get_mode() const { return mode; }
+    const GrindSessionDescriptor& get_session_descriptor() const { return session_descriptor; }
     
     // Grind logging functions
-    void set_grind_profile_id(uint8_t profile_id) { current_profile_id = profile_id; }
+    void set_grind_profile_id(uint8_t profile_id) { current_profile_id = profile_id; session_descriptor.profile_id = profile_id; }
     void send_measurements_data();           // Send structured measurement data via serial
     
     // Getter methods for logger (to eliminate calculations in logger)
@@ -184,19 +198,15 @@ public:
     
 private:
     void switch_phase(GrindPhase new_phase, const GrindLoopData& loop_data = {});
-    void pulse_control(const GrindLoopData& loop_data = {});
     void final_measurement(const GrindLoopData& loop_data);
- 
+
     bool check_timeout() const;
-    float calculate_pulse_duration_ms(float error_grams);
-    float get_effective_flow_rate() const;
     uint8_t get_current_phase_id() const;
     
     // UI event emission - thread-safe for Core 0
     void emit_ui_event(const GrindEventData& data);
     
     // Core 0 control methods  
-    bool predictive_control(const GrindLoopData& loop_data);
     bool should_log_measurements() const;
     
     // Internal state methods (moved from public to prevent polling)

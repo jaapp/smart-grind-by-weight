@@ -60,8 +60,8 @@ private:
     lv_timer_t* grind_complete_timer;
     lv_timer_t* grind_timeout_timer;
     
-    float edit_weight;
-    float original_weight;
+    float edit_target;
+    float original_target;
     float calibration_weight;
     float final_grind_weight;
     int final_grind_progress;
@@ -189,7 +189,8 @@ private:
     void refresh_ready_profiles();
     void setup_event_handlers();
     void update_grind_button_icon();
-    void update_edit_weight_display();
+    void update_edit_target_display();
+    void update_grinding_targets();
     void start_jog_timer(int direction);
     void stop_jog_timer();
     

@@ -77,6 +77,9 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     } else {
         BLE_LOG("Log message queue created successfully\n");
     }
+
+    strategy_context.controller = this;
+    active_strategy = nullptr;
 }
 
 void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grind_mode) {
@@ -121,6 +124,20 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     session_end_flash_queued = false;
 
     last_error_message[0] = '\0';
+
+    session_descriptor.mode = mode;
+    session_descriptor.target_weight = target_weight;
+    session_descriptor.target_time_ms = target_time_ms;
+    session_descriptor.tolerance = tolerance;
+    session_descriptor.profile_id = current_profile_id;
+
+    if (mode == GrindMode::WEIGHT) {
+        active_strategy = static_cast<IGrindStrategy*>(&weight_strategy);
+    } else if (mode == GrindMode::TIME) {
+        active_strategy = static_cast<IGrindStrategy*>(&time_strategy);
+    } else {
+        active_strategy = nullptr;
+    }
     
     // Start with INITIALIZING phase - this emits immediate UI event
     // Create minimal loop_data for initial phase transition
@@ -128,6 +145,10 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     loop_data.now = millis();
     loop_data.timestamp_ms = loop_data.now - start_time;
     loop_data.current_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
+
+    if (active_strategy) {
+        active_strategy->on_enter(session_descriptor, strategy_context, loop_data);
+    }
     
     switch_phase(GrindPhase::INITIALIZING, loop_data);
 }
@@ -145,6 +166,10 @@ void GrindController::return_to_idle() {
         time_grind_start_ms = 0;
         target_time_ms = 0;
         last_error_message[0] = '\0';
+        if (active_strategy) {
+            active_strategy->on_exit(session_descriptor, strategy_context);
+            active_strategy = nullptr;
+        }
         switch_phase(GrindPhase::IDLE);  // No loop_data needed for IDLE transition
     }
     // If already IDLE, do nothing. If in another active state, this method shouldn't be called.
@@ -163,6 +188,10 @@ void GrindController::stop_grind() {
     time_grind_start_ms = 0;
     target_time_ms = 0;
     last_error_message[0] = '\0';
+    if (active_strategy) {
+        active_strategy->on_exit(session_descriptor, strategy_context);
+        active_strategy = nullptr;
+    }
     switch_phase(GrindPhase::IDLE);  // No loop_data needed for IDLE transition
 }
 
@@ -230,49 +259,33 @@ void GrindController::update() {
             }
             break;
 
-        case GrindPhase::TIME_GRINDING: {
-            if (time_grind_start_ms == 0) {
-                time_grind_start_ms = loop_data.now;
-            }
-
-            if (target_time_ms == 0) {
-                grinder->stop();
-                switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
-                break;
-            }
-
-            unsigned long elapsed = loop_data.now - time_grind_start_ms;
-            if (elapsed >= target_time_ms) {
-                grinder->stop();
-                switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
+        case GrindPhase::TIME_GRINDING:
+            if (mode == GrindMode::TIME && active_strategy) {
+                active_strategy->update(session_descriptor, strategy_context, loop_data);
             }
             break;
-        }
 
         case GrindPhase::PREDICTIVE:
-            // Inline predictive control logic
-            if (predictive_control(loop_data)) {
-                switch_phase(GrindPhase::PULSE_SETTLING, loop_data);
+            if (mode == GrindMode::WEIGHT && active_strategy) {
+                active_strategy->update(session_descriptor, strategy_context, loop_data);
             }
             break;
             
         case GrindPhase::PULSE_DECISION:
-            pulse_control(loop_data);
+            if (mode == GrindMode::WEIGHT && active_strategy) {
+                active_strategy->update(session_descriptor, strategy_context, loop_data);
+            }
             break;
 
         case GrindPhase::PULSE_EXECUTE:
-            if (grinder->is_pulse_complete()) {
-                switch_phase(GrindPhase::PULSE_SETTLING, loop_data);
+            if (mode == GrindMode::WEIGHT && active_strategy) {
+                active_strategy->update(session_descriptor, strategy_context, loop_data);
             }
             break;
 
         case GrindPhase::PULSE_SETTLING:
-            // Wait minimum grind_latency_ms + HW_MOTOR_SETTLING_TIME_MS before checking weight settling
-            if (loop_data.now - phase_start_time >= grind_latency_ms + HW_MOTOR_SETTLING_TIME_MS) {
-                // After minimum latency, wait for weight to settle with motor settling window
-                if (weight_sensor->check_settling_complete(HW_MOTOR_SETTLING_TIME_MS)) {
-                    switch_phase(GrindPhase::PULSE_DECISION, loop_data);
-                }
+            if (mode == GrindMode::WEIGHT && active_strategy) {
+                active_strategy->update(session_descriptor, strategy_context, loop_data);
             }
             break;
 
@@ -350,6 +363,7 @@ void GrindController::update() {
     GrindEventData progress_event = {};
     progress_event.event = UIGrindEvent::PROGRESS_UPDATED;
     progress_event.phase = phase;
+    progress_event.mode = session_descriptor.mode;
     progress_event.current_weight = (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) 
                                     ? final_weight 
                                     : loop_data.display_weight;
@@ -395,50 +409,6 @@ void GrindController::update() {
 
 // OLD predictive_grind method removed - logic now inline in update()
 
-void GrindController::pulse_control(const GrindLoopData& loop_data) {
-    // Use non-blocking precision settling check instead of blocking call
-    float settled_weight;
-    if (!weight_sensor->check_settling_complete(HW_SCALE_PRECISION_SETTLING_TIME_MS, &settled_weight)) {
-        // Still settling, wait for next cycle
-        return;
-    }
-    
-    // Weight has settled with precision window, proceed with pulse decision
-    float current_weight = settled_weight;
-    // Use conservative target that biases toward undershoot (since overshoot is unrecoverable)
-    float conservative_target = target_weight - USER_GRIND_ACCURACY_TOLERANCE_G;
-    float error = conservative_target - current_weight;
-    
-    if (coast_time_ms == 0) { 
-        coast_time_ms = SYS_TIMEOUT_MEDIUM_MS;
-    }
-    
-    if (target_weight - current_weight < USER_GRIND_ACCURACY_TOLERANCE_G || pulse_attempts >= USER_GRIND_MAX_PULSE_ATTEMPTS) {
-        switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
-        return;
-    }
-    
-    // Record pulse history for summary report
-    pulse_history[pulse_attempts].start_weight = current_weight;
-    pulse_history[pulse_attempts].end_weight = current_weight; // Will be updated after pulse
-    pulse_history[pulse_attempts].settle_time_ms = coast_time_ms;
-    current_pulse_duration_ms = calculate_pulse_duration_ms(error);
-    pulse_history[pulse_attempts].duration_ms = current_pulse_duration_ms;
-    
-    // SWITCH PHASE FIRST to prevent re-entry
-    switch_phase(GrindPhase::PULSE_EXECUTE, loop_data);
-    grinder->start_pulse_rmt((uint32_t)current_pulse_duration_ms);
-    
-#if HW_LOADCELL_USE_MOCK_DRIVER
-    // Simulate pulse in mock driver for testing
-    if (weight_sensor && weight_sensor->get_adc_driver()) {
-        weight_sensor->get_adc_driver()->simulate_pulse((uint32_t)current_pulse_duration_ms);
-    }
-#endif
-    
-    pulse_attempts++;
-}
-
 void GrindController::final_measurement(const GrindLoopData& loop_data) {
     final_weight = weight_sensor->get_weight_high_latency();
 
@@ -451,50 +421,6 @@ void GrindController::final_measurement(const GrindLoopData& loop_data) {
 
     // Switch to COMPLETED. The state machine will then transition to IDLE on the next tick.
     switch_phase(GrindPhase::COMPLETED, loop_data);
-}
-
-
-float GrindController::calculate_pulse_duration_ms(float error_grams) {
-    // Get effective flow rate with safety checks
-    float effective_flow_rate = get_effective_flow_rate();
-    
-    // Apply error magnitude factor (be gentler for small errors)
-    float error_factor = (error_grams < 0.05f) ? SYS_GRIND_SMALL_ERROR_FACTOR : 1.0f;
-#if ENABLE_GRIND_DEBUG
-    queue_log_message("[DYNAMIC_DEBUG] EffectiveFlowRate: %.3fg/s, ErrorFactor: %.2f (small_error: %s)\n", 
-            effective_flow_rate, error_factor, (error_grams < 0.1f) ? "YES" : "NO");
-#endif
-    
-    // Calculate base duration from flow rate
-    float base_duration = (error_grams * error_factor / effective_flow_rate) * 1000.0f;
-#if ENABLE_GRIND_DEBUG
-    queue_log_message("[DYNAMIC_DEBUG] BaseDuration: %.1fms (%.3fg * %.2f / %.3fg/s * 1000)\n", 
-            base_duration, error_grams, error_factor, effective_flow_rate);
-#endif
-    
-    // No pulse effectiveness learning - keep it simple
-    
-    // Apply safety bounds
-    float final_duration = max(HW_MOTOR_MIN_PULSE_DURATION_MS, min(base_duration, HW_MOTOR_MAX_PULSE_DURATION_MS));
-#if ENABLE_GRIND_DEBUG
-    queue_log_message("[DYNAMIC_DEBUG] FinalDuration: %.1fms (bounded between %.1f-%.1f)\n", 
-            final_duration, HW_MOTOR_MIN_PULSE_DURATION_MS, HW_MOTOR_MAX_PULSE_DURATION_MS);
-#endif
-    
-    return final_duration;
-}
-
-float GrindController::get_effective_flow_rate() const {
-    float flow_rate = pulse_flow_rate; // Use ONLY the reliable predictive phase measurement
-    
-    // Apply safety bounds to prevent extreme calculations
-    if (flow_rate < HW_FLOW_RATE_MIN_SANE_GPS) {
-        flow_rate = HW_FLOW_RATE_REFERENCE_GPS; // Use reference if too low
-    } else if (flow_rate > HW_FLOW_RATE_MAX_SANE_GPS) {
-        flow_rate = HW_FLOW_RATE_MAX_SANE_GPS; // Cap if too high
-    }
-    
-    return flow_rate;
 }
 
 
@@ -571,6 +497,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
     GrindEventData event_data = {};
     event_data.event = UIGrindEvent::PHASE_CHANGED;
     event_data.phase = new_phase;
+    event_data.mode = session_descriptor.mode;
     event_data.current_weight = weight_sensor ? weight_sensor->get_display_weight() : 0.0f;
     event_data.progress_percent = get_progress_percent();
     event_data.phase_display_text = get_phase_name(new_phase);
@@ -608,15 +535,8 @@ bool GrindController::is_active() const {
 }
 
 int GrindController::get_progress_percent() const {
-    if (mode == GrindMode::TIME && target_time_ms > 0) {
-        if (time_grind_start_ms == 0) {
-            return 0;
-        }
-        unsigned long elapsed = millis() - time_grind_start_ms;
-        int progress = (int)(((float)elapsed / (float)target_time_ms) * 100.0f);
-        if (progress > 100) progress = 100;
-        if (progress < 0) progress = 0;
-        return progress;
+    if (active_strategy && session_descriptor.mode == GrindMode::TIME) {
+        return active_strategy->progress_percent(session_descriptor, *this);
     }
 
     if (target_weight <= 0) return 0;
@@ -715,53 +635,6 @@ void GrindController::emit_ui_event(const GrindEventData& data) {
 //==============================================================================
 // CORE 0 HELPER METHODS
 //==============================================================================
-
-
-bool GrindController::predictive_control(const GrindLoopData& loop_data) {
-    // Inline predictive grind logic (previously in predictive_grind method)
-    
-    // Step 1: Poll flowrate over a 500ms window to detect flow start.
-    if (!flow_start_confirmed) {
-        const uint32_t flow_detection_window_ms = 500;
-        float current_flow_rate = weight_sensor->get_flow_rate(flow_detection_window_ms);
-
-        if (current_flow_rate >= USER_GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
-            // Flow detected, calculate latency from the start of the predictive phase.
-            grind_latency_ms = loop_data.now - phase_start_time;
-            flow_start_confirmed = true;
-            BLE_LOG("[PREDICTIVE] Flow start CONFIRMED! Latency: %lums, Flow: %.2fg/s\n", grind_latency_ms, current_flow_rate);
-        }
-    }
-
-    // Once latency is known (flow start confirmed), continuously update the dynamic goal based on the current flow rate.
-    if (flow_start_confirmed) {
-        const uint32_t flow_rate_calc_window_ms = 1500;
-
-        // Wait for stable flow rate calculation window
-        if (loop_data.now > (phase_start_time + grind_latency_ms + flow_rate_calc_window_ms)) {
-            float current_flow_rate = weight_sensor->get_flow_rate(flow_rate_calc_window_ms);
-            
-            if (current_flow_rate > USER_GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
-                // Also applying USER_LATENCY_TO_COAST_RATIO ratio to account for expected difference between initial latency and final coast
-                motor_stop_target_weight = ((grind_latency_ms * USER_LATENCY_TO_COAST_RATIO) / (float)SYS_MS_PER_SECOND) * current_flow_rate;
-            }
-        }
-    }
-    
-    // Check if motor stop target weight reached - return true to indicate grinder should be stopped
-    if (loop_data.current_weight >= (target_weight - motor_stop_target_weight)) {
-        grinder->stop();
-        predictive_end_weight = loop_data.current_weight;
-        
-        // Store final 95th percentile flow rate for pulse algorithm - only needed when exiting predictive phase
-        pulse_flow_rate = weight_sensor->get_flow_rate_95th_percentile(2500);
-        
-        return true;  // Signal that predictive phase should end
-    }
-    
-    return false;  // Continue grinding
-}
-
 
 
 bool GrindController::should_log_measurements() const {

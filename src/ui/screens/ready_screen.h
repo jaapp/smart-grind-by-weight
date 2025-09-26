@@ -1,6 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include "../../config/ui_theme.h"
+#include "../../controllers/grind_mode.h"
 
 class ReadyScreen {
 private:
@@ -15,7 +16,7 @@ public:
     void create();
     void show();
     void hide();
-    void update_profile_values(const float values[3], bool show_time);
+    void update_profile_values(const float values[3], GrindMode mode);
     void set_active_tab(int tab);
     void set_profile_long_press_handler(lv_event_cb_t handler);
     

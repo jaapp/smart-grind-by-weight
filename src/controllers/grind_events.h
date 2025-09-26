@@ -15,6 +15,7 @@ enum class UIGrindEvent {
 struct GrindEventData {
     UIGrindEvent event;
     GrindPhase phase;
+    GrindMode mode;
     float current_weight;
     int progress_percent;
     const char* phase_display_text;

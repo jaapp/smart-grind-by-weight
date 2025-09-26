@@ -1,6 +1,7 @@
 #include "ready_screen.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
+#include "../../controllers/grind_mode_traits.h"
 
 void ReadyScreen::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -43,7 +44,7 @@ void ReadyScreen::create() {
     // Create settings tab page
     create_settings_page(settings_tab);
 
-    update_profile_values(default_weights, false);
+    update_profile_values(default_weights, GrindMode::WEIGHT);
 
     visible = false;
 }
@@ -95,15 +96,11 @@ void ReadyScreen::hide() {
     visible = false;
 }
 
-void ReadyScreen::update_profile_values(const float values[3], bool show_time) {
+void ReadyScreen::update_profile_values(const float values[3], GrindMode mode) {
     for (int i = 0; i < 3; i++) {
         if (weight_labels[i]) {
             char text[24];
-            if (show_time) {
-                snprintf(text, sizeof(text), "%.1fs", values[i]);
-            } else {
-                snprintf(text, sizeof(text), SYS_WEIGHT_DISPLAY_FORMAT, values[i]);
-            }
+            format_ready_value(text, sizeof(text), mode, values[i]);
             lv_label_set_text(weight_labels[i], text);
         }
     }

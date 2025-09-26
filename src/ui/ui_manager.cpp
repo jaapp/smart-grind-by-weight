@@ -8,6 +8,7 @@
 #include "screens/calibration_screen.h"
 #include "event_handlers.h"
 #include "../logging/grind_logging.h"
+#include "../controllers/grind_mode_traits.h"
 #include <cstring>
 
 // Static instance pointer for grind event callbacks
@@ -25,8 +26,8 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     // Set static instance for event callbacks
     instance = this;
     
-    edit_weight = 0.0f;
-    original_weight = 0.0f;
+    edit_target = 0.0f;
+    original_target = 0.0f;
     calibration_weight = USER_CALIBRATION_REFERENCE_WEIGHT_G;
     final_grind_weight = 0.0f;
     final_grind_progress = 0;
@@ -165,13 +166,9 @@ void UIManager::refresh_ready_profiles() {
     }
     float values[USER_PROFILE_COUNT];
     for (int i = 0; i < USER_PROFILE_COUNT; ++i) {
-        if (current_mode == GrindMode::TIME) {
-            values[i] = profile_controller->get_profile_time(i);
-        } else {
-            values[i] = profile_controller->get_profile_weight(i);
-        }
+        values[i] = get_profile_target(*profile_controller, current_mode, i);
     }
-    ready_screen.update_profile_values(values, current_mode == GrindMode::TIME);
+    ready_screen.update_profile_values(values, current_mode);
 }
 
 void UIManager::setup_event_handlers() {
@@ -371,8 +368,8 @@ void UIManager::switch_to_state(UIState new_state) {
         case UIState::EDIT:
             edit_screen.show();
             edit_screen.update_profile_name(profile_controller->get_current_name());
-            edit_screen.set_time_mode(current_mode == GrindMode::TIME);
-            edit_screen.update_weight(edit_weight);
+            edit_screen.set_mode(current_mode);
+            edit_screen.update_target(edit_target);
             lv_obj_add_flag(grind_button, LV_OBJ_FLAG_HIDDEN);
             break;
             
@@ -385,13 +382,7 @@ void UIManager::switch_to_state(UIState new_state) {
                 grinding_screen.update_profile_name(profile_controller->get_current_name());
                 grinding_screen.set_mode(current_mode);
                 chart_updates_enabled = true;
-                if (current_mode == GrindMode::TIME) {
-                    float target_time = profile_controller->get_current_time();
-                    grinding_screen.update_target_weight(grind_controller->get_target_weight());
-                    grinding_screen.update_target_time(target_time);
-                } else {
-                    grinding_screen.update_target_weight(grind_controller->get_target_weight());
-                }
+                update_grinding_targets();
                 grinding_screen.update_current_weight(weight_sensor->get_display_weight());
                 grinding_screen.update_progress(0);
                 lv_obj_clear_flag(grind_button, LV_OBJ_FLAG_HIDDEN);
@@ -404,13 +395,7 @@ void UIManager::switch_to_state(UIState new_state) {
             grinding_screen.update_profile_name(profile_controller->get_current_name());
             grinding_screen.set_mode(current_mode);
             chart_updates_enabled = false;
-            if (current_mode == GrindMode::TIME) {
-                float target_time = profile_controller->get_current_time();
-                grinding_screen.update_target_weight(grind_controller->get_target_weight());
-                grinding_screen.update_target_time(target_time);
-            } else {
-                grinding_screen.update_target_weight(grind_controller->get_target_weight());
-            }
+            update_grinding_targets();
             grinding_screen.update_current_weight(final_grind_weight); // Use captured final settled weight
             grinding_screen.update_progress(final_grind_progress); // Use captured final progress
             lv_obj_clear_flag(grind_button, LV_OBJ_FLAG_HIDDEN);
@@ -636,9 +621,22 @@ void UIManager::handle_edit_minus(lv_event_code_t code) {
     profile_handler->handle_edit_minus(code);
 }
 
-void UIManager::update_edit_weight_display() {
-    edit_screen.set_time_mode(current_mode == GrindMode::TIME);
-    edit_screen.update_weight(edit_weight);
+void UIManager::update_edit_target_display() {
+    edit_screen.set_mode(current_mode);
+    edit_screen.update_target(edit_target);
+}
+
+void UIManager::update_grinding_targets() {
+    if (!grind_controller || !profile_controller) {
+        return;
+    }
+
+    const auto& session = grind_controller->get_session_descriptor();
+    grinding_screen.update_target_weight(session.target_weight);
+    if (session.mode == GrindMode::TIME && session.target_time_ms > 0) {
+        float target_time_seconds = static_cast<float>(session.target_time_ms) / 1000.0f;
+        grinding_screen.update_target_time(target_time_seconds);
+    }
 }
 
 void UIManager::start_jog_timer(int direction) {
@@ -667,15 +665,13 @@ void UIManager::toggle_mode() {
     }
     current_mode = (current_mode == GrindMode::WEIGHT) ? GrindMode::TIME : GrindMode::WEIGHT;
     refresh_ready_profiles();
+    edit_target = get_current_profile_target(*profile_controller, current_mode);
+    if (state_machine->is_state(UIState::EDIT)) {
+        update_edit_target_display();
+    }
     grinding_screen.set_mode(current_mode);
     if (state_machine->is_state(UIState::GRINDING) || state_machine->is_state(UIState::GRIND_COMPLETE)) {
-        if (current_mode == GrindMode::TIME) {
-            float target_time = profile_controller->get_current_time();
-            grinding_screen.update_target_weight(grind_controller->get_target_weight());
-            grinding_screen.update_target_time(target_time);
-        } else {
-            grinding_screen.update_target_weight(grind_controller->get_target_weight());
-        }
+        update_grinding_targets();
     }
     update_grind_button_icon();
 }
@@ -716,13 +712,9 @@ void UIManager::jog_timer_cb(lv_timer_t* timer) {
         // Check which mode we're in and update accordingly
         if (state_machine->is_state(UIState::EDIT)) {
             // Edit mode - update edit weight using ProfileController validation
-            if (current_mode == GrindMode::TIME) {
-                edit_weight = profile_controller->clamp_time(
-                    edit_weight + jog_direction * USER_FINE_TIME_ADJUSTMENT_S);
-            } else {
-                edit_weight = profile_controller->clamp_weight(
-                    edit_weight + jog_direction * USER_FINE_WEIGHT_ADJUSTMENT_G);
-            }
+            const auto& traits = get_grind_mode_traits(current_mode);
+            edit_target = clamp_profile_target(*profile_controller, current_mode,
+                                               edit_target + jog_direction * traits.fine_increment);
         } else if (state_machine->is_state(UIState::CALIBRATION)) {
             // Calibration mode - update calibration weight using ProfileController validation
             float cal_weight = calibration_screen.get_calibration_weight();
@@ -734,7 +726,7 @@ void UIManager::jog_timer_cb(lv_timer_t* timer) {
     
     // Update display only once per timer callback
     if (state_machine->is_state(UIState::EDIT)) {
-        update_edit_weight_display();
+        update_edit_target_display();
     }
 }
 
@@ -969,6 +961,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
         case UIGrindEvent::PHASE_CHANGED:
             // Handle phase changes, particularly tare start/completion
             // Transition to GRINDING state when grind starts (any active grinding phase)
+            instance->current_mode = event_data.mode;
             if (event_data.phase != GrindPhase::IDLE && !instance->state_machine->is_state(UIState::GRINDING)) {
                 UI_DEBUG_LOG("[%lums UI_TRANSITION] Switching to GRINDING state due to phase: %s\n", 
                         millis(), event_data.phase_display_text);
@@ -976,10 +969,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                 instance->grinding_screen.update_profile_name(instance->profile_controller->get_current_name());
                 instance->grinding_screen.set_mode(instance->current_mode);
                 instance->chart_updates_enabled = true;
-                instance->grinding_screen.update_target_weight(instance->grind_controller->get_target_weight());
-                if (instance->current_mode == GrindMode::TIME) {
-                    instance->grinding_screen.update_target_time(instance->profile_controller->get_current_time());
-                }
+                instance->update_grinding_targets();
                 instance->grinding_screen.update_current_weight(weight_sensor->get_display_weight());
                 instance->grinding_screen.update_progress(0);
                 instance->switch_to_state(UIState::GRINDING);
@@ -1014,6 +1004,8 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             if (event_data.show_taring_text) {
                 instance->grinding_screen.update_tare_display();
             } else {
+                instance->current_mode = event_data.mode;
+                instance->grinding_screen.set_mode(instance->current_mode);
                 instance->grinding_screen.update_current_weight(event_data.current_weight);
                 instance->grinding_screen.update_progress(event_data.progress_percent);
                 
@@ -1030,6 +1022,8 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             
         case UIGrindEvent::COMPLETED:
             // Capture final weight and transition to completion state
+            instance->current_mode = event_data.mode;
+            instance->grinding_screen.set_mode(instance->current_mode);
             instance->final_grind_weight = event_data.final_weight;
             instance->final_grind_progress = event_data.progress_percent;
             BLE_LOG("GRIND COMPLETE - Final settled weight captured: %.2fg (Progress: %d%%)\n", 
@@ -1046,6 +1040,8 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             break;
             
         case UIGrindEvent::TIMEOUT: {
+            instance->current_mode = event_data.mode;
+            instance->grinding_screen.set_mode(instance->current_mode);
             instance->error_grind_weight = event_data.error_weight;
             instance->error_grind_progress = event_data.error_progress;
             const char* message = event_data.error_message ? event_data.error_message : "Error";
@@ -1067,6 +1063,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
         case UIGrindEvent::STOPPED:
             // Grind was stopped by user or error
             // Clean up any active timers
+            instance->current_mode = event_data.mode;
             if (instance->grind_complete_timer) {
                 lv_timer_del(instance->grind_complete_timer);
                 instance->grind_complete_timer = nullptr;

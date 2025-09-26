@@ -1,6 +1,7 @@
 #include "edit_screen.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
+#include "../../controllers/grind_mode_traits.h"
 
 void EditScreen::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -73,7 +74,7 @@ void EditScreen::create() {
     lv_obj_center(plus_label);
 
     visible = false;
-    show_time_mode = false;
+    mode = GrindMode::WEIGHT;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -91,16 +92,12 @@ void EditScreen::update_profile_name(const char* name) {
     lv_label_set_text(profile_label, name);
 }
 
-void EditScreen::update_weight(float weight) {
-    char weight_text[16];
-    if (show_time_mode) {
-        snprintf(weight_text, sizeof(weight_text), "%.1fs", weight);
-    } else {
-        snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
-    }
-    lv_label_set_text(weight_label, weight_text);
+void EditScreen::update_target(float value) {
+    char text[16];
+    format_ready_value(text, sizeof(text), mode, value);
+    lv_label_set_text(weight_label, text);
 }
 
-void EditScreen::set_time_mode(bool time_mode) {
-    show_time_mode = time_mode;
+void EditScreen::set_mode(GrindMode time_mode) {
+    mode = time_mode;
 }

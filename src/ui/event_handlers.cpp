@@ -3,6 +3,7 @@
 #include "../config/constants.h"
 #include "../config/system_config.h"
 #include "../config/logging.h"
+#include "../controllers/grind_mode_traits.h"
 #include "components/ui_operations.h"
 #include "components/blocking_overlay.h"
 #include "screens/calibration_screen.h"
@@ -22,24 +23,16 @@ void ProfileEventHandler::handle_tab_change(int tab) {
 void ProfileEventHandler::handle_profile_long_press() {
     if (ui_manager->state_machine->is_state(UIState::READY) && ui_manager->current_tab < 3) {
         // Store the current tab so we can return to it after editing
-        if (ui_manager->current_mode == GrindMode::TIME) {
-            ui_manager->original_weight = ui_manager->profile_controller->get_current_time();
-        } else {
-            ui_manager->original_weight = ui_manager->profile_controller->get_current_weight();
-        }
-        ui_manager->edit_weight = ui_manager->original_weight;
-        ui_manager->edit_screen.set_time_mode(ui_manager->current_mode == GrindMode::TIME);
-        ui_manager->update_edit_weight_display();
+        ui_manager->original_target = get_current_profile_target(*ui_manager->profile_controller, ui_manager->current_mode);
+        ui_manager->edit_target = ui_manager->original_target;
+        ui_manager->edit_screen.set_mode(ui_manager->current_mode);
+        ui_manager->update_edit_target_display();
         ui_manager->switch_to_state(UIState::EDIT);
     }
 }
 
 void ProfileEventHandler::handle_edit_save() {
-    if (ui_manager->current_mode == GrindMode::TIME) {
-        ui_manager->profile_controller->update_current_time(ui_manager->edit_weight);
-    } else {
-        ui_manager->profile_controller->update_current_weight(ui_manager->edit_weight);
-    }
+    update_current_profile_target(*ui_manager->profile_controller, ui_manager->current_mode, ui_manager->edit_target);
     ui_manager->profile_controller->save_profiles();
     ui_manager->refresh_ready_profiles();
     
@@ -47,20 +40,18 @@ void ProfileEventHandler::handle_edit_save() {
 }
 
 void ProfileEventHandler::handle_edit_cancel() {
-    ui_manager->edit_weight = ui_manager->original_weight;
-    ui_manager->edit_screen.set_time_mode(ui_manager->current_mode == GrindMode::TIME);
-    ui_manager->update_edit_weight_display();
+    ui_manager->edit_target = ui_manager->original_target;
+    ui_manager->edit_screen.set_mode(ui_manager->current_mode);
+    ui_manager->update_edit_target_display();
     ui_manager->switch_to_state(UIState::READY);
 }
 
 void ProfileEventHandler::handle_edit_plus(lv_event_code_t code) {
     if (code == LV_EVENT_CLICKED) {
-        if (ui_manager->current_mode == GrindMode::TIME) {
-            ui_manager->edit_weight = ui_manager->profile_controller->clamp_time(ui_manager->edit_weight + USER_FINE_TIME_ADJUSTMENT_S);
-        } else {
-            ui_manager->edit_weight = ui_manager->profile_controller->clamp_weight(ui_manager->edit_weight + USER_FINE_WEIGHT_ADJUSTMENT_G);
-        }
-        ui_manager->update_edit_weight_display();
+        const auto& traits = get_grind_mode_traits(ui_manager->current_mode);
+        ui_manager->edit_target = clamp_profile_target(*ui_manager->profile_controller, ui_manager->current_mode,
+                                                      ui_manager->edit_target + traits.fine_increment);
+        ui_manager->update_edit_target_display();
     } else if (code == LV_EVENT_LONG_PRESSED) {
         ui_manager->start_jog_timer(1);
     } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
@@ -70,12 +61,10 @@ void ProfileEventHandler::handle_edit_plus(lv_event_code_t code) {
 
 void ProfileEventHandler::handle_edit_minus(lv_event_code_t code) {
     if (code == LV_EVENT_CLICKED) {
-        if (ui_manager->current_mode == GrindMode::TIME) {
-            ui_manager->edit_weight = ui_manager->profile_controller->clamp_time(ui_manager->edit_weight - USER_FINE_TIME_ADJUSTMENT_S);
-        } else {
-            ui_manager->edit_weight = ui_manager->profile_controller->clamp_weight(ui_manager->edit_weight - USER_FINE_WEIGHT_ADJUSTMENT_G);
-        }
-        ui_manager->update_edit_weight_display();
+        const auto& traits = get_grind_mode_traits(ui_manager->current_mode);
+        ui_manager->edit_target = clamp_profile_target(*ui_manager->profile_controller, ui_manager->current_mode,
+                                                      ui_manager->edit_target - traits.fine_increment);
+        ui_manager->update_edit_target_display();
     } else if (code == LV_EVENT_LONG_PRESSED) {
         ui_manager->start_jog_timer(-1);
     } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
