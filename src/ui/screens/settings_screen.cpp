@@ -275,32 +275,9 @@ void SettingsScreen::create_data_page(lv_obj_t* parent) {
 
     create_toggle_row(parent, "Logging", &logging_toggle);
 
-    // Sessions info (number of recorded grind sessions)
-    sessions_label = lv_label_create(parent);
-    lv_label_set_text(sessions_label, "Sessions: --");
-    lv_obj_set_style_text_font(sessions_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(sessions_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(sessions_label, 280);
-    lv_label_set_long_mode(sessions_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(sessions_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Events info (total number of events across all sessions)
-    events_label = lv_label_create(parent);
-    lv_label_set_text(events_label, "Events: --");
-    lv_obj_set_style_text_font(events_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(events_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(events_label, 280);
-    lv_label_set_long_mode(events_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(events_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Measurements info (total number of measurements across all sessions)
-    measurements_label = lv_label_create(parent);
-    lv_label_set_text(measurements_label, "Measurements: --");
-    lv_obj_set_style_text_font(measurements_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(measurements_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(measurements_label, 280);
-    lv_label_set_long_mode(measurements_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(measurements_label, LV_TEXT_ALIGN_LEFT, 0);
+    create_data_label(parent, "Sessions:", &sessions_label);
+    create_data_label(parent, "Events:", &events_label);
+    create_data_label(parent, "Measurements:", &measurements_label);
 
     refresh_stats_button = create_button(parent, "Refresh Stats");
     lv_obj_add_flag(refresh_stats_button, LV_OBJ_FLAG_HIDDEN); // Refresh button is not used anymore
@@ -394,35 +371,27 @@ void SettingsScreen::hide_taring_overlay() {
 void SettingsScreen::set_session_count(uint32_t count) {
     if (!sessions_label) return;
     char buf[48];
-    snprintf(buf, sizeof(buf), "Sessions: %lu", (unsigned long)count);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)count);
     lv_label_set_text(sessions_label, buf);
 }
 
 void SettingsScreen::set_event_count(uint32_t count) {
     if (!events_label) return;
     char buf[48];
-    snprintf(buf, sizeof(buf), "Events: %lu", (unsigned long)count);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)count);
     lv_label_set_text(events_label, buf);
 }
 
 void SettingsScreen::set_measurement_count(uint32_t count) {
     if (!measurements_label) return;
     char buf[48];
-    snprintf(buf, sizeof(buf), "Measurements: %lu", (unsigned long)count);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)count);
     lv_label_set_text(measurements_label, buf);
 }
 
 void SettingsScreen::refresh_statistics() {
     if (!visible) return;
-    
-    // Show loading indicators
-    lv_label_set_text(sessions_label, "Sessions: Loading...");
-    lv_label_set_text(events_label, "Events: Loading...");
-    lv_label_set_text(measurements_label, "Measurements: Loading...");
-    
-    // Force a UI update to show loading text
-    lv_timer_handler();
-    
+
     // Perform the expensive IO operations
     uint32_t session_count = grind_logger.get_total_flash_sessions();
     uint32_t event_count = grind_logger.count_total_events_in_flash();
@@ -619,13 +588,31 @@ lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, 
     return row_container;
 }
 
-// lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* text) {
-//     lv_obj_t* label = lv_label_create(parent);
-//     lv_label_set_text(label, text);
-//     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
-//     lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-//     lv_obj_set_width(label, 280);
-//     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-//     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-//     return label;
-// }
+lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** variable) {
+    lv_obj_t* container = lv_obj_create(parent);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(container, 0, 0);
+    lv_obj_set_style_pad_all(container, 2, 0);
+    lv_obj_set_style_pad_left(container, 20, 0);
+    lv_obj_set_style_pad_right(container, 24, 0); // Just a bit away from the scroll bar
+    lv_obj_set_style_margin_all(container, 0, 0);
+    lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
+
+    lv_obj_set_layout(container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END);
+    
+    lv_obj_t* label = lv_label_create(container);
+    lv_label_set_text(label, name);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    
+    *variable = lv_label_create(container);
+    lv_label_set_text(*variable, "");
+    lv_obj_set_style_text_font(*variable, &lv_font_montserrat_24, 0);
+    // lv_obj_set_flex_grow(*variable, 1);
+    lv_obj_set_style_text_color(*variable, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_set_style_text_align(*variable, LV_TEXT_ALIGN_RIGHT, 0);
+
+    return label;
+}
