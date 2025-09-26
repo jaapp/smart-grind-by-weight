@@ -32,6 +32,7 @@
 // Background colors
 #define THEME_COLOR_BACKGROUND 0x000000                                        // Background color (black)
 #define THEME_COLOR_NEUTRAL 0x666666                                           // Neutral color (dark gray)
+#define THEME_COLOR_BACKGROUND_MOCK 0x035e03                                  // Background color when mock hardware is active (dark green)
 
 // Status indication colors
 #define THEME_COLOR_SUCCESS 0x00AA00                                           // Success state color (green)

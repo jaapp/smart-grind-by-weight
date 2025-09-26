@@ -77,7 +77,7 @@ void UIManager::create_ui() {
     // Set background style
     static lv_style_t style_screen;
     lv_style_init(&style_screen);
-    lv_style_set_bg_color(&style_screen, lv_color_hex(THEME_COLOR_BACKGROUND));
+    lv_style_set_bg_color(&style_screen, get_default_background_color());
     lv_obj_add_style(lv_scr_act(), &style_screen, 0);
 
     // Create all screens
@@ -676,6 +676,33 @@ void UIManager::toggle_mode() {
     update_grind_button_icon();
 }
 
+lv_color_t UIManager::get_default_background_color() {
+    return is_mock_driver_active() ? lv_color_hex(THEME_COLOR_BACKGROUND_MOCK)
+                                   : lv_color_hex(THEME_COLOR_BACKGROUND);
+}
+
+bool UIManager::is_mock_driver_active() {
+#if defined(HW_ENABLE_LOADCELL_MOCK) && (HW_ENABLE_LOADCELL_MOCK != 0)
+    return true;
+#else
+    if (!hardware_manager) {
+        return false;
+    }
+
+    WeightSensor* sensor = hardware_manager->get_weight_sensor();
+    if (!sensor) {
+        return false;
+    }
+
+    const char* driver_name = sensor->get_adc_driver_name();
+    if (!driver_name) {
+        return false;
+    }
+
+    return strstr(driver_name, "MOCK") != nullptr;
+#endif
+}
+
 void UIManager::jog_timer_cb(lv_timer_t* timer) {
     
     // Check for acceleration stage transitions
@@ -1089,9 +1116,10 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                 }
                 
                 // Set background color based on grinder state
+                lv_color_t inactive_color = instance->get_default_background_color();
                 lv_color_t bg_color = event_data.background_active ? 
                     lv_color_hex(THEME_COLOR_GRINDER_ACTIVE) :       // Dark yellow when active
-                    lv_color_hex(THEME_COLOR_BACKGROUND);            // Black when inactive
+                    inactive_color;                                  // Default background when inactive
                     
                 lv_style_set_bg_color(&style_bg, bg_color);
                 lv_obj_add_style(lv_scr_act(), &style_bg, 0);

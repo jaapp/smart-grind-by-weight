@@ -36,6 +36,17 @@
 
 // Load Cell ADC Configuration (HX711 only)
 
+// Mock driver configuration (compile-time selectable)
+#define HW_ENABLE_LOADCELL_MOCK 1                                            // 0=use physical HX711, 1=use simulated mock driver
+#define HW_MOCK_FLOW_RATE_GPS 1.9f                                           // Simulated continuous flow rate in grams per second
+#define HW_MOCK_CAL_FACTOR -7050.0f                                          // Fixed calibration factor used during mocking
+#define HW_MOCK_BASELINE_RAW 0x700000                                        // Baseline raw count around mid-scale for tare offset
+#define HW_MOCK_IDLE_NOISE_RAW 60.0f                                         // Peak raw noise when idle (counts)
+#define HW_MOCK_GRIND_NOISE_RAW 400.0f                                       // Peak raw noise when grinding (counts)
+#define HW_MOCK_FLOW_RAMP_MS 350                                             // Ramp duration for simulated flow transitions
+#define HW_MOCK_START_DELAY_MS 500                                           // Delay from motor start command to weight increase
+#define HW_MOCK_STOP_DELAY_MS 400                                            // Delay from motor stop command to weight stop
+
 // Load Cell ADC Pins
 #define HW_LOADCELL_DOUT_PIN 3                                                 // HX711 data output pin
 #define HW_LOADCELL_SCK_PIN 2                                                  // HX711 serial clock pin

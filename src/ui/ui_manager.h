@@ -197,6 +197,8 @@ private:
     void grind_timeout_timer_cb(lv_timer_t* timer);
 
     void toggle_mode();
+    lv_color_t get_default_background_color();
+    bool is_mock_driver_active();
     
     
     // Static wrappers for LVGL callbacks

@@ -1,6 +1,9 @@
 #include "WeightSensor.h"
 #include "../config/hardware_config.h"
 #include "hx711_driver.h"
+#if HW_ENABLE_LOADCELL_MOCK
+#include "mock_hx711_driver.h"
+#endif
 #include "../config/pins.h"
 #include "../config/logging.h"
 #include <Arduino.h>
@@ -20,7 +23,11 @@
 
 WeightSensor::WeightSensor() {
     // Initialize calibration parameters
+#if HW_ENABLE_LOADCELL_MOCK
+    cal_factor = HW_MOCK_CAL_FACTOR;
+#else
     cal_factor = USER_DEFAULT_CALIBRATION_FACTOR;
+#endif
     tare_offset = 0;
     
     // Initialize current readings
@@ -61,8 +68,12 @@ void WeightSensor::init(Preferences* preferences) {
     
     BLE_LOG("Initializing WeightSensor configuration and filters...\n");
     
-    // Create HX711 driver
+    // Create load cell driver instance based on configuration
+#if HW_ENABLE_LOADCELL_MOCK
+    adc_driver = std::make_unique<MockHX711Driver>();
+#else
     adc_driver = std::make_unique<HX711Driver>(HW_LOADCELL_SCK_PIN, HW_LOADCELL_DOUT_PIN);
+#endif
     if (!adc_driver) {
         BLE_LOG("ERROR: Failed to create ADC driver\n");
         return;
@@ -203,6 +214,10 @@ void WeightSensor::tare() {
 }
 
 void WeightSensor::calibrate(float known_weight) {
+#if HW_ENABLE_LOADCELL_MOCK
+    BLE_LOG("Mock load cell: calibration skipped (fixed factor %.2f)\n", cal_factor);
+    return;
+#endif
     if (known_weight <= 0) {
         BLE_LOG("ERROR: Invalid calibration weight\n");
         return;
@@ -242,7 +257,12 @@ void WeightSensor::calibrate(float known_weight) {
 }
 
 void WeightSensor::set_calibration_factor(float factor) {
+#if HW_ENABLE_LOADCELL_MOCK
+    cal_factor = HW_MOCK_CAL_FACTOR;
+    BLE_LOG("Mock load cell: ignoring calibration update, using fixed factor: %.2f\n", cal_factor);
+#else
     cal_factor = factor;
+#endif
 }
 
 void WeightSensor::set_zero_offset(int32_t offset) {
@@ -383,18 +403,29 @@ bool WeightSensor::is_data_ready() const {
 }
 
 void WeightSensor::save_calibration() {
+#if HW_ENABLE_LOADCELL_MOCK
+    BLE_LOG("Mock load cell: calibration save skipped (fixed factor).\n");
+    return;
+#endif
     if (prefs) {
         prefs->putFloat("hx_cal", cal_factor);
     }
 }
 
 void WeightSensor::save_calibration_weight(float weight) {
+#if HW_ENABLE_LOADCELL_MOCK
+    BLE_LOG("Mock load cell: calibration weight save skipped.\n");
+    return;
+#endif
     if (prefs) {
         prefs->putFloat("hx_wt", weight);
     }
 }
 
 float WeightSensor::get_saved_calibration_weight() {
+#if HW_ENABLE_LOADCELL_MOCK
+    return USER_CALIBRATION_REFERENCE_WEIGHT_G;
+#endif
     if (prefs) {
         return prefs->getFloat("hx_wt", USER_CALIBRATION_REFERENCE_WEIGHT_G);
     }
@@ -402,6 +433,11 @@ float WeightSensor::get_saved_calibration_weight() {
 }
 
 void WeightSensor::load_calibration() {
+#if HW_ENABLE_LOADCELL_MOCK
+    cal_factor = HW_MOCK_CAL_FACTOR;
+    BLE_LOG("Mock load cell: using fixed calibration factor: %.2f\n", cal_factor);
+    return;
+#endif
     if (prefs) {
         float saved_factor = prefs->getFloat("hx_cal", USER_DEFAULT_CALIBRATION_FACTOR);
         
@@ -422,6 +458,11 @@ void WeightSensor::load_calibration() {
 }
 
 void WeightSensor::clear_calibration_data() {
+#if HW_ENABLE_LOADCELL_MOCK
+    cal_factor = HW_MOCK_CAL_FACTOR;
+    BLE_LOG("Mock load cell: calibration data reset to fixed factor.\n");
+    return;
+#endif
     if (prefs) {
         BLE_LOG("Clearing corrupted calibration data...\n");
         prefs->remove("hx_cal");

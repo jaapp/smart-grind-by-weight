@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../config/hardware_config.h"
+#include "load_cell_driver.h"
 #include <Arduino.h>
 #include <math.h>
 
@@ -18,7 +19,7 @@
  * Copyright (c) 2018 Olav Kallhovd
  * Licensed under MIT License
  */
-class HX711Driver {
+class HX711Driver : public LoadCellDriver {
 private:
     // HX711 Hardware pins and configuration
     uint8_t sck_pin;
@@ -45,25 +46,25 @@ public:
     virtual ~HX711Driver() = default;
     
     // Initialization and configuration
-    bool begin();
-    bool begin(uint8_t gain_value);
-    void set_gain(uint8_t gain_value);
-    
-    void power_up();
-    void power_down();
-    
-    bool is_ready();
-    bool data_waiting_async();
-    bool update_async();
-    int32_t get_raw_data() const;
-    
-    bool validate_hardware();
-    
+    bool begin() override;
+    bool begin(uint8_t gain_value) override;
+    void set_gain(uint8_t gain_value) override;
+
+    void power_up() override;
+    void power_down() override;
+
+    bool is_ready() override;
+    bool data_waiting_async() override;
+    bool update_async() override;
+    int32_t get_raw_data() const override;
+
+    bool validate_hardware() override;
+
     // HX711-specific capabilities
-    bool supports_temperature_sensor() const { return false; }
-    float get_temperature() const { return NAN; }
-    uint32_t get_max_sample_rate() const { return HW_LOADCELL_SAMPLE_RATE_SPS; }
-    
+    bool supports_temperature_sensor() const override { return false; }
+    float get_temperature() const override { return NAN; }
+    uint32_t get_max_sample_rate() const override { return HW_LOADCELL_SAMPLE_RATE_SPS; }
+
     uint8_t get_current_gain() const;
-    const char* get_driver_name() const { return "HX711"; }
+    const char* get_driver_name() const override { return "HX711"; }
 };
