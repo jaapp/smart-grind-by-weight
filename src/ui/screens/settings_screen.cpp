@@ -142,70 +142,29 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 15, 0);
-    lv_obj_set_style_pad_top(parent, 20, 0);
+    lv_obj_set_style_pad_all(parent, 0, 0);
     
     // Enable vertical scrolling for the info page content
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // // Title
-    // lv_obj_t* title = lv_label_create(parent);
-    // lv_label_set_text(title, "System Info");
-    // lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    // lv_obj_set_style_text_color(title, lv_color_hex(THEME_COLOR_SECONDARY), 0);
-
-    // Load cell info
-    info_label = lv_label_create(parent);
-    char initial_loadcell_text[32];
-    snprintf(initial_loadcell_text, sizeof(initial_loadcell_text), "Load Cell: " SYS_WEIGHT_DISPLAY_FORMAT, 0.0f);
-    lv_label_set_text(info_label, initial_loadcell_text);
-    lv_obj_set_style_text_font(info_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(info_label, 280);
-    lv_label_set_long_mode(info_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Uptime
-    uptime_label = lv_label_create(parent);
-    lv_label_set_text(uptime_label, "Uptime: 00:00:00");
-    lv_obj_set_style_text_font(uptime_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(uptime_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(uptime_label, 280);
-    lv_label_set_long_mode(uptime_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(uptime_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Memory info
-    memory_label = lv_label_create(parent);
-    lv_label_set_text(memory_label, "Free Heap: 0 KB");
-    lv_obj_set_style_text_font(memory_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(memory_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(memory_label, 280);
-    lv_label_set_long_mode(memory_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(memory_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Version info
-    version_label = lv_label_create(parent);
-    lv_label_set_text(version_label, "Firmware: v" INTERNAL_FIRMWARE_VERSION);
-    lv_obj_set_style_text_font(version_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(version_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_width(version_label, 280);
-    lv_label_set_long_mode(version_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(version_label, LV_TEXT_ALIGN_LEFT, 0);
-    
-    // Build info
-    build_label = lv_label_create(parent);
     char build_info[64];
-    // Show build number prominently for BLE OTA testing
-    snprintf(build_info, sizeof(build_info), "Build: #%d", BUILD_NUMBER);
-    lv_label_set_text(build_label, build_info);
-    lv_obj_set_style_text_font(build_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(build_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_width(build_label, 280);
-    lv_label_set_long_mode(build_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(build_label, LV_TEXT_ALIGN_LEFT, 0);
-
-    // Stats and refresh button moved to Data tab - Grind Logging section
+    snprintf(build_info, sizeof(build_info), "#%d", BUILD_NUMBER);
+    
+    create_static_data_label(parent, "Firmware:", "v" INTERNAL_FIRMWARE_VERSION);
+    create_static_data_label(parent, "Build:", build_info);    
+    
+    create_separator(parent);
+   
+    create_data_label(parent, "Uptime:", &uptime_label);
+    create_data_label(parent, "RAM:", &memory_label);
+    
+    create_separator(parent);
+    
+    create_data_label(parent, "Instant:", &instant_label);
+    create_data_label(parent, "Smooth:", &smooth_label);
+    create_data_label(parent, "Samples:", &samples_label);
+    create_data_label(parent, "Raw:", &raw_label);
 }
 
 
@@ -277,7 +236,7 @@ void SettingsScreen::create_data_page(lv_obj_t* parent) {
 
     create_data_label(parent, "Sessions:", &sessions_label);
     create_data_label(parent, "Events:", &events_label);
-    create_data_label(parent, "Measurements:", &measurements_label);
+    create_data_label(parent, "Metrics:", &measurements_label);
 
     refresh_stats_button = create_button(parent, "Refresh Stats");
     lv_obj_add_flag(refresh_stats_button, LV_OBJ_FLAG_HIDDEN); // Refresh button is not used anymore
@@ -304,26 +263,26 @@ void SettingsScreen::hide() {
     visible = false;
 }
 
-void SettingsScreen::update_info(const char* load_cell_info, unsigned long uptime_ms, size_t free_heap) {
+void SettingsScreen::update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap) {
     if (!visible) return;
-    
-    // Update load cell reading
-    lv_label_set_text(info_label, load_cell_info);
+
+    set_label_text_float(instant_label, weight_sensor->get_instant_weight(), "g");
+    set_label_text_float(smooth_label, weight_sensor->get_weight_high_latency(), "g");
+    set_label_text_int(samples_label, weight_sensor->get_sample_count());
+    set_label_text_int(raw_label, weight_sensor->get_raw_adc_instant());
+
     
     // Update uptime - use compact format to avoid horizontal scrolling
     unsigned long seconds = uptime_ms / 1000;
     unsigned long hours = seconds / 3600;
     unsigned long minutes = (seconds % 3600) / 60;
     seconds = seconds % 60;
-    
+
     char uptime_text[48];
-    snprintf(uptime_text, sizeof(uptime_text), "Up: %02lu:%02lu:%02lu", hours, minutes, seconds);
+    snprintf(uptime_text, sizeof(uptime_text), "%02lu:%02lu:%02lu", hours, minutes, seconds);
     lv_label_set_text(uptime_label, uptime_text);
-    
-    // Update memory info - use compact format
-    char memory_text[48];
-    snprintf(memory_text, sizeof(memory_text), "RAM: %zu KB", free_heap / 1024);
-    lv_label_set_text(memory_label, memory_text);
+
+    set_label_text_int(memory_label, free_heap / 1024, "kB");
 }
 
 void SettingsScreen::update_ble_status() {
@@ -367,40 +326,12 @@ void SettingsScreen::hide_taring_overlay() {
     lv_obj_add_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
 }
 
-
-void SettingsScreen::set_session_count(uint32_t count) {
-    if (!sessions_label) return;
-    char buf[48];
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)count);
-    lv_label_set_text(sessions_label, buf);
-}
-
-void SettingsScreen::set_event_count(uint32_t count) {
-    if (!events_label) return;
-    char buf[48];
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)count);
-    lv_label_set_text(events_label, buf);
-}
-
-void SettingsScreen::set_measurement_count(uint32_t count) {
-    if (!measurements_label) return;
-    char buf[48];
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)count);
-    lv_label_set_text(measurements_label, buf);
-}
-
 void SettingsScreen::refresh_statistics() {
     if (!visible) return;
 
-    // Perform the expensive IO operations
-    uint32_t session_count = grind_logger.get_total_flash_sessions();
-    uint32_t event_count = grind_logger.count_total_events_in_flash();
-    uint32_t measurement_count = grind_logger.count_total_measurements_in_flash();
-    
-    // Update with actual values
-    set_session_count(session_count);
-    set_event_count(event_count);
-    set_measurement_count(measurement_count);
+    set_label_text_int(sessions_label, grind_logger.get_total_flash_sessions());
+    set_label_text_int(events_label, grind_logger.count_total_events_in_flash());
+    set_label_text_int(measurements_label, grind_logger.count_total_measurements_in_flash());
 }
 
 void SettingsScreen::update_brightness_sliders() {
@@ -448,10 +379,9 @@ void SettingsScreen::update_brightness_labels(int normal_percent, int screensave
 lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
     // Create separator container
     lv_obj_t* separator_container = lv_obj_create(parent);
-    lv_obj_set_size(separator_container, 280, 40);
+    lv_obj_set_size(separator_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(separator_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(separator_container, 0, 0);
-    lv_obj_set_style_pad_ver(separator_container, 10, 0);
     lv_obj_set_layout(separator_container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(separator_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(separator_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -463,7 +393,11 @@ lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
     lv_obj_set_flex_grow(left_line, 1);
     lv_obj_set_style_bg_color(left_line, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
     lv_obj_set_style_border_width(left_line, 0, 0);
-    lv_obj_set_style_radius(left_line, 1, 0);
+
+    if (!text) {
+        // If no text, make the line take full width
+        return separator_container;
+    }
 
     // Create text label
     lv_obj_t* separator_label = lv_label_create(separator_container);
@@ -479,7 +413,6 @@ lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
     lv_obj_set_flex_grow(right_line, 1);
     lv_obj_set_style_bg_color(right_line, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
     lv_obj_set_style_border_width(right_line, 0, 0);
-    lv_obj_set_style_radius(right_line, 1, 0);
 
     return separator_container;
 }
@@ -584,8 +517,14 @@ lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, 
     lv_obj_set_style_bg_color(*slider, lv_color_hex(THEME_COLOR_BACKGROUND), LV_PART_MAIN);
     lv_obj_set_style_bg_color(*slider, slider_color, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(*slider, LV_OPA_TRANSP, LV_PART_KNOB);
-    
     return row_container;
+}
+
+lv_obj_t* SettingsScreen::create_static_data_label(lv_obj_t* parent, const char* name, const char* value) {
+    lv_obj_t* label;
+    lv_obj_t* data_label = create_data_label(parent, name, &label);
+    lv_label_set_text(label, value);
+    return data_label;
 }
 
 lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** variable) {
@@ -593,8 +532,8 @@ lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, 
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container, 0, 0);
     lv_obj_set_style_pad_all(container, 2, 0);
-    lv_obj_set_style_pad_left(container, 20, 0);
-    lv_obj_set_style_pad_right(container, 24, 0); // Just a bit away from the scroll bar
+    lv_obj_set_style_pad_left(container, 10, 0);
+    lv_obj_set_style_pad_right(container, 14, 0); // Just a bit away from the scroll bar
     lv_obj_set_style_margin_all(container, 0, 0);
     lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
 
@@ -610,7 +549,6 @@ lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, 
     *variable = lv_label_create(container);
     lv_label_set_text(*variable, "");
     lv_obj_set_style_text_font(*variable, &lv_font_montserrat_24, 0);
-    // lv_obj_set_flex_grow(*variable, 1);
     lv_obj_set_style_text_color(*variable, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
     lv_obj_set_style_text_align(*variable, LV_TEXT_ALIGN_RIGHT, 0);
 

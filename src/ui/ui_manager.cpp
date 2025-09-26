@@ -935,21 +935,11 @@ void UIManager::stop_data_export_ui() {
 void UIManager::update_settings_state() {
     // Update developer screen with comprehensive system info
     WeightSensor* lc = hardware_manager->get_weight_sensor();
-    // Show both instant and high-latency weight for diagnostic purposes
-    float weight_instant = lc->get_instant_weight();
-    float weight_smoothed = lc->get_weight_high_latency();
-    int32_t raw_reading = lc->get_raw_adc_instant();
-    int sample_count = lc->get_sample_count();
-    
-    char leight_sensor_info[256];
-    snprintf(leight_sensor_info, sizeof(leight_sensor_info), 
-        "Instant: %.2fg\nSmoothed: %.2fg\nSamples: %d\nRaw: %ld", 
-        weight_instant, weight_smoothed, sample_count, (long)raw_reading);
     
     unsigned long uptime_ms = millis();
     size_t free_heap = ESP.getFreeHeap();
     
-    settings_screen.update_info(leight_sensor_info, uptime_ms, free_heap);
+    settings_screen.update_info(lc, uptime_ms, free_heap);
     settings_screen.update_ble_status();
 }
 
