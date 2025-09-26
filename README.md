@@ -110,4 +110,6 @@ In this project, that's most obvious when looking at the UI and state management
 
 **Want to dive deeper?** → Check out **[DOC.md](DOC.md)** for comprehensive documentation.
 
+**Different grinder?** → See **[Grinder Compatibility Matrix](GRINDER_COMPATIBILITY.md)** for adaptation guidance.
+
 **Having issues?** → See **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** for common problems and solutions.
