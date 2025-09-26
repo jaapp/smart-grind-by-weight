@@ -28,7 +28,8 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 **The concept is simple:** Perform a "brain swap" on your grinder. Replace the original controller with our intelligent ESP32-S3 controller and add a precision load cell to the mix.
 
 **Upgrade cost:** €30-40 in parts  
-**Target accuracy:** ±0.05g tolerance
+**Target accuracy:** ±0.05g tolerance  
+**Still supports**: Original timed grinding is one swipe away if you ever need it
 
 ---
 
@@ -38,6 +39,7 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 - **Beautiful display** with simple graphics or detailed charts (easily switchable)
 - **High accuracy**: ±0.05g error tolerance  
 - **Zero-shot learning**: Algorithm adapts instantly to any grind settings without manual tuning
+- **Original timed run preserved** – a quick swipe up or down on the ready screen drops you back to standard “grind-by-time” behaviour whenever you want
 - **BLE OTA updates** for firmware
 - **Advanced analytics** using BLE data transfer and Python Streamlit reports
 - **For Eureka**: No permanent modifications needed - just swap the screen and add 3D printed parts

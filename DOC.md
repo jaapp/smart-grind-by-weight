@@ -189,23 +189,31 @@ After flashing firmware, calibrate the load cell for accurate measurements:
 ## 📱 Usage Guide
 
 ### Grinding Profiles
-All profiles are fully customizable - these are default starting weights:
-- **Single**: Default ~9g (customizable)
-- **Double**: Default ~18g (customizable)  
-- **Custom**: Default ~21.5g (customizable)
+All profiles are fully customizable. Default grind-by-weight targets (fallback time values shown in parenthesis):
+- **Single**: 9 g (5 s)
+- **Double**: 18 g (10 s)  
+- **Custom**: 21.5 g (12 s)
+
+> 💡 **Tip** – the target label always shows the active unit (`g` or `s`). Long-press to edit in whichever mode you are currently using.
 
 ### Navigation
 - **Swipe left/right** to navigate between menu tabs
+- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes
 - **Tap** to select profiles or buttons
-- **Long press** on profile weights to edit/customize them
+- **Long press** on profile targets to edit/customize them
+
+> **Color cues:** The GRIND button background turns **red** in weight mode and **blue** in time mode, so you always know which behaviour is armed.
 
 ### Basic Operation
-1. Select profile by tapping on main screen
-2. **Long press** any profile weight to edit/customize it
-3. Place dosing cup on scale platform
-4. Press GRIND button - scale will tare automatically
-5. System grinds to precise target weight using predictive algorithm
-6. GRIND COMPLETE screen shows final weight and statistics
+These steps describe the default grind-by-weight workflow:
+1. Select profile by tapping on the main screen
+2. Long press the profile target to edit/customize the weight if needed
+3. Place the dosing cup on the scale platform
+4. Press the GRIND button – the scale will tare automatically
+5. The system grinds to the precise target weight using the predictive algorithm
+6. GRIND COMPLETE shows the final settled weight in grams (with statistics)
+
+Need the stock timed run? Just swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight).
 
 ### Display Modes
 - **Arc Layout**: Clean, minimal arc-based interface
