@@ -15,7 +15,7 @@ public:
     void create();
     void show();
     void hide();
-    void update_weights(float weights[3]);
+    void update_profile_values(const float values[3], bool show_time);
     void set_active_tab(int tab);
     void set_profile_long_press_handler(lv_event_cb_t handler);
     

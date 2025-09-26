@@ -15,6 +15,7 @@
 #include "../controllers/profile_controller.h"
 #include "../controllers/grind_controller.h"
 #include "../controllers/grind_events.h"
+#include "../controllers/grind_mode.h"
 #include "../hardware/hardware_manager.h"
 #include "../bluetooth/manager.h"
 
@@ -64,10 +65,12 @@ private:
     float calibration_weight;
     float final_grind_weight;
     int final_grind_progress;
-    float timeout_grind_weight;
-    int timeout_grind_progress;
-    const char* timeout_phase_name;
+    float error_grind_weight;
+    int error_grind_progress;
+    char error_message[32];
     int current_tab;
+    GrindMode current_mode;
+    bool chart_updates_enabled;
     bool initialized;
     unsigned long jog_start_time;
     int jog_stage;
@@ -183,6 +186,7 @@ private:
     void create_grind_button();
     void create_ble_status_icon();
     void update_ble_status_icon();
+    void refresh_ready_profiles();
     void setup_event_handlers();
     void update_grind_button_icon();
     void update_edit_weight_display();
@@ -200,6 +204,8 @@ private:
     void motor_timer_cb(lv_timer_t* timer);
     void grind_complete_timeout_cb(lv_timer_t* timer);
     void grind_timeout_timer_cb(lv_timer_t* timer);
+
+    void toggle_mode();
     
     
     // Static wrappers for LVGL callbacks

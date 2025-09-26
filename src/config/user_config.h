@@ -26,9 +26,18 @@
 #define USER_DOUBLE_ESPRESSO_WEIGHT_G 18.0f                                    // Double espresso default weight  
 #define USER_CUSTOM_PROFILE_WEIGHT_G 21.5f                                     // Custom profile default weight
 
+#define USER_SINGLE_ESPRESSO_TIME_S 5.0f                                       // Single espresso default grind time
+#define USER_DOUBLE_ESPRESSO_TIME_S 10.0f                                      // Double espresso default grind time
+#define USER_CUSTOM_PROFILE_TIME_S 12.0f                                       // Custom profile default grind time
+
 // Weight limits
 #define USER_MIN_TARGET_WEIGHT_G 5.0f                                          // Minimum allowed target weight
 #define USER_MAX_TARGET_WEIGHT_G 500.0f                                        // Maximum allowed target weight
+
+#define USER_MIN_TARGET_TIME_S 0.5f                                            // Minimum allowed target time
+#define USER_MAX_TARGET_TIME_S 60.0f                                           // Maximum allowed target time
+
+#define USER_FINE_TIME_ADJUSTMENT_S 0.1f                                       // Fine adjustment step for time editing
 
 //------------------------------------------------------------------------------
 // GRIND CONTROL TUNING
@@ -102,7 +111,7 @@
 //------------------------------------------------------------------------------
 // UI VISUAL FEEDBACK
 //------------------------------------------------------------------------------
-#define USER_ENABLE_GRINDER_BACKGROUND_INDICATOR 0                            // 0=disabled, 1=show background color during grinding/pulses
+#define USER_ENABLE_GRINDER_BACKGROUND_INDICATOR 1                            // 0=disabled, 1=show background color during grinding/pulses
 
 //------------------------------------------------------------------------------
 // BLUETOOTH TIMEOUTS

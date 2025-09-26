@@ -73,6 +73,7 @@ void EditScreen::create() {
     lv_obj_center(plus_label);
 
     visible = false;
+    show_time_mode = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -92,6 +93,14 @@ void EditScreen::update_profile_name(const char* name) {
 
 void EditScreen::update_weight(float weight) {
     char weight_text[16];
-    snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
+    if (show_time_mode) {
+        snprintf(weight_text, sizeof(weight_text), "%.1fs", weight);
+    } else {
+        snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
+    }
     lv_label_set_text(weight_label, weight_text);
+}
+
+void EditScreen::set_time_mode(bool time_mode) {
+    show_time_mode = time_mode;
 }

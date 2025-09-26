@@ -146,7 +146,7 @@ void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {
         case EventType::CONFIRM_CANCEL:
             ui_manager->handle_confirm_cancel();
             break;
-            
+
         default:
             BLE_LOG("[WARNING] EventBridgeLVGL: Unknown event type: %d\n", static_cast<int>(event_type));
             break;

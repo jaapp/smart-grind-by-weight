@@ -5,12 +5,15 @@
 #include "../config/user_config.h"
 #include <Arduino.h>
 #include <cstdarg>
+#include <cstring>
 
 // UI event queue size
 #define UI_EVENT_QUEUE_SIZE 10
 
 // Flash operation queue size
 #define FLASH_OP_QUEUE_SIZE 5
+
+static constexpr float NO_WEIGHT_DELIVERED_THRESHOLD_G = 0.2f;
 
 void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     weight_sensor = lc;
@@ -20,6 +23,10 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     tolerance = USER_GRIND_ACCURACY_TOLERANCE_G;
     current_profile_id = 0;
     force_measurement_log = false;
+    target_time_ms = 0;
+    time_grind_start_ms = 0;
+    mode = GrindMode::WEIGHT;
+    last_error_message[0] = '\0';
     
     // Set up grinder background indicator callback (if enabled)
     if (grinder) {
@@ -72,11 +79,14 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     }
 }
 
-void GrindController::start_grind(float target) {
-    BLE_LOG("[%lums CONTROLLER] start_grind() called with target=%.1fg\n", millis(), target);
+void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grind_mode) {
+    BLE_LOG("[%lums CONTROLLER] start_grind() called with target=%.1fg, time=%lums, mode=%s\n",
+            millis(), target, (unsigned long)time_ms, grind_mode == GrindMode::TIME ? "TIME" : "WEIGHT");
     if (!weight_sensor || !grinder) return;
     
     target_weight = target;
+    target_time_ms = time_ms;
+    mode = grind_mode;
     start_time = millis();
     pulse_attempts = 0;
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
@@ -88,6 +98,8 @@ void GrindController::start_grind(float target) {
     predictive_end_weight = 0;
     final_weight = 0;
     motor_stop_target_weight = USER_GRIND_UNDERSHOOT_TARGET_G; // Start with a safe default
+
+    time_grind_start_ms = 0;
 
     flow_start_confirmed = false;
 
@@ -101,12 +113,14 @@ void GrindController::start_grind(float target) {
     last_logged_weight = 0.0f;
     last_logged_time = millis();
     force_measurement_log = false;
-    
+
     // Reset UI acknowledgment flag for new grind
     ui_ready_for_setup = false;
-    
+
     // Reset flash operation flag for new grind
     session_end_flash_queued = false;
+
+    last_error_message[0] = '\0';
     
     // Start with INITIALIZING phase - this emits immediate UI event
     // Create minimal loop_data for initial phase transition
@@ -128,6 +142,9 @@ void GrindController::return_to_idle() {
     // and return the controller to the IDLE state.
     if (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) {
         BLE_LOG("[%lums CONTROLLER] UI acknowledged completion/timeout, returning to IDLE.\n", millis());
+        time_grind_start_ms = 0;
+        target_time_ms = 0;
+        last_error_message[0] = '\0';
         switch_phase(GrindPhase::IDLE);  // No loop_data needed for IDLE transition
     }
     // If already IDLE, do nothing. If in another active state, this method shouldn't be called.
@@ -143,6 +160,9 @@ void GrindController::stop_grind() {
     
     BLE_LOG("--- GRIND STOPPED BY USER ---\n");
     
+    time_grind_start_ms = 0;
+    target_time_ms = 0;
+    last_error_message[0] = '\0';
     switch_phase(GrindPhase::IDLE);  // No loop_data needed for IDLE transition
 }
 
@@ -200,10 +220,34 @@ void GrindController::update() {
                 // Double confirm weights are settled
                 if (weight_sensor->is_settled()) {
                     grinder->start();  // Start motor
-                    switch_phase(GrindPhase::PREDICTIVE, loop_data);
+                    time_grind_start_ms = loop_data.now;
+                    if (mode == GrindMode::TIME) {
+                        switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+                    } else {
+                        switch_phase(GrindPhase::PREDICTIVE, loop_data);
+                    }
                 }
             }
             break;
+
+        case GrindPhase::TIME_GRINDING: {
+            if (time_grind_start_ms == 0) {
+                time_grind_start_ms = loop_data.now;
+            }
+
+            if (target_time_ms == 0) {
+                grinder->stop();
+                switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
+                break;
+            }
+
+            unsigned long elapsed = loop_data.now - time_grind_start_ms;
+            if (elapsed >= target_time_ms) {
+                grinder->stop();
+                switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
+            }
+            break;
+        }
 
         case GrindPhase::PREDICTIVE:
             // Inline predictive control logic
@@ -242,6 +286,9 @@ void GrindController::update() {
         case GrindPhase::COMPLETED:
             if (grind_logger.is_logging_active() && !session_end_flash_queued) {
                 float error = final_weight - target_weight;
+                if (mode == GrindMode::TIME) {
+                    error = 0.0f;
+                }
     
                 // Determine result for logging and reporting
                 const char* result_string;
@@ -322,6 +369,7 @@ void GrindController::update() {
         
         queue_log_message("--- NEGATIVE WEIGHT FAILSAFE TRIGGERED: %.2fg in phase %s ---\n", 
                          loop_data.current_weight, get_phase_name(timeout_phase));
+        set_error_message("Err: neg wt");
         switch_phase(GrindPhase::TIMEOUT, loop_data);
     }
     // Only check timeout during active grinding phases, not during completion states
@@ -330,6 +378,17 @@ void GrindController::update() {
         grinder->stop();
         
         queue_log_message("--- GRIND TIMEOUT in phase %s ---\n", get_phase_name(timeout_phase));
+        char timeout_msg[32];
+        const char* phase_name = get_phase_name(timeout_phase);
+        if (phase_name && phase_name[0]) {
+            char phase_short[5];
+            strncpy(phase_short, phase_name, sizeof(phase_short) - 1);
+            phase_short[sizeof(phase_short) - 1] = '\0';
+            snprintf(timeout_msg, sizeof(timeout_msg), "Timeout:%s", phase_short);
+        } else {
+            snprintf(timeout_msg, sizeof(timeout_msg), "Timeout");
+        }
+        set_error_message(timeout_msg);
         switch_phase(GrindPhase::TIMEOUT, loop_data);
     }
 }
@@ -382,6 +441,13 @@ void GrindController::pulse_control(const GrindLoopData& loop_data) {
 
 void GrindController::final_measurement(const GrindLoopData& loop_data) {
     final_weight = weight_sensor->get_weight_high_latency();
+
+    if (mode == GrindMode::WEIGHT && target_weight >= 1.0f && final_weight < NO_WEIGHT_DELIVERED_THRESHOLD_G) {
+        timeout_phase = GrindPhase::FINAL_SETTLING;
+        set_error_message("Err: no wt");
+        switch_phase(GrindPhase::TIMEOUT, loop_data);
+        return;
+    }
 
     // Switch to COMPLETED. The state machine will then transition to IDLE on the next tick.
     switch_phase(GrindPhase::COMPLETED, loop_data);
@@ -518,10 +584,13 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
                                  (weight_sensor ? weight_sensor->get_weight_high_latency() : 0.0f);
     } else if (new_phase == GrindPhase::TIMEOUT) {
         event_data.event = UIGrindEvent::TIMEOUT;
-        event_data.timeout_phase = get_phase_name(timeout_phase);
+        if (last_error_message[0] == '\0') {
+            set_error_message("Error");
+        }
+        event_data.error_message = last_error_message;
         // Use non-blocking high latency weight instead of precision settled weight
-        event_data.timeout_weight = weight_sensor ? weight_sensor->get_weight_high_latency() : 0.0f;
-        event_data.timeout_progress = get_progress_percent();
+        event_data.error_weight = weight_sensor ? weight_sensor->get_weight_high_latency() : 0.0f;
+        event_data.error_progress = get_progress_percent();
     } else if (new_phase == GrindPhase::IDLE) {
         event_data.event = UIGrindEvent::STOPPED;
     }
@@ -539,6 +608,17 @@ bool GrindController::is_active() const {
 }
 
 int GrindController::get_progress_percent() const {
+    if (mode == GrindMode::TIME && target_time_ms > 0) {
+        if (time_grind_start_ms == 0) {
+            return 0;
+        }
+        unsigned long elapsed = millis() - time_grind_start_ms;
+        int progress = (int)(((float)elapsed / (float)target_time_ms) * 100.0f);
+        if (progress > 100) progress = 100;
+        if (progress < 0) progress = 0;
+        return progress;
+    }
+
     if (target_weight <= 0) return 0;
     
     float ground = (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) 
@@ -569,6 +649,7 @@ const char* GrindController::get_phase_name(GrindPhase p) const {
         case GrindPhase::PULSE_EXECUTE: return "PULSE_EXECUTE";
         case GrindPhase::PULSE_SETTLING: return "PULSE_SETTLING";
         case GrindPhase::FINAL_SETTLING: return "FINAL_SETTLING";
+        case GrindPhase::TIME_GRINDING: return "TIME";
         case GrindPhase::COMPLETED: return "COMPLETED";
         case GrindPhase::TIMEOUT: return "TIMEOUT";
         default: return "UNKNOWN";
@@ -776,4 +857,13 @@ void GrindController::process_queued_log_messages() {
         // Output the message using BLE_LOG on Core 1
         BLE_LOG("%s", log_msg.message);
     }
+}
+
+void GrindController::set_error_message(const char* message) {
+    if (!message || !message[0]) {
+        last_error_message[0] = '\0';
+        return;
+    }
+    strncpy(last_error_message, message, sizeof(last_error_message) - 1);
+    last_error_message[sizeof(last_error_message) - 1] = '\0';
 }

@@ -39,15 +39,17 @@ void GrindingScreenChart::create() {
     lv_obj_set_style_pad_all(chart, 0, LV_PART_MAIN);
     
     // Initialize data tracking
+    target_weight_value = 18.0f;
     chart_start_time_ms = 0;
     predicted_grind_time_ms = (uint32_t)(1000.0f + (target_weight_value / REFERENCE_FLOW_RATE_GPS) * 1000.0f);
     predicted_chart_points = (predicted_grind_time_ms / DATA_POINT_INTERVAL_MS);
     if (predicted_chart_points > MAX_CHART_POINTS) {
         predicted_chart_points = MAX_CHART_POINTS;
     }
-    target_weight_value = 18.0f;
     max_y_value = target_weight_value + 0.2f;
     last_data_point_time_ms = 0;
+    time_mode = false;
+    target_time_seconds = 0.0f;
     
     // Set chart to use predicted number of points, enable sliding window
     lv_chart_set_point_count(chart, predicted_chart_points);
@@ -139,19 +141,21 @@ void GrindingScreenChart::update_target_weight(float weight) {
         predicted_chart_points = MAX_CHART_POINTS;
     }
     
-    // Update the weight display spans for current/target format
-    char current_text[16], target_text[16];
-    snprintf(current_text, sizeof(current_text), "0.0g");
-    snprintf(target_text, sizeof(target_text), " / " SYS_WEIGHT_DISPLAY_FORMAT, weight);
-    
-    // Update spans
-    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
-    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-    
-    if (current_span && separator_span) {
-        lv_span_set_text(current_span, current_text);
-        lv_span_set_text(separator_span, target_text);
-        lv_spangroup_refresh(weight_spangroup);
+    if (!time_mode) {
+        // Update the weight display spans for current/target format
+        char current_text[16], target_text[16];
+        snprintf(current_text, sizeof(current_text), "0.0g");
+        snprintf(target_text, sizeof(target_text), " / " SYS_WEIGHT_DISPLAY_FORMAT, weight);
+
+        // Update spans
+        lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
+        lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
+
+        if (current_span && separator_span) {
+            lv_span_set_text(current_span, current_text);
+            lv_span_set_text(separator_span, target_text);
+            lv_spangroup_refresh(weight_spangroup);
+        }
     }
     
     // Update chart configuration
@@ -163,8 +167,34 @@ void GrindingScreenChart::update_target_weight(float weight) {
 }
 
 void GrindingScreenChart::update_target_weight_text(const char* text) {
-    // This method is kept for compatibility but target is now shown in weight_label
-    // Extract the weight value from text if needed for current/target display
+    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
+    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
+
+    if (current_span && separator_span) {
+        const char* target_text = text ? text : "";
+        char formatted_text[48];
+        if (target_text[0] && target_text[0] != ' ' && target_text[0] != '/' && target_text[0] != '\n') {
+            snprintf(formatted_text, sizeof(formatted_text), "\n%s", target_text);
+        } else {
+            snprintf(formatted_text, sizeof(formatted_text), "%s", target_text);
+        }
+        lv_span_set_text(separator_span, formatted_text);
+        lv_spangroup_refresh(weight_spangroup);
+    }
+}
+
+void GrindingScreenChart::update_target_time(float seconds) {
+    target_time_seconds = seconds;
+    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
+    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
+
+    if (current_span && separator_span) {
+        // Keep the current weight span untouched; show time on a new line without slash
+        char target_text[48];
+        snprintf(target_text, sizeof(target_text), "\nTime: %.1fs", seconds);
+        lv_span_set_text(separator_span, target_text);
+        lv_spangroup_refresh(weight_spangroup);
+    }
 }
 
 void GrindingScreenChart::update_current_weight(float weight) {
@@ -178,7 +208,13 @@ void GrindingScreenChart::update_current_weight(float weight) {
     
     if (current_span && separator_span) {
         lv_span_set_text(current_span, current_text);
-        lv_span_set_text(separator_span, target_text);
+        if (time_mode) {
+            char time_text[48];
+            snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
+            lv_span_set_text(separator_span, time_text);
+        } else {
+            lv_span_set_text(separator_span, target_text);
+        }
         lv_spangroup_refresh(weight_spangroup);
     }
 }
@@ -193,7 +229,13 @@ void GrindingScreenChart::update_tare_display() {
     
     if (current_span && separator_span) {
         lv_span_set_text(current_span, "TARE");
-        lv_span_set_text(separator_span, target_text);
+        if (time_mode) {
+            char time_text[48];
+            snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
+            lv_span_set_text(separator_span, time_text);
+        } else {
+            lv_span_set_text(separator_span, target_text);
+        }
         lv_spangroup_refresh(weight_spangroup);
     }
 }
@@ -240,4 +282,14 @@ void GrindingScreenChart::reset_chart_data() {
     }
     
     lv_chart_refresh(chart);
+}
+
+void GrindingScreenChart::set_time_mode(bool enabled) {
+    time_mode = enabled;
+    if (time_mode) {
+        update_target_time(target_time_seconds);
+    } else {
+        // Revert to weight display formatting using the last known target weight
+        update_target_weight(target_weight_value);
+    }
 }

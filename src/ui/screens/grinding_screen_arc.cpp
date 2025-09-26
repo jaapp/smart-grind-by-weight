@@ -56,6 +56,7 @@ void GrindingScreenArc::create() {
     }
 
     visible = false;
+    time_mode = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -74,6 +75,9 @@ void GrindingScreenArc::update_profile_name(const char* name) {
 }
 
 void GrindingScreenArc::update_target_weight(float weight) {
+    if (time_mode) {
+        return;
+    }
     char target_text[32];
     snprintf(target_text, sizeof(target_text), "Target: " SYS_WEIGHT_DISPLAY_FORMAT, weight);
     lv_label_set_text(target_label, target_text);
@@ -81,6 +85,12 @@ void GrindingScreenArc::update_target_weight(float weight) {
 
 void GrindingScreenArc::update_target_weight_text(const char* text) {
     lv_label_set_text(target_label, text);
+}
+
+void GrindingScreenArc::update_target_time(float seconds) {
+    char target_text[32];
+    snprintf(target_text, sizeof(target_text), "Time: %.1fs", seconds);
+    lv_label_set_text(target_label, target_text);
 }
 
 void GrindingScreenArc::update_current_weight(float weight) {
@@ -96,4 +106,8 @@ void GrindingScreenArc::update_tare_display() {
 
 void GrindingScreenArc::update_progress(int percent) {
     lv_arc_set_value(progress_arc, percent);
+}
+
+void GrindingScreenArc::set_time_mode(bool enabled) {
+    time_mode = enabled;
 }

@@ -9,11 +9,14 @@ void ReadyScreen::create() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
+    lv_obj_add_flag(screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // Create tabview
     tabview = lv_tabview_create(screen);
     lv_obj_set_size(tabview, LV_PCT(100), LV_PCT(100));
     lv_obj_align(tabview, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(tabview, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+    lv_obj_add_flag(tabview, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // Hide tab buttons for swipe-only interface
     lv_obj_t* tab_btns = lv_tabview_get_tab_btns(tabview);
@@ -30,7 +33,7 @@ void ReadyScreen::create() {
     profile_tabs[3] = settings_tab;
 
     // Default weights
-    float default_weights[3] = {9.0f, 18.0f, 21.5f};
+    float default_weights[3] = {USER_SINGLE_ESPRESSO_WEIGHT_G, USER_DOUBLE_ESPRESSO_WEIGHT_G, USER_CUSTOM_PROFILE_WEIGHT_G};
     const char* names[3] = {"SINGLE", "DOUBLE", "CUSTOM"};
     
     for (int i = 0; i < 3; i++) {
@@ -39,6 +42,8 @@ void ReadyScreen::create() {
 
     // Create settings tab page
     create_settings_page(settings_tab);
+
+    update_profile_values(default_weights, false);
 
     visible = false;
 }
@@ -90,12 +95,16 @@ void ReadyScreen::hide() {
     visible = false;
 }
 
-void ReadyScreen::update_weights(float weights[3]) {
+void ReadyScreen::update_profile_values(const float values[3], bool show_time) {
     for (int i = 0; i < 3; i++) {
         if (weight_labels[i]) {
-            char weight_text[16];
-            snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weights[i]);
-            lv_label_set_text(weight_labels[i], weight_text);
+            char text[24];
+            if (show_time) {
+                snprintf(text, sizeof(text), "%.1fs", values[i]);
+            } else {
+                snprintf(text, sizeof(text), SYS_WEIGHT_DISPLAY_FORMAT, values[i]);
+            }
+            lv_label_set_text(weight_labels[i], text);
         }
     }
 }
@@ -113,5 +122,3 @@ void ReadyScreen::set_profile_long_press_handler(lv_event_cb_t handler) {
         }
     }
 }
-
-

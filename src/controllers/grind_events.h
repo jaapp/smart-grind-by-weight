@@ -23,8 +23,8 @@ struct GrindEventData {
     
     // Additional data for specific events
     float final_weight;           // For COMPLETED event
-    const char* timeout_phase;    // For TIMEOUT event
-    float timeout_weight;         // For TIMEOUT event
-    int timeout_progress;         // For TIMEOUT event
+    const char* error_message;    // For TIMEOUT/ERROR event
+    float error_weight;           // For TIMEOUT/ERROR event
+    int error_progress;           // For TIMEOUT/ERROR event
     bool background_active;       // For BACKGROUND_CHANGE event
 };

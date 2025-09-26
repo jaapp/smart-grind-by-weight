@@ -12,6 +12,7 @@ private:
     lv_obj_t* plus_btn;
     lv_obj_t* minus_btn;
     bool visible;
+    bool show_time_mode;
 
 public:
     void create();
@@ -19,6 +20,7 @@ public:
     void hide();
     void update_profile_name(const char* name);
     void update_weight(float weight);
+    void set_time_mode(bool time_mode);
     
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }

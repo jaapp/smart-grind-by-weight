@@ -15,47 +15,51 @@ void ProfileEventHandler::handle_tab_change(int tab) {
     // Only set profile if not on DEV tab (tab 3)
     if (tab < 3) {
         ui_manager->profile_controller->set_current_profile(tab);
-        
-        // Update ready screen weights
-        float weights[3];
-        for (int i = 0; i < 3; i++) {
-            weights[i] = ui_manager->profile_controller->get_profile_weight(i);
-        }
-        ui_manager->ready_screen.update_weights(weights);
+        ui_manager->refresh_ready_profiles();
     }
 }
 
 void ProfileEventHandler::handle_profile_long_press() {
     if (ui_manager->state_machine->is_state(UIState::READY) && ui_manager->current_tab < 3) {
         // Store the current tab so we can return to it after editing
-        ui_manager->original_weight = ui_manager->profile_controller->get_current_weight();
+        if (ui_manager->current_mode == GrindMode::TIME) {
+            ui_manager->original_weight = ui_manager->profile_controller->get_current_time();
+        } else {
+            ui_manager->original_weight = ui_manager->profile_controller->get_current_weight();
+        }
         ui_manager->edit_weight = ui_manager->original_weight;
+        ui_manager->edit_screen.set_time_mode(ui_manager->current_mode == GrindMode::TIME);
+        ui_manager->update_edit_weight_display();
         ui_manager->switch_to_state(UIState::EDIT);
     }
 }
 
 void ProfileEventHandler::handle_edit_save() {
-    ui_manager->profile_controller->update_current_weight(ui_manager->edit_weight);
-    ui_manager->profile_controller->save_profiles();
-    
-    // Update ready screen
-    float weights[3];
-    for (int i = 0; i < 3; i++) {
-        weights[i] = ui_manager->profile_controller->get_profile_weight(i);
+    if (ui_manager->current_mode == GrindMode::TIME) {
+        ui_manager->profile_controller->update_current_time(ui_manager->edit_weight);
+    } else {
+        ui_manager->profile_controller->update_current_weight(ui_manager->edit_weight);
     }
-    ui_manager->ready_screen.update_weights(weights);
+    ui_manager->profile_controller->save_profiles();
+    ui_manager->refresh_ready_profiles();
     
     ui_manager->switch_to_state(UIState::READY);
 }
 
 void ProfileEventHandler::handle_edit_cancel() {
     ui_manager->edit_weight = ui_manager->original_weight;
+    ui_manager->edit_screen.set_time_mode(ui_manager->current_mode == GrindMode::TIME);
+    ui_manager->update_edit_weight_display();
     ui_manager->switch_to_state(UIState::READY);
 }
 
 void ProfileEventHandler::handle_edit_plus(lv_event_code_t code) {
     if (code == LV_EVENT_CLICKED) {
-        ui_manager->edit_weight = ui_manager->profile_controller->clamp_weight(ui_manager->edit_weight + USER_FINE_WEIGHT_ADJUSTMENT_G);
+        if (ui_manager->current_mode == GrindMode::TIME) {
+            ui_manager->edit_weight = ui_manager->profile_controller->clamp_time(ui_manager->edit_weight + USER_FINE_TIME_ADJUSTMENT_S);
+        } else {
+            ui_manager->edit_weight = ui_manager->profile_controller->clamp_weight(ui_manager->edit_weight + USER_FINE_WEIGHT_ADJUSTMENT_G);
+        }
         ui_manager->update_edit_weight_display();
     } else if (code == LV_EVENT_LONG_PRESSED) {
         ui_manager->start_jog_timer(1);
@@ -66,7 +70,11 @@ void ProfileEventHandler::handle_edit_plus(lv_event_code_t code) {
 
 void ProfileEventHandler::handle_edit_minus(lv_event_code_t code) {
     if (code == LV_EVENT_CLICKED) {
-        ui_manager->edit_weight = ui_manager->profile_controller->clamp_weight(ui_manager->edit_weight - USER_FINE_WEIGHT_ADJUSTMENT_G);
+        if (ui_manager->current_mode == GrindMode::TIME) {
+            ui_manager->edit_weight = ui_manager->profile_controller->clamp_time(ui_manager->edit_weight - USER_FINE_TIME_ADJUSTMENT_S);
+        } else {
+            ui_manager->edit_weight = ui_manager->profile_controller->clamp_weight(ui_manager->edit_weight - USER_FINE_WEIGHT_ADJUSTMENT_G);
+        }
         ui_manager->update_edit_weight_display();
     } else if (code == LV_EVENT_LONG_PRESSED) {
         ui_manager->start_jog_timer(-1);
@@ -94,8 +102,13 @@ void GrindEventHandler::handle_grind_button() {
             // Start grind with non-blocking tare - no overlay needed
             // Let the event system handle the UI state transition
             BLE_LOG("[%lums GRIND_START] About to call start_grind()\n", millis());
+            ui_manager->error_message[0] = '\0';
+            ui_manager->error_grind_weight = 0.0f;
+            ui_manager->error_grind_progress = 0;
             float target_weight = ui_manager->profile_controller->get_current_weight();
-            ui_manager->grind_controller->start_grind(target_weight);
+            float target_time_seconds = ui_manager->profile_controller->get_current_time();
+            uint32_t target_time_ms = static_cast<uint32_t>((target_time_seconds * 1000.0f) + 0.5f);
+            ui_manager->grind_controller->start_grind(target_weight, target_time_ms, ui_manager->current_mode);
             BLE_LOG("[%lums GRIND_START] start_grind() returned\n", millis());
         }
     } else if (ui_manager->state_machine->is_state(UIState::GRINDING)) {

@@ -4,6 +4,7 @@
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
+#include "grind_mode.h"
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <freertos/FreeRTOS.h>
@@ -58,6 +59,7 @@ enum class GrindPhase {
     PULSE_EXECUTE,      // Executing precision pulse
     PULSE_SETTLING,     // Waiting for weight to settle after pulse
     FINAL_SETTLING,     // Waiting for weight to settle
+    TIME_GRINDING,      // Time-based grinding phase
     COMPLETED,          // Grind completed (success, overshoot, or max pulses)
     TIMEOUT             // Grind timed out
 };
@@ -79,11 +81,14 @@ private:
     Grinder* grinder;
     Preferences* preferences;
     float target_weight;
+    uint32_t target_time_ms;
     GrindPhase phase;
     unsigned long start_time;
     unsigned long phase_start_time;
+    unsigned long time_grind_start_ms;
     
     float tolerance;
+    GrindMode mode;
     
     // Timeout tracking
     GrindPhase timeout_phase;   // Phase when timeout occurred
@@ -134,10 +139,11 @@ private:
     
     // Flag to prevent repeated flash operations for terminal phases (COMPLETED/TIMEOUT)
     bool session_end_flash_queued = false;
+    char last_error_message[32];
 
 public:
     void init(WeightSensor* lc, Grinder* gr, Preferences* prefs);
-    void start_grind(float target);
+    void start_grind(float target_weight, uint32_t target_time_ms, GrindMode grind_mode);
     void user_tare_request();
     void return_to_idle(); // Called by UI to acknowledge completion/timeout
     void stop_grind();
@@ -159,6 +165,8 @@ public:
     
     bool is_active() const;
     float get_target_weight() const { return target_weight; }
+    uint32_t get_target_time_ms() const { return target_time_ms; }
+    GrindMode get_mode() const { return mode; }
     
     // Grind logging functions
     void set_grind_profile_id(uint8_t profile_id) { current_profile_id = profile_id; }
@@ -200,4 +208,6 @@ private:
     GrindPhase get_phase() const { return phase; }
     GrindPhase get_timeout_phase() const { return timeout_phase; }
     const char* get_phase_name(GrindPhase p = static_cast<GrindPhase>(-1)) const;
+
+    void set_error_message(const char* message);
 };

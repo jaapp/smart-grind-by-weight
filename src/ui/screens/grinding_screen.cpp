@@ -1,7 +1,7 @@
 #include "grinding_screen.h"
 #include <Preferences.h>
 
-GrindingScreen::GrindingScreen() : current_layout(GrindScreenLayout::MINIMAL_ARC), preferences(nullptr) {
+GrindingScreen::GrindingScreen() : current_layout(GrindScreenLayout::MINIMAL_ARC), preferences(nullptr), current_mode(GrindMode::WEIGHT) {
     // Layout will be loaded in init() when preferences are available
     active_screen = (IGrindingScreen*)&arc_screen; // Default to arc screen
 }
@@ -54,6 +54,8 @@ void GrindingScreen::set_layout(GrindScreenLayout layout) {
 void GrindingScreen::create() {
     arc_screen.create();
     chart_screen.create();
+    arc_screen.set_time_mode(current_mode == GrindMode::TIME);
+    chart_screen.set_time_mode(current_mode == GrindMode::TIME);
     
     // Hide the inactive screen initially
     if (current_layout == GrindScreenLayout::NERDY_CHART) {
@@ -72,31 +74,38 @@ void GrindingScreen::hide() {
 }
 
 void GrindingScreen::update_profile_name(const char* name) {
-    if (active_screen) active_screen->update_profile_name(name);
+    arc_screen.update_profile_name(name);
+    chart_screen.update_profile_name(name);
 }
 
 void GrindingScreen::update_target_weight(float weight) {
-    // MODIFIED: Always update both screens.
-    // The arc screen needs it to display the correct target weight text.
-    // The chart screen needs it to correctly configure its X and Y axes before data arrives.
     arc_screen.update_target_weight(weight);
     chart_screen.update_target_weight(weight);
 }
 
 void GrindingScreen::update_target_weight_text(const char* text) {
-    if (active_screen) active_screen->update_target_weight_text(text);
+    arc_screen.update_target_weight_text(text);
+    chart_screen.update_target_weight_text(text);
+}
+
+void GrindingScreen::update_target_time(float seconds) {
+    arc_screen.update_target_time(seconds);
+    chart_screen.update_target_time(seconds);
 }
 
 void GrindingScreen::update_current_weight(float weight) {
-    if (active_screen) active_screen->update_current_weight(weight);
+    arc_screen.update_current_weight(weight);
+    chart_screen.update_current_weight(weight);
 }
 
 void GrindingScreen::update_tare_display() {
-    if (active_screen) active_screen->update_tare_display();
+    arc_screen.update_tare_display();
+    chart_screen.update_tare_display();
 }
 
 void GrindingScreen::update_progress(int percent) {
-    if (active_screen) active_screen->update_progress(percent);
+    arc_screen.update_progress(percent);
+    chart_screen.update_progress(percent);
 }
 
 bool GrindingScreen::is_visible() const {
@@ -116,4 +125,11 @@ void GrindingScreen::add_chart_data_point(float current_weight, float flow_rate,
 
 void GrindingScreen::reset_chart_data() {
     chart_screen.reset_chart_data();
+}
+
+void GrindingScreen::set_mode(GrindMode mode) {
+    current_mode = mode;
+    bool time_enabled = (mode == GrindMode::TIME);
+    arc_screen.set_time_mode(time_enabled);
+    chart_screen.set_time_mode(time_enabled);
 }
