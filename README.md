@@ -21,6 +21,13 @@ https://github.com/user-attachments/assets/e20ce3e2-417e-4a3b-bb48-05591fce9418
 > **⚠️ Newly Released Mod - Buyer Beware!**  
 > This is a **recently released modification project** that transforms grinders into smart grind-by-weight systems. While functional and free/open source, it's an **experimental mod** that requires technical skill to build and may have rough edges. **Build at your own risk** - this is not a polished commercial product!
 
+
+> ## 📜 Changelog
+> **📅 Update 27-09-2025** – Added Grind-by-Time (GBT) mode  
+>  - Activated by swiping vertically over grind profiles  
+>  - Grind button turns blue to indicate timed mode (red = GBW)  
+>  - Each profile configurable with grind duration, similar to GBW weight configuration
+>
 > **📅 Update 21-09-2025:** Important fit tweak for T70 load cell users. Updated Cup holder.stl and Back plate.stl to accommodate T70 load cells. All users with T70 load cells must use the latest 3D files for proper fit.
 
 The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly accurate open source grinder modification that transforms any grinder with a motor relay accepting 3.3V logic levels into an intelligent grind-by-weight system. Originally developed for the Eureka Mignon Specialita, the system can be easily adapted for other grinders.
