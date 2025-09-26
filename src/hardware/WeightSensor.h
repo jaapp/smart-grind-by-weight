@@ -2,11 +2,7 @@
 
 #include "circular_buffer_math/circular_buffer_math.h"
 #include "../config/hardware_config.h"
-#if HW_LOADCELL_USE_MOCK_DRIVER
-#include "hx711_mock_driver.h"
-#else
 #include "hx711_driver.h"
-#endif
 #include "../config/pins.h"
 #include "../config/constants.h"
 #include <Preferences.h>
@@ -35,12 +31,8 @@
  */
 class WeightSensor {
 private:
-    // HX711 hardware driver (real or mock based on compile flag)
-    #if HW_LOADCELL_USE_MOCK_DRIVER
-    std::unique_ptr<HX711MockDriver> adc_driver;
-    #else
+    // HX711 hardware driver
     std::unique_ptr<HX711Driver> adc_driver;
-    #endif
     
     // CircularBufferMath for advanced filtering and analysis
     CircularBufferMath raw_filter;
@@ -197,7 +189,4 @@ public:
     float get_current_sps() const;                                   // Get samples per second over last 2 seconds
 #endif
 
-#if HW_LOADCELL_USE_MOCK_DRIVER
-    HX711MockDriver* get_adc_driver() { return adc_driver.get(); }
-#endif
 };

@@ -1,10 +1,6 @@
 #include "WeightSensor.h"
 #include "../config/hardware_config.h"
-#if HW_LOADCELL_USE_MOCK_DRIVER
-#include "hx711_mock_driver.h"
-#else
 #include "hx711_driver.h"
-#endif
 #include "../config/pins.h"
 #include "../config/logging.h"
 #include <Arduino.h>
@@ -65,23 +61,7 @@ void WeightSensor::init(Preferences* preferences) {
     
     BLE_LOG("Initializing WeightSensor configuration and filters...\n");
     
-    #if HW_LOADCELL_USE_MOCK_DRIVER
-    // Create mock HX711 driver for testing
-    adc_driver = std::make_unique<HX711MockDriver>(HW_LOADCELL_SCK_PIN, HW_LOADCELL_DOUT_PIN);
-    if (!adc_driver) {
-        BLE_LOG("ERROR: Failed to create mock ADC driver\n");
-        return;
-    }
-    
-    BLE_LOG("Created %s ADC driver\n", adc_driver->get_driver_name());
-    
-    // Configure mock driver with simple parameters
-    // The mock driver now simulates grinding internally.
-    // We can get a pointer to it to control the grinder state for testing.
-    // Example: adc_driver->set_grinder_active(true);
-    
-    #else
-    // Create real HX711 driver
+    // Create HX711 driver
     adc_driver = std::make_unique<HX711Driver>(HW_LOADCELL_SCK_PIN, HW_LOADCELL_DOUT_PIN);
     if (!adc_driver) {
         BLE_LOG("ERROR: Failed to create ADC driver\n");
@@ -89,7 +69,6 @@ void WeightSensor::init(Preferences* preferences) {
     }
     
     BLE_LOG("Created %s ADC driver\n", adc_driver->get_driver_name());
-    #endif
     
     // Don't load calibration data here - WeightSamplingTask will handle it on Core 0
     // This avoids NVS threading issues between Core 1 init and Core 0 hardware access
@@ -435,11 +414,6 @@ void WeightSensor::load_calibration() {
         }
         
         cal_factor = saved_factor;
-#if HW_LOADCELL_USE_MOCK_DRIVER
-        if (adc_driver) {
-            get_adc_driver()->set_mock_calibration(cal_factor, tare_offset);
-        }
-#endif
         BLE_LOG("Loaded calibration factor: %.2f\n", saved_factor);
     } else {
         cal_factor = USER_DEFAULT_CALIBRATION_FACTOR;
@@ -503,12 +477,6 @@ bool WeightSensor::sample_and_feed_filter() {
             
             // Tare logic (hardware-independent)
             if (doTare) {
-                // Enable mock driver tare mode for stable readings during tare
-                // #if HW_LOADCELL_USE_MOCK_DRIVER
-                // if (tareTimes == 0 && adc_driver) {
-                //     adc_driver->enable_tare_mode(current_weight);
-                // }
-                // #endif
                 if (tareTimes < DATA_SET) {
                     tareTimes++;
                 } else {
@@ -518,13 +486,6 @@ bool WeightSensor::sample_and_feed_filter() {
                     tareTimes = 0;
                     doTare = 0;
                     tareStatus = 1;
-                    
-                    // Disable mock driver tare mode after tare completes
-                    // #if HW_LOADCELL_USE_MOCK_DRIVER
-                    // if (adc_driver) {
-                    //     adc_driver->disable_tare_mode();
-                    // }
-                    // #endif
                 }
             }
             

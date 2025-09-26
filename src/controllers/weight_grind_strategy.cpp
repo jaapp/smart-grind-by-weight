@@ -142,12 +142,6 @@ void WeightGrindStrategy::run_pulse_decision_phase(GrindController& controller,
     controller.switch_phase(GrindPhase::PULSE_EXECUTE, loop_data);
     controller.grinder->start_pulse_rmt(static_cast<uint32_t>(controller.current_pulse_duration_ms));
 
-#if HW_LOADCELL_USE_MOCK_DRIVER
-    if (controller.weight_sensor && controller.weight_sensor->get_adc_driver()) {
-        controller.weight_sensor->get_adc_driver()->simulate_pulse(static_cast<uint32_t>(controller.current_pulse_duration_ms));
-    }
-#endif
-
     controller.pulse_attempts++;
 }
 

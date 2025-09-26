@@ -81,12 +81,6 @@ private:
     // Screen timeout state
     bool screen_dimmed;
     
-#if HW_LOADCELL_USE_MOCK_DRIVER
-    // Mock grinder background state
-    lv_style_t style_screen;
-    bool mock_grinder_background_active;
-#endif
-    
     // Function pointer for pending confirmation action
     void (*pending_confirm_callback)();
     
@@ -175,10 +169,6 @@ public:
     
     // Event-driven grind updates
     static void grind_event_handler(const GrindEventData& event_data);
-    
-#if HW_LOADCELL_USE_MOCK_DRIVER
-    void update_mock_grinder_background(bool grinder_active);
-#endif
     
 
 private:

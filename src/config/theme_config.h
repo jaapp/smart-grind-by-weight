@@ -37,7 +37,7 @@
 #define THEME_COLOR_SUCCESS 0x00AA00                                           // Success state color (green)
 #define THEME_COLOR_ERROR 0xFF0000                                             // Error state color (red)
 #define THEME_COLOR_WARNING 0xCC8800                                           // Warning state color (darker yellow/orange)
-#define THEME_COLOR_MOCK_GRINDER_ACTIVE 0x403800                              // Mock grinder active indicator (dark yellow)
+#define THEME_COLOR_GRINDER_ACTIVE 0x403800                                   // Grinder active indicator (dark yellow)
 
 //------------------------------------------------------------------------------
 // UI ELEMENT DIMENSIONS

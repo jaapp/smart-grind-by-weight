@@ -46,8 +46,6 @@
 //------------------------------------------------------------------------------
 // LOAD CELL ADC SPECIFICATIONS
 //------------------------------------------------------------------------------
-// Mock hardware mode for testing without HX711 connected
-#define HW_LOADCELL_USE_MOCK_DRIVER 0                                          // 0=real HX711 driver, 1=mock driver for testing
 
 // Sample rate configuration
 // HX711: Only supports 10 SPS or 80 SPS

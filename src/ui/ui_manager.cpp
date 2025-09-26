@@ -1090,7 +1090,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                 
                 // Set background color based on grinder state
                 lv_color_t bg_color = event_data.background_active ? 
-                    lv_color_hex(THEME_COLOR_MOCK_GRINDER_ACTIVE) :  // Dark yellow when active
+                    lv_color_hex(THEME_COLOR_GRINDER_ACTIVE) :       // Dark yellow when active
                     lv_color_hex(THEME_COLOR_BACKGROUND);            // Black when inactive
                     
                 lv_style_set_bg_color(&style_bg, bg_color);

@@ -33,12 +33,6 @@ void Grinder::init(int pin) {
 void Grinder::start() {
     if (!initialized || !rmt_initialized) return;
     
-    // Safety: Never activate motor when mock HX711 driver is active
-    #if HW_LOADCELL_USE_MOCK_DRIVER
-    BLE_LOG("[SAFETY] Motor activation blocked - mock HX711 driver is active\n");
-    return;
-    #endif
-    
     // Reset any active pulse state when using continuous mode
     pulse_active = false;
     
@@ -91,12 +85,6 @@ void Grinder::stop() {
 
 void Grinder::start_pulse_rmt(uint32_t duration_ms) {
     if (!initialized || !rmt_initialized) return;
-    
-    // Safety: Never activate motor when mock HX711 driver is active
-    #if HW_LOADCELL_USE_MOCK_DRIVER
-    BLE_LOG("[SAFETY] Motor pulse activation blocked - mock HX711 driver is active\n");
-    return;
-    #endif
     
     // Clean up any existing encoder
     if (current_encoder) {

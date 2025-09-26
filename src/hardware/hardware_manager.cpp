@@ -10,13 +10,6 @@ void HardwareManager::init() {
     weight_sensor.init(&preferences);
     grinder.init(HW_MOTOR_RELAY_PIN);
     
-#if HW_LOADCELL_USE_MOCK_DRIVER
-    // Connect mock driver to grinder for grinding simulation
-    if (weight_sensor.get_adc_driver()) {
-        weight_sensor.get_adc_driver()->set_grinder_reference(&grinder);
-    }
-#endif
-    
     grind_controller = nullptr; // Will be set later
     initialized = true;
 }
