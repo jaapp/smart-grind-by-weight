@@ -28,3 +28,29 @@ inline lv_obj_t* create_button(lv_obj_t* parent, const char* text,
     
     return button;  
 }
+
+inline void set_label_text_int(lv_obj_t* label, int32_t value, const char* unit = nullptr) {
+    if (!label) return;
+    char buf[24];
+
+    if (unit) {
+        snprintf(buf, sizeof(buf), "%ld %s", value, unit);
+    } else {
+        snprintf(buf, sizeof(buf), "%ld", value);
+    }
+
+    lv_label_set_text(label, buf);
+}
+
+inline void set_label_text_float(lv_obj_t* label, float value, const char* unit = nullptr) {
+    if (!label) return;
+    char buf[24];
+    
+    if (unit) {
+        snprintf(buf, sizeof(buf), "%.2fg %s", value, unit);
+    } else {
+        snprintf(buf, sizeof(buf), "%.2f", value);
+    }
+
+    lv_label_set_text(label, buf);
+}

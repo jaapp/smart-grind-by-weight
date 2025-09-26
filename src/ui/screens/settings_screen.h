@@ -21,8 +21,10 @@ private:
     lv_obj_t* info_label;
     lv_obj_t* uptime_label;
     lv_obj_t* memory_label;
-    lv_obj_t* version_label;
-    lv_obj_t* build_label;
+    lv_obj_t* instant_label;
+    lv_obj_t* smooth_label;
+    lv_obj_t* samples_label;
+    lv_obj_t* raw_label;
     lv_obj_t* sessions_label;
     lv_obj_t* events_label;
     lv_obj_t* measurements_label;
@@ -60,11 +62,8 @@ public:
     void create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr);
     void show();
     void hide();
-    void update_info(const char* load_cell_info, unsigned long uptime_ms, size_t free_heap);
+    void update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap);
     void update_ble_status();
-    void set_session_count(uint32_t count);
-    void set_event_count(uint32_t count);
-    void set_measurement_count(uint32_t count);
     void refresh_statistics();
     void show_taring_overlay();
     void hide_taring_overlay();
@@ -94,13 +93,15 @@ private:
     void create_display_page(lv_obj_t* parent);
     void create_tools_page(lv_obj_t* parent);
     void create_data_page(lv_obj_t* parent);
-    lv_obj_t* create_separator(lv_obj_t* parent, const char* text);
+    lv_obj_t* create_separator(lv_obj_t* parent, const char* text = nullptr);
     lv_obj_t* create_menu_item(lv_obj_t* parent, const char* text);
     lv_obj_t *create_toggle_row(lv_obj_t *parent, const char *text,lv_obj_t **out_toggle);
     lv_obj_t *create_slider_row(lv_obj_t *parent, const char *text,
                                 lv_obj_t **label, lv_obj_t **slider,
                                 lv_color_t slider_color = lv_color_hex(THEME_COLOR_ACCENT),
                                 uint32_t min = 0, uint32_t max = 100);
+    lv_obj_t *create_static_data_label(lv_obj_t *parent, const char *name,
+                                       const char *value);
     lv_obj_t *create_data_label(lv_obj_t *parent, const char *name,
                                 lv_obj_t **variable);
 };
