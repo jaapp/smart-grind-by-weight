@@ -19,6 +19,7 @@ private:
     lv_obj_t* plus_btn;
     lv_obj_t* minus_btn;
     lv_obj_t* weight_input;
+    lv_obj_t* top_button_row;
     lv_obj_t* taring_overlay;
     lv_obj_t* taring_label;
     lv_obj_t* calibrating_overlay;

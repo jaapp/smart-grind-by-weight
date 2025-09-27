@@ -1,6 +1,7 @@
 #include "calibration_screen.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
+#include "ui_helpers.h"
 
 void CalibrationScreen::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -9,30 +10,9 @@ void CalibrationScreen::create() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
+    lv_obj_set_style_pad_ver(screen, 6, 0);
 
-    // OK button (top left) - using same size as edit screen
-    ok_button = lv_btn_create(screen);
-    lv_obj_set_size(ok_button, THEME_BUTTON_WIDTH_PX, 75);
-    lv_obj_align(ok_button, LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_set_style_bg_color(ok_button, lv_color_hex(THEME_COLOR_SUCCESS), 0);
-    lv_obj_set_style_border_width(ok_button, 0, 0);
-    
-    lv_obj_t* ok_label = lv_label_create(ok_button);
-    lv_label_set_text(ok_label, LV_SYMBOL_OK);
-    lv_obj_set_style_text_font(ok_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(ok_label);
-
-    // Cancel button (top right)
-    cancel_button = lv_btn_create(screen);
-    lv_obj_set_size(cancel_button, THEME_BUTTON_WIDTH_PX, 75);
-    lv_obj_align(cancel_button, LV_ALIGN_TOP_RIGHT, -10, 10);
-    lv_obj_set_style_bg_color(cancel_button, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(cancel_button, 0, 0);
-    
-    lv_obj_t* cancel_label = lv_label_create(cancel_button);
-    lv_label_set_text(cancel_label, LV_SYMBOL_CLOSE);
-    lv_obj_set_style_text_font(cancel_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(cancel_label);
+    top_button_row = create_dual_button_row(screen, &ok_button, &cancel_button, LV_SYMBOL_OK, LV_SYMBOL_CLOSE, lv_color_hex(THEME_COLOR_SUCCESS), lv_color_hex(THEME_COLOR_NEUTRAL), 80, &lv_font_montserrat_32);
 
     // Title label (center top)
     title_label = lv_label_create(screen);
@@ -56,30 +36,9 @@ void CalibrationScreen::create() {
     lv_obj_set_style_text_color(weight_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     lv_obj_align(weight_label, LV_ALIGN_CENTER, 0, 55);
 
-    // Minus button (bottom left) - only visible during weight input step
-    minus_btn = lv_btn_create(screen);
-    lv_obj_set_size(minus_btn, THEME_BUTTON_WIDTH_PX, THEME_BUTTON_HEIGHT_PX);
-    lv_obj_align(minus_btn, LV_ALIGN_BOTTOM_LEFT, 10, -5);
-    lv_obj_set_style_bg_color(minus_btn, lv_color_hex(THEME_COLOR_ERROR), 0);
-    lv_obj_set_style_border_width(minus_btn, 0, 0);
-    
-    lv_obj_t* minus_label = lv_label_create(minus_btn);
-    lv_label_set_text(minus_label, LV_SYMBOL_MINUS);
-    lv_obj_set_style_text_font(minus_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(minus_label);
+    lv_obj_t* bottom_button_row = create_dual_button_row(screen, &minus_btn, &plus_btn, LV_SYMBOL_MINUS, LV_SYMBOL_PLUS, lv_color_hex(THEME_COLOR_PRIMARY), lv_color_hex(THEME_COLOR_PRIMARY), 100, &lv_font_montserrat_32);
+    lv_obj_align(bottom_button_row, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_flag(minus_btn, LV_OBJ_FLAG_HIDDEN);
-
-    // Plus button (bottom right) - only visible during weight input step
-    plus_btn = lv_btn_create(screen);
-    lv_obj_set_size(plus_btn, THEME_BUTTON_WIDTH_PX, THEME_BUTTON_HEIGHT_PX);
-    lv_obj_align(plus_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -5);
-    lv_obj_set_style_bg_color(plus_btn, lv_color_hex(THEME_COLOR_ERROR), 0);
-    lv_obj_set_style_border_width(plus_btn, 0, 0);
-    
-    lv_obj_t* plus_label = lv_label_create(plus_btn);
-    lv_label_set_text(plus_label, LV_SYMBOL_PLUS);
-    lv_obj_set_style_text_font(plus_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(plus_label);
     lv_obj_add_flag(plus_btn, LV_OBJ_FLAG_HIDDEN);
 
     // Hidden weight input (keeping for compatibility but not used in UI)
@@ -149,6 +108,7 @@ void CalibrationScreen::set_step(CalibrationStep step) {
     switch (step) {
         case CAL_STEP_EMPTY:
             lv_label_set_text(instruction_label, "Remove all weight\nPress OK when empty");
+            lv_obj_set_style_pad_hor(top_button_row, 0, 0);
             lv_obj_clear_flag(cancel_button, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(plus_btn, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(minus_btn, LV_OBJ_FLAG_HIDDEN);
@@ -164,6 +124,7 @@ void CalibrationScreen::set_step(CalibrationStep step) {
             
         case CAL_STEP_COMPLETE:
             lv_label_set_text(instruction_label, "Calibration complete!");
+            lv_obj_set_style_pad_hor(top_button_row, 10, 0);
             lv_obj_add_flag(cancel_button, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(plus_btn, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(minus_btn, LV_OBJ_FLAG_HIDDEN);
