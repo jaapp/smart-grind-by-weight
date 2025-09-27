@@ -46,46 +46,6 @@ void CalibrationScreen::create() {
     lv_obj_set_size(weight_input, 1, 1);
     lv_obj_add_flag(weight_input, LV_OBJ_FLAG_HIDDEN);
 
-    // Taring overlay (initially hidden)
-    taring_overlay = lv_obj_create(screen);
-    lv_obj_set_size(taring_overlay, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(taring_overlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(taring_overlay, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(taring_overlay, LV_OPA_70, 0);
-    lv_obj_set_style_border_width(taring_overlay, 0, 0);
-    lv_obj_set_style_pad_all(taring_overlay, 0, 0);
-    
-    // Taring label
-    taring_label = lv_label_create(taring_overlay);
-    lv_label_set_text(taring_label, "TARING...\nPlease wait");
-    lv_obj_set_style_text_font(taring_label, &lv_font_montserrat_36, 0);
-    lv_obj_set_style_text_color(taring_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_style_text_align(taring_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(taring_label, LV_ALIGN_CENTER, 0, 0);
-    
-    // Hide the overlay initially
-    lv_obj_add_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
-
-    // Calibrating overlay (initially hidden)
-    calibrating_overlay = lv_obj_create(screen);
-    lv_obj_set_size(calibrating_overlay, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(calibrating_overlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(calibrating_overlay, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(calibrating_overlay, LV_OPA_70, 0);
-    lv_obj_set_style_border_width(calibrating_overlay, 0, 0);
-    lv_obj_set_style_pad_all(calibrating_overlay, 0, 0);
-    
-    // Calibrating label
-    calibrating_label = lv_label_create(calibrating_overlay);
-    lv_label_set_text(calibrating_label, "CALIBRATING...\nPlease wait");
-    lv_obj_set_style_text_font(calibrating_label, &lv_font_montserrat_36, 0);
-    lv_obj_set_style_text_color(calibrating_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_style_text_align(calibrating_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(calibrating_label, LV_ALIGN_CENTER, 0, 0);
-    
-    // Hide the overlay initially
-    lv_obj_add_flag(calibrating_overlay, LV_OBJ_FLAG_HIDDEN);
-
     current_step = CAL_STEP_EMPTY;
     calibration_weight = 20.0f; // Default calibration weight
     visible = false;
@@ -162,20 +122,4 @@ void CalibrationScreen::update_calibration_weight(float weight) {
         snprintf(weight_display, sizeof(weight_display), SYS_WEIGHT_DISPLAY_FORMAT, weight);
         lv_label_set_text(weight_label, weight_display);
     }
-}
-
-void CalibrationScreen::show_taring_overlay() {
-    lv_obj_clear_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
-}
-
-void CalibrationScreen::hide_taring_overlay() {
-    lv_obj_add_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
-}
-
-void CalibrationScreen::show_calibrating_overlay() {
-    lv_obj_clear_flag(calibrating_overlay, LV_OBJ_FLAG_HIDDEN);
-}
-
-void CalibrationScreen::hide_calibrating_overlay() {
-    lv_obj_add_flag(calibrating_overlay, LV_OBJ_FLAG_HIDDEN);
 }

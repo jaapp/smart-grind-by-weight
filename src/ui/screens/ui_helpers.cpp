@@ -103,4 +103,3 @@ lv_obj_t* create_dual_button_row(lv_obj_t* parent, lv_obj_t** left_button, lv_ob
 
     return row_container;
 }
-
