@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"
+#include "ui_helpers.h"
 
 void ReadyScreen::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -53,22 +54,16 @@ void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 20, 0);
+    lv_obj_set_style_pad_gap(parent, 0, 0);
 
-    // Profile name label
-    lv_obj_t* name_label = lv_label_create(parent);
+    lv_obj_t* name_label;
+    lv_obj_t* profile_container = create_profile_label(parent, &name_label, &weight_labels[profile_index]);
     lv_label_set_text(name_label, profile_name);
-    lv_obj_set_style_text_font(name_label, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(name_label, lv_color_hex(THEME_COLOR_SECONDARY), 0);
     lv_obj_add_flag(name_label, LV_OBJ_FLAG_CLICKABLE);
-
-    // Weight label
-    weight_labels[profile_index] = lv_label_create(parent);
+    
     char weight_text[16];
     snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
     lv_label_set_text(weight_labels[profile_index], weight_text);
-    lv_obj_set_style_text_font(weight_labels[profile_index], &lv_font_montserrat_60, 0);
-    lv_obj_set_style_text_color(weight_labels[profile_index], lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     lv_obj_add_flag(weight_labels[profile_index], LV_OBJ_FLAG_CLICKABLE);
 }
 

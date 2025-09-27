@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"
+#include "ui_helpers.h"
 
 void EditScreen::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -9,69 +10,57 @@ void EditScreen::create() {
     lv_obj_align(screen, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
-    lv_obj_set_style_pad_all(screen, 0, 0);
+    lv_obj_set_style_pad_ver(screen, 0, 0);
+    lv_obj_set_style_pad_hor(screen, 6, 0);
 
-    // Save button (top left)
-    save_btn = lv_btn_create(screen);
-    lv_obj_set_size(save_btn, THEME_BUTTON_WIDTH_PX, 75);
-    lv_obj_align(save_btn, LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_set_style_bg_color(save_btn, lv_color_hex(THEME_COLOR_SUCCESS), 0);
-    lv_obj_set_style_border_width(save_btn, 0, 0);
+
+    // Set up flex layout (column)
+    lv_obj_set_layout(screen, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(screen, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t *top_button_container = lv_obj_create(screen);
+    lv_obj_set_size(top_button_container, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(top_button_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(top_button_container, 0, 0);
+    lv_obj_set_style_pad_all(top_button_container, 0, 0);
     
-    lv_obj_t* save_label = lv_label_create(save_btn);
-    lv_label_set_text(save_label, LV_SYMBOL_OK);
-    lv_obj_set_style_text_font(save_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(save_label);
+    // Set up button container as horizontal flex
+    lv_obj_set_layout(top_button_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(top_button_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(top_button_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(top_button_container, 10, 0);
 
-    // Cancel button (top right)
-    cancel_btn = lv_btn_create(screen);
-    lv_obj_set_size(cancel_btn, THEME_BUTTON_WIDTH_PX, 75);
-    lv_obj_align(cancel_btn, LV_ALIGN_TOP_RIGHT, -10, 10);
-    lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(cancel_btn, 0, 0);
+    save_btn = create_button(top_button_container, LV_SYMBOL_OK, lv_color_hex(THEME_COLOR_SUCCESS));
+    lv_obj_set_style_text_font(lv_obj_get_child(save_btn, -1), &lv_font_montserrat_32, 0);
+    lv_obj_set_flex_grow(save_btn, 1);
+
+    cancel_btn = create_button(top_button_container, LV_SYMBOL_CLOSE, lv_color_hex(THEME_COLOR_NEUTRAL));
+    lv_obj_set_style_text_font(lv_obj_get_child(cancel_btn, -1), &lv_font_montserrat_32, 0);
+    lv_obj_set_flex_grow(cancel_btn, 1);
+
+    create_profile_label(screen, &profile_label, &weight_label);
+
+    lv_obj_t *bottom_button_container = lv_obj_create(screen);
+    lv_obj_set_size(bottom_button_container, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(bottom_button_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bottom_button_container, 0, 0);
+    lv_obj_set_style_pad_all(bottom_button_container, 0, 0);
     
-    lv_obj_t* cancel_label = lv_label_create(cancel_btn);
-    lv_label_set_text(cancel_label, LV_SYMBOL_CLOSE);
-    lv_obj_set_style_text_font(cancel_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(cancel_label);
+    // Set up button container as horizontal flex
+    lv_obj_set_layout(bottom_button_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(bottom_button_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(bottom_button_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(bottom_button_container, 10, 0);
 
-    // Profile name label (center)
-    profile_label = lv_label_create(screen);
-    lv_label_set_text(profile_label, "DOUBLE");
-    lv_obj_set_style_text_font(profile_label, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(profile_label, lv_color_hex(THEME_COLOR_SECONDARY), 0);
-    lv_obj_align(profile_label, LV_ALIGN_CENTER, 0, -40);
+    minus_btn = create_button(bottom_button_container, LV_SYMBOL_MINUS, lv_color_hex(THEME_COLOR_PRIMARY), -1);
+    lv_obj_set_style_text_font(lv_obj_get_child(minus_btn, -1), &lv_font_montserrat_32, 0);
+    lv_obj_set_flex_grow(minus_btn, 1);
 
-    // Weight label (center)
-    weight_label = lv_label_create(screen);
-    lv_label_set_text(weight_label, "18.0g");
-    lv_obj_set_style_text_font(weight_label, &lv_font_montserrat_56, 0);
-    lv_obj_set_style_text_color(weight_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_align(weight_label, LV_ALIGN_CENTER, 0, 10);
+    plus_btn = create_button(bottom_button_container, LV_SYMBOL_PLUS, lv_color_hex(THEME_COLOR_PRIMARY), -1);
+    lv_obj_set_style_text_font(lv_obj_get_child(plus_btn, -1), &lv_font_montserrat_32, 0);
+    lv_obj_set_flex_grow(plus_btn, 1);
 
-    // Minus button (bottom left)
-    minus_btn = lv_btn_create(screen);
-    lv_obj_set_size(minus_btn, THEME_BUTTON_WIDTH_PX, THEME_BUTTON_HEIGHT_PX);
-    lv_obj_align(minus_btn, LV_ALIGN_BOTTOM_LEFT, 10, -5);
-    lv_obj_set_style_bg_color(minus_btn, lv_color_hex(THEME_COLOR_ERROR), 0);
-    lv_obj_set_style_border_width(minus_btn, 0, 0);
-    
-    lv_obj_t* minus_label = lv_label_create(minus_btn);
-    lv_label_set_text(minus_label, LV_SYMBOL_MINUS);
-    lv_obj_set_style_text_font(minus_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(minus_label);
-
-    // Plus button (bottom right)
-    plus_btn = lv_btn_create(screen);
-    lv_obj_set_size(plus_btn, THEME_BUTTON_WIDTH_PX, THEME_BUTTON_HEIGHT_PX);
-    lv_obj_align(plus_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -5);
-    lv_obj_set_style_bg_color(plus_btn, lv_color_hex(THEME_COLOR_ERROR), 0);
-    lv_obj_set_style_border_width(plus_btn, 0, 0);
-    
-    lv_obj_t* plus_label = lv_label_create(plus_btn);
-    lv_label_set_text(plus_label, LV_SYMBOL_PLUS);
-    lv_obj_set_style_text_font(plus_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(plus_label);
 
     visible = false;
     mode = GrindMode::WEIGHT;

@@ -1,5 +1,6 @@
 #include "confirm_screen.h"
 #include <Arduino.h>
+#include "ui_helpers.h"
 
 void ConfirmScreen::create() {
       screen = lv_obj_create(lv_scr_act());
@@ -7,8 +8,9 @@ void ConfirmScreen::create() {
     lv_obj_align(screen, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
-    lv_obj_set_style_pad_all(screen, 0, 0);
-    lv_obj_set_style_pad_gap(screen, 10, 0);
+    lv_obj_set_style_pad_ver(screen, 0, 0);
+    lv_obj_set_style_pad_hor(screen, 6, 0);
+    lv_obj_set_style_pad_gap(screen, 5, 0);
     
     // Set up flex layout (column)
     lv_obj_set_layout(screen, LV_LAYOUT_FLEX);
