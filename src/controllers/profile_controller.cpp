@@ -18,6 +18,9 @@ void ProfileController::init(Preferences* prefs) {
     profiles[2].weight = USER_CUSTOM_PROFILE_WEIGHT_G;
     profiles[2].time_seconds = USER_CUSTOM_PROFILE_TIME_S;
     
+    // Initialize default grind mode
+    current_grind_mode = GrindMode::WEIGHT;
+    
     load_profiles();
 }
 
@@ -31,6 +34,10 @@ void ProfileController::load_profiles() {
     profiles[0].time_seconds = preferences->getFloat("time0", USER_SINGLE_ESPRESSO_TIME_S);
     profiles[1].time_seconds = preferences->getFloat("time1", USER_DOUBLE_ESPRESSO_TIME_S);
     profiles[2].time_seconds = preferences->getFloat("time2", USER_CUSTOM_PROFILE_TIME_S);
+    
+    // Load grind mode (default to WEIGHT if not set)
+    int stored_mode = preferences->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
+    current_grind_mode = static_cast<GrindMode>(stored_mode);
     
     if (current_profile < 0 || current_profile >= USER_PROFILE_COUNT) {
         current_profile = 1;
@@ -124,4 +131,13 @@ float ProfileController::clamp_time(float seconds) const {
     if (seconds < USER_MIN_TARGET_TIME_S) return USER_MIN_TARGET_TIME_S;
     if (seconds > USER_MAX_TARGET_TIME_S) return USER_MAX_TARGET_TIME_S;
     return seconds;
+}
+
+void ProfileController::set_grind_mode(GrindMode mode) {
+    current_grind_mode = mode;
+    save_grind_mode();
+}
+
+void ProfileController::save_grind_mode() {
+    preferences->putInt("grind_mode", static_cast<int>(current_grind_mode));
 }

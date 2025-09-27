@@ -35,7 +35,7 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     error_grind_progress = 0;
     error_message[0] = '\0';
     current_tab = profile_controller->get_current_profile();
-    current_mode = GrindMode::WEIGHT;
+    current_mode = profile_controller->get_grind_mode();
     chart_updates_enabled = false;
     jog_timer = nullptr;
     motor_timer = nullptr;
@@ -740,6 +740,7 @@ void UIManager::toggle_mode() {
         return;
     }
     current_mode = (current_mode == GrindMode::WEIGHT) ? GrindMode::TIME : GrindMode::WEIGHT;
+    profile_controller->set_grind_mode(current_mode);
     refresh_ready_profiles();
     edit_target = get_current_profile_target(*profile_controller, current_mode);
     if (state_machine->is_state(UIState::EDIT)) {

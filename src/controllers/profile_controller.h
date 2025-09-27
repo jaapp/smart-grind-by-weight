@@ -1,6 +1,7 @@
 #pragma once
 #include <Preferences.h>
 #include "../config/constants.h"
+#include "grind_mode.h"
 
 struct Profile {
     char name[USER_PROFILE_NAME_MAX_LENGTH];
@@ -12,6 +13,7 @@ class ProfileController {
 private:
     Profile profiles[USER_PROFILE_COUNT];
     int current_profile;
+    GrindMode current_grind_mode;
     Preferences* preferences;
 
 public:
@@ -41,4 +43,9 @@ public:
 
     bool is_time_valid(float seconds) const;
     float clamp_time(float seconds) const;
+    
+    // Grind mode persistence methods
+    void set_grind_mode(GrindMode mode);
+    GrindMode get_grind_mode() const { return current_grind_mode; }
+    void save_grind_mode();
 };
