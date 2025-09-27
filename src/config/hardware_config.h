@@ -37,7 +37,7 @@
 // Load Cell ADC Configuration (HX711 only)
 
 // Mock driver configuration (compile-time selectable)
-#define HW_ENABLE_LOADCELL_MOCK 1                                            // 0=use physical HX711, 1=use simulated mock driver
+#define HW_ENABLE_LOADCELL_MOCK 0                                            // 0=use physical HX711, 1=use simulated mock driver
 #define HW_MOCK_FLOW_RATE_GPS 1.9f                                           // Simulated continuous flow rate in grams per second
 #define HW_MOCK_CAL_FACTOR -7050.0f                                          // Fixed calibration factor used during mocking
 #define HW_MOCK_BASELINE_RAW 0x700000                                        // Baseline raw count around mid-scale for tare offset
@@ -83,7 +83,7 @@
 #define HW_DISPLAY_IPS_INVERT_X 180                                            // IPS X-axis inversion setting
 #define HW_DISPLAY_IPS_INVERT_Y 24                                             // IPS Y-axis inversion setting
 #define HW_DISPLAY_COLOR_ORDER 20                                              // Color channel ordering
-
+#define HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT 15                                       // Minimum brightness percentage (to avoid too dim to see)
 //------------------------------------------------------------------------------
 // SERIAL COMMUNICATION
 //------------------------------------------------------------------------------

@@ -3,15 +3,17 @@
 #include "../../config/ui_theme.h"
 #include "../../bluetooth/manager.h"
 #include "../../controllers/grind_controller.h"
+#include "ui_helpers.h"
 
 class GrindingScreen;  // Forward declaration
 
 class SettingsScreen {
 private:
     lv_obj_t* screen;
-    lv_obj_t* tabview;
+    lv_obj_t* menu;
     lv_obj_t* info_tab;
-    lv_obj_t* settings_tab;
+    lv_obj_t* bluetooth_tab;
+    lv_obj_t* display_tab;
     lv_obj_t* tools_tab;
     lv_obj_t* reset_tab;
     
@@ -19,8 +21,10 @@ private:
     lv_obj_t* info_label;
     lv_obj_t* uptime_label;
     lv_obj_t* memory_label;
-    lv_obj_t* version_label;
-    lv_obj_t* build_label;
+    lv_obj_t* instant_label;
+    lv_obj_t* smooth_label;
+    lv_obj_t* samples_label;
+    lv_obj_t* raw_label;
     lv_obj_t* sessions_label;
     lv_obj_t* events_label;
     lv_obj_t* measurements_label;
@@ -47,7 +51,6 @@ private:
     lv_obj_t* taring_label;
     
     // Common elements
-    lv_obj_t* back_button;
     bool visible;
     
     BluetoothManager* bluetooth_manager;
@@ -59,28 +62,24 @@ public:
     void create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr);
     void show();
     void hide();
-    void update_info(const char* load_cell_info, unsigned long uptime_ms, size_t free_heap);
+    void update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap);
     void update_ble_status();
-    void set_session_count(uint32_t count);
-    void set_event_count(uint32_t count);
-    void set_measurement_count(uint32_t count);
     void refresh_statistics();
     void show_taring_overlay();
     void hide_taring_overlay();
+    void update_brightness_labels(int normal_percent = -1, int screensaver_percent = -1); // Use negative value to leave unchanged
     void update_brightness_sliders();
-    void update_brightness_labels();
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
     
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
-    lv_obj_t* get_tabview() const { return tabview; }
+    lv_obj_t* get_tabview() const { return menu; }
     lv_obj_t* get_cal_button() const { return cal_button; }
     lv_obj_t* get_purge_button() const { return purge_button; }
     lv_obj_t* get_reset_button() const { return reset_button; }
     lv_obj_t* get_motor_test_button() const { return motor_test_button; }
     lv_obj_t* get_tare_button() const { return tare_button; }
-    lv_obj_t* get_back_button() const { return back_button; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
     lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
     lv_obj_t* get_logging_toggle() const { return logging_toggle; }
@@ -90,9 +89,19 @@ public:
     
 private:
     void create_info_page(lv_obj_t* parent);
-    void create_settings_page(lv_obj_t* parent);
+    void create_bluetooth_page(lv_obj_t* parent);
+    void create_display_page(lv_obj_t* parent);
     void create_tools_page(lv_obj_t* parent);
-    void create_reset_page(lv_obj_t* parent);
-    void create_back_button();
-    lv_obj_t* create_separator(lv_obj_t* parent, const char* text);
+    void create_data_page(lv_obj_t* parent);
+    lv_obj_t* create_separator(lv_obj_t* parent, const char* text = nullptr);
+    lv_obj_t* create_menu_item(lv_obj_t* parent, const char* text);
+    lv_obj_t *create_toggle_row(lv_obj_t *parent, const char *text,lv_obj_t **out_toggle);
+    lv_obj_t *create_slider_row(lv_obj_t *parent, const char *text,
+                                lv_obj_t **label, lv_obj_t **slider,
+                                lv_color_t slider_color = lv_color_hex(THEME_COLOR_ACCENT),
+                                uint32_t min = 0, uint32_t max = 100);
+    lv_obj_t *create_static_data_label(lv_obj_t *parent, const char *name,
+                                       const char *value);
+    lv_obj_t *create_data_label(lv_obj_t *parent, const char *name,
+                                lv_obj_t **variable);
 };

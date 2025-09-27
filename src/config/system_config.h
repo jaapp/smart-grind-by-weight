@@ -123,3 +123,4 @@
 //------------------------------------------------------------------------------
 #define SYS_WEIGHT_DISPLAY_FORMAT "%.1fg"                                      // Weight display format string
 #define SYS_RAW_VALUE_FORMAT "%ld"                                             // Raw load cell value format string
+

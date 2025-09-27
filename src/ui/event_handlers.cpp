@@ -4,6 +4,7 @@
 #include "../config/system_config.h"
 #include "../config/logging.h"
 #include "../controllers/grind_mode_traits.h"
+#include "../config/hardware_config.h"
 #include "components/ui_operations.h"
 #include "components/blocking_overlay.h"
 #include "screens/calibration_screen.h"
@@ -342,13 +343,17 @@ void SettingsEventHandler::handle_brightness_normal_slider() {
     if (!slider) return;
     
     int brightness_percent = lv_slider_get_value(slider);
+    if (brightness_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT){
+        brightness_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+        lv_slider_set_value(slider, brightness_percent, LV_ANIM_OFF);
+    } 
     float brightness = brightness_percent / 100.0f;
     
     // Apply brightness immediately for reactive feedback
     ui_manager->hardware_manager->get_display()->set_brightness(brightness);
     
     // Update label
-    ui_manager->settings_screen.update_brightness_labels();
+    ui_manager->settings_screen.update_brightness_labels(brightness_percent, -1);
     // Do not persist on move; commit on release only
     DEBUG_PRINTF("Normal brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
 }
@@ -360,6 +365,10 @@ void SettingsEventHandler::handle_brightness_normal_slider_released() {
     if (!slider) return;
     
     int brightness_percent = lv_slider_get_value(slider);
+    if (brightness_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) {
+        brightness_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+        lv_slider_set_value(slider, brightness_percent, LV_ANIM_OFF);
+    }
     float brightness = brightness_percent / 100.0f;
     
     // Persist on release only
@@ -376,13 +385,17 @@ void SettingsEventHandler::handle_brightness_screensaver_slider() {
     if (!slider) return;
     
     int brightness_percent = lv_slider_get_value(slider);
+    if (brightness_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) {
+        brightness_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+        lv_slider_set_value(slider, brightness_percent, LV_ANIM_OFF);
+    }
     float brightness = brightness_percent / 100.0f;
     
     // Apply screensaver brightness for preview during sliding
     ui_manager->hardware_manager->get_display()->set_brightness(brightness);
     
     // Update label
-    ui_manager->settings_screen.update_brightness_labels();
+    ui_manager->settings_screen.update_brightness_labels(-1, brightness_percent);
     
     // Do not persist on move; commit on release only
     DEBUG_PRINTF("Screensaver brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
@@ -395,6 +408,10 @@ void SettingsEventHandler::handle_brightness_screensaver_slider_released() {
     lv_obj_t* slider = ui_manager->settings_screen.get_brightness_screensaver_slider();
     if (slider) {
         int brightness_percent = lv_slider_get_value(slider);
+        if (brightness_percent < HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT) {
+            brightness_percent = HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT;
+            lv_slider_set_value(slider, brightness_percent, LV_ANIM_OFF);
+        }
         float brightness = brightness_percent / 100.0f;
         Preferences prefs;
         prefs.begin("brightness", false);
