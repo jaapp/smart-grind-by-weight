@@ -54,6 +54,8 @@ private:
     
     lv_obj_t* grind_button;
     lv_obj_t* grind_icon;
+    lv_obj_t* pulse_button;      // Additional pulse button for time mode
+    lv_obj_t* pulse_icon;        // Icon for pulse button
     lv_obj_t* ble_status_icon;
     lv_timer_t* jog_timer;
     lv_timer_t* motor_timer;
@@ -112,6 +114,7 @@ public:
     void handle_tab_change(int tab);
     void handle_profile_long_press();
     void handle_grind_button();
+    void handle_pulse_button(); // Handle additional pulse button in time mode
     void handle_edit_save();
     void handle_edit_cancel();
     void handle_edit_plus(lv_event_code_t code);
@@ -174,11 +177,14 @@ public:
 private:
     void create_ui();
     void create_grind_button();
+    void create_pulse_button();
     void create_ble_status_icon();
     void update_ble_status_icon();
     void refresh_ready_profiles();
     void setup_event_handlers();
     void update_grind_button_icon();
+    void update_button_layout(); // Switch between single/split button layout
+    void reset_grind_complete_timer(); // Reset the 60s auto-return timer
     void update_edit_target_display();
     void update_grinding_targets();
     void start_jog_timer(int direction);

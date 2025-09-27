@@ -11,6 +11,7 @@ public:
         TAB_CHANGE,
         PROFILE_LONG_PRESS,
         GRIND_BUTTON,
+        PULSE_BUTTON,
         EDIT_SAVE,
         EDIT_CANCEL,
         EDIT_PLUS,

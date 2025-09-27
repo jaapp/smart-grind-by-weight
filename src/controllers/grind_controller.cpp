@@ -7,6 +7,10 @@
 #include <cstdarg>
 #include <cstring>
 
+#if defined(HW_ENABLE_LOADCELL_MOCK) && (HW_ENABLE_LOADCELL_MOCK != 0)
+#include "../hardware/mock_hx711_driver.h"
+#endif
+
 // UI event queue size
 #define UI_EVENT_QUEUE_SIZE 10
 
@@ -130,6 +134,10 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     session_descriptor.target_time_ms = target_time_ms;
     session_descriptor.tolerance = tolerance;
     session_descriptor.profile_id = current_profile_id;
+
+    // Initialize pulse tracking
+    additional_pulse_count = 0;
+    pulse_duration_ms = USER_TIME_PULSE_DURATION_MS;
 
     if (mode == GrindMode::WEIGHT) {
         active_strategy = static_cast<IGrindStrategy*>(&weight_strategy);
@@ -299,6 +307,17 @@ void GrindController::update() {
             // Wait for weight to settle with precision settling window
             if (weight_sensor->check_settling_complete(HW_SCALE_PRECISION_SETTLING_TIME_MS)) {
                 final_measurement(loop_data);
+            }
+            break;
+            
+        case GrindPhase::TIME_ADDITIONAL_PULSE:
+            // Check for additional pulse completion
+            if (grinder && grinder->is_pulse_complete()) {
+                BLE_LOG("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n", 
+                        millis(), additional_pulse_count, weight_sensor ? weight_sensor->get_display_weight() : 0.0f);
+                
+                // Return to completed phase
+                switch_phase(GrindPhase::COMPLETED, loop_data);
             }
             break;
             
@@ -537,6 +556,13 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
         // Use final_weight if available (from final_measurement), otherwise use high latency weight
         event_data.final_weight = (final_weight > 0) ? final_weight : 
                                  (weight_sensor ? weight_sensor->get_weight_high_latency() : 0.0f);
+        
+        // For time mode, also indicate pulse availability
+        if (mode == GrindMode::TIME) {
+            event_data.can_pulse = true;
+            event_data.pulse_count = additional_pulse_count;
+            event_data.pulse_duration_ms = pulse_duration_ms;
+        }
     } else if (new_phase == GrindPhase::TIMEOUT) {
         event_data.event = UIGrindEvent::TIMEOUT;
         if (last_error_message[0] == '\0') {
@@ -598,6 +624,7 @@ const char* GrindController::get_phase_name(GrindPhase p) const {
         case GrindPhase::PULSE_SETTLING: return "PULSE_SETTLING";
         case GrindPhase::FINAL_SETTLING: return "FINAL_SETTLING";
         case GrindPhase::TIME_GRINDING: return "TIME";
+        case GrindPhase::TIME_ADDITIONAL_PULSE: return "PULSE";
         case GrindPhase::COMPLETED: return "COMPLETED";
         case GrindPhase::TIMEOUT: return "TIMEOUT";
         default: return "UNKNOWN";
@@ -652,6 +679,9 @@ void GrindController::emit_ui_event(const GrindEventData& data) {
                     case UIGrindEvent::TIMEOUT: event_name = "TIMEOUT"; break;
                     case UIGrindEvent::STOPPED: event_name = "STOPPED"; break;
                     case UIGrindEvent::BACKGROUND_CHANGE: event_name = "BACKGROUND_CHANGE"; break;
+                    case UIGrindEvent::PULSE_AVAILABLE: event_name = "PULSE_AVAILABLE"; break;
+                    case UIGrindEvent::PULSE_STARTED: event_name = "PULSE_STARTED"; break;
+                    case UIGrindEvent::PULSE_COMPLETED: event_name = "PULSE_COMPLETED"; break;
                 }
                 BLE_LOG("[%lums UI_EVENT] QUEUED %s: phase=%s, weight=%.2fg, progress=%d%%\n", 
                         millis(), event_name, data.phase_display_text, data.current_weight, data.progress_percent);
@@ -769,4 +799,39 @@ void GrindController::set_error_message(const char* message) {
     }
     strncpy(last_error_message, message, sizeof(last_error_message) - 1);
     last_error_message[sizeof(last_error_message) - 1] = '\0';
+}
+
+void GrindController::start_additional_pulse() {
+    if (!can_pulse()) {
+        return;
+    }
+    
+    if (!grinder) {
+        BLE_LOG("ERROR: Cannot pulse - grinder not available\n");
+        return;
+    }
+    
+    additional_pulse_count++;
+    
+    BLE_LOG("[%lums CONTROLLER] Starting additional pulse #%d (%lums)\n", 
+            millis(), additional_pulse_count, (unsigned long)pulse_duration_ms);
+    
+    // Transition to additional pulse phase (without loop_data since this is a manual action)
+    GrindLoopData empty_loop_data = {};
+    empty_loop_data.now = millis();
+    switch_phase(GrindPhase::TIME_ADDITIONAL_PULSE, empty_loop_data);
+    
+    // Start the pulse
+    grinder->start_pulse_rmt(pulse_duration_ms);
+    
+    // Notify mock driver for weight simulation (if mock is active)
+#if defined(HW_ENABLE_LOADCELL_MOCK) && (HW_ENABLE_LOADCELL_MOCK != 0)
+    MockHX711Driver::notify_pulse(pulse_duration_ms);
+#endif
+}
+
+bool GrindController::can_pulse() const {
+    // Only allow pulses in time mode when grind is completed and not in pulse phase
+    return mode == GrindMode::TIME && 
+           phase == GrindPhase::COMPLETED;
 }

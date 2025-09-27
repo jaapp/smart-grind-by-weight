@@ -33,12 +33,18 @@ python3 tools/grinder.py analyze
 
 **Key Components:**
 - **HardwareManager**: Central hardware coordinator
-- **GrindController**: 8-phase state machine with predictive flow control, 10 pulse corrections
+- **GrindController**: 9-phase state machine with predictive flow control, 10 pulse corrections, and time mode additional pulses
 - **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered)
-- **UIManager**: 7 screens with LVGL integration
+- **UIManager**: 7 screens with LVGL integration, including split-button layout for time mode pulses
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
+
+**Grind Phases:**
+- Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
+- New: `TIME_ADDITIONAL_PULSE` - Dedicated phase for post-completion additional grinding pulses in time mode
+
+**Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color

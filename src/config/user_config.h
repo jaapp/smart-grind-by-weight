@@ -111,7 +111,12 @@
 //------------------------------------------------------------------------------
 // UI VISUAL FEEDBACK
 //------------------------------------------------------------------------------
-#define USER_ENABLE_GRINDER_BACKGROUND_INDICATOR 0                            // 0=disabled, 1=show background color during grinding/pulses
+#define USER_ENABLE_GRINDER_BACKGROUND_INDICATOR 1                            // 0=disabled, 1=show background color during grinding/pulses
+
+//------------------------------------------------------------------------------
+// TIME MODE PULSE SETTINGS
+//------------------------------------------------------------------------------
+#define USER_TIME_PULSE_DURATION_MS 100                                       // Duration of additional pulses in time mode (milliseconds)
 
 //------------------------------------------------------------------------------
 // BLUETOOTH TIMEOUTS

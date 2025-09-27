@@ -95,6 +95,7 @@ void UIManager::create_ui() {
     refresh_ready_profiles();
     
     create_grind_button();
+    create_pulse_button();
     create_ble_status_icon();
     setup_event_handlers();
     
@@ -125,7 +126,7 @@ void UIManager::create_ui() {
 void UIManager::create_grind_button() {
     grind_button = lv_btn_create(lv_scr_act());
     lv_obj_set_size(grind_button, 100, 100);
-    lv_obj_align(grind_button, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(grind_button, LV_ALIGN_BOTTOM_MID, -60, -10); // Moved left to make room for pulse button
     lv_obj_set_style_radius(grind_button, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(grind_button, lv_color_hex(THEME_COLOR_PRIMARY), 0);
     lv_obj_set_style_border_width(grind_button, 0, 0);
@@ -135,7 +136,24 @@ void UIManager::create_grind_button() {
     lv_img_set_src(grind_icon, LV_SYMBOL_PLAY);
     lv_obj_center(grind_icon);
     lv_obj_set_style_text_font(grind_icon, &lv_font_montserrat_24, 0);
+}
 
+void UIManager::create_pulse_button() {
+    pulse_button = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(pulse_button, 100, 100); // Same size as grind button
+    lv_obj_align(pulse_button, LV_ALIGN_BOTTOM_MID, 60, -10); // Positioned to the right
+    lv_obj_set_style_radius(pulse_button, LV_RADIUS_CIRCLE, 0); // Circular like grind button
+    lv_obj_set_style_bg_color(pulse_button, lv_color_hex(THEME_COLOR_ACCENT), 0);
+    lv_obj_set_style_border_width(pulse_button, 0, 0);
+    lv_obj_set_style_shadow_width(pulse_button, 0, 0);
+
+    pulse_icon = lv_img_create(pulse_button);
+    lv_img_set_src(pulse_icon, LV_SYMBOL_PLUS); // Use built-in plus symbol
+    lv_obj_center(pulse_icon);
+    lv_obj_set_style_text_font(pulse_icon, &lv_font_montserrat_32, 0); // Larger font for symbol
+    
+    // Initially hidden - only shown in time mode completion
+    lv_obj_add_flag(pulse_button, LV_OBJ_FLAG_HIDDEN);
 }
 
 void UIManager::create_ble_status_icon() {
@@ -216,6 +234,9 @@ void UIManager::setup_event_handlers() {
 
     // Set up grind button event handler
     lv_obj_add_event_cb(grind_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(GRIND_BUTTON));
+    
+    // Set up pulse button event handler
+    lv_obj_add_event_cb(pulse_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(PULSE_BUTTON));
     
     // Set up edit screen event handlers
     lv_obj_add_event_cb(edit_screen.get_save_btn(), EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED, EVENT_DATA(EDIT_SAVE));
@@ -486,6 +507,49 @@ void UIManager::update_grind_button_icon() {
                                                   ? lv_color_hex(THEME_COLOR_ACCENT)
                                                   : lv_color_hex(THEME_COLOR_PRIMARY), 0);
     }
+    
+    // Update button layout based on state and mode
+    update_button_layout();
+}
+
+void UIManager::update_button_layout() {
+    // Show pulse button in time mode completion state (both COMPLETED and TIME_ADDITIONAL_PULSE phases)
+    bool should_show_pulse = (state_machine->is_state(UIState::GRIND_COMPLETE) && 
+                             current_mode == GrindMode::TIME);
+    
+    if (should_show_pulse) {
+        // Split layout: move grind button left, show pulse button right
+        lv_obj_align(grind_button, LV_ALIGN_BOTTOM_MID, -60, -10);
+        lv_obj_align(pulse_button, LV_ALIGN_BOTTOM_MID, 60, -10);
+        lv_obj_clear_flag(pulse_button, LV_OBJ_FLAG_HIDDEN);
+        
+        // Enable/disable pulse button based on whether pulsing is allowed
+        if (grind_controller && grind_controller->can_pulse()) {
+            lv_obj_clear_state(pulse_button, LV_STATE_DISABLED);
+            lv_obj_set_style_bg_opa(pulse_button, LV_OPA_COVER, 0);
+        } else {
+            lv_obj_add_state(pulse_button, LV_STATE_DISABLED);
+            lv_obj_set_style_bg_opa(pulse_button, LV_OPA_50, LV_STATE_DISABLED); // 50% opacity when disabled
+        }
+    } else {
+        // Single layout: center grind button, hide pulse button
+        lv_obj_align(grind_button, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_add_flag(pulse_button, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void UIManager::reset_grind_complete_timer() {
+    // Only reset if we're in grind complete state and timer exists
+    if (state_machine->is_state(UIState::GRIND_COMPLETE) && grind_complete_timer) {
+        BLE_LOG("[UIManager] Resetting grind complete timer (60s auto-return)\n");
+        
+        // Delete existing timer
+        lv_timer_del(grind_complete_timer);
+        
+        // Create new 60-second timer
+        grind_complete_timer = lv_timer_create(static_grind_complete_timeout_cb, 60000, this);
+        lv_timer_set_repeat_count(grind_complete_timer, 1);
+    }
 }
 
 // Event handlers
@@ -501,6 +565,18 @@ void UIManager::handle_profile_long_press() {
 
 void UIManager::handle_grind_button() {
     grind_handler->handle_grind_button();
+}
+
+void UIManager::handle_pulse_button() {
+    if (grind_controller && grind_controller->can_pulse()) {
+        BLE_LOG("[UIManager] Pulse button clicked - requesting additional pulse\n");
+        grind_controller->start_additional_pulse();
+        
+        // Reset the 60-second auto-return timer
+        reset_grind_complete_timer();
+    } else {
+        BLE_LOG("[UIManager] Pulse button clicked but pulsing not allowed\n");
+    }
 }
 
 void UIManager::handle_settings_calibrate() {
@@ -989,7 +1065,9 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             // Handle phase changes, particularly tare start/completion
             // Transition to GRINDING state when grind starts (any active grinding phase)
             instance->current_mode = event_data.mode;
-            if (event_data.phase != GrindPhase::IDLE && !instance->state_machine->is_state(UIState::GRINDING)) {
+            if (event_data.phase != GrindPhase::IDLE && 
+                event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE && 
+                !instance->state_machine->is_state(UIState::GRINDING)) {
                 UI_DEBUG_LOG("[%lums UI_TRANSITION] Switching to GRINDING state due to phase: %s\n", 
                         millis(), event_data.phase_display_text);
                 WeightSensor* weight_sensor = instance->hardware_manager->get_weight_sensor();
@@ -1008,6 +1086,11 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                 }
             }
             
+            // Update button layout when phase changes (for pulse button enable/disable)
+            if (instance->state_machine->is_state(UIState::GRIND_COMPLETE)) {
+                instance->update_button_layout();
+            }
+            
             // Update display based on current phase
             if (event_data.show_taring_text) {
                 instance->grinding_screen.update_tare_display();
@@ -1020,7 +1103,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                     event_data.phase != GrindPhase::IDLE && event_data.phase != GrindPhase::TARING && 
                     event_data.phase != GrindPhase::TARE_CONFIRM && event_data.phase != GrindPhase::INITIALIZING && 
                     event_data.phase != GrindPhase::SETUP && event_data.phase != GrindPhase::COMPLETED && 
-                    event_data.phase != GrindPhase::TIMEOUT) {                    
+                    event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE) {                    
                     instance->grinding_screen.add_chart_data_point(event_data.current_weight, event_data.flow_rate, millis());
                 }
             }
@@ -1041,7 +1124,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                     event_data.phase != GrindPhase::IDLE && event_data.phase != GrindPhase::TARING && 
                     event_data.phase != GrindPhase::TARE_CONFIRM && event_data.phase != GrindPhase::INITIALIZING && 
                     event_data.phase != GrindPhase::SETUP && event_data.phase != GrindPhase::COMPLETED && 
-                    event_data.phase != GrindPhase::TIMEOUT) {                    
+                    event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE) {                    
                     instance->grinding_screen.add_chart_data_point(event_data.current_weight, event_data.flow_rate, millis());
                 }
             }
@@ -1128,6 +1211,42 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             }
 #else
             // Background indicator feature is disabled - no action needed
+#endif
+            break;
+            
+        case UIGrindEvent::PULSE_AVAILABLE:
+            // Time mode completion - pulse button should now be available
+            BLE_LOG("[UIManager] Pulse available - updating button layout\n");
+            instance->update_button_layout();
+            break;
+            
+        case UIGrindEvent::PULSE_STARTED:
+            // Additional pulse started - show background indicator if enabled
+            BLE_LOG("[UIManager] Pulse #%d started (%.1fms)\n", 
+                    event_data.pulse_count, (float)event_data.pulse_duration_ms);
+#if USER_ENABLE_GRINDER_BACKGROUND_INDICATOR
+            {
+                static lv_style_t style_bg;
+                lv_style_init(&style_bg);
+                lv_style_set_bg_color(&style_bg, lv_color_hex(THEME_COLOR_GRINDER_ACTIVE));
+                lv_obj_add_style(lv_scr_act(), &style_bg, 0);
+            }
+#endif
+            break;
+            
+        case UIGrindEvent::PULSE_COMPLETED:
+            // Additional pulse completed - update weight display and restore background
+            BLE_LOG("[UIManager] Pulse #%d completed - weight: %.2fg\n", 
+                    event_data.pulse_count, event_data.current_weight);
+            instance->grinding_screen.update_current_weight(event_data.current_weight);
+            instance->update_button_layout(); // Update pulse button availability
+#if USER_ENABLE_GRINDER_BACKGROUND_INDICATOR
+            {
+                static lv_style_t style_bg;
+                lv_style_init(&style_bg);
+                lv_style_set_bg_color(&style_bg, instance->get_default_background_color());
+                lv_obj_add_style(lv_scr_act(), &style_bg, 0);
+            }
 #endif
             break;
     }

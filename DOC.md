@@ -215,6 +215,8 @@ These steps describe the default grind-by-weight workflow:
 
 Need the stock timed run? Just swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight).
 
+> **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
+
 ### Display Modes
 - **Arc Layout**: Clean, minimal arc-based interface
 - **Nerdy Layout**: Detailed charts showing flow rates and real-time grinding analytics
@@ -225,19 +227,20 @@ Need the stock timed run? Just swipe up or down on the ready screen before you s
 ## 🗺️ User Interface Navigation
 
 ```
-Main Screen (swipe left/right between tabs)
+Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode)
 |
 +-- Single Profile 
 |   |-- Weight display (long press to edit)
-|   \-- GRIND button
+|   \-- GRIND button (red=weight, blue=time)
 |
 +-- Double Profile
 |   |-- Weight display (long press to edit)
-|   \-- GRIND button
+|   \-- GRIND button (red=weight, blue=time)
 |
 +-- Custom Profile
 |   |-- Weight display (long press to edit)
-|   \-- GRIND button
+|   \-- GRIND button (red=weight, blue=time)
+|   \-- Time mode completion: OK + PULSE buttons
 |
 \-- Settings (swipe left/right between sub-tabs)
     |

@@ -43,6 +43,11 @@ void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {
             ui_manager->handle_grind_button();
             break;
             
+        case EventType::PULSE_BUTTON:
+            BLE_LOG("[%lums LVGL_EVENT] pulse_button triggered\n", millis());
+            ui_manager->handle_pulse_button();
+            break;
+            
         case EventType::EDIT_SAVE:
             ui_manager->handle_edit_save();
             break;

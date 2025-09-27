@@ -63,6 +63,7 @@ enum class GrindPhase {
     PULSE_SETTLING,     // Waiting for weight to settle after pulse
     FINAL_SETTLING,     // Waiting for weight to settle
     TIME_GRINDING,      // Time-based grinding phase
+    TIME_ADDITIONAL_PULSE, // Additional pulse in time mode after completion
     COMPLETED,          // Grind completed (success, overshoot, or max pulses)
     TIMEOUT             // Grind timed out
 };
@@ -140,6 +141,10 @@ private:
     QueueHandle_t log_queue;
     static const int LOG_QUEUE_SIZE = 20;
     
+    // Time mode pulse tracking
+    int additional_pulse_count;
+    uint32_t pulse_duration_ms;
+    
     void (*ui_event_callback)(const GrindEventData&) = nullptr;
     bool ui_ready_for_setup = false; // Flag to track UI acknowledgment of INITIALIZING phase
     
@@ -160,6 +165,11 @@ public:
     void return_to_idle(); // Called by UI to acknowledge completion/timeout
     void stop_grind();
     void update(); // Core 0 main control method - runs at fixed RTOS interval
+    
+    // Time mode pulse functionality
+    void start_additional_pulse(); // Start an additional 100ms pulse in time mode
+    bool can_pulse() const; // Check if additional pulses are allowed
+    int get_additional_pulse_count() const { return additional_pulse_count; }
     
     // UI event system
     void set_ui_event_callback(void (*callback)(const GrindEventData&));
