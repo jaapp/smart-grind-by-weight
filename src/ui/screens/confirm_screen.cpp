@@ -8,8 +8,8 @@ void ConfirmScreen::create() {
     lv_obj_align(screen, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
-    lv_obj_set_style_pad_ver(screen, 0, 0);
-    lv_obj_set_style_pad_hor(screen, 6, 0);
+    lv_obj_set_style_pad_ver(screen, 6, 0);
+    lv_obj_set_style_pad_hor(screen, 0, 0);
     lv_obj_set_style_pad_gap(screen, 5, 0);
     
     // Set up flex layout (column)
@@ -49,28 +49,9 @@ void ConfirmScreen::create() {
     lv_obj_update_layout(message_container);
     lv_obj_scroll_to_y(message_container, 0, LV_ANIM_OFF);  // Scroll to top
 
-    lv_obj_t *button_container = lv_obj_create(screen);
-    lv_obj_set_size(button_container, LV_PCT(100), 80);
-    lv_obj_set_style_bg_opa(button_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(button_container, 0, 0);
-    lv_obj_set_style_pad_all(button_container, 0, 0);
-    lv_obj_set_flex_grow(button_container, 0);
-    
-    // Set up button container as horizontal flex
-    lv_obj_set_layout(button_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(button_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(button_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(button_container, 10, 0);
-    
-    // Buttons
-    confirm_button = create_button(button_container, "Confirm", lv_color_hex(THEME_COLOR_SUCCESS), -1);
+    create_dual_button_row(screen, &confirm_button, &cancel_button, "Confirm", "Cancel", lv_color_hex(THEME_COLOR_SUCCESS));
     confirm_button_label = lv_obj_get_child(confirm_button, -1);
-
-    lv_obj_set_flex_grow(confirm_button, 1);
-    
-    cancel_button = create_button(button_container, "Cancel", lv_color_hex(THEME_COLOR_NEUTRAL), -1);
     cancel_button_label = lv_obj_get_child(cancel_button, -1);
-    lv_obj_set_flex_grow(cancel_button, 1);
     
     visible = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);

@@ -2,12 +2,12 @@
 #include <lvgl.h>
 #include "../../config/ui_theme.h"
 
-inline void style_as_button(lv_obj_t* object, int32_t width = 260, int32_t height = 80) {
+inline void style_as_button(lv_obj_t* object, int32_t width = 260, int32_t height = 80, const lv_font_t* font = &lv_font_montserrat_28) {
     lv_obj_set_style_radius(object, THEME_CORNER_RADIUS_PX, 0);
     lv_obj_set_style_bg_opa(object, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(object, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     lv_obj_set_style_text_color(object, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_style_text_font(object, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(object, font, 0);
     lv_obj_set_style_border_width(object, 0, 0);
     lv_obj_set_style_pad_hor(object, 20, 0);
     if (width >= 0){
@@ -22,9 +22,9 @@ inline void style_as_button(lv_obj_t* object, int32_t width = 260, int32_t heigh
 
 inline lv_obj_t* create_button(lv_obj_t* parent, const char* text,
                                 lv_color_t bg_color = lv_color_hex(THEME_COLOR_NEUTRAL),
-                                int32_t width = 260, int32_t height = 80){ 
+                                int32_t width = 260, int32_t height = 80, const lv_font_t* font = &lv_font_montserrat_28){ 
     lv_obj_t* button = lv_btn_create(parent);
-    style_as_button(button, width, height);
+    style_as_button(button, width, height, font);
     lv_obj_set_style_bg_color(button, bg_color, 0);
     
     lv_obj_t* label = lv_label_create(button);
@@ -86,4 +86,24 @@ inline lv_obj_t* create_profile_label(lv_obj_t* parent, lv_obj_t** profile_label
     return label_container;
 }
 
-inline
+inline lv_obj_t* create_dual_button_row(lv_obj_t* parent, lv_obj_t** left_button, lv_obj_t** right_button, const char* left_name, const char* right_name, lv_color_t left_color = lv_color_hex(THEME_COLOR_NEUTRAL), lv_color_t right_color = lv_color_hex(THEME_COLOR_NEUTRAL), int height = 80, const lv_font_t* font = &lv_font_montserrat_28){
+    lv_obj_t *row_container = lv_obj_create(parent);
+    lv_obj_set_size(row_container, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row_container, 0, 0);
+    lv_obj_set_style_pad_all(row_container, 0, 0);
+    
+    lv_obj_set_layout(row_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(row_container, 10, 0);
+
+    *left_button = create_button(row_container, left_name, left_color, -1, height, font);
+    lv_obj_set_flex_grow(*left_button, 1);
+
+    *right_button = create_button(row_container, right_name, right_color, -1, height, font);
+    lv_obj_set_flex_grow(*right_button, 1);
+
+    return row_container;
+}
+
