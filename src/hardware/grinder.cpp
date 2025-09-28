@@ -1,7 +1,7 @@
 #include "grinder.h"
 #include "../controllers/grind_events.h"
 #include "../config/constants.h"
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
 #include "mock_hx711_driver.h"
 #endif
 
@@ -16,7 +16,7 @@ void Grinder::init(int pin) {
     background_active = false;
     ui_event_callback = nullptr;
 
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     initialized = true;
     return;
 #endif
@@ -38,7 +38,7 @@ void Grinder::init(int pin) {
 }
 
 void Grinder::start() {
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     if (!initialized) return;
     MockHX711Driver::notify_grinder_start();
     pulse_active = false;
@@ -81,7 +81,7 @@ void Grinder::start() {
 }
 
 void Grinder::stop() {
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     if (!initialized) return;
     MockHX711Driver::notify_grinder_stop();
     grinding = false;
@@ -107,7 +107,7 @@ void Grinder::stop() {
 }
 
 void Grinder::start_pulse_rmt(uint32_t duration_ms) {
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     if (!initialized) return;
     MockHX711Driver::notify_pulse(duration_ms);
     pulse_active = true;
@@ -174,7 +174,7 @@ void Grinder::start_pulse_rmt(uint32_t duration_ms) {
 }
 
 bool Grinder::is_pulse_complete() {
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     if (!pulse_active) return true;
     if (!MockHX711Driver::is_pulse_active()) {
         pulse_active = false;
@@ -223,6 +223,6 @@ void Grinder::emit_background_change(bool active) {
         
         ui_event_callback(event_data);
         
-        BLE_LOG("[Grinder] Background change: %s\n", active ? "ACTIVE" : "INACTIVE");
+        LOG_BLE("[Grinder] Background change: %s\n", active ? "ACTIVE" : "INACTIVE");
     }
 }

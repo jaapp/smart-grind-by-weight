@@ -491,7 +491,7 @@ if analysis_mode == "Single Session":
             c4.metric("Result", session_data['result_status'],
                      help="Final grind outcome: COMPLETE (within tolerance), TIMEOUT (exceeded max time), OVERSHOOT (too much coffee), or other controller states.")
             c5.metric("Pulse Count", session_data['pulse_count'],
-                     help="Number of precision pulse corrections executed during grind. Max 10 pulses per session as defined by USER_GRIND_MAX_PULSE_ATTEMPTS.")
+                     help="Number of precision pulse corrections executed during grind. Max 10 pulses per session as defined by GRIND_MAX_PULSE_ATTEMPTS.")
             c6.metric("Data Resolution", f"{avg_meas_per_sec:.1f} meas/sec",
                      help="Data sampling frequency during grind. Higher values indicate more precise weight measurements. Controlled by load cell update interval and logging frequency.")
 
@@ -620,7 +620,7 @@ if analysis_mode == "Single Session":
                           help="Ratio used to predict coasting time after motor stop. Higher ratios expect longer coasting. Used to calculate motor stop target: expected_coast_time = grind_latency * ratio.")
 
                 c4.metric("Grind Latency (ms)", f"{predictive_data['grind_latency_ms']}",
-                         help="Time from motor start until flow detection threshold reached (USER_GRIND_FLOW_DETECTION_THRESHOLD_GPS). Measures grinder startup lag and is used to predict coasting behavior.")
+                         help="Time from motor start until flow detection threshold reached (GRIND_FLOW_DETECTION_THRESHOLD_GPS). Measures grinder startup lag and is used to predict coasting behavior.")
 
 
                 if not phase_measurements.empty:
@@ -714,7 +714,7 @@ if analysis_mode == "Single Session":
                 c1.metric("Total Pulse Yield (g)", f"{total_pulse_weight:.2f}",
                          help="Total coffee weight added by all pulse corrections combined. Each pulse uses short bursts (50-400ms) to precisely reach target weight.")
                 c2.metric("Number of Pulses", len(summary_df),
-                         help="Count of PULSE_EXECUTE events. System stops pulsing when within tolerance or max attempts reached (USER_GRIND_MAX_PULSE_ATTEMPTS = 10).")
+                         help="Count of PULSE_EXECUTE events. System stops pulsing when within tolerance or max attempts reached (GRIND_MAX_PULSE_ATTEMPTS = 10).")
                 c3.metric("Pulse Flow Rate (g/s)", f"{pulse_flow_rate:.3f}", 
                          help="95th percentile flow rate calculated during PREDICTIVE phase, stored in pulse_flow_rate field. Used to calculate pulse duration: duration = (error_grams / flow_rate).")
 

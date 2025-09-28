@@ -391,7 +391,7 @@ void UIManager::switch_to_state(UIState new_state) {
             
         case UIState::GRINDING:
             {
-                UI_DEBUG_LOG("[%lums UI_SCREEN_VISIBLE] GRINDING screen showing\n", millis());
+                LOG_UI_DEBUG("[%lums UI_SCREEN_VISIBLE] GRINDING screen showing\n", millis());
                 WeightSensor* weight_sensor = hardware_manager->get_weight_sensor();
                 grinding_screen.reset_chart_data(); // Explicitly reset chart for new grind
                 grinding_screen.show();
@@ -536,7 +536,7 @@ void UIManager::update_button_layout() {
 void UIManager::reset_grind_complete_timer() {
     // Only reset if we're in grind complete state and timer exists
     if (state_machine->is_state(UIState::GRIND_COMPLETE) && grind_complete_timer) {
-        BLE_LOG("[UIManager] Resetting grind complete timer (60s auto-return)\n");
+        LOG_BLE("[UIManager] Resetting grind complete timer (60s auto-return)\n");
         
         // Delete existing timer
         lv_timer_del(grind_complete_timer);
@@ -564,13 +564,13 @@ void UIManager::handle_grind_button() {
 
 void UIManager::handle_pulse_button() {
     if (grind_controller && grind_controller->can_pulse()) {
-        BLE_LOG("[UIManager] Pulse button clicked - requesting additional pulse\n");
+        LOG_BLE("[UIManager] Pulse button clicked - requesting additional pulse\n");
         grind_controller->start_additional_pulse();
         
         // Reset the 60-second auto-return timer
         reset_grind_complete_timer();
     } else {
-        BLE_LOG("[UIManager] Pulse button clicked but pulsing not allowed\n");
+        LOG_BLE("[UIManager] Pulse button clicked but pulsing not allowed\n");
     }
 }
 
@@ -754,7 +754,7 @@ lv_color_t UIManager::get_default_background_color() {
 }
 
 bool UIManager::is_mock_driver_active() {
-#if defined(HW_ENABLE_LOADCELL_MOCK) && (HW_ENABLE_LOADCELL_MOCK != 0)
+#if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
     return true;
 #else
     if (!hardware_manager) {
@@ -1054,7 +1054,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             if (event_data.phase != GrindPhase::IDLE && 
                 event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE && 
                 !instance->state_machine->is_state(UIState::GRINDING)) {
-                UI_DEBUG_LOG("[%lums UI_TRANSITION] Switching to GRINDING state due to phase: %s\n", 
+                LOG_UI_DEBUG("[%lums UI_TRANSITION] Switching to GRINDING state due to phase: %s\n", 
                         millis(), event_data.phase_display_text);
                 WeightSensor* weight_sensor = instance->hardware_manager->get_weight_sensor();
                 instance->grinding_screen.update_profile_name(instance->profile_controller->get_current_name());
@@ -1068,7 +1068,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                 // Acknowledge INITIALIZING phase transition to allow controller to proceed to SETUP
                 if (event_data.phase == GrindPhase::INITIALIZING) {
                     instance->grind_controller->ui_acknowledge_phase_transition();
-                    UI_DEBUG_LOG("[%lums UI_ACKNOWLEDGMENT] INITIALIZING phase confirmed, ready for SETUP\n", millis());
+                    LOG_UI_DEBUG("[%lums UI_ACKNOWLEDGMENT] INITIALIZING phase confirmed, ready for SETUP\n", millis());
                 }
             }
             
@@ -1122,7 +1122,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             instance->grinding_screen.set_mode(instance->current_mode);
             instance->final_grind_weight = event_data.final_weight;
             instance->final_grind_progress = event_data.progress_percent;
-            BLE_LOG("GRIND COMPLETE - Final settled weight captured: %.2fg (Progress: %d%%)\n", 
+            LOG_BLE("GRIND COMPLETE - Final settled weight captured: %.2fg (Progress: %d%%)\n", 
                     instance->final_grind_weight, instance->final_grind_progress);
             instance->chart_updates_enabled = false;
             instance->switch_to_state(UIState::GRIND_COMPLETE);
@@ -1143,7 +1143,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             const char* message = event_data.error_message ? event_data.error_message : "Error";
             strncpy(instance->error_message, message, sizeof(instance->error_message) - 1);
             instance->error_message[sizeof(instance->error_message) - 1] = '\0';
-            BLE_LOG("GRIND ERROR - %s, Weight: %.2fg (Progress: %d%%)\n", 
+            LOG_BLE("GRIND ERROR - %s, Weight: %.2fg (Progress: %d%%)\n", 
                     instance->error_message, instance->error_grind_weight, instance->error_grind_progress);
             instance->chart_updates_enabled = false;
             instance->switch_to_state(UIState::GRIND_TIMEOUT);
@@ -1173,7 +1173,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             break;
             
         case UIGrindEvent::BACKGROUND_CHANGE:
-#if USER_ENABLE_GRINDER_BACKGROUND_INDICATOR
+#if DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR
             // Update background color based on grinder activity
             {
                 static lv_style_t style_bg;
@@ -1193,7 +1193,7 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
                 lv_style_set_bg_color(&style_bg, bg_color);
                 lv_obj_add_style(lv_scr_act(), &style_bg, 0);
                 
-                UI_DEBUG_LOG("[UIManager] Background: %s\n", event_data.background_active ? "ACTIVE" : "INACTIVE");
+                LOG_UI_DEBUG("[UIManager] Background: %s\n", event_data.background_active ? "ACTIVE" : "INACTIVE");
             }
 #else
             // Background indicator feature is disabled - no action needed
@@ -1202,15 +1202,15 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             
         case UIGrindEvent::PULSE_AVAILABLE:
             // Time mode completion - pulse button should now be available
-            BLE_LOG("[UIManager] Pulse available - updating button layout\n");
+            LOG_BLE("[UIManager] Pulse available - updating button layout\n");
             instance->update_button_layout();
             break;
             
         case UIGrindEvent::PULSE_STARTED:
             // Additional pulse started - show background indicator if enabled
-            BLE_LOG("[UIManager] Pulse #%d started (%.1fms)\n", 
+            LOG_BLE("[UIManager] Pulse #%d started (%.1fms)\n", 
                     event_data.pulse_count, (float)event_data.pulse_duration_ms);
-#if USER_ENABLE_GRINDER_BACKGROUND_INDICATOR
+#if DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR
             {
                 static lv_style_t style_bg;
                 lv_style_init(&style_bg);
@@ -1222,11 +1222,11 @@ void UIManager::grind_event_handler(const GrindEventData& event_data) {
             
         case UIGrindEvent::PULSE_COMPLETED:
             // Additional pulse completed - update weight display and restore background
-            BLE_LOG("[UIManager] Pulse #%d completed - weight: %.2fg\n", 
+            LOG_BLE("[UIManager] Pulse #%d completed - weight: %.2fg\n", 
                     event_data.pulse_count, event_data.current_weight);
             instance->grinding_screen.update_current_weight(event_data.current_weight);
             instance->update_button_layout(); // Update pulse button availability
-#if USER_ENABLE_GRINDER_BACKGROUND_INDICATOR
+#if DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR
             {
                 static lv_style_t style_bg;
                 lv_style_init(&style_bg);

@@ -44,7 +44,7 @@ bool HX711Driver::begin(uint8_t gain_value) {
     
     // Initial conversion to establish communication - use dynamic timeout
     uint32_t comm_timeout = sample_interval_ms * 2 + 200; // 2 sample intervals + margin
-    BLE_LOG("HX711Driver: Waiting for first sample (timeout: %lums)\n", comm_timeout);
+    LOG_BLE("HX711Driver: Waiting for first sample (timeout: %lums)\n", comm_timeout);
     
     unsigned long start_time = millis();
     while (!data_waiting_async() && millis() - start_time < comm_timeout) {
@@ -54,11 +54,11 @@ bool HX711Driver::begin(uint8_t gain_value) {
     if (data_waiting_async()) {
         update_async();  // Consume first reading
         data_ready_flag = true;
-        BLE_LOG("HX711Driver: First sample acquired successfully\n");
+        LOG_BLE("HX711Driver: First sample acquired successfully\n");
         return true;
     }
     
-    BLE_LOG("HX711Driver: Timeout waiting for first sample\n");
+    LOG_BLE("HX711Driver: Timeout waiting for first sample\n");
     return false;
 }
 
@@ -145,7 +145,7 @@ void HX711Driver::conversion_24bit() {
     // HX711_ADC data validation
     if (raw_data > 0xFFFFFF) {
         // Data out of range - this shouldn't happen with proper 24-bit data
-        BLE_LOG("HX711Driver: Data out of range - raw=0x%08x\n", raw_data);
+        LOG_BLE("HX711Driver: Data out of range - raw=0x%08x\n", raw_data);
         return; // Skip this invalid reading
     }
     
@@ -163,7 +163,7 @@ bool HX711Driver::validate_hardware() {
     uint32_t sample_interval_ms = HW_LOADCELL_SAMPLE_INTERVAL_MS;
     uint32_t validation_timeout = (sample_interval_ms * 4) + 500; // 4 sample intervals + 500ms margin
     
-    BLE_LOG("HX711Driver: Hardware validation timeout = %lums (sample rate: %d SPS)\n", 
+    LOG_BLE("HX711Driver: Hardware validation timeout = %lums (sample rate: %d SPS)\n", 
            validation_timeout, HW_LOADCELL_SAMPLE_RATE_SPS);
     
     unsigned long start_time = millis();
@@ -173,13 +173,13 @@ bool HX711Driver::validate_hardware() {
         if (data_waiting_async()) {
             if (update_async()) {
                 successful_reads++;
-                BLE_LOG("HX711Driver: Validation read %d/3 successful\n", successful_reads);
+                LOG_BLE("HX711Driver: Validation read %d/3 successful\n", successful_reads);
             }
         }
         delay(sample_interval_ms / 4); // Poll at 4x the sample rate
     }
     
-    BLE_LOG("HX711Driver: Hardware validation completed - %d/3 successful reads in %lums\n", 
+    LOG_BLE("HX711Driver: Hardware validation completed - %d/3 successful reads in %lums\n", 
            successful_reads, millis() - start_time);
     
     return successful_reads >= 3;

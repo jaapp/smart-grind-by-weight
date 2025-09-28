@@ -57,28 +57,28 @@ unsigned long TaskScheduler::get_next_wake_time() {
 }
 
 void TaskScheduler::print_task_status() {
-    BLE_LOG("=== Task Scheduler Status ===\n");
+    LOG_BLE("=== Task Scheduler Status ===\n");
     unsigned long now = millis();
     
     for (const auto& task : tasks) {
         unsigned long time_since_last = now - task.last_run;
-        BLE_LOG("Task: %-15s | Interval: %4lums | Last: %6lums ago | %s\n",
+        LOG_BLE("Task: %-15s | Interval: %4lums | Last: %6lums ago | %s\n",
                      task.name, task.interval_ms, time_since_last,
                      task.enabled ? "ENABLED" : "DISABLED");
     }
-    BLE_LOG("=============================\n");
+    LOG_BLE("=============================\n");
 }
 
 void TaskScheduler::suspend_hardware_tasks() {
     enable_task("hardware", false);
     enable_task("grind_control", false);
-    BLE_LOG("TaskScheduler: Hardware I2C tasks suspended for OTA\n");
+    LOG_BLE("TaskScheduler: Hardware I2C tasks suspended for OTA\n");
 }
 
 void TaskScheduler::resume_hardware_tasks() {
     enable_task("hardware", true);
     enable_task("grind_control", true);
-    BLE_LOG("TaskScheduler: Hardware I2C tasks resumed after OTA\n");
+    LOG_BLE("TaskScheduler: Hardware I2C tasks resumed after OTA\n");
 }
 
 TaskScheduler::Task* TaskScheduler::find_task(const char* name) {

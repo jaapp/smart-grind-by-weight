@@ -23,7 +23,7 @@ uint32_t DataStreamManager::get_total_sessions() const {
 
 void DataStreamManager::close_stream() {
     if (file_stream_active) {
-        BLE_LOG("DataStream: Closing file stream\n");
+        LOG_BLE("DataStream: Closing file stream\n");
     }
     if (active_file) {
         active_file.close();
@@ -43,7 +43,7 @@ uint32_t DataStreamManager::get_session_list(uint32_t* session_ids, uint32_t max
     // Reuse the session list logic from export_sessions_binary_chunk
     uint32_t* session_list = (uint32_t*)heap_caps_malloc(total_sessions * sizeof(uint32_t), MALLOC_CAP_8BIT);
     if (!session_list) {
-        BLE_LOG("ERROR: Failed to allocate session list memory\n");
+        LOG_BLE("ERROR: Failed to allocate session list memory\n");
         return 0;
     }
     
@@ -93,7 +93,7 @@ uint32_t DataStreamManager::get_session_list(uint32_t* session_ids, uint32_t max
     }
     
     heap_caps_free(session_list);
-    BLE_LOG("DataStream: Found %lu session files\n", list_count);
+    LOG_BLE("DataStream: Found %lu session files\n", list_count);
     return copy_count;
 }
 
@@ -109,18 +109,18 @@ bool DataStreamManager::initialize_file_stream(uint32_t session_id) {
     snprintf(filename, sizeof(filename), SESSION_FILE_FORMAT, session_id);
 
     if (!LittleFS.exists(filename)) {
-        BLE_LOG("ERROR: Session file %s does not exist\n", filename);
+        LOG_BLE("ERROR: Session file %s does not exist\n", filename);
         return false;
     }
 
     active_file = LittleFS.open(filename, "r");
     if (!active_file) {
-        BLE_LOG("ERROR: Failed to open session file %s\n", filename);
+        LOG_BLE("ERROR: Failed to open session file %s\n", filename);
         return false;
     }
 
     file_total_size = active_file.size();
-    BLE_LOG("DataStream: Initialized file stream for session %lu (%lu bytes)\n", session_id, file_total_size);
+    LOG_BLE("DataStream: Initialized file stream for session %lu (%lu bytes)\n", session_id, file_total_size);
     file_stream_active = true;
     return true;
 }
@@ -131,7 +131,7 @@ bool DataStreamManager::read_file_chunk(uint8_t* buffer, size_t buffer_size, siz
     }
 
     if (!active_file) {
-        BLE_LOG("ERROR: Active file handle missing for session %lu\n", current_session_id);
+        LOG_BLE("ERROR: Active file handle missing for session %lu\n", current_session_id);
         file_stream_active = false;
         return false;
     }
@@ -145,7 +145,7 @@ bool DataStreamManager::read_file_chunk(uint8_t* buffer, size_t buffer_size, siz
 
         // Check if file is complete
         if (file_bytes_sent >= file_total_size) {
-            BLE_LOG("DataStream: Completed file stream for session %lu\n", current_session_id);
+            LOG_BLE("DataStream: Completed file stream for session %lu\n", current_session_id);
             active_file.close();
             file_stream_active = false;
         }
@@ -154,7 +154,7 @@ bool DataStreamManager::read_file_chunk(uint8_t* buffer, size_t buffer_size, siz
     }
 
     // No more data
-    BLE_LOG("DataStream: End of file stream for session %lu\n", current_session_id);
+    LOG_BLE("DataStream: End of file stream for session %lu\n", current_session_id);
     active_file.close();
     file_stream_active = false;
     return false;

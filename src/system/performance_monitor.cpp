@@ -50,7 +50,7 @@ void PerformanceMonitor::print_statistics() {
     
     if (!has_data) return; // Don't print if no performance data collected
     
-    BLE_LOG("⚡ PERFORMANCE REPORT:\n");
+    LOG_BLE("⚡ PERFORMANCE REPORT:\n");
     
     bool system_healthy = true;
     for (int i = 0; i < task_count; i++) {
@@ -69,19 +69,19 @@ void PerformanceMonitor::print_statistics() {
                 status = "~";
             }
             
-            BLE_LOG("  %s %s: req=%lums avg=%lums(%+.0f%%) max=%lums runtime=%lums", 
+            LOG_BLE("  %s %s: req=%lums avg=%lums(%+.0f%%) max=%lums runtime=%lums", 
                          status, task->task_name, task->expected_interval, avg_interval, avg_deviation, task->max_interval, avg_runtime);
             
             // Runtime warning if task takes >50% of its interval
             if (avg_runtime > task->expected_interval / 2) {
-                BLE_LOG(" CPU-HOG");
+                LOG_BLE(" CPU-HOG");
             }
             
-            BLE_LOG("\n");
+            LOG_BLE("\n");
         }
     }
     
-    BLE_LOG("⚡ SYSTEM: %s\n", system_healthy ? "OK" : "STRESSED");
+    LOG_BLE("⚡ SYSTEM: %s\n", system_healthy ? "OK" : "STRESSED");
 }
 
 void PerformanceMonitor::reset_statistics() {

@@ -55,29 +55,29 @@ bool TaskManager::init(HardwareManager* hw_mgr, StateMachine* sm, ProfileControl
     bluetooth_manager = bluetooth;
     ui_manager = ui;
     
-    BLE_LOG("TaskManager: Initializing FreeRTOS task architecture...\n");
+    LOG_BLE("TaskManager: Initializing FreeRTOS task architecture...\n");
     
     // Validate hardware is ready
     if (!validate_hardware_ready()) {
-        BLE_LOG("ERROR: Hardware not ready for task initialization\n");
+        LOG_BLE("ERROR: Hardware not ready for task initialization\n");
         return false;
     }
     
     // Create inter-task communication queues
     if (!create_inter_task_queues()) {
-        BLE_LOG("ERROR: Failed to create inter-task communication queues\n");
+        LOG_BLE("ERROR: Failed to create inter-task communication queues\n");
         return false;
     }
     
     // Create all FreeRTOS tasks
     if (!create_all_tasks()) {
-        BLE_LOG("ERROR: Failed to create FreeRTOS tasks\n");
+        LOG_BLE("ERROR: Failed to create FreeRTOS tasks\n");
         cleanup_queues();
         return false;
     }
     
     tasks_initialized = true;
-    BLE_LOG("TaskManager: All tasks created successfully\n");
+    LOG_BLE("TaskManager: All tasks created successfully\n");
     
     return true;
 }
@@ -88,18 +88,18 @@ bool TaskManager::create_inter_task_queues() {
     // UI to Grind queue  
     task_queues.ui_to_grind_queue = xQueueCreate(SYS_QUEUE_UI_TO_GRIND_SIZE, sizeof(void*)); // Generic pointer for UI events
     if (!task_queues.ui_to_grind_queue) {
-        BLE_LOG("ERROR: Failed to create ui_to_grind_queue\n");
+        LOG_BLE("ERROR: Failed to create ui_to_grind_queue\n");
         return false;
     }
     
     // File I/O queue
     task_queues.file_io_queue = xQueueCreate(SYS_QUEUE_FILE_IO_SIZE, sizeof(FileIORequest));
     if (!task_queues.file_io_queue) {
-        BLE_LOG("ERROR: Failed to create file_io_queue\n");
+        LOG_BLE("ERROR: Failed to create file_io_queue\n");
         return false;
     }
     
-    BLE_LOG("TaskManager: Inter-task communication queues created successfully\n");
+    LOG_BLE("TaskManager: Inter-task communication queues created successfully\n");
     return true;
 }
 
@@ -120,28 +120,28 @@ bool TaskManager::create_all_tasks() {
     // Create tasks in order of priority (highest to lowest)
     
     if (!create_weight_sampling_task()) {
-        BLE_LOG("ERROR: Failed to create weight sampling task\n");
+        LOG_BLE("ERROR: Failed to create weight sampling task\n");
         return false;
     }
     
     if (!create_grind_control_task()) {
-        BLE_LOG("ERROR: Failed to create grind control task\n");
+        LOG_BLE("ERROR: Failed to create grind control task\n");
         return false;
     }
     
     if (!create_ui_render_task()) {
-        BLE_LOG("ERROR: Failed to create UI render task\n");
+        LOG_BLE("ERROR: Failed to create UI render task\n");
         return false;
     }
     
     
     if (!create_bluetooth_task()) {
-        BLE_LOG("ERROR: Failed to create bluetooth task\n");
+        LOG_BLE("ERROR: Failed to create bluetooth task\n");
         return false;
     }
     
     if (!create_file_io_task()) {
-        BLE_LOG("ERROR: Failed to create file I/O task\n");
+        LOG_BLE("ERROR: Failed to create file I/O task\n");
         return false;
     }
     
@@ -160,11 +160,11 @@ bool TaskManager::create_weight_sampling_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create weight sampling task\n");
+        LOG_BLE("ERROR: Failed to create weight sampling task\n");
         return false;
     }
     
-    BLE_LOG("✅ Weight Sampling Task created (Core 0, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ Weight Sampling Task created (Core 0, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_WEIGHT_SAMPLING, 1000 / SYS_TASK_WEIGHT_SAMPLING_INTERVAL_MS);
     return true;
 }
@@ -181,11 +181,11 @@ bool TaskManager::create_grind_control_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create grind control task\n");
+        LOG_BLE("ERROR: Failed to create grind control task\n");
         return false;
     }
     
-    BLE_LOG("✅ Grind Control Task created (Core 0, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ Grind Control Task created (Core 0, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_GRIND_CONTROL, 1000 / SYS_TASK_GRIND_CONTROL_INTERVAL_MS);
     return true;
 }
@@ -202,11 +202,11 @@ bool TaskManager::create_ui_render_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create UI render task\n");
+        LOG_BLE("ERROR: Failed to create UI render task\n");
         return false;
     }
     
-    BLE_LOG("✅ UI Render Task created (Core 1, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ UI Render Task created (Core 1, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_UI, 1000 / SYS_TASK_UI_INTERVAL_MS);
     return true;
 }
@@ -224,11 +224,11 @@ bool TaskManager::create_bluetooth_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create bluetooth task\n");
+        LOG_BLE("ERROR: Failed to create bluetooth task\n");
         return false;
     }
     
-    BLE_LOG("✅ Bluetooth Task created (Core 1, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ Bluetooth Task created (Core 1, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_BLUETOOTH, 1000 / SYS_TASK_BLUETOOTH_INTERVAL_MS);
     return true;
 }
@@ -245,11 +245,11 @@ bool TaskManager::create_file_io_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create file I/O task\n");
+        LOG_BLE("ERROR: Failed to create file I/O task\n");
         return false;
     }
     
-    BLE_LOG("✅ File I/O Task created (Core 1, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ File I/O Task created (Core 1, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_FILE_IO, 1000 / SYS_TASK_FILE_IO_INTERVAL_MS);
     return true;
 }
@@ -257,7 +257,7 @@ bool TaskManager::create_file_io_task() {
 void TaskManager::suspend_hardware_tasks() {
     if (ota_suspended) return;
     
-    BLE_LOG("TaskManager: Suspending hardware tasks for OTA operations\n");
+    LOG_BLE("TaskManager: Suspending hardware tasks for OTA operations\n");
     
     if (task_handles.weight_sampling_task) {
         vTaskSuspend(task_handles.weight_sampling_task);
@@ -273,7 +273,7 @@ void TaskManager::suspend_hardware_tasks() {
 void TaskManager::resume_hardware_tasks() {
     if (!ota_suspended) return;
     
-    BLE_LOG("TaskManager: Resuming hardware tasks after OTA operations\n");
+    LOG_BLE("TaskManager: Resuming hardware tasks after OTA operations\n");
     
     if (task_handles.weight_sampling_task) {
         vTaskResume(task_handles.weight_sampling_task);
@@ -325,7 +325,7 @@ bool TaskManager::validate_hardware_ready() const {
                           ui_manager != nullptr);
     
     if (!hardware_ready) {
-        BLE_LOG("TaskManager validation: Hardware interfaces not ready\n");
+        LOG_BLE("TaskManager validation: Hardware interfaces not ready\n");
         return false;
     }
     
@@ -338,16 +338,16 @@ bool TaskManager::validate_hardware_ready() const {
     bool grind_task_ready = grind_control_task.validate_hardware_ready();
     
     if (!weight_task_ready) {
-        BLE_LOG("TaskManager validation: WeightSamplingTask dependencies not ready\n");
+        LOG_BLE("TaskManager validation: WeightSamplingTask dependencies not ready\n");
         return false;
     }
     
     if (!grind_task_ready) {
-        BLE_LOG("TaskManager validation: GrindControlTask dependencies not ready\n");
+        LOG_BLE("TaskManager validation: GrindControlTask dependencies not ready\n");
         return false;
     }
     
-    BLE_LOG("TaskManager validation: All hardware and task dependencies ready\n");
+    LOG_BLE("TaskManager validation: All hardware and task dependencies ready\n");
     return true;
 }
 
@@ -403,7 +403,7 @@ void TaskManager::ui_render_task_impl() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(SYS_TASK_UI_INTERVAL_MS);
     
-    BLE_LOG("UI Render Task started on Core %d\n", xPortGetCoreID());
+    LOG_BLE("UI Render Task started on Core %d\n", xPortGetCoreID());
     
     while (true) {
         uint32_t start_time = millis();
@@ -448,7 +448,7 @@ void TaskManager::bluetooth_task_impl() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(SYS_TASK_BLUETOOTH_INTERVAL_MS);
     
-    BLE_LOG("Bluetooth Task started on Core %d\n", xPortGetCoreID());
+    LOG_BLE("Bluetooth Task started on Core %d\n", xPortGetCoreID());
     
     while (true) {
         uint32_t start_time = millis();
@@ -508,7 +508,7 @@ void TaskManager::print_task_heartbeat(int task_index, const char* task_name) co
     const TaskMetrics& metrics = task_metrics[task_index];
     uint32_t avg_cycle_time = metrics.cycle_count > 0 ? metrics.cycle_time_sum_ms / metrics.cycle_count : 0;
     
-    BLE_LOG("[%lums TASK_HEARTBEAT_%s] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Build: #%d\n",
+    LOG_BLE("[%lums TASK_HEARTBEAT_%s] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Build: #%d\n",
            millis(), task_name, metrics.cycle_count, avg_cycle_time, 
            metrics.cycle_time_min_ms, metrics.cycle_time_max_ms, BUILD_NUMBER);
 #endif
@@ -524,14 +524,14 @@ bool TaskManager::are_tasks_healthy() const {
 }
 
 void TaskManager::print_task_status() const {
-    BLE_LOG("=== TaskManager Status ===\n");
-    BLE_LOG("Tasks initialized: %s\n", tasks_initialized ? "YES" : "NO");
-    BLE_LOG("OTA suspended: %s\n", ota_suspended ? "YES" : "NO");
-    BLE_LOG("Task handles:\n");
-    BLE_LOG("  WeightSampling: %s\n", task_handles.weight_sampling_task ? "RUNNING" : "NULL");
-    BLE_LOG("  GrindControl: %s\n", task_handles.grind_control_task ? "RUNNING" : "NULL");
-    BLE_LOG("  UIRender: %s\n", task_handles.ui_render_task ? "RUNNING" : "NULL");
-    BLE_LOG("  Bluetooth: %s\n", task_handles.bluetooth_task ? "RUNNING" : "NULL");
-    BLE_LOG("  FileIO: %s\n", task_handles.file_io_task ? "RUNNING" : "NULL");
-    BLE_LOG("========================\n");
+    LOG_BLE("=== TaskManager Status ===\n");
+    LOG_BLE("Tasks initialized: %s\n", tasks_initialized ? "YES" : "NO");
+    LOG_BLE("OTA suspended: %s\n", ota_suspended ? "YES" : "NO");
+    LOG_BLE("Task handles:\n");
+    LOG_BLE("  WeightSampling: %s\n", task_handles.weight_sampling_task ? "RUNNING" : "NULL");
+    LOG_BLE("  GrindControl: %s\n", task_handles.grind_control_task ? "RUNNING" : "NULL");
+    LOG_BLE("  UIRender: %s\n", task_handles.ui_render_task ? "RUNNING" : "NULL");
+    LOG_BLE("  Bluetooth: %s\n", task_handles.bluetooth_task ? "RUNNING" : "NULL");
+    LOG_BLE("  FileIO: %s\n", task_handles.file_io_task ? "RUNNING" : "NULL");
+    LOG_BLE("========================\n");
 }

@@ -125,7 +125,7 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
     char build_info[64];
     snprintf(build_info, sizeof(build_info), "#%d", BUILD_NUMBER);
     
-    create_static_data_label(parent, "Firmware:", "v" INTERNAL_FIRMWARE_VERSION);
+    create_static_data_label(parent, "Firmware:", "v" BUILD_INTERNAL_FIRMWARE_VERSION);
     create_static_data_label(parent, "Build:", build_info);    
     
     create_separator(parent);

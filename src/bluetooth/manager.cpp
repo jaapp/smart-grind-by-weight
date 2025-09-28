@@ -660,21 +660,21 @@ void BluetoothManager::handle_ota_control_command(BLECharacteristic* characteris
             
         case BLE_OTA_CMD_END:            
             log("Bluetooth OTA: Received END command\n");
-            OTA_DEBUG_LOG("BLE_OTA_CMD_END received, checking if OTA active...\n");
+            LOG_OTA_DEBUG("BLE_OTA_CMD_END received, checking if OTA active...\n");
             if (ota_handler.is_ota_active()) {
-                OTA_DEBUG_LOG("OTA is active, updating UI status...\n");
+                LOG_OTA_DEBUG("OTA is active, updating UI status...\n");
                 update_ui_status("Applying patch...");
-                OTA_DEBUG_LOG("UI status updated, calling complete_ota()...\n");
+                LOG_OTA_DEBUG("UI status updated, calling complete_ota()...\n");
                 if (ota_handler.complete_ota()) {
-                    OTA_DEBUG_LOG("complete_ota() returned SUCCESS\n");
+                    LOG_OTA_DEBUG("complete_ota() returned SUCCESS\n");
                     set_ota_status(BLE_OTA_SUCCESS);
                     update_ui_status("Restarting...");
                 } else {
-                    OTA_DEBUG_LOG("complete_ota() returned FAILED\n");
+                    LOG_OTA_DEBUG("complete_ota() returned FAILED\n");
                     set_ota_status(BLE_OTA_ERROR);
                 }
             } else {
-                OTA_DEBUG_LOG("OTA is NOT active - ignoring END command\n");
+                LOG_OTA_DEBUG("OTA is NOT active - ignoring END command\n");
             }
             break;
             
@@ -858,7 +858,7 @@ void BluetoothManager::update_system_info() {
         "\"flash_size\":%u,"
         "\"cpu_freq\":%u"
         "}",
-        INTERNAL_FIRMWARE_VERSION,
+        BUILD_INTERNAL_FIRMWARE_VERSION,
         BUILD_NUMBER,
         uptime_hours,
         uptime_minutes % 60,

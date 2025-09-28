@@ -72,7 +72,7 @@ void ProfileEventHandler::handle_edit_minus(lv_event_code_t code) {
 
 // GrindEventHandler implementation
 void GrindEventHandler::handle_grind_button() {
-    BLE_LOG("[%lums BUTTON_PRESS] Grind button pressed in state: %s\n", 
+    LOG_BLE("[%lums BUTTON_PRESS] Grind button pressed in state: %s\n", 
             millis(), ui_manager->state_machine->is_state(UIState::READY) ? "READY" :
                      ui_manager->state_machine->is_state(UIState::GRINDING) ? "GRINDING" :
                      ui_manager->state_machine->is_state(UIState::GRIND_COMPLETE) ? "GRIND_COMPLETE" :
@@ -88,7 +88,7 @@ void GrindEventHandler::handle_grind_button() {
             
             // Start grind with non-blocking tare - no overlay needed
             // Let the event system handle the UI state transition
-            BLE_LOG("[%lums GRIND_START] About to call start_grind()\n", millis());
+            LOG_BLE("[%lums GRIND_START] About to call start_grind()\n", millis());
             ui_manager->error_message[0] = '\0';
             ui_manager->error_grind_weight = 0.0f;
             ui_manager->error_grind_progress = 0;
@@ -96,7 +96,7 @@ void GrindEventHandler::handle_grind_button() {
             float target_time_seconds = ui_manager->profile_controller->get_current_time();
             uint32_t target_time_ms = static_cast<uint32_t>((target_time_seconds * 1000.0f) + 0.5f);
             ui_manager->grind_controller->start_grind(target_weight, target_time_ms, ui_manager->current_mode);
-            BLE_LOG("[%lums GRIND_START] start_grind() returned\n", millis());
+            LOG_BLE("[%lums GRIND_START] start_grind() returned\n", millis());
         }
     } else if (ui_manager->state_machine->is_state(UIState::GRINDING)) {
         ui_manager->grind_controller->stop_grind();
@@ -121,7 +121,7 @@ static UIManager* confirmation_ui_manager = nullptr;
 static void factory_reset_callback() {
     if (!confirmation_ui_manager) return;
     
-    DEBUG_PRINTLN("\n=== FACTORY RESET INITIATED ===");
+    LOG_DEBUG_PRINTLN("\n=== FACTORY RESET INITIATED ===");
     
     // Reset all profiles to defaults
     confirmation_ui_manager->get_profile_controller()->set_profile_weight(0, USER_SINGLE_ESPRESSO_WEIGHT_G);
@@ -137,7 +137,7 @@ static void factory_reset_callback() {
         LittleFS.remove("/last_grind.txt");
     }
     
-    DEBUG_PRINTLN("Factory reset completed.");
+    LOG_DEBUG_PRINTLN("Factory reset completed.");
     
     // Return to developer screen
     confirmation_ui_manager->set_current_tab(3);
@@ -145,16 +145,16 @@ static void factory_reset_callback() {
 }
 
 static void perform_purge_operation() {
-    DEBUG_PRINTLN("\n=== PURGE GRIND HISTORY INITIATED ===");
+    LOG_DEBUG_PRINTLN("\n=== PURGE GRIND HISTORY INITIATED ===");
     
     // Clear new time-series sessions from flash
     extern GrindLogger grind_logger;
     bool success = grind_logger.clear_all_sessions_from_flash();
     
     if (success) {
-        DEBUG_PRINTLN("Grind history purged successfully - reinitializing logger...");
+        LOG_DEBUG_PRINTLN("Grind history purged successfully - reinitializing logger...");
     } else {
-        DEBUG_PRINTLN("ERROR: Failed to purge all grind history data!");
+        LOG_DEBUG_PRINTLN("ERROR: Failed to purge all grind history data!");
     }
 }
 
@@ -242,24 +242,24 @@ void SettingsEventHandler::handle_settings_motor_test() {
 
 
 void SettingsEventHandler::handle_settings_measurements_data() {
-    BLE_LOG("=== MEASUREMENT DATA EXPORT ===\n");
+    LOG_BLE("=== MEASUREMENT DATA EXPORT ===\n");
     ui_manager->grind_controller->send_measurements_data();
     //ui_manager->grind_controller->export_measurements_csv();
-    BLE_LOG("=== END MEASUREMENT DATA ===\n");
+    LOG_BLE("=== END MEASUREMENT DATA ===\n");
 }
 
 void SettingsEventHandler::handle_settings_ble_export() {
     if (ui_manager->bluetooth_manager->is_enabled() && ui_manager->bluetooth_manager->is_connected()) {
-        BLE_LOG("=== BLE MEASUREMENT DATA EXPORT ===\n");
+        LOG_BLE("=== BLE MEASUREMENT DATA EXPORT ===\n");
         ui_manager->bluetooth_manager->start_data_export();
-        BLE_LOG("BLE export started - check laptop BLE receiver\n");
+        LOG_BLE("BLE export started - check laptop BLE receiver\n");
     } else {
-        BLE_LOG("BLE not enabled or not connected - enable BLE first\n");
+        LOG_BLE("BLE not enabled or not connected - enable BLE first\n");
     }
 }
 
 void SettingsEventHandler::handle_settings_tare() {
-    DEBUG_PRINTLN("Manual tare requested from developer tools");
+    LOG_DEBUG_PRINTLN("Manual tare requested from developer tools");
     
     // Execute tare using unified system
     UIOperations::execute_tare(ui_manager->hardware_manager);
@@ -276,12 +276,12 @@ void SettingsEventHandler::handle_ble_toggle() {
     
     if (ui_manager->bluetooth_manager->is_enabled()) {
         ui_manager->bluetooth_manager->disable();
-        DEBUG_PRINTLN("Bluetooth disabled by user");
+        LOG_DEBUG_PRINTLN("Bluetooth disabled by user");
     } else {
         // Use common blocking overlay for BLE enabling
         auto ble_enable_operation = [this]() {
             ui_manager->bluetooth_manager->enable();
-            DEBUG_PRINTLN("Bluetooth enabled by user (30 minute timeout)");
+            LOG_DEBUG_PRINTLN("Bluetooth enabled by user (30 minute timeout)");
         };
         
         auto completion = [this]() {
@@ -310,7 +310,7 @@ void SettingsEventHandler::handle_ble_startup_toggle() {
     prefs.putBool("startup", startup_enabled);
     prefs.end();
 
-    DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
+    LOG_DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
 }
 
 void SettingsEventHandler::handle_logging_toggle() {
@@ -325,7 +325,7 @@ void SettingsEventHandler::handle_logging_toggle() {
     prefs.putBool("enabled", logging_enabled);
     prefs.end();
 
-    DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
+    LOG_DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
 }
 
 void SettingsEventHandler::handle_brightness_normal_slider() {
@@ -347,7 +347,7 @@ void SettingsEventHandler::handle_brightness_normal_slider() {
     // Update label
     ui_manager->settings_screen.update_brightness_labels(brightness_percent, -1);
     // Do not persist on move; commit on release only
-    DEBUG_PRINTF("Normal brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
+    LOG_DEBUG_PRINTF("Normal brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
 }
 
 void SettingsEventHandler::handle_brightness_normal_slider_released() {
@@ -390,7 +390,7 @@ void SettingsEventHandler::handle_brightness_screensaver_slider() {
     ui_manager->settings_screen.update_brightness_labels(-1, brightness_percent);
     
     // Do not persist on move; commit on release only
-    DEBUG_PRINTF("Screensaver brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
+    LOG_DEBUG_PRINTF("Screensaver brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
 }
 
 void SettingsEventHandler::handle_brightness_screensaver_slider_released() {
@@ -415,7 +415,7 @@ void SettingsEventHandler::handle_brightness_screensaver_slider_released() {
     float normal_brightness = ui_manager->get_normal_brightness();
     ui_manager->hardware_manager->get_display()->set_brightness(normal_brightness);
     
-    DEBUG_PRINTF("Touch released - restored normal brightness to %.2f\n", normal_brightness);
+    LOG_DEBUG_PRINTF("Touch released - restored normal brightness to %.2f\n", normal_brightness);
 }
 
 void SettingsEventHandler::handle_confirm() {

@@ -6,7 +6,7 @@
 #include <cstdarg>
 #include <cstring>
 
-#if defined(HW_ENABLE_LOADCELL_MOCK) && (HW_ENABLE_LOADCELL_MOCK != 0)
+#if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
 #include "../hardware/mock_hx711_driver.h"
 #endif
 
@@ -23,7 +23,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     grinder = gr;
     preferences = prefs;
     phase = GrindPhase::IDLE;
-    tolerance = USER_GRIND_ACCURACY_TOLERANCE_G;
+    tolerance = GRIND_ACCURACY_TOLERANCE_G;
     current_profile_id = 0;
     force_measurement_log = false;
     target_time_ms = 0;
@@ -33,7 +33,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     
     // Set up grinder background indicator callback (if enabled)
     if (grinder) {
-#if USER_ENABLE_GRINDER_BACKGROUND_INDICATOR
+#if DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR
         grinder->set_ui_event_callback([this](const GrindEventData& event_data) {
             // Forward grinder background events to our existing UI event queue
             if (event_data.event == UIGrindEvent::BACKGROUND_CHANGE) {
@@ -48,7 +48,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     
     // Initialize the grind logger
     if (!grind_logger.init(preferences)) {
-        BLE_LOG("Warning: Grind logging disabled due to initialization failure\n");
+        LOG_BLE("Warning: Grind logging disabled due to initialization failure\n");
     }
     
     // RealtimeController removed - functionality moved to FreeRTOS WeightSamplingTask and GrindControlTask
@@ -60,25 +60,25 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     // Initialize thread-safe UI event queue
     ui_event_queue = xQueueCreate(UI_EVENT_QUEUE_SIZE, sizeof(GrindEventData));
     if (!ui_event_queue) {
-        BLE_LOG("ERROR: Failed to create UI event queue\n");
+        LOG_BLE("ERROR: Failed to create UI event queue\n");
     } else {
-        BLE_LOG("UI event queue created successfully\n");
+        LOG_BLE("UI event queue created successfully\n");
     }
     
     // Initialize thread-safe flash operation queue
     flash_op_queue = xQueueCreate(FLASH_OP_QUEUE_SIZE, sizeof(FlashOpRequest));
     if (!flash_op_queue) {
-        BLE_LOG("ERROR: Failed to create flash operation queue\n");
+        LOG_BLE("ERROR: Failed to create flash operation queue\n");
     } else {
-        BLE_LOG("Flash operation queue created successfully\n");
+        LOG_BLE("Flash operation queue created successfully\n");
     }
     
     // Initialize thread-safe log message queue
     log_queue = xQueueCreate(LOG_QUEUE_SIZE, sizeof(LogMessage));
     if (!log_queue) {
-        BLE_LOG("ERROR: Failed to create log message queue\n");
+        LOG_BLE("ERROR: Failed to create log message queue\n");
     } else {
-        BLE_LOG("Log message queue created successfully\n");
+        LOG_BLE("Log message queue created successfully\n");
     }
 
     strategy_context.controller = this;
@@ -86,7 +86,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
 }
 
 void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grind_mode) {
-    BLE_LOG("[%lums CONTROLLER] start_grind() called with target=%.1fg, time=%lums, mode=%s\n",
+    LOG_BLE("[%lums CONTROLLER] start_grind() called with target=%.1fg, time=%lums, mode=%s\n",
             millis(), target, (unsigned long)time_ms, grind_mode == GrindMode::TIME ? "TIME" : "WEIGHT");
     if (!weight_sensor || !grinder) return;
     
@@ -103,7 +103,7 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     coast_time_ms = 0;
     predictive_end_weight = 0;
     final_weight = 0;
-    motor_stop_target_weight = USER_GRIND_UNDERSHOOT_TARGET_G; // Start with a safe default
+    motor_stop_target_weight = GRIND_UNDERSHOOT_TARGET_G; // Start with a safe default
 
     time_grind_start_ms = 0;
 
@@ -136,7 +136,7 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
 
     // Initialize pulse tracking
     additional_pulse_count = 0;
-    pulse_duration_ms = USER_TIME_PULSE_DURATION_MS;
+    pulse_duration_ms = GRIND_TIME_PULSE_DURATION_MS;
 
     if (mode == GrindMode::WEIGHT) {
         active_strategy = static_cast<IGrindStrategy*>(&weight_strategy);
@@ -169,7 +169,7 @@ void GrindController::return_to_idle() {
     // This is called by the UI to acknowledge a completed or timed-out grind
     // and return the controller to the IDLE state.
     if (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) {
-        BLE_LOG("[%lums CONTROLLER] UI acknowledged completion/timeout, returning to IDLE.\n", millis());
+        LOG_BLE("[%lums CONTROLLER] UI acknowledged completion/timeout, returning to IDLE.\n", millis());
         time_grind_start_ms = 0;
         target_time_ms = 0;
         last_error_message[0] = '\0';
@@ -190,7 +190,7 @@ void GrindController::stop_grind() {
     // Cancelled grinds just discard PSRAM data and go to IDLE
     grind_logger.discard_current_session();
     
-    BLE_LOG("--- GRIND STOPPED BY USER ---\n");
+    LOG_BLE("--- GRIND STOPPED BY USER ---\n");
     
     time_grind_start_ms = 0;
     target_time_ms = 0;
@@ -227,7 +227,7 @@ void GrindController::update() {
         case GrindPhase::INITIALIZING:
             // Wait for UI to acknowledge the phase transition before proceeding
             if (ui_ready_for_setup) {
-                UI_DEBUG_LOG("UI acknowledged INITIALIZING phase, proceeding to SETUP\n");
+                LOG_UI_DEBUG("UI acknowledged INITIALIZING phase, proceeding to SETUP\n");
                 switch_phase(GrindPhase::SETUP, loop_data);
             }
             break;
@@ -251,7 +251,7 @@ void GrindController::update() {
             
         case GrindPhase::TARING:
             if (weight_sensor->start_nonblocking_tare()) {
-                LOADCELL_DEBUG_LOG("Non-blocking tare started\n");
+                LOG_LOADCELL_DEBUG("Non-blocking tare started\n");
                 switch_phase(GrindPhase::TARE_CONFIRM, loop_data);
             }
             break;
@@ -312,7 +312,7 @@ void GrindController::update() {
         case GrindPhase::TIME_ADDITIONAL_PULSE:
             // Check for additional pulse completion
             if (grinder && grinder->is_pulse_complete()) {
-                BLE_LOG("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n", 
+                LOG_BLE("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n", 
                         millis(), additional_pulse_count, weight_sensor ? weight_sensor->get_display_weight() : 0.0f);
                 
                 // Return to completed phase
@@ -331,13 +331,13 @@ void GrindController::update() {
                 const char* result_string;
                 if (error > tolerance) { 
                     result_string = "OVERSHOOT";
-                    BLE_LOG("--- RESULT: OVERSHOOT (Error: %+.2fg) ---\n", error);
-                } else if (pulse_attempts >= USER_GRIND_MAX_PULSE_ATTEMPTS && abs(error) > tolerance) { // abs() is correct here
+                    LOG_BLE("--- RESULT: OVERSHOOT (Error: %+.2fg) ---\n", error);
+                } else if (pulse_attempts >= GRIND_MAX_PULSE_ATTEMPTS && abs(error) > tolerance) { // abs() is correct here
                     result_string = "COMPLETE - MAX PULSES";
-                    BLE_LOG("--- RESULT: COMPLETE - MAX PULSES (Error: %+.2fg) ---\n", error);
+                    LOG_BLE("--- RESULT: COMPLETE - MAX PULSES (Error: %+.2fg) ---\n", error);
                 } else {
                     result_string = "COMPLETE";
-                    BLE_LOG("--- RESULT: COMPLETE (Error: %+.2fg) ---\n", error);
+                    LOG_BLE("--- RESULT: COMPLETE (Error: %+.2fg) ---\n", error);
                 }
 
                 // Queue flash operation for Core 1 processing - no blocking on Core 0
@@ -580,7 +580,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
 
 
 bool GrindController::check_timeout() const {
-    return (millis() - start_time) >= (USER_GRIND_TIMEOUT_SEC * 1000);
+    return (millis() - start_time) >= (GRIND_TIMEOUT_SEC * 1000);
 }
 
 bool GrindController::is_active() const {
@@ -652,7 +652,7 @@ void GrindController::set_ui_event_callback(void (*callback)(const GrindEventDat
 void GrindController::ui_acknowledge_phase_transition() {
     if (phase == GrindPhase::INITIALIZING) {
         ui_ready_for_setup = true;
-        UI_DEBUG_LOG("UI acknowledged INITIALIZING phase transition\n");
+        LOG_UI_DEBUG("UI acknowledged INITIALIZING phase transition\n");
     }
 }
 
@@ -665,7 +665,7 @@ void GrindController::emit_ui_event(const GrindEventData& data) {
             // Queue full - drop event to prevent Core 0 blocking
             // Only log dropped significant events, not progress updates
             if (data.event != UIGrindEvent::PROGRESS_UPDATED) {
-                BLE_LOG("WARNING: UI event queue full, dropped event type %d\n", (int)data.event);
+                LOG_BLE("WARNING: UI event queue full, dropped event type %d\n", (int)data.event);
             }
         } else {
             // Only log significant queued events, not every progress update
@@ -682,7 +682,7 @@ void GrindController::emit_ui_event(const GrindEventData& data) {
                     case UIGrindEvent::PULSE_STARTED: event_name = "PULSE_STARTED"; break;
                     case UIGrindEvent::PULSE_COMPLETED: event_name = "PULSE_COMPLETED"; break;
                 }
-                BLE_LOG("[%lums UI_EVENT] QUEUED %s: phase=%s, weight=%.2fg, progress=%d%%\n", 
+                LOG_BLE("[%lums UI_EVENT] QUEUED %s: phase=%s, weight=%.2fg, progress=%d%%\n", 
                         millis(), event_name, data.phase_display_text, data.current_weight, data.progress_percent);
             }
         }
@@ -720,11 +720,11 @@ void GrindController::queue_flash_operation(const FlashOpRequest& request) {
         
         if (result != pdPASS) {
             // Queue full - this shouldn't happen with reasonable queue size
-            BLE_LOG("WARNING: Flash operation queue full, dropping request type %d\n", (int)request.operation_type);
+            LOG_BLE("WARNING: Flash operation queue full, dropping request type %d\n", (int)request.operation_type);
         } else {
             const char* op_name = (request.operation_type == FlashOpRequest::END_GRIND_SESSION)
                                    ? "END_GRIND_SESSION" : "START_GRIND_SESSION";
-            BLE_LOG("[%lums FLASH_OP] QUEUED %s operation for Core 1 processing\n", millis(), op_name);
+            LOG_BLE("[%lums FLASH_OP] QUEUED %s operation for Core 1 processing\n", millis(), op_name);
         }
     }
 }
@@ -737,7 +737,7 @@ void GrindController::process_queued_flash_operations() {
         switch (request.operation_type) {
             case FlashOpRequest::START_GRIND_SESSION:
                 // Perform the blocking flash operation on Core 1
-                BLE_LOG("[%lums FLASH_OP] Processing START_GRIND_SESSION on Core 1: mode=%s, profile=%d\n", 
+                LOG_BLE("[%lums FLASH_OP] Processing START_GRIND_SESSION on Core 1: mode=%s, profile=%d\n", 
                         millis(),
                         request.descriptor.mode == GrindMode::TIME ? "TIME" : "WEIGHT",
                         request.descriptor.profile_id);
@@ -746,13 +746,13 @@ void GrindController::process_queued_flash_operations() {
                 
             case FlashOpRequest::END_GRIND_SESSION:
                 // Perform the blocking flash operation on Core 1
-                BLE_LOG("[%lums FLASH_OP] Processing END_GRIND_SESSION on Core 1: %s, %.2fg, %d pulses\n", 
+                LOG_BLE("[%lums FLASH_OP] Processing END_GRIND_SESSION on Core 1: %s, %.2fg, %d pulses\n", 
                         millis(), request.result_string, request.final_weight, request.pulse_count);
                 grind_logger.end_grind_session(request.result_string, request.final_weight, request.pulse_count);
                 break;
                 
             default:
-                BLE_LOG("WARNING: Unknown flash operation type %d\n", request.operation_type);
+                LOG_BLE("WARNING: Unknown flash operation type %d\n", request.operation_type);
                 break;
         }
     }
@@ -786,8 +786,8 @@ void GrindController::process_queued_log_messages() {
     
     // Process all queued log messages from Core 0
     while (xQueueReceive(log_queue, &log_msg, 0) == pdPASS) {
-        // Output the message using BLE_LOG on Core 1
-        BLE_LOG("%s", log_msg.message);
+        // Output the message using LOG_BLE on Core 1
+        LOG_BLE("%s", log_msg.message);
     }
 }
 
@@ -806,13 +806,13 @@ void GrindController::start_additional_pulse() {
     }
     
     if (!grinder) {
-        BLE_LOG("ERROR: Cannot pulse - grinder not available\n");
+        LOG_BLE("ERROR: Cannot pulse - grinder not available\n");
         return;
     }
     
     additional_pulse_count++;
     
-    BLE_LOG("[%lums CONTROLLER] Starting additional pulse #%d (%lums)\n", 
+    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums)\n", 
             millis(), additional_pulse_count, (unsigned long)pulse_duration_ms);
     
     // Transition to additional pulse phase (without loop_data since this is a manual action)
@@ -824,7 +824,7 @@ void GrindController::start_additional_pulse() {
     grinder->start_pulse_rmt(pulse_duration_ms);
     
     // Notify mock driver for weight simulation (if mock is active)
-#if defined(HW_ENABLE_LOADCELL_MOCK) && (HW_ENABLE_LOADCELL_MOCK != 0)
+#if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
     MockHX711Driver::notify_pulse(pulse_duration_ms);
 #endif
 }

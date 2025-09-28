@@ -108,7 +108,7 @@ private:
     float predictive_end_weight;
     volatile float grind_latency_ms;        // Thread-safe for Core 0 access
     float coast_time_ms;
-    PulseReport pulse_history[USER_GRIND_MAX_PULSE_ATTEMPTS];
+    PulseReport pulse_history[GRIND_MAX_PULSE_ATTEMPTS];
     volatile float motor_stop_target_weight; // Thread-safe for Core 0 access
     float final_weight; // Stores the final settled weight from final_measurement()
 

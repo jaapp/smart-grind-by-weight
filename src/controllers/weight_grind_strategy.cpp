@@ -78,10 +78,10 @@ void WeightGrindStrategy::run_predictive_phase(GrindController& controller,
         const uint32_t flow_detection_window_ms = 500;
         float current_flow_rate = controller.weight_sensor->get_flow_rate(flow_detection_window_ms);
 
-        if (current_flow_rate >= USER_GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
+        if (current_flow_rate >= GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
             controller.grind_latency_ms = loop_data.now - controller.phase_start_time;
             controller.flow_start_confirmed = true;
-            BLE_LOG("[PREDICTIVE] Flow start CONFIRMED! Latency: %lums, Flow: %.2fg/s\n",
+            LOG_BLE("[PREDICTIVE] Flow start CONFIRMED! Latency: %lums, Flow: %.2fg/s\n",
                     controller.grind_latency_ms, current_flow_rate);
         }
     }
@@ -91,8 +91,8 @@ void WeightGrindStrategy::run_predictive_phase(GrindController& controller,
         if (loop_data.now > (controller.phase_start_time + controller.grind_latency_ms + flow_rate_calc_window_ms)) {
             float current_flow_rate = controller.weight_sensor->get_flow_rate(flow_rate_calc_window_ms);
 
-            if (current_flow_rate > USER_GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
-                controller.motor_stop_target_weight = ((controller.grind_latency_ms * USER_LATENCY_TO_COAST_RATIO) /
+            if (current_flow_rate > GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
+                controller.motor_stop_target_weight = ((controller.grind_latency_ms * GRIND_LATENCY_TO_COAST_RATIO) /
                                                        (float)SYS_MS_PER_SECOND) * current_flow_rate;
             }
         }
@@ -117,15 +117,15 @@ void WeightGrindStrategy::run_pulse_decision_phase(GrindController& controller,
         return;
     }
 
-    float conservative_target = controller.target_weight - USER_GRIND_ACCURACY_TOLERANCE_G;
+    float conservative_target = controller.target_weight - GRIND_ACCURACY_TOLERANCE_G;
     float error = conservative_target - settled_weight;
 
     if (controller.coast_time_ms == 0) {
         controller.coast_time_ms = SYS_TIMEOUT_MEDIUM_MS;
     }
 
-    if (controller.target_weight - settled_weight < USER_GRIND_ACCURACY_TOLERANCE_G ||
-        controller.pulse_attempts >= USER_GRIND_MAX_PULSE_ATTEMPTS) {
+    if (controller.target_weight - settled_weight < GRIND_ACCURACY_TOLERANCE_G ||
+        controller.pulse_attempts >= GRIND_MAX_PULSE_ATTEMPTS) {
         controller.switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
         return;
     }

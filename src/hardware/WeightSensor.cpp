@@ -1,7 +1,7 @@
 #include "WeightSensor.h"
 #include "../config/constants.h"
 #include "hx711_driver.h"
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
 #include "mock_hx711_driver.h"
 #endif
 #include <Arduino.h>
@@ -21,8 +21,8 @@
 
 WeightSensor::WeightSensor() {
     // Initialize calibration parameters
-#if HW_ENABLE_LOADCELL_MOCK
-    cal_factor = HW_MOCK_CAL_FACTOR;
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    cal_factor = DEBUG_MOCK_CAL_FACTOR;
 #else
     cal_factor = USER_DEFAULT_CALIBRATION_FACTOR;
 #endif
@@ -64,20 +64,20 @@ WeightSensor::~WeightSensor() {
 void WeightSensor::init(Preferences* preferences) {
     prefs = preferences;
     
-    BLE_LOG("Initializing WeightSensor configuration and filters...\n");
+    LOG_BLE("Initializing WeightSensor configuration and filters...\n");
     
     // Create load cell driver instance based on configuration
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     adc_driver = std::make_unique<MockHX711Driver>();
 #else
     adc_driver = std::make_unique<HX711Driver>(HW_LOADCELL_SCK_PIN, HW_LOADCELL_DOUT_PIN);
 #endif
     if (!adc_driver) {
-        BLE_LOG("ERROR: Failed to create ADC driver\n");
+        LOG_BLE("ERROR: Failed to create ADC driver\n");
         return;
     }
     
-    BLE_LOG("Created %s ADC driver\n", adc_driver->get_driver_name());
+    LOG_BLE("Created %s ADC driver\n", adc_driver->get_driver_name());
     
     // Don't load calibration data here - WeightSamplingTask will handle it on Core 0
     // This avoids NVS threading issues between Core 1 init and Core 0 hardware access
@@ -92,7 +92,7 @@ void WeightSensor::init(Preferences* preferences) {
     tareTimes = 0;
     tareStatus = false;
     
-    BLE_LOG("WeightSensor configuration initialized - hardware will be initialized by WeightSamplingTask\n");
+    LOG_BLE("WeightSensor configuration initialized - hardware will be initialized by WeightSamplingTask\n");
 }
 
 bool WeightSensor::begin() {
@@ -101,18 +101,18 @@ bool WeightSensor::begin() {
 
 bool WeightSensor::begin(uint8_t gain_value) {
     if (!adc_driver) {
-        BLE_LOG("ERROR: ADC driver not initialized\n");
+        LOG_BLE("ERROR: ADC driver not initialized\n");
         return false;
     }
     
-    BLE_LOG("Initializing %s ADC hardware...\n", adc_driver->get_driver_name());
+    LOG_BLE("Initializing %s ADC hardware...\n", adc_driver->get_driver_name());
     
     bool success = adc_driver->begin(gain_value);
     if (success) {
         data_available = true;
-        BLE_LOG("%s ADC initialized successfully\n", adc_driver->get_driver_name());
+        LOG_BLE("%s ADC initialized successfully\n", adc_driver->get_driver_name());
     } else {
-        BLE_LOG("ERROR: Failed to initialize %s ADC\n", adc_driver->get_driver_name());
+        LOG_BLE("ERROR: Failed to initialize %s ADC\n", adc_driver->get_driver_name());
     }
     
     return success;
@@ -185,7 +185,7 @@ void WeightSensor::update_temperature_if_available() {
 }
 
 void WeightSensor::tare() {
-    LOADCELL_DEBUG_LOG("[DEBUG %lums] BLOCKING_TARE_START: Beginning blocking tare operation using HX711_ADC exact implementation\n", millis());
+    LOG_LOADCELL_DEBUG("[DEBUG %lums] BLOCKING_TARE_START: Beginning blocking tare operation using HX711_ADC exact implementation\n", millis());
     
     // Use exact HX711_ADC non-blocking implementation
     tareNoDelay();
@@ -201,33 +201,33 @@ void WeightSensor::tare() {
     }
     
     if (doTare) {
-        BLE_LOG("ERROR: Blocking tare operation failed or timed out\n");
+        LOG_BLE("ERROR: Blocking tare operation failed or timed out\n");
     } else {
         // Clear buffer after tare completes for clean measurements
         raw_filter.clear_all_samples();
         raw_filter.reset_display_filter();
     }
     
-    LOADCELL_DEBUG_LOG("[DEBUG %lums] BLOCKING_TARE_COMPLETE: Tare operation completed\n", millis());
+    LOG_LOADCELL_DEBUG("[DEBUG %lums] BLOCKING_TARE_COMPLETE: Tare operation completed\n", millis());
 }
 
 void WeightSensor::calibrate(float known_weight) {
-#if HW_ENABLE_LOADCELL_MOCK
-    BLE_LOG("Mock load cell: calibration skipped (fixed factor %.2f)\n", cal_factor);
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    LOG_BLE("Mock load cell: calibration skipped (fixed factor %.2f)\n", cal_factor);
     return;
 #endif
     if (known_weight <= 0) {
-        BLE_LOG("ERROR: Invalid calibration weight\n");
+        LOG_BLE("ERROR: Invalid calibration weight\n");
         return;
     }
     
-    BLE_LOG("Starting calibration with %.3fg weight...\n", known_weight);
+    LOG_BLE("Starting calibration with %.3fg weight...\n", known_weight);
     
     // First, wait for weight to settle (user just placed calibration weight)
-    CALIBRATION_DEBUG_LOG("Waiting for calibration weight to settle...\n");
+    LOG_CALIBRATION_DEBUG("Waiting for calibration weight to settle...\n");
     get_precision_settled_weight(); // Use precision settling for calibration
     
-    CALIBRATION_DEBUG_LOG("Weight settled, performing calibration...");
+    LOG_CALIBRATION_DEBUG("Weight settled, performing calibration...");
     
     // Now perform calibration with high accuracy - CircularBufferMath handles all filtering
     
@@ -251,13 +251,13 @@ void WeightSensor::calibrate(float known_weight) {
     raw_filter.clear_all_samples();
     raw_filter.reset_display_filter();
     
-    BLE_LOG("Calibration completed. New factor: %.2f\n", cal_factor);
+    LOG_BLE("Calibration completed. New factor: %.2f\n", cal_factor);
 }
 
 void WeightSensor::set_calibration_factor(float factor) {
-#if HW_ENABLE_LOADCELL_MOCK
-    cal_factor = HW_MOCK_CAL_FACTOR;
-    BLE_LOG("Mock load cell: ignoring calibration update, using fixed factor: %.2f\n", cal_factor);
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    cal_factor = DEBUG_MOCK_CAL_FACTOR;
+    LOG_BLE("Mock load cell: ignoring calibration update, using fixed factor: %.2f\n", cal_factor);
 #else
     cal_factor = factor;
 #endif
@@ -281,13 +281,13 @@ void WeightSensor::update() {
 
 bool WeightSensor::is_settled(uint32_t window_ms) {
     // Convert grams threshold to raw threshold and use CircularBufferMath
-    int32_t raw_threshold = weight_to_raw_threshold(USER_SCALE_SETTLING_TOLERANCE_G);
+    int32_t raw_threshold = weight_to_raw_threshold(GRIND_SCALE_SETTLING_TOLERANCE_G);
     
     // Debug output for threshold conversion every 5s to avoid spam
     static uint32_t last_threshold_debug = 0;
     if (millis() - last_threshold_debug > 5000) {
-        LOADCELL_DEBUG_LOG("[WeightSensor] Grams threshold: %.4fg -> Raw threshold: %ld (cal_factor: %.2f)\n",
-                         USER_SCALE_SETTLING_TOLERANCE_G, (long)raw_threshold, cal_factor);
+        LOG_LOADCELL_DEBUG("[WeightSensor] Grams threshold: %.4fg -> Raw threshold: %ld (cal_factor: %.2f)\n",
+                         GRIND_SCALE_SETTLING_TOLERANCE_G, (long)raw_threshold, cal_factor);
         last_threshold_debug = millis();
     }
     
@@ -306,7 +306,7 @@ float WeightSensor::get_precision_settled_weight(float* settle_time_out) {
 
 // WARNING: This method blocks execution until weight settles or times out!
 float WeightSensor::get_settled_weight(uint32_t window_ms, float* settle_time_out) {
-    SETTLING_DEBUG_LOG("Waiting for weight to settle (window=%lums, timeout=%lums)...\n", window_ms, HW_SCALE_SETTLING_TIMEOUT_MS);
+    LOG_SETTLING_DEBUG("Waiting for weight to settle (window=%lums, timeout=%lums)...\n", window_ms, HW_SCALE_SETTLING_TIMEOUT_MS);
     
     unsigned long start_time = millis();
     float settled_weight = 0.0f;
@@ -321,7 +321,7 @@ float WeightSensor::get_settled_weight(uint32_t window_ms, float* settle_time_ou
             if (settle_time_out) {
                 *settle_time_out = millis() - start_time;
             }
-            SETTLING_DEBUG_LOG("Weight settled in %lums\n", millis() - start_time);
+            LOG_SETTLING_DEBUG("Weight settled in %lums\n", millis() - start_time);
             return settled_weight;
         }
         
@@ -330,7 +330,7 @@ float WeightSensor::get_settled_weight(uint32_t window_ms, float* settle_time_ou
     }
     
     // Timeout occurred - return best available measurement
-    SETTLING_DEBUG_LOG("Weight settling timed out after %lums\n", HW_SCALE_SETTLING_TIMEOUT_MS);
+    LOG_SETTLING_DEBUG("Weight settling timed out after %lums\n", HW_SCALE_SETTLING_TIMEOUT_MS);
     if (settle_time_out) {
         *settle_time_out = HW_SCALE_SETTLING_TIMEOUT_MS;
     }
@@ -401,8 +401,8 @@ bool WeightSensor::is_data_ready() const {
 }
 
 void WeightSensor::save_calibration() {
-#if HW_ENABLE_LOADCELL_MOCK
-    BLE_LOG("Mock load cell: calibration save skipped (fixed factor).\n");
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    LOG_BLE("Mock load cell: calibration save skipped (fixed factor).\n");
     return;
 #endif
     if (prefs) {
@@ -411,8 +411,8 @@ void WeightSensor::save_calibration() {
 }
 
 void WeightSensor::save_calibration_weight(float weight) {
-#if HW_ENABLE_LOADCELL_MOCK
-    BLE_LOG("Mock load cell: calibration weight save skipped.\n");
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    LOG_BLE("Mock load cell: calibration weight save skipped.\n");
     return;
 #endif
     if (prefs) {
@@ -421,7 +421,7 @@ void WeightSensor::save_calibration_weight(float weight) {
 }
 
 float WeightSensor::get_saved_calibration_weight() {
-#if HW_ENABLE_LOADCELL_MOCK
+#if DEBUG_ENABLE_LOADCELL_MOCK
     return USER_CALIBRATION_REFERENCE_WEIGHT_G;
 #endif
     if (prefs) {
@@ -431,9 +431,9 @@ float WeightSensor::get_saved_calibration_weight() {
 }
 
 void WeightSensor::load_calibration() {
-#if HW_ENABLE_LOADCELL_MOCK
-    cal_factor = HW_MOCK_CAL_FACTOR;
-    BLE_LOG("Mock load cell: using fixed calibration factor: %.2f\n", cal_factor);
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    cal_factor = DEBUG_MOCK_CAL_FACTOR;
+    LOG_BLE("Mock load cell: using fixed calibration factor: %.2f\n", cal_factor);
     return;
 #endif
     if (prefs) {
@@ -441,32 +441,32 @@ void WeightSensor::load_calibration() {
         
         // Check for corrupted/invalid calibration data
         if (isnan(saved_factor) || !isfinite(saved_factor) || saved_factor == 0.0) {
-            BLE_LOG("WARNING: Invalid calibration factor detected, using default\n");
+            LOG_BLE("WARNING: Invalid calibration factor detected, using default\n");
             saved_factor = USER_DEFAULT_CALIBRATION_FACTOR;
             // Clear corrupted data and save default
             prefs->putFloat("hx_cal", saved_factor);
         }
         
         cal_factor = saved_factor;
-        BLE_LOG("Loaded calibration factor: %.2f\n", saved_factor);
+        LOG_BLE("Loaded calibration factor: %.2f\n", saved_factor);
     } else {
         cal_factor = USER_DEFAULT_CALIBRATION_FACTOR;
-        BLE_LOG("Using default calibration factor: %.2f\n", USER_DEFAULT_CALIBRATION_FACTOR);
+        LOG_BLE("Using default calibration factor: %.2f\n", USER_DEFAULT_CALIBRATION_FACTOR);
     }
 }
 
 void WeightSensor::clear_calibration_data() {
-#if HW_ENABLE_LOADCELL_MOCK
-    cal_factor = HW_MOCK_CAL_FACTOR;
-    BLE_LOG("Mock load cell: calibration data reset to fixed factor.\n");
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    cal_factor = DEBUG_MOCK_CAL_FACTOR;
+    LOG_BLE("Mock load cell: calibration data reset to fixed factor.\n");
     return;
 #endif
     if (prefs) {
-        BLE_LOG("Clearing corrupted calibration data...\n");
+        LOG_BLE("Clearing corrupted calibration data...\n");
         prefs->remove("hx_cal");
         prefs->remove("hx_wt");
         cal_factor = USER_DEFAULT_CALIBRATION_FACTOR;
-        BLE_LOG("Calibration data cleared, using defaults\n");
+        LOG_BLE("Calibration data cleared, using defaults\n");
     }
 }
 
@@ -477,7 +477,7 @@ bool WeightSensor::check_settling_complete(uint32_t window_ms, float* settled_we
         if (settled_weight_out) {
             *settled_weight_out = raw_to_weight(raw_filter.get_smoothed_raw(window_ms));
         }
-        SETTLING_DEBUG_LOG("[DEBUG %lums] SETTLING_COMPLETE: Weight settled (%.3fg, confidence=%.2f, window=%lums)\n", 
+        LOG_SETTLING_DEBUG("[DEBUG %lums] SETTLING_COMPLETE: Weight settled (%.3fg, confidence=%.2f, window=%lums)\n", 
                       millis(), settled_weight_out ? *settled_weight_out : raw_to_weight(raw_filter.get_smoothed_raw(window_ms)), 
                       raw_filter.get_settling_confidence(window_ms), window_ms);
         return true;
@@ -488,7 +488,7 @@ bool WeightSensor::check_settling_complete(uint32_t window_ms, float* settled_we
 
 void WeightSensor::cancel_settling() {
     // Settling cancellation no longer needed with direct window_ms approach
-    SETTLING_DEBUG_LOG("[DEBUG %lums] SETTLING_CANCEL: Settling cancelled\n", millis());
+    LOG_SETTLING_DEBUG("[DEBUG %lums] SETTLING_CANCEL: Settling cancelled\n", millis());
 }
 
 //==============================================================================
@@ -549,7 +549,7 @@ bool WeightSensor::sample_and_feed_filter() {
             // Debug invalid readings
             static uint32_t last_invalid_debug = 0;
             if (timestamp - last_invalid_debug > 5000) {
-                BLE_LOG("WeightSensor: Invalid raw ADC reading detected - raw=%ld (expected range: 0x000000 to 0xFFFFFF)\n", 
+                LOG_BLE("WeightSensor: Invalid raw ADC reading detected - raw=%ld (expected range: 0x000000 to 0xFFFFFF)\n", 
                        (long)raw_adc);
                 last_invalid_debug = timestamp;
             }

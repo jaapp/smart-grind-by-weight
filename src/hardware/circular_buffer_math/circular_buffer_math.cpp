@@ -213,7 +213,7 @@ bool CircularBufferMath::is_settled(uint32_t window_ms, int32_t threshold_raw_un
                 offset += snprintf(sample_str + offset, sizeof(sample_str) - offset, "...");
             }
             
-            LOADCELL_DEBUG_LOG("[SETTLING] Window:%lums Samples:%d Raw:[%s] StdDev:%.2f Threshold:%ld Settled:%s\n",
+            LOG_LOADCELL_DEBUG("[SETTLING] Window:%lums Samples:%d Raw:[%s] StdDev:%.2f Threshold:%ld Settled:%s\n",
                              window_ms, actual_samples, sample_str, std_dev, (long)threshold_raw_units, 
                              settled ? "YES" : "NO");
         }

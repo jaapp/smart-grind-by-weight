@@ -20,7 +20,7 @@ MockHX711Driver::~MockHX711Driver() {
 }
 
 void MockHX711Driver::reset_state() {
-    last_raw_data = static_cast<int32_t>(HW_MOCK_BASELINE_RAW);
+    last_raw_data = static_cast<int32_t>(DEBUG_MOCK_BASELINE_RAW);
     last_sample_time_ms = 0;
     next_sample_due_ms = 0;
     simulated_mass_g = 0.0f;
@@ -53,10 +53,10 @@ bool MockHX711Driver::begin(uint8_t gain_value) {
     unsigned long now = millis();
     last_sample_time_ms = now;
     next_sample_due_ms = now + HW_LOADCELL_SAMPLE_INTERVAL_MS;
-    last_raw_data = static_cast<int32_t>(HW_MOCK_BASELINE_RAW);
+    last_raw_data = static_cast<int32_t>(DEBUG_MOCK_BASELINE_RAW);
     data_ready_flag = false;
-    BLE_LOG("MockHX711Driver: initialized (flow=%.2fg/s, cal=%.1f)\n",
-            HW_MOCK_FLOW_RATE_GPS, HW_MOCK_CAL_FACTOR);
+    LOG_BLE("MockHX711Driver: initialized (flow=%.2fg/s, cal=%.1f)\n",
+            DEBUG_MOCK_FLOW_RATE_GPS, DEBUG_MOCK_CAL_FACTOR);
     return true;
 }
 
@@ -109,14 +109,14 @@ bool MockHX711Driver::update_async() {
         simulated_mass_g = 500.0f;
     }
 
-    float raw_value = static_cast<float>(HW_MOCK_BASELINE_RAW);
-    raw_value += simulated_mass_g * HW_MOCK_CAL_FACTOR;
+    float raw_value = static_cast<float>(DEBUG_MOCK_BASELINE_RAW);
+    raw_value += simulated_mass_g * DEBUG_MOCK_CAL_FACTOR;
 
-    float noise_peak = HW_MOCK_IDLE_NOISE_RAW;
+    float noise_peak = DEBUG_MOCK_IDLE_NOISE_RAW;
     if (pulse_flow) {
-        noise_peak = HW_MOCK_GRIND_NOISE_RAW * 3.0f;
+        noise_peak = DEBUG_MOCK_GRIND_NOISE_RAW * 3.0f;
     } else if (continuous_flow) {
-        noise_peak = HW_MOCK_GRIND_NOISE_RAW;
+        noise_peak = DEBUG_MOCK_GRIND_NOISE_RAW;
     }
     raw_value += random_noise(noise_peak);
 
@@ -155,7 +155,7 @@ float MockHX711Driver::process_continuous_state(unsigned long now_ms, bool& cont
 
     if (continuous_commanded) {
         if (!continuous_started) {
-            if (now_ms - continuous_start_ms >= HW_MOCK_START_DELAY_MS) {
+            if (now_ms - continuous_start_ms >= DEBUG_MOCK_START_DELAY_MS) {
                 continuous_started = true;
                 continuous_ramp_start_ms = now_ms;
             }
@@ -163,18 +163,18 @@ float MockHX711Driver::process_continuous_state(unsigned long now_ms, bool& cont
 
         if (continuous_started) {
             continuous_flow = true;
-            if (HW_MOCK_FLOW_RAMP_MS <= 0) {
+            if (DEBUG_MOCK_FLOW_RAMP_MS <= 0) {
                 flow_factor = 1.0f;
             } else {
                 unsigned long elapsed = now_ms - continuous_ramp_start_ms;
-                flow_factor = std::min(1.0f, static_cast<float>(elapsed) / static_cast<float>(HW_MOCK_FLOW_RAMP_MS));
+                flow_factor = std::min(1.0f, static_cast<float>(elapsed) / static_cast<float>(DEBUG_MOCK_FLOW_RAMP_MS));
             }
         }
     } else if (continuous_stop_pending) {
         unsigned long elapsed = now_ms - continuous_stop_ms;
         float ramp_factor = 0.0f;
-        if (HW_MOCK_FLOW_RAMP_MS > 0) {
-            ramp_factor = std::max(0.0f, 1.0f - static_cast<float>(elapsed) / static_cast<float>(HW_MOCK_FLOW_RAMP_MS));
+        if (DEBUG_MOCK_FLOW_RAMP_MS > 0) {
+            ramp_factor = std::max(0.0f, 1.0f - static_cast<float>(elapsed) / static_cast<float>(DEBUG_MOCK_FLOW_RAMP_MS));
         }
 
         if (ramp_factor > 0.0f) {
@@ -182,7 +182,7 @@ float MockHX711Driver::process_continuous_state(unsigned long now_ms, bool& cont
             flow_factor = ramp_factor;
         }
 
-        uint32_t stop_threshold = std::max<uint32_t>(HW_MOCK_STOP_DELAY_MS, HW_MOCK_FLOW_RAMP_MS);
+        uint32_t stop_threshold = std::max<uint32_t>(DEBUG_MOCK_STOP_DELAY_MS, DEBUG_MOCK_FLOW_RAMP_MS);
         if (elapsed >= stop_threshold) {
             continuous_stop_pending = false;
             continuous_started = false;
@@ -203,7 +203,7 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
     float flow_factor = 0.0f;
 
     if (pulse_command_active && !pulse_started) {
-        if (now_ms - pulse_start_ms >= HW_MOCK_START_DELAY_MS) {
+        if (now_ms - pulse_start_ms >= DEBUG_MOCK_START_DELAY_MS) {
             pulse_started = true;
             pulse_ramp_start_ms = now_ms;
         }
@@ -215,19 +215,19 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
     }
 
     if (pulse_started && pulse_command_active && !pulse_stop_pending) {
-        if (HW_MOCK_FLOW_RAMP_MS <= 0) {
+        if (DEBUG_MOCK_FLOW_RAMP_MS <= 0) {
             flow_factor = 1.0f;
         } else {
             unsigned long elapsed = now_ms - pulse_ramp_start_ms;
-            flow_factor = std::min(1.0f, static_cast<float>(elapsed) / static_cast<float>(HW_MOCK_FLOW_RAMP_MS));
+            flow_factor = std::min(1.0f, static_cast<float>(elapsed) / static_cast<float>(DEBUG_MOCK_FLOW_RAMP_MS));
         }
         if (flow_factor > 0.0f) {
             pulse_flow = true;
         }
     } else if (pulse_started && pulse_stop_pending) {
         unsigned long elapsed = now_ms - pulse_stop_ms;
-        if (HW_MOCK_FLOW_RAMP_MS > 0) {
-            flow_factor = std::max(0.0f, 1.0f - static_cast<float>(elapsed) / static_cast<float>(HW_MOCK_FLOW_RAMP_MS));
+        if (DEBUG_MOCK_FLOW_RAMP_MS > 0) {
+            flow_factor = std::max(0.0f, 1.0f - static_cast<float>(elapsed) / static_cast<float>(DEBUG_MOCK_FLOW_RAMP_MS));
         } else {
             flow_factor = 0.0f;
         }
@@ -236,7 +236,7 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
             pulse_flow = true;
         }
 
-        uint32_t stop_threshold = std::max<uint32_t>(HW_MOCK_STOP_DELAY_MS, HW_MOCK_FLOW_RAMP_MS);
+        uint32_t stop_threshold = std::max<uint32_t>(DEBUG_MOCK_STOP_DELAY_MS, DEBUG_MOCK_FLOW_RAMP_MS);
         if (elapsed >= stop_threshold) {
             pulse_stop_pending = false;
             pulse_command_active = false;
@@ -263,7 +263,7 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
 }
 
 float MockHX711Driver::grams_per_sample() const {
-    return HW_MOCK_FLOW_RATE_GPS / static_cast<float>(HW_LOADCELL_SAMPLE_RATE_SPS);
+    return DEBUG_MOCK_FLOW_RATE_GPS / static_cast<float>(HW_LOADCELL_SAMPLE_RATE_SPS);
 }
 
 float MockHX711Driver::random_noise(float peak) const {
@@ -304,7 +304,7 @@ void MockHX711Driver::handle_pulse_request(unsigned long now_ms, uint32_t durati
     pulse_stop_pending = false;
     pulse_start_ms = now_ms;
     pulse_end_ms = now_ms + duration_ms;
-    pending_pulse_mass_g += HW_MOCK_FLOW_RATE_GPS * (static_cast<float>(duration_ms) / 1000.0f);
+    pending_pulse_mass_g += DEBUG_MOCK_FLOW_RATE_GPS * (static_cast<float>(duration_ms) / 1000.0f);
     pulse_ramp_start_ms = now_ms;
 }
 

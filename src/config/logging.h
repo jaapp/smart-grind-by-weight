@@ -7,54 +7,54 @@ extern BluetoothManager g_bluetooth_manager;
 // Temporary fallback logging - use Serial instead of BLE to avoid circular dependencies
 #include <Arduino.h>
 
-#define BLE_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#define LOG_BLE(format, ...) Serial.printf(format, ##__VA_ARGS__)
 
 // Replace DEBUG macros to use Serial logging
-#if USER_DEBUG_SERIAL_OUTPUT
-#define DEBUG_PRINTF(format, ...) Serial.printf(format, ##__VA_ARGS__)
-#define DEBUG_PRINTLN(str) Serial.println(str)
-#define DEBUG_PRINT(str) Serial.print(str)
+#if DEBUG_SERIAL_OUTPUT
+#define LOG_DEBUG_PRINTF(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#define LOG_DEBUG_PRINTLN(str) Serial.println(str)
+#define LOG_DEBUG_PRINT(str) Serial.print(str)
 #else
-#define DEBUG_PRINTF(format, ...)
-#define DEBUG_PRINTLN(str)
-#define DEBUG_PRINT(str)
+#define LOG_DEBUG_PRINTF(format, ...)
+#define LOG_DEBUG_PRINTLN(str)
+#define LOG_DEBUG_PRINT(str)
 #endif
 
 // Conditional debug macros for different subsystems
-#if USER_DEBUG_GRIND_CONTROLLER
-#define GRIND_DEBUG_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#if DEBUG_GRIND_CONTROLLER
+#define LOG_GRIND_DEBUG(format, ...) Serial.printf(format, ##__VA_ARGS__)
 #else
-#define GRIND_DEBUG_LOG(format, ...)
+#define LOG_GRIND_DEBUG(format, ...)
 #endif
 
-#if USER_DEBUG_LOAD_CELL
-#define LOADCELL_DEBUG_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#if DEBUG_LOAD_CELL
+#define LOG_LOADCELL_DEBUG(format, ...) Serial.printf(format, ##__VA_ARGS__)
 #else
-#define LOADCELL_DEBUG_LOG(format, ...)
+#define LOG_LOADCELL_DEBUG(format, ...)
 #endif
 
-#if USER_DEBUG_UI_SYSTEM
-#define UI_DEBUG_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#if DEBUG_UI_SYSTEM
+#define LOG_UI_DEBUG(format, ...) Serial.printf(format, ##__VA_ARGS__)
 #else
-#define UI_DEBUG_LOG(format, ...)
+#define LOG_UI_DEBUG(format, ...)
 #endif
 
-#if USER_DEBUG_CALIBRATION
-#define CALIBRATION_DEBUG_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#if DEBUG_CALIBRATION
+#define LOG_CALIBRATION_DEBUG(format, ...) Serial.printf(format, ##__VA_ARGS__)
 #else
-#define CALIBRATION_DEBUG_LOG(format, ...)
+#define LOG_CALIBRATION_DEBUG(format, ...)
 #endif
 
-#if USER_DEBUG_WEIGHT_SETTLING
-#define SETTLING_DEBUG_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#if DEBUG_WEIGHT_SETTLING
+#define LOG_SETTLING_DEBUG(format, ...) Serial.printf(format, ##__VA_ARGS__)
 #else
-#define SETTLING_DEBUG_LOG(format, ...)
+#define LOG_SETTLING_DEBUG(format, ...)
 #endif
 
 #ifdef ENABLE_BLE_DEBUG_VERBOSE
-#define BLE_DEBUG_LOG(format, ...) Serial.printf(format, ##__VA_ARGS__)
+#define LOG_BLE_DEBUG(format, ...) Serial.printf(format, ##__VA_ARGS__)
 #else
-#define BLE_DEBUG_LOG(format, ...)
+#define LOG_BLE_DEBUG(format, ...)
 #endif
 
-#define OTA_DEBUG_LOG(format, ...) Serial.printf("[OTA_DEBUG] " format, ##__VA_ARGS__)
+#define LOG_OTA_DEBUG(format, ...) Serial.printf("[OTA_DEBUG] " format, ##__VA_ARGS__)

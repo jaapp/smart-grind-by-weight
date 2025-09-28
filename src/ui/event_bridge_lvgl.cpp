@@ -10,7 +10,7 @@ void EventBridgeLVGL::set_ui_manager(UIManager* mgr) {
 
 void EventBridgeLVGL::dispatch_event(lv_event_t* e) {
     if (!ui_manager) {
-        BLE_LOG("[ERROR] EventBridgeLVGL: UI manager not initialized\n");
+        LOG_BLE("[ERROR] EventBridgeLVGL: UI manager not initialized\n");
         return;
     }
     
@@ -39,12 +39,12 @@ void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {
             break;
             
         case EventType::GRIND_BUTTON:
-            BLE_LOG("[%lums LVGL_EVENT] grind_button triggered\n", millis());
+            LOG_BLE("[%lums LVGL_EVENT] grind_button triggered\n", millis());
             ui_manager->handle_grind_button();
             break;
             
         case EventType::PULSE_BUTTON:
-            BLE_LOG("[%lums LVGL_EVENT] pulse_button triggered\n", millis());
+            LOG_BLE("[%lums LVGL_EVENT] pulse_button triggered\n", millis());
             ui_manager->handle_pulse_button();
             break;
             
@@ -153,7 +153,7 @@ void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {
             break;
 
         default:
-            BLE_LOG("[WARNING] EventBridgeLVGL: Unknown event type: %d\n", static_cast<int>(event_type));
+            LOG_BLE("[WARNING] EventBridgeLVGL: Unknown event type: %d\n", static_cast<int>(event_type));
             break;
     }
 }

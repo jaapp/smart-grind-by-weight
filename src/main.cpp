@@ -49,17 +49,17 @@ void setup() {
         case ESP_RST_SDIO: rr_str = "SDIO"; break;
         default: break;
     }
-    BLE_LOG("[STARTUP] Reset reason: %s (%d)\n", rr_str, rr);
+    LOG_BLE("[STARTUP] Reset reason: %s (%d)\n", rr_str, rr);
     
     
     // Early startup heartbeat - helps capture initialization sequence
-    BLE_LOG("[STARTUP] Initializing ESP32-S3 Coffee Scale - Build %d - Core1 active\n", BUILD_NUMBER);
+    LOG_BLE("[STARTUP] Initializing ESP32-S3 Coffee Scale - Build %d - Core1 active\n", BUILD_NUMBER);
     
     // Initialize LittleFS once - format if necessary
     if (!LittleFS.begin(true)) {
-        BLE_LOG("ERROR: LittleFS mount failed - continuing without filesystem\n");
+        LOG_BLE("ERROR: LittleFS mount failed - continuing without filesystem\n");
     } else {
-        BLE_LOG("✅ LittleFS mounted successfully\n");
+        LOG_BLE("✅ LittleFS mounted successfully\n");
     }
     
     hardware_manager.init();
@@ -76,7 +76,7 @@ void setup() {
     bool ota_failed = !failed_ota_build.isEmpty();
     
     if (ota_failed) {
-        BLE_LOG("BOOT: Starting in OTA failure state for expected build %s\n", failed_ota_build.c_str());
+        LOG_BLE("BOOT: Starting in OTA failure state for expected build %s\n", failed_ota_build.c_str());
         state_machine.init(UIState::OTA_UPDATE_FAILED);
     } else {
         state_machine.init(UIState::READY);
@@ -100,31 +100,31 @@ void setup() {
     
     // Initialize individual task modules BEFORE TaskManager creates FreeRTOS tasks
     // This ensures all task dependencies are ready before tasks start running
-    BLE_LOG("[STARTUP] Initializing task module dependencies...\n");
+    LOG_BLE("[STARTUP] Initializing task module dependencies...\n");
     weight_sampling_task.init(hardware_manager.get_load_cell(), &grind_logger);
     grind_control_task.init(&grind_controller, hardware_manager.get_load_cell(), 
                            hardware_manager.get_grinder(), &grind_logger);
     
-    BLE_LOG("✅ Task module dependencies initialized\n");
+    LOG_BLE("✅ Task module dependencies initialized\n");
     
     // Initialize TaskManager with hardware and system interfaces
-    BLE_LOG("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
+    LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller, 
                                               &grind_controller, &bluetooth_manager, &ui_manager);
     
     if (!task_init_success) {
-        BLE_LOG("ERROR: Failed to initialize TaskManager - system cannot start\n");
+        LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
         while (true) {
             delay(1000); // Halt system if task initialization fails
         }
     }
     
-    BLE_LOG("✅ TaskManager initialized successfully\n");
+    LOG_BLE("✅ TaskManager initialized successfully\n");
     
     // Initialize remaining task modules that depend on TaskManager queues
     file_io_task.init(task_manager.get_file_io_queue());
     
-    BLE_LOG("✅ All task modules initialized\n");
+    LOG_BLE("✅ All task modules initialized\n");
 }
 
 void loop() {
@@ -144,11 +144,11 @@ void loop() {
     if (ota_active && !hardware_suspended) {
         task_manager.suspend_hardware_tasks();
         hardware_suspended = true;
-        BLE_LOG("[MAIN] Hardware tasks suspended for OTA\n");
+        LOG_BLE("[MAIN] Hardware tasks suspended for OTA\n");
     } else if (!ota_active && hardware_suspended) {
         task_manager.resume_hardware_tasks();
         hardware_suspended = false;
-        BLE_LOG("[MAIN] Hardware tasks resumed after OTA\n");
+        LOG_BLE("[MAIN] Hardware tasks resumed after OTA\n");
     }
     
     // UI events are now processed inside the UI render FreeRTOS task
@@ -174,7 +174,7 @@ void loop() {
         const char* tasks_status = task_manager.are_tasks_healthy() ? "HEALTHY" : "ERROR";
         size_t free_heap_kb = ESP.getFreeHeap() / 1024;
         
-        BLE_LOG("[%lums MAIN_LOOP_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Tasks: %s | BLE: %s | Grinder: %s | Mem: %zuKB | Build: #%d\n",
+        LOG_BLE("[%lums MAIN_LOOP_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Tasks: %s | BLE: %s | Grinder: %s | Mem: %zuKB | Build: #%d\n",
                millis(), core1_cycle_count_10s, avg_cycle_time, core1_cycle_time_min_ms, core1_cycle_time_max_ms,
                tasks_status, ble_state, grinder_state, free_heap_kb, BUILD_NUMBER);
         

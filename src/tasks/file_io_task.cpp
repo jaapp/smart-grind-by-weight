@@ -52,26 +52,26 @@ void FileIOTask::init(QueueHandle_t io_queue) {
     // Check initial filesystem availability
     filesystem_available = LittleFS.begin(true);
     if (filesystem_available) {
-        BLE_LOG("FileIOTask: LittleFS filesystem available\n");
+        LOG_BLE("FileIOTask: LittleFS filesystem available\n");
     } else {
-        BLE_LOG("FileIOTask: LittleFS filesystem unavailable\n");
+        LOG_BLE("FileIOTask: LittleFS filesystem unavailable\n");
     }
     
-    BLE_LOG("FileIOTask: Initialized with file I/O queue\n");
+    LOG_BLE("FileIOTask: Initialized with file I/O queue\n");
 }
 
 bool FileIOTask::start_task() {
     if (task_running) {
-        BLE_LOG("WARNING: FileIOTask already running\n");
+        LOG_BLE("WARNING: FileIOTask already running\n");
         return false;
     }
     
     if (!file_io_queue) {
-        BLE_LOG("ERROR: File I/O queue not initialized\n");
+        LOG_BLE("ERROR: File I/O queue not initialized\n");
         return false;
     }
     
-    BLE_LOG("FileIOTask: Starting task on Core 1...\n");
+    LOG_BLE("FileIOTask: Starting task on Core 1...\n");
     task_running = true;
     
     BaseType_t result = xTaskCreatePinnedToCore(
@@ -85,13 +85,13 @@ bool FileIOTask::start_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create FileIOTask!\n");
+        LOG_BLE("ERROR: Failed to create FileIOTask!\n");
         task_running = false;
         task_handle = nullptr;
         return false;
     }
     
-    BLE_LOG("✅ FileIOTask created successfully (Core 1, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ FileIOTask created successfully (Core 1, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_FILE_IO, 1000 / SYS_TASK_FILE_IO_INTERVAL_MS);
     return true;
 }
@@ -101,7 +101,7 @@ void FileIOTask::stop_task() {
         return;
     }
     
-    BLE_LOG("FileIOTask: Stopping task...\n");
+    LOG_BLE("FileIOTask: Stopping task...\n");
     task_running = false;
     
     // Wait for task to complete (with timeout)
@@ -113,7 +113,7 @@ void FileIOTask::stop_task() {
         task_handle = nullptr;
     }
     
-    BLE_LOG("FileIOTask: Task stopped\n");
+    LOG_BLE("FileIOTask: Task stopped\n");
 }
 
 void FileIOTask::task_wrapper(void* parameter) {
@@ -127,7 +127,7 @@ void FileIOTask::task_impl() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(SYS_TASK_FILE_IO_INTERVAL_MS);
     
-    BLE_LOG("FileIOTask started on Core %d at %dHz\n", 
+    LOG_BLE("FileIOTask started on Core %d at %dHz\n", 
             xPortGetCoreID(), 1000 / SYS_TASK_FILE_IO_INTERVAL_MS);
     
     // When invoked via TaskManager wrapper, start_task() isn't used.
@@ -165,7 +165,7 @@ void FileIOTask::task_impl() {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
     
-    BLE_LOG("FileIOTask: I/O processing loop stopped\n");
+    LOG_BLE("FileIOTask: I/O processing loop stopped\n");
 }
 
 void FileIOTask::process_file_io_operations() {
@@ -204,7 +204,7 @@ void FileIOTask::process_file_io_operations() {
                 break;
                 
             default:
-                BLE_LOG("WARNING: FileIOTask unknown operation type %d\n", (int)request.operation_type);
+                LOG_BLE("WARNING: FileIOTask unknown operation type %d\n", (int)request.operation_type);
                 failed_operations_count++;
                 break;
         }
@@ -215,20 +215,20 @@ void FileIOTask::process_flash_operation(const FlashOpRequest& request) {
     // This is the existing flash operation processing extracted from GrindController
     switch (request.operation_type) {
         case FlashOpRequest::START_GRIND_SESSION:
-            BLE_LOG("[%lums FLASH_OP] Processing START_GRIND_SESSION: mode=%s, profile=%d\n", 
+            LOG_BLE("[%lums FLASH_OP] Processing START_GRIND_SESSION: mode=%s, profile=%d\n", 
                     millis(), request.descriptor.mode == GrindMode::TIME ? "TIME" : "WEIGHT",
                     request.descriptor.profile_id);
             grind_logger.start_grind_session(request.descriptor, request.start_weight);
             break;
             
         case FlashOpRequest::END_GRIND_SESSION:
-            BLE_LOG("[%lums FLASH_OP] Processing END_GRIND_SESSION: %s, %.2fg, %d pulses\n", 
+            LOG_BLE("[%lums FLASH_OP] Processing END_GRIND_SESSION: %s, %.2fg, %d pulses\n", 
                     millis(), request.result_string, request.final_weight, request.pulse_count);
             grind_logger.end_grind_session(request.result_string, request.final_weight, request.pulse_count);
             break;
             
         default:
-            BLE_LOG("WARNING: FileIOTask unknown flash operation type %d\n", request.operation_type);
+            LOG_BLE("WARNING: FileIOTask unknown flash operation type %d\n", request.operation_type);
             failed_operations_count++;
             break;
     }
@@ -236,7 +236,7 @@ void FileIOTask::process_flash_operation(const FlashOpRequest& request) {
 
 void FileIOTask::process_log_message(const LogMessage& message) {
     // Output the log message using BLE_LOG (extracted from GrindController)
-    BLE_LOG("%s", message.message);
+    LOG_BLE("%s", message.message);
 }
 
 void FileIOTask::process_preference_write(const char* key, const char* value) {
@@ -252,13 +252,13 @@ void FileIOTask::process_preference_write(const char* key, const char* value) {
         prefs.end();
         
         if (written == 0) {
-            BLE_LOG("WARNING: Failed to write preference %s=%s\n", key, value);
+            LOG_BLE("WARNING: Failed to write preference %s=%s\n", key, value);
             failed_operations_count++;
         } else {
-            BLE_LOG("FileIOTask: Preference written %s=%s\n", key, value);
+            LOG_BLE("FileIOTask: Preference written %s=%s\n", key, value);
         }
     } else {
-        BLE_LOG("ERROR: Failed to open preferences for writing\n");
+        LOG_BLE("ERROR: Failed to open preferences for writing\n");
         failed_operations_count++;
     }
 }
@@ -269,12 +269,12 @@ void FileIOTask::process_data_export(const char* export_path, uint32_t start_id,
         return;
     }
     
-    BLE_LOG("FileIOTask: Data export requested: %s (sessions %lu-%lu)\n", export_path, start_id, end_id);
+    LOG_BLE("FileIOTask: Data export requested: %s (sessions %lu-%lu)\n", export_path, start_id, end_id);
     
     // Placeholder for data export implementation
     // This could be extended to export grind session data to files
     // For now, just log the request
-    BLE_LOG("FileIOTask: Data export processing not yet implemented\n");
+    LOG_BLE("FileIOTask: Data export processing not yet implemented\n");
 }
 
 void FileIOTask::check_filesystem_health() {
@@ -282,7 +282,7 @@ void FileIOTask::check_filesystem_health() {
     
     if (fs_available != filesystem_available) {
         filesystem_available = fs_available;
-        BLE_LOG("FileIOTask: Filesystem availability changed to %s\n", fs_available ? "AVAILABLE" : "UNAVAILABLE");
+        LOG_BLE("FileIOTask: Filesystem availability changed to %s\n", fs_available ? "AVAILABLE" : "UNAVAILABLE");
         
         if (!fs_available) {
             handle_filesystem_error();
@@ -316,18 +316,18 @@ void FileIOTask::perform_filesystem_maintenance() {
 }
 
 void FileIOTask::handle_filesystem_error() {
-    BLE_LOG("FileIOTask: Filesystem error detected\n");
+    LOG_BLE("FileIOTask: Filesystem error detected\n");
     
     // Attempt filesystem recovery
     if (attempt_filesystem_recovery()) {
-        BLE_LOG("FileIOTask: Filesystem recovery successful\n");
+        LOG_BLE("FileIOTask: Filesystem recovery successful\n");
     } else {
-        BLE_LOG("ERROR: FileIOTask: Filesystem recovery failed\n");
+        LOG_BLE("ERROR: FileIOTask: Filesystem recovery failed\n");
     }
 }
 
 bool FileIOTask::attempt_filesystem_recovery() {
-    BLE_LOG("FileIOTask: Attempting filesystem recovery...\n");
+    LOG_BLE("FileIOTask: Attempting filesystem recovery...\n");
     
     // Try to remount the filesystem
     LittleFS.end();
@@ -345,7 +345,7 @@ void FileIOTask::log_operation_failure(FileIOOperationType type, const char* det
     const char* type_names[] = {"FLASH_OP", "LOG_MSG", "PREF_WRITE", "DATA_EXPORT"};
     const char* type_name = ((int)type < 4) ? type_names[(int)type] : "UNKNOWN";
     
-    BLE_LOG("ERROR: FileIOTask operation failed - Type: %s, Details: %s\n", type_name, details);
+    LOG_BLE("ERROR: FileIOTask operation failed - Type: %s, Details: %s\n", type_name, details);
     failed_operations_count++;
 }
 
@@ -381,7 +381,7 @@ void FileIOTask::print_heartbeat() const {
     uint32_t avg_cycle_time = cycle_count > 0 ? cycle_time_sum_ms / cycle_count : 0;
     const char* fs_status = filesystem_available ? "OK" : "ERROR";
     
-    BLE_LOG("[%lums FILE_IO_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | FS: %s | Ops: %lu | Failed: %lu | Build: #%d\n",
+    LOG_BLE("[%lums FILE_IO_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | FS: %s | Ops: %lu | Failed: %lu | Build: #%d\n",
            millis(), cycle_count, avg_cycle_time, cycle_time_min_ms, cycle_time_max_ms,
            fs_status, total_operations_processed, failed_operations_count, BUILD_NUMBER);
 #endif
@@ -395,31 +395,31 @@ void FileIOTask::reset_performance_metrics() {
 }
 
 void FileIOTask::print_performance_stats() const {
-    BLE_LOG("=== FileIOTask Performance ===\n");
-    BLE_LOG("Task running: %s\n", task_running ? "YES" : "NO");
-    BLE_LOG("Filesystem available: %s\n", filesystem_available ? "YES" : "NO");
-    BLE_LOG("Cycle count: %lu\n", cycle_count);
+    LOG_BLE("=== FileIOTask Performance ===\n");
+    LOG_BLE("Task running: %s\n", task_running ? "YES" : "NO");
+    LOG_BLE("Filesystem available: %s\n", filesystem_available ? "YES" : "NO");
+    LOG_BLE("Cycle count: %lu\n", cycle_count);
     
     if (cycle_count > 0) {
         uint32_t avg_cycle_time = cycle_time_sum_ms / cycle_count;
-        BLE_LOG("Average cycle time: %lums (%lu-%lums)\n", avg_cycle_time, cycle_time_min_ms, cycle_time_max_ms);
+        LOG_BLE("Average cycle time: %lums (%lu-%lums)\n", avg_cycle_time, cycle_time_min_ms, cycle_time_max_ms);
     }
     
-    BLE_LOG("Total operations: %lu\n", total_operations_processed);
-    BLE_LOG("Failed operations: %lu\n", failed_operations_count);
-    BLE_LOG("=============================\n");
+    LOG_BLE("Total operations: %lu\n", total_operations_processed);
+    LOG_BLE("Failed operations: %lu\n", failed_operations_count);
+    LOG_BLE("=============================\n");
 }
 
 void FileIOTask::print_operation_stats() const {
-    BLE_LOG("=== FileIOTask Operation Statistics ===\n");
-    BLE_LOG("Flash operations: %lu\n", flash_operations_processed);
-    BLE_LOG("Log messages: %lu\n", log_messages_processed);
-    BLE_LOG("Preference writes: %lu\n", preference_operations_processed);
-    BLE_LOG("Data exports: %lu\n", data_export_operations_processed);
-    BLE_LOG("Total operations: %lu\n", total_operations_processed);
-    BLE_LOG("Failed operations: %lu\n", failed_operations_count);
-    BLE_LOG("Success rate: %.1f%%\n", 
+    LOG_BLE("=== FileIOTask Operation Statistics ===\n");
+    LOG_BLE("Flash operations: %lu\n", flash_operations_processed);
+    LOG_BLE("Log messages: %lu\n", log_messages_processed);
+    LOG_BLE("Preference writes: %lu\n", preference_operations_processed);
+    LOG_BLE("Data exports: %lu\n", data_export_operations_processed);
+    LOG_BLE("Total operations: %lu\n", total_operations_processed);
+    LOG_BLE("Failed operations: %lu\n", failed_operations_count);
+    LOG_BLE("Success rate: %.1f%%\n", 
            total_operations_processed > 0 ? 
            (100.0f * (total_operations_processed - failed_operations_count) / total_operations_processed) : 0.0f);
-    BLE_LOG("======================================\n");
+    LOG_BLE("======================================\n");
 }

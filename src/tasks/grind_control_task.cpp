@@ -51,22 +51,22 @@ void GrindControlTask::init(GrindController* gc, WeightSensor* ws, Grinder* gr, 
     grinder = gr;
     logger = log;
     
-    BLE_LOG("GrindControlTask: Initialized with hardware interfaces\n");
+    LOG_BLE("GrindControlTask: Initialized with hardware interfaces\n");
 }
 
 bool GrindControlTask::start_task() {
     if (task_running) {
-        BLE_LOG("WARNING: GrindControlTask already running\n");
+        LOG_BLE("WARNING: GrindControlTask already running\n");
         return false;
     }
     
-    BLE_LOG("GrindControlTask: Validating hardware interfaces...\n");
+    LOG_BLE("GrindControlTask: Validating hardware interfaces...\n");
     if (!validate_hardware_ready()) {
-        BLE_LOG("ERROR: Hardware not ready for grind control task\n");
+        LOG_BLE("ERROR: Hardware not ready for grind control task\n");
         return false;
     }
     
-    BLE_LOG("GrindControlTask: Starting task on Core 0...\n");
+    LOG_BLE("GrindControlTask: Starting task on Core 0...\n");
     task_running = true;
     
     BaseType_t result = xTaskCreatePinnedToCore(
@@ -80,13 +80,13 @@ bool GrindControlTask::start_task() {
     );
     
     if (result != pdPASS) {
-        BLE_LOG("ERROR: Failed to create GrindControlTask!\n");
+        LOG_BLE("ERROR: Failed to create GrindControlTask!\n");
         task_running = false;
         task_handle = nullptr;
         return false;
     }
     
-    BLE_LOG("✅ GrindControlTask created successfully (Core 0, Priority %d, %dHz)\n", 
+    LOG_BLE("✅ GrindControlTask created successfully (Core 0, Priority %d, %dHz)\n", 
             SYS_TASK_PRIORITY_GRIND_CONTROL, 1000 / SYS_TASK_GRIND_CONTROL_INTERVAL_MS);
     return true;
 }
@@ -96,7 +96,7 @@ void GrindControlTask::stop_task() {
         return;
     }
     
-    BLE_LOG("GrindControlTask: Stopping task...\n");
+    LOG_BLE("GrindControlTask: Stopping task...\n");
     task_running = false;
     
     // Wait for task to complete (with timeout)
@@ -108,7 +108,7 @@ void GrindControlTask::stop_task() {
         task_handle = nullptr;
     }
     
-    BLE_LOG("GrindControlTask: Task stopped\n");
+    LOG_BLE("GrindControlTask: Task stopped\n");
 }
 
 void GrindControlTask::task_wrapper(void* parameter) {
@@ -122,7 +122,7 @@ void GrindControlTask::task_impl() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(SYS_TASK_GRIND_CONTROL_INTERVAL_MS);
     
-    BLE_LOG("GrindControlTask started on Core %d at %dHz\n", 
+    LOG_BLE("GrindControlTask started on Core %d at %dHz\n", 
             xPortGetCoreID(), 1000 / SYS_TASK_GRIND_CONTROL_INTERVAL_MS);
     
     // When invoked via TaskManager wrapper, start_task() isn't used.
@@ -161,7 +161,7 @@ void GrindControlTask::task_impl() {
     task_running = false;
     esp_task_wdt_delete(nullptr);
     
-    BLE_LOG("GrindControlTask: Control loop stopped\n");
+    LOG_BLE("GrindControlTask: Control loop stopped\n");
 }
 
 void GrindControlTask::update_grind_control() {
@@ -185,13 +185,13 @@ void GrindControlTask::monitor_grind_state() {
     if (!grind_active && current_grind_active) {
         grind_active = true;
         grind_start_time = millis();
-        BLE_LOG("GrindControlTask: Grind session started\n");
+        LOG_BLE("GrindControlTask: Grind session started\n");
     }
     // Detect grind end
     else if (grind_active && !current_grind_active) {
         grind_active = false;
         uint32_t grind_duration = millis() - grind_start_time;
-        BLE_LOG("GrindControlTask: Grind session ended (duration: %lums)\n", grind_duration);
+        LOG_BLE("GrindControlTask: Grind session ended (duration: %lums)\n", grind_duration);
     }
 }
 
@@ -201,11 +201,11 @@ bool GrindControlTask::validate_hardware_ready() const {
     bool grinder_ready = (grinder != nullptr && grinder->is_initialized());
     bool logger_ready = (logger != nullptr);
     
-    BLE_LOG("GrindControlTask hardware validation:\n");
-    BLE_LOG("  grind_controller != nullptr: %s\n", grind_controller_ready ? "YES" : "NO");
-    BLE_LOG("  weight_sensor ready: %s\n", weight_sensor_ready ? "YES" : "NO");
-    BLE_LOG("  grinder ready: %s\n", grinder_ready ? "YES" : "NO");
-    BLE_LOG("  logger != nullptr: %s\n", logger_ready ? "YES" : "NO");
+    LOG_BLE("GrindControlTask hardware validation:\n");
+    LOG_BLE("  grind_controller != nullptr: %s\n", grind_controller_ready ? "YES" : "NO");
+    LOG_BLE("  weight_sensor ready: %s\n", weight_sensor_ready ? "YES" : "NO");
+    LOG_BLE("  grinder ready: %s\n", grinder_ready ? "YES" : "NO");
+    LOG_BLE("  logger != nullptr: %s\n", logger_ready ? "YES" : "NO");
     
     return grind_controller_ready && weight_sensor_ready && grinder_ready && logger_ready;
 }
@@ -251,7 +251,7 @@ void GrindControlTask::print_heartbeat() const {
     float current_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
     const char* grind_status = grind_active ? "ACTIVE" : "IDLE";
     
-    BLE_LOG("[%lums GRIND_CONTROL_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Status: %s | Target: %.1fg | Current: %.3fg | Build: #%d\n",
+    LOG_BLE("[%lums GRIND_CONTROL_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Status: %s | Target: %.1fg | Current: %.3fg | Build: #%d\n",
            millis(), cycle_count, avg_cycle_time, cycle_time_min_ms, cycle_time_max_ms,
            grind_status, target_weight, current_weight, BUILD_NUMBER);
 #endif
@@ -265,31 +265,31 @@ void GrindControlTask::reset_performance_metrics() {
 }
 
 void GrindControlTask::print_performance_stats() const {
-    BLE_LOG("=== GrindControlTask Performance ===\n");
-    BLE_LOG("Task running: %s\n", task_running ? "YES" : "NO");
-    BLE_LOG("Grind active: %s\n", grind_active ? "YES" : "NO");
-    BLE_LOG("Cycle count: %lu\n", cycle_count);
+    LOG_BLE("=== GrindControlTask Performance ===\n");
+    LOG_BLE("Task running: %s\n", task_running ? "YES" : "NO");
+    LOG_BLE("Grind active: %s\n", grind_active ? "YES" : "NO");
+    LOG_BLE("Cycle count: %lu\n", cycle_count);
     
     if (cycle_count > 0) {
         uint32_t avg_cycle_time = cycle_time_sum_ms / cycle_count;
-        BLE_LOG("Average cycle time: %lums (%lu-%lums)\n", avg_cycle_time, cycle_time_min_ms, cycle_time_max_ms);
+        LOG_BLE("Average cycle time: %lums (%lu-%lums)\n", avg_cycle_time, cycle_time_min_ms, cycle_time_max_ms);
     }
     
     if (grind_active) {
-        BLE_LOG("Current grind duration: %lums\n", get_grind_duration_ms());
+        LOG_BLE("Current grind duration: %lums\n", get_grind_duration_ms());
     }
     
-    BLE_LOG("Last grind update: %lums ago\n", millis() - last_grind_update_time);
-    BLE_LOG("===================================\n");
+    LOG_BLE("Last grind update: %lums ago\n", millis() - last_grind_update_time);
+    LOG_BLE("===================================\n");
 }
 
 void GrindControlTask::handle_grind_error() {
-    BLE_LOG("GrindControlTask: Grind error detected\n");
+    LOG_BLE("GrindControlTask: Grind error detected\n");
     
     // Stop any active grinding
     if (grinder && grinder->is_grinding()) {
         grinder->stop();
-        BLE_LOG("GrindControlTask: Emergency grinder stop executed\n");
+        LOG_BLE("GrindControlTask: Emergency grinder stop executed\n");
     }
     
     // Reset grind state
