@@ -6,15 +6,6 @@
 // This file contains all Bluetooth Low Energy (BLE) related configuration
 // constants for the ESP32 coffee grinder. This includes service definitions,
 // timing parameters, and communication settings for OTA updates and data export.
-//
-// Categories:
-// - BLE Service and Characteristic UUIDs (OTA, data export, debug services)
-// - Communication Parameters (chunk sizes, timeouts, retry counts)
-// - Power Management Settings (auto-disable timeouts, connection handling)
-// - Data Transfer Configuration (export chunk sizes, status reporting)
-// - Security and Validation Settings (OTA validation, connection timeouts)
-//
-// All constants use the BLE_ prefix to indicate Bluetooth-specific parameters.
 
 //------------------------------------------------------------------------------
 // BLE OTA (Over-The-Air Update) SERVICE
@@ -27,7 +18,6 @@
 
 // OTA Device Settings
 #define BLE_OTA_DEVICE_NAME "GrindByWeight"                                    // Bluetooth device name when in OTA mode
-#define BLE_OTA_CHUNK_SIZE_BYTES 512                                           // Size of each firmware data chunk in bytes
 
 //------------------------------------------------------------------------------
 // BLE DATA EXPORT SERVICE
@@ -62,6 +52,7 @@
 #define BLE_AUTO_DISABLE_TIMEOUT_MS (30 * 60 * 1000)                          // Auto-disable BLE after inactivity
 #define BLE_BOOTUP_AUTO_DISABLE_TIMEOUT_MS (5 * 60 * 1000)                    // Auto-disable BLE after bootup period
 
+
 //------------------------------------------------------------------------------
 // BLE INITIALIZATION TIMING
 //------------------------------------------------------------------------------
@@ -80,8 +71,7 @@
 #define BLE_SHUTDOWN_DEINIT_DELAY_MS 100                                       // Delay to allow BLE stack to deinitialize
 
 //------------------------------------------------------------------------------
-// BLE POWER MANAGEMENT (Include from hardware_config.h)
+// BLE POWER MANAGEMENT
 //------------------------------------------------------------------------------
-#include "hardware_config.h"
-#define BLE_NORMAL_CPU_FREQ_MHZ HW_CPU_FREQ_NORMAL_MHZ                       // Normal CPU frequency during BLE operations
-#define BLE_REDUCED_CPU_FREQ_MHZ HW_CPU_FREQ_BLE_MODE_MHZ                    // Reduced CPU frequency for BLE mode
+#define BLE_NORMAL_CPU_FREQ_MHZ 240                                            // Normal CPU frequency during BLE operations
+#define BLE_REDUCED_CPU_FREQ_MHZ 240                                           // Reduced CPU frequency for BLE mode

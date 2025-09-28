@@ -1,5 +1,6 @@
 #include "data_stream.h"
 #include "../logging/grind_logging.h"
+#include "../config/constants.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 

@@ -2,7 +2,7 @@
 .vscode/
 
 # Generated build info
-src/config/git_info.h
+include/git_info.h
 .build_number
 
 # bin archive

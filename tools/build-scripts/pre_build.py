@@ -110,7 +110,7 @@ def create_git_info_header():
         project_root = env.get("PROJECT_DIR", os.getcwd())
     else:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    header_path = os.path.join(project_root, "src", "config", "git_info.h")
+    header_path = os.path.join(project_root, "include", "git_info.h")
     
     header_content = f"""#pragma once
 

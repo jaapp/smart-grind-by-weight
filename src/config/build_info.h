@@ -1,9 +1,11 @@
 #pragma once
 
-#include "git_info.h"
+#include <cstdio>
+#include "../../include/git_info.h"
 
 // Build information - update these manually or use build scripts
 #define FIRMWARE_VERSION "1.0.0"                                          // Firmware version string
+#define INTERNAL_FIRMWARE_VERSION "1.0.0"                                 // Internal firmware version (for compatibility)
 // BUILD_NUMBER is now defined in git_info.h as an auto-incrementing integer
 #define BUILD_DATE __DATE__                                                // Compiler-provided build date
 #define BUILD_TIME __TIME__                                                // Compiler-provided build time

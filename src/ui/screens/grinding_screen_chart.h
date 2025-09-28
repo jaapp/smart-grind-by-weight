@@ -1,6 +1,5 @@
 #pragma once
 #include <lvgl.h>
-#include "../../config/ui_theme.h"
 #include "grinding_screen_base.h"
 #include "../../config/constants.h"
 

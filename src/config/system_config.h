@@ -17,8 +17,7 @@
 //
 // All constants use the SYS_ prefix to indicate system-level parameters.
 
-// Include logging system
-#include "logging.h"
+// Logging system is included separately where needed
 
 //------------------------------------------------------------------------------
 // FREERTOS TASK CONFIGURATION
@@ -53,8 +52,6 @@
 
 // Legacy task scheduler intervals (deprecated - kept for compatibility)
 #define SYS_TASK_LOADCELL_INTERVAL_MS 20                                       // Load cell polling frequency (50Hz)
-#define SYS_TASK_UI_NORMAL_INTERVAL_MS 16                                      // UI update frequency (60Hz)  
-#define SYS_TASK_DEBUG_OUTPUT_INTERVAL_MS 1000                                 // Debug output frequency (1Hz)
 
 //------------------------------------------------------------------------------
 // SYSTEM TIMEOUTS
@@ -65,15 +62,9 @@
 #define SYS_TIMEOUT_EXTENDED_MS 5000                                           // Extended timeout for complex operations
 
 //------------------------------------------------------------------------------
-// BUFFER SIZES
-//------------------------------------------------------------------------------
-#define SYS_LOG_BUFFER_SIZE_BYTES 512                                          // Size of general logging buffer
-
-//------------------------------------------------------------------------------
 // TIME CONVERSION CONSTANTS
 //------------------------------------------------------------------------------
 #define SYS_MS_PER_SECOND 1000                                                 // Milliseconds per second conversion
-#define SYS_SECONDS_PER_MINUTE 60                                              // Seconds per minute conversion
 
 //------------------------------------------------------------------------------
 // GRIND CONTROL ALGORITHM PARAMETERS  
@@ -90,8 +81,6 @@
 // WEIGHT DISPLAY FILTER SETTINGS
 //------------------------------------------------------------------------------
 // Asymmetric display filter for smooth weight updates
-#define SYS_DISPLAY_FILTER_DEADBAND_G 0.01f                                    // Ignore tiny weight fluctuations
-#define SYS_DISPLAY_FILTER_ALPHA_UP 1.0f                                       // Immediate updates when weight increases
 #define SYS_DISPLAY_FILTER_ALPHA_DOWN 0.9f                                     // Slower decay when weight decreases
 
 //------------------------------------------------------------------------------

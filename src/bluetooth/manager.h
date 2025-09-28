@@ -9,7 +9,7 @@
 #include <freertos/queue.h>
 #include <Preferences.h>
 
-#include "../config/bluetooth_config.h"
+#include "../config/constants.h"
 #include "ota_handler.h"
 #include "data_stream.h"
 

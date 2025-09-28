@@ -16,7 +16,7 @@ extern "C" {
 }
 
 // Removed config.h - not needed for HX711Core integration
-#include "../config/bluetooth_config.h"
+#include "../config/constants.h"
 
 // OTA-specific enums
 enum BLEOTACommand {

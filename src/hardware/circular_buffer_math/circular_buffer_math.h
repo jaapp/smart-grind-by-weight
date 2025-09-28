@@ -55,23 +55,12 @@ private:
     mutable uint32_t flow_stable_since_ms;  // When flow rate first became stable
     mutable bool flow_stability_initialized;
     
-#if HW_LOADCELL_ENABLE_IIR_FILTER
-    // Single-Pole IIR filter state for noise reduction
-    int32_t iir_filtered_value;             // Previous filtered output
-    bool iir_initialized;                   // True after first sample processed
-#endif
-    
     // Helper methods - using dynamic arrays based on window size
     int get_samples_in_window(uint32_t window_ms, int32_t* samples_out) const;
     int32_t apply_outlier_rejection(const int32_t* samples, int count) const;
     float calculate_standard_deviation(const int32_t* samples, int count) const;
     int32_t get_latest_sample() const;
     int calculate_max_samples_for_window(uint32_t window_ms) const;
-    
-#if HW_LOADCELL_ENABLE_IIR_FILTER
-    // Single-Pole IIR filter method
-    int32_t apply_iir_filter(int32_t raw_input);
-#endif
     
 public:
     CircularBufferMath();

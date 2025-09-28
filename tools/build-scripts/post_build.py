@@ -17,7 +17,7 @@ def get_build_number(env):
     try:
         # Get project directory from env parameter
         project_dir = env.get("PROJECT_DIR")
-        git_info_path = os.path.join(project_dir, "src", "config", "git_info.h")
+        git_info_path = os.path.join(project_dir, "include", "git_info.h")
         with open(git_info_path, 'r') as f:
             content = f.read()
             match = re.search(r'#define BUILD_NUMBER (\d+)', content)

@@ -11,11 +11,6 @@ CircularBufferMath::CircularBufferMath() {
     flow_stable_since_ms = 0;
     flow_stability_initialized = false;
     
-#if HW_LOADCELL_ENABLE_IIR_FILTER
-    iir_filtered_value = 0;
-    iir_initialized = false;
-#endif
-    
     // Initialize buffer
     for (uint16_t i = 0; i < MAX_BUFFER_SIZE; i++) {
         circular_buffer[i].raw_value = 0;
@@ -27,16 +22,8 @@ void CircularBufferMath::add_sample(int32_t raw_adc_value, uint32_t timestamp_ms
     // Raw ADC values should be valid 24-bit signed integers
     // We don't validate range here as different ADCs have different ranges
     
-#if HW_LOADCELL_ENABLE_IIR_FILTER
-    // Apply Single-Pole IIR filter for noise reduction
-    int32_t filtered_value = apply_iir_filter(raw_adc_value);
-#else
-    // No filtering - use raw value directly
-    int32_t filtered_value = raw_adc_value;
-#endif
-    
-    // Add filtered value to circular buffer
-    circular_buffer[write_index].raw_value = filtered_value;
+    // Add raw value directly to circular buffer (no IIR filtering)
+    circular_buffer[write_index].raw_value = raw_adc_value;
     circular_buffer[write_index].timestamp_ms = timestamp_ms;
     
     // Advance write index (circular)
@@ -468,10 +455,6 @@ void CircularBufferMath::clear_all_samples() {
     display_filter_initialized = false;
     flow_stability_initialized = false;
     
-#if HW_LOADCELL_ENABLE_IIR_FILTER
-    iir_initialized = false;
-#endif
-    
     // Clear buffer
     for (uint16_t i = 0; i < MAX_BUFFER_SIZE; i++) {
         circular_buffer[i].raw_value = 0;
@@ -479,34 +462,3 @@ void CircularBufferMath::clear_all_samples() {
     }
 }
 
-#if HW_LOADCELL_ENABLE_IIR_FILTER
-//==============================================================================
-// Single-Pole IIR Filter Implementation
-//==============================================================================
-
-int32_t CircularBufferMath::apply_iir_filter(int32_t raw_input) {
-    if (!iir_initialized) {
-        // First sample - initialize filter with input value
-        iir_filtered_value = raw_input;
-        iir_initialized = true;
-        return raw_input;
-    }
-    
-    // Single-pole IIR filter: output = α × input + (1-α) × previous_output
-    // Using 64-bit intermediate calculations to prevent overflow with HX711 24-bit values
-    
-    // Convert alpha to integer representation (multiply by 65536 for precision)
-    const int32_t alpha_fixed = (int32_t)(HW_LOADCELL_IIR_ALPHA * 65536.0f);
-    const int32_t one_minus_alpha_fixed = 65536 - alpha_fixed;
-    
-    // Apply IIR filter using 64-bit arithmetic to prevent overflow
-    int64_t alpha_term = (int64_t)alpha_fixed * (int64_t)raw_input;
-    int64_t feedback_term = (int64_t)one_minus_alpha_fixed * (int64_t)iir_filtered_value;
-    int32_t filtered_output = (int32_t)((alpha_term + feedback_term) >> 16);
-    
-    // Store filtered value for next iteration
-    iir_filtered_value = filtered_output;
-    
-    return filtered_output;
-}
-#endif
