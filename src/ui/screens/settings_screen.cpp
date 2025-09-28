@@ -110,29 +110,6 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
 
     // Set main page as active (menu will be the landing page)
     lv_menu_set_page(menu, main_page);
-    
-    // Create taring overlay (initially hidden)
-    taring_overlay = lv_obj_create(screen);
-    lv_obj_set_size(taring_overlay, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(taring_overlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(taring_overlay, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(taring_overlay, LV_OPA_70, 0);
-    lv_obj_set_style_border_width(taring_overlay, 0, 0);
-    lv_obj_set_style_pad_all(taring_overlay, 0, 0);
-    
-    // Taring label
-    taring_label = lv_label_create(taring_overlay);
-    lv_label_set_text(taring_label, "TARING...\nPlease wait");
-    lv_obj_set_style_text_font(taring_label, &lv_font_montserrat_36, 0);
-    lv_obj_set_style_text_color(taring_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_style_text_align(taring_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(taring_label, LV_ALIGN_CENTER, 0, 0);
-    
-    // Hide the overlay initially
-    lv_obj_add_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
-    
-    // Create back button (common to all pages)
-    // create_back_button();
 
     visible = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -316,14 +293,6 @@ void SettingsScreen::update_ble_status() {
         lv_obj_add_flag(ble_status_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(ble_timer_label, LV_OBJ_FLAG_HIDDEN);
     }
-}
-
-void SettingsScreen::show_taring_overlay() {
-    lv_obj_clear_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
-}
-
-void SettingsScreen::hide_taring_overlay() {
-    lv_obj_add_flag(taring_overlay, LV_OBJ_FLAG_HIDDEN);
 }
 
 void SettingsScreen::refresh_statistics() {

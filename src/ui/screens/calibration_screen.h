@@ -19,10 +19,7 @@ private:
     lv_obj_t* plus_btn;
     lv_obj_t* minus_btn;
     lv_obj_t* weight_input;
-    lv_obj_t* taring_overlay;
-    lv_obj_t* taring_label;
-    lv_obj_t* calibrating_overlay;
-    lv_obj_t* calibrating_label;
+    lv_obj_t* top_button_row;
     CalibrationStep current_step;
     float calibration_weight;
     bool visible;
@@ -34,10 +31,6 @@ public:
     void set_step(CalibrationStep step);
     void update_current_weight(float weight);
     void update_calibration_weight(float weight);
-    void show_taring_overlay();
-    void hide_taring_overlay();
-    void show_calibrating_overlay();
-    void hide_calibrating_overlay();
     
     bool is_visible() const { return visible; }
     CalibrationStep get_step() const { return current_step; }

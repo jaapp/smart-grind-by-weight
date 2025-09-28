@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"
+#include "ui_helpers.h"
 
 void EditScreen::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -9,69 +10,20 @@ void EditScreen::create() {
     lv_obj_align(screen, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
-    lv_obj_set_style_pad_all(screen, 0, 0);
+    lv_obj_set_style_pad_ver(screen, 6, 0);
+    lv_obj_set_style_pad_hor(screen, 0, 0);
 
-    // Save button (top left)
-    save_btn = lv_btn_create(screen);
-    lv_obj_set_size(save_btn, THEME_BUTTON_WIDTH_PX, 75);
-    lv_obj_align(save_btn, LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_set_style_bg_color(save_btn, lv_color_hex(THEME_COLOR_SUCCESS), 0);
-    lv_obj_set_style_border_width(save_btn, 0, 0);
-    
-    lv_obj_t* save_label = lv_label_create(save_btn);
-    lv_label_set_text(save_label, LV_SYMBOL_OK);
-    lv_obj_set_style_text_font(save_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(save_label);
+    // Set up flex layout (column)
+    lv_obj_set_layout(screen, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(screen, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Cancel button (top right)
-    cancel_btn = lv_btn_create(screen);
-    lv_obj_set_size(cancel_btn, THEME_BUTTON_WIDTH_PX, 75);
-    lv_obj_align(cancel_btn, LV_ALIGN_TOP_RIGHT, -10, 10);
-    lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
-    lv_obj_set_style_border_width(cancel_btn, 0, 0);
-    
-    lv_obj_t* cancel_label = lv_label_create(cancel_btn);
-    lv_label_set_text(cancel_label, LV_SYMBOL_CLOSE);
-    lv_obj_set_style_text_font(cancel_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(cancel_label);
 
-    // Profile name label (center)
-    profile_label = lv_label_create(screen);
-    lv_label_set_text(profile_label, "DOUBLE");
-    lv_obj_set_style_text_font(profile_label, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(profile_label, lv_color_hex(THEME_COLOR_SECONDARY), 0);
-    lv_obj_align(profile_label, LV_ALIGN_CENTER, 0, -40);
+    create_dual_button_row(screen, &save_btn, &cancel_btn, LV_SYMBOL_OK, LV_SYMBOL_CLOSE, lv_color_hex(THEME_COLOR_SUCCESS), lv_color_hex(THEME_COLOR_NEUTRAL), 80, &lv_font_montserrat_32);
 
-    // Weight label (center)
-    weight_label = lv_label_create(screen);
-    lv_label_set_text(weight_label, "18.0g");
-    lv_obj_set_style_text_font(weight_label, &lv_font_montserrat_56, 0);
-    lv_obj_set_style_text_color(weight_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_align(weight_label, LV_ALIGN_CENTER, 0, 10);
+    create_profile_label(screen, &profile_label, &weight_label);
 
-    // Minus button (bottom left)
-    minus_btn = lv_btn_create(screen);
-    lv_obj_set_size(minus_btn, THEME_BUTTON_WIDTH_PX, THEME_BUTTON_HEIGHT_PX);
-    lv_obj_align(minus_btn, LV_ALIGN_BOTTOM_LEFT, 10, -5);
-    lv_obj_set_style_bg_color(minus_btn, lv_color_hex(THEME_COLOR_ERROR), 0);
-    lv_obj_set_style_border_width(minus_btn, 0, 0);
-    
-    lv_obj_t* minus_label = lv_label_create(minus_btn);
-    lv_label_set_text(minus_label, LV_SYMBOL_MINUS);
-    lv_obj_set_style_text_font(minus_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(minus_label);
-
-    // Plus button (bottom right)
-    plus_btn = lv_btn_create(screen);
-    lv_obj_set_size(plus_btn, THEME_BUTTON_WIDTH_PX, THEME_BUTTON_HEIGHT_PX);
-    lv_obj_align(plus_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -5);
-    lv_obj_set_style_bg_color(plus_btn, lv_color_hex(THEME_COLOR_ERROR), 0);
-    lv_obj_set_style_border_width(plus_btn, 0, 0);
-    
-    lv_obj_t* plus_label = lv_label_create(plus_btn);
-    lv_label_set_text(plus_label, LV_SYMBOL_PLUS);
-    lv_obj_set_style_text_font(plus_label, &lv_font_montserrat_32, 0);
-    lv_obj_center(plus_label);
+    create_dual_button_row(screen, &minus_btn, &plus_btn, LV_SYMBOL_MINUS, LV_SYMBOL_PLUS, lv_color_hex(THEME_COLOR_PRIMARY), lv_color_hex(THEME_COLOR_PRIMARY), 100, &lv_font_montserrat_32);
 
     visible = false;
     mode = GrindMode::WEIGHT;

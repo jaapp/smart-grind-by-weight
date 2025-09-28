@@ -9,7 +9,7 @@ class ConfirmScreen {
 private:
     lv_obj_t* screen;
     lv_obj_t* title_label;
-    lv_obj_t* warning_label;
+    lv_obj_t* message_label;
     lv_obj_t* confirm_button;
     lv_obj_t* cancel_button;
     lv_obj_t* confirm_button_label;
