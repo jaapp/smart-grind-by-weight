@@ -10,10 +10,14 @@
 // MOST IMPORTANT DEBUG PARAMETERS
 //------------------------------------------------------------------------------
 // Mock hardware (most critical for testing vs production)
-#define DEBUG_ENABLE_LOADCELL_MOCK 1                                              // 0=use physical HX711, 1=use simulated mock driver
+#ifndef DEBUG_ENABLE_LOADCELL_MOCK
+    #define DEBUG_ENABLE_LOADCELL_MOCK 0                                              // Default: use physical HX711, override with build flag
+#endif
 
 // UI visual feedback
-#define DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR 1                             // 0=disabled, 1=show background color during grinding/pulses
+#ifndef DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR
+    #define DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR 0                             // Default: disabled, override with build flag
+#endif
 
 // Core debug logging settings
 #define DEBUG_SERIAL_OUTPUT 1                                             // Enable serial debug output
