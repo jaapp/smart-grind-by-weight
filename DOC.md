@@ -87,6 +87,20 @@ ESP32-S3 3.3V      →    HX711 VCC
 ESP32-S3 GND       →    HX711 GND
 ```
 
+**Load Cell to HX711 Wiring:**
+```
+Load Cell           HX711
+Red (E+)         →  E+
+Black (E-)       →  E-
+White (A-)       →  A-
+Green (A+)       →  A+
+Yellow (Shield)  →  GND
+```
+
+- Connect the load cell shield wire (usually yellow) to the HX711 GND
+- The HX711 only has 1 GND pin - solder the shield wire to the backside of the pin header
+- **Tip**: Keep the load cell wire as short as possible to reduce noise
+
 **Eureka Mignon Connections:**
 
 ⚠️ **CRITICAL WARNING:** Always verify your specific Eureka's wiring independently! Wire colors vary between units and cannot be trusted. Use the numbered pin positions shown in the reference image.
