@@ -4,9 +4,7 @@
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
-#include "../config/system_config.h"
 #include "../config/constants.h"
-#include "../config/user_config.h"
 #include <Arduino.h>
 
 void WeightGrindStrategy::on_enter(const GrindSessionDescriptor&, GrindStrategyContext&, const GrindLoopData&) {

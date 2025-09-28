@@ -11,7 +11,7 @@
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
-#include "../config/internal_config.h"
+#include "../config/constants.h"
 #include <esp_task_wdt.h>
 #include <Arduino.h>
 

@@ -1,5 +1,5 @@
 #include "hx711_driver.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 #include <Arduino.h>
 #include <driver/gpio.h>
 

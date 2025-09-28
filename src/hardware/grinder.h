@@ -3,8 +3,7 @@
 #include <driver/rmt_tx.h>
 #include <driver/rmt_encoder.h>
 #include <functional>
-#include "../config/pins.h"
-#include "../config/hardware_config.h"
+#include "../config/constants.h"
 
 // Forward declarations
 struct GrindEventData;

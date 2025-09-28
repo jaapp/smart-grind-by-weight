@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "../../config/ui_theme.h"
+#include "../../config/constants.h"
 
 #define THEME_BUTTON_WIDTH_PX 120
 #define CONFIRM_BUTTON_HEIGHT 60

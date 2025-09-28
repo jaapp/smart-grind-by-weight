@@ -1,6 +1,5 @@
 #include "circular_buffer_math.h"
 #include "../../config/constants.h"
-#include "../../config/logging.h"
 #include <math.h>
 #include <algorithm>
 

@@ -1,6 +1,6 @@
 #include "file_io_task.h"
 #include "../logging/grind_logging.h"
-#include "../config/git_info.h"
+#include "../config/constants.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <Preferences.h>

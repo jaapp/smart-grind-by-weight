@@ -3,8 +3,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
-#include "../config/system_config.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 
 // Forward declarations
 class HardwareManager;

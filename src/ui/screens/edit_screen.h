@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "../../config/ui_theme.h"
+#include "../../config/constants.h"
 #include "../../controllers/grind_mode.h"
 
 class EditScreen {

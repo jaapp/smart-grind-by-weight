@@ -1,6 +1,6 @@
 #pragma once
 #include <Wire.h>
-#include "../config/pins.h"
+#include "../config/constants.h"
 
 struct TouchData {
     uint16_t x;

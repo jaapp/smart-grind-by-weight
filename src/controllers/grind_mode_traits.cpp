@@ -2,7 +2,6 @@
 
 #include "profile_controller.h"
 #include "../config/constants.h"
-#include "../config/user_config.h"
 #include <cstdio>
 
 namespace {

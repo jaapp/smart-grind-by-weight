@@ -1,4 +1,5 @@
 #include "ota_handler.h"
+#include "../config/build_info.h"
 #include "../config/logging.h"
 #include "../hardware/touch_driver.h"
 #include "../hardware/hardware_manager.h"

@@ -1,5 +1,5 @@
 #include "time_grind_strategy.h"
-
+#include "../config/constants.h"
 #include "grind_controller.h"
 #include "../logging/grind_logging.h"
 #include <Arduino.h>

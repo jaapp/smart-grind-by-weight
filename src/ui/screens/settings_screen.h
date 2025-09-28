@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "../../config/ui_theme.h"
+#include "../../config/constants.h"
 #include "../../bluetooth/manager.h"
 #include "../../controllers/grind_controller.h"
 #include "ui_helpers.h"

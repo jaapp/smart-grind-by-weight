@@ -1,7 +1,6 @@
 #include "grinder.h"
 #include "../controllers/grind_events.h"
-#include "../config/logging.h"
-#include "../config/hardware_config.h"
+#include "../config/constants.h"
 #if HW_ENABLE_LOADCELL_MOCK
 #include "mock_hx711_driver.h"
 #endif

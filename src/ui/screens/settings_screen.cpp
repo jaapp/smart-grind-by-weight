@@ -1,9 +1,6 @@
 #include "settings_screen.h"
 #include <Arduino.h>
-#include "../../config/build_info.h"
-#include "../../config/git_info.h"
 #include "../../config/constants.h"
-#include "../../config/hardware_config.h"
 #include "../../logging/grind_logging.h"
 #include "../../hardware/hardware_manager.h"
 #include "grinding_screen.h"

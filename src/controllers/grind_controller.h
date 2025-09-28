@@ -1,6 +1,5 @@
 #pragma once
 #include "../config/constants.h"
-#include "../config/system_config.h"
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"

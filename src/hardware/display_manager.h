@@ -2,7 +2,7 @@
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
 #include "touch_driver.h"
-#include "../config/pins.h"
+#include "../config/constants.h"
 
 class DisplayManager {
 private:

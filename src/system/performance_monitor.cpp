@@ -1,5 +1,5 @@
 #include "performance_monitor.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 
 PerformanceMonitor performance_monitor;
 

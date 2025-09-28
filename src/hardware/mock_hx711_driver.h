@@ -1,7 +1,7 @@
 #pragma once
 
 #include "load_cell_driver.h"
-#include "../config/hardware_config.h"
+#include "../config/constants.h"
 #include <Arduino.h>
 
 /**

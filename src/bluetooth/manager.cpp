@@ -3,9 +3,7 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include "../system/performance_monitor.h"
-#include "../config/internal_config.h"
-#include "../config/bluetooth_config.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 #include "../logging/grind_logging.h"
 
 BluetoothManager::BluetoothManager()

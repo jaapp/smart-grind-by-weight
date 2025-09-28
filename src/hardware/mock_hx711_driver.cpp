@@ -1,5 +1,5 @@
 #include "mock_hx711_driver.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 #include <algorithm>
 #include <cstdint>
 #ifdef ESP_PLATFORM

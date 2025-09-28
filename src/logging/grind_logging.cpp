@@ -4,8 +4,7 @@
 #include <esp_log.h>
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
-#include "../config/system_config.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 
 namespace {
 

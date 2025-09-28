@@ -1,6 +1,6 @@
 #include "ota_update_failed_screen.h"
 #include <Arduino.h>
-#include "../../config/build_info.h"
+#include "../../config/constants.h"
 
 void OtaUpdateFailedScreen::create() {
     screen = lv_obj_create(lv_scr_act());

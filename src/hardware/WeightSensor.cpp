@@ -1,11 +1,9 @@
 #include "WeightSensor.h"
-#include "../config/hardware_config.h"
+#include "../config/constants.h"
 #include "hx711_driver.h"
 #if HW_ENABLE_LOADCELL_MOCK
 #include "mock_hx711_driver.h"
 #endif
-#include "../config/pins.h"
-#include "../config/logging.h"
 #include <Arduino.h>
 #include <math.h>
 

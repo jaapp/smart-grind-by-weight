@@ -1,6 +1,6 @@
 #include "event_bridge_lvgl.h"
 #include "ui_manager.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 
 UIManager* EventBridgeLVGL::ui_manager = nullptr;
 

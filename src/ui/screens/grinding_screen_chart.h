@@ -2,7 +2,7 @@
 #include <lvgl.h>
 #include "../../config/ui_theme.h"
 #include "grinding_screen_base.h"
-#include "../../config/system_config.h"
+#include "../../config/constants.h"
 
 class GrindingScreenChart : public IGrindingScreen {
 private:

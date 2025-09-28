@@ -1,8 +1,7 @@
 #include "grind_controller.h"
 #include "grind_events.h"
 #include "../hardware/circular_buffer_math/circular_buffer_math.h"
-#include "../config/logging.h"
-#include "../config/user_config.h"
+#include "../config/constants.h"
 #include <Arduino.h>
 #include <cstdarg>
 #include <cstring>

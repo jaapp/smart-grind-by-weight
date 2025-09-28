@@ -1,6 +1,5 @@
 #include "display_manager.h"
 #include "../config/constants.h"
-#include "../config/system_config.h"
 #include <Arduino.h>
 
 

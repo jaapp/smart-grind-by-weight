@@ -2,7 +2,6 @@
 #include "../controllers/grind_controller.h"
 #include <Arduino.h>
 #include "../config/constants.h"
-#include "../config/pins.h"
 
 void HardwareManager::init() {
     preferences.begin("grinder", false);

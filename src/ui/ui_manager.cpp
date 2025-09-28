@@ -1,10 +1,6 @@
 #include "ui_manager.h"
 #include <Arduino.h>
-#include "../config/ui_theme.h"
 #include "../config/constants.h"
-#include "../config/system_config.h"
-#include "../config/user_config.h"
-#include "../config/build_info.h"
 #include "screens/calibration_screen.h"
 #include "event_handlers.h"
 #include "../logging/grind_logging.h"

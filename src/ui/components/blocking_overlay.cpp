@@ -1,5 +1,5 @@
 #include "blocking_overlay.h"
-#include "../../config/ui_theme.h"
+#include "../../config/constants.h"
 #include <lvgl.h>
 #include <Arduino.h>
 

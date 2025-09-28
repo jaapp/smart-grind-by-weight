@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "../../config/ui_theme.h"
+#include "../../config/constants.h"
 
 // Function declarations
 void style_as_button(lv_obj_t* object, int32_t width = 260, int32_t height = 80, const lv_font_t* font = &lv_font_montserrat_28);

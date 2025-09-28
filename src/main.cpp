@@ -7,7 +7,6 @@
 #include "controllers/grind_controller.h"
 #include "ui/ui_manager.h"
 #include "config/constants.h"
-#include "config/git_info.h"
 #include "bluetooth/manager.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"

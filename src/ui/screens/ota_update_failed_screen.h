@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "../../config/ui_theme.h"
+#include "../../config/constants.h"
 
 #define OTA_WARNING_BUTTON_WIDTH 120
 #define OTA_WARNING_BUTTON_HEIGHT 60

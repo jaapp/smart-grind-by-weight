@@ -1,5 +1,5 @@
 #include "task_scheduler.h"
-#include "../config/logging.h"
+#include "../config/constants.h"
 
 TaskScheduler::TaskScheduler() {
     tasks.reserve(8); // Reserve space for typical number of tasks

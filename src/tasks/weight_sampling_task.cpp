@@ -1,7 +1,7 @@
 #include "weight_sampling_task.h"
 #include "../hardware/WeightSensor.h"
 #include "../logging/grind_logging.h"
-#include "../config/git_info.h"
+#include "../config/constants.h"
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 
