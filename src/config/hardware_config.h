@@ -83,7 +83,7 @@
 #define HW_DISPLAY_IPS_INVERT_X 180                                            // IPS X-axis inversion setting
 #define HW_DISPLAY_IPS_INVERT_Y 24                                             // IPS Y-axis inversion setting
 #define HW_DISPLAY_COLOR_ORDER 20                                              // Color channel ordering
-
+#define HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT 15                                       // Minimum brightness percentage (to avoid too dim to see)
 //------------------------------------------------------------------------------
 // SERIAL COMMUNICATION
 //------------------------------------------------------------------------------
