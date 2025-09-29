@@ -213,51 +213,13 @@ def create_release():
     
     print(f"\nPreparing release: {new_version}")
     
-    # Ask for release notes
-    print("\nEnter release notes (optional, leave empty for basic release):")
-    print("You can use markdown formatting. Press Ctrl+D (Unix) or Ctrl+Z+Enter (Windows) when finished.")
-    print("Example:")
-    print("🚀 Smart Grind v1.2.3")
-    print("")
-    print("## New Features")
-    print("- Added time-based grinding mode")
-    print("- Improved BLE connection stability")
-    print("")
-    print("## Bug Fixes")
-    print("- Fixed load cell calibration drift")
-    print("")
-    print("Enter your release notes:")
-    
-    release_notes_lines = []
-    try:
-        while True:
-            line = input()
-            release_notes_lines.append(line)
-    except EOFError:
-        pass
-    
-    release_notes = '\n'.join(release_notes_lines).strip()
-    
-    # Use release notes as-is (GitHub will add automatic changelog and contributors)
-    final_release_notes = release_notes
-    
-    # Ask about draft release
-    print(f"\nRelease type:")
-    print("1. Published release (immediately visible to users)")
-    print("2. Draft release (can be reviewed and published later)")
-    
-    draft_choice = input("Enter choice (1-2): ").strip()
-    is_draft = draft_choice == '2'
+    # No manual release notes - GitHub will handle this
+    final_release_notes = f"Release {new_version}"
     
     # Show preview
     print(f"\n--- Release Preview ---")
     print(f"Version: {new_version}")
-    print(f"Type: {'Draft' if is_draft else 'Published'}")
-    if final_release_notes:
-        print(f"Release Notes:")
-        print(final_release_notes)
-    else:
-        print("Release Notes: (Basic release message)")
+    print("Release Notes: GitHub will generate automatically")
     print("--- End Preview ---")
     
     # Confirm
@@ -283,12 +245,8 @@ def create_release():
         print("Failed to commit version update.")
         return False
     
-    # Create tag with release notes (including contributors)
-    tag_message = final_release_notes if final_release_notes else f"Release {new_version}"
-    
-    # Add draft marker if this is a draft release
-    if is_draft:
-        tag_message = f"[DRAFT]\n\n{tag_message}"
+    # Create tag with simple release message
+    tag_message = f"Release {new_version}"
     
     print(f"Creating annotated tag {new_version}...")
     # Use subprocess directly for complex multiline messages

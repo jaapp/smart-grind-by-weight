@@ -45,13 +45,8 @@ jobs:
     - name: Prepare release notes
       id: changelog
       run: |
-        # Get the tag message (custom release notes)
-        TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
-        
-        # Create release notes with installation instructions
+        # Create simple release notes with installation instructions
         cat > release-notes.md << EOF
-        $TAG_MESSAGE
-        
         ## Installation
         
         1. Download \`firmware.bin\` below
@@ -74,7 +69,7 @@ jobs:
           release-artifacts/*.tar.gz
           release-artifacts/*.bin
         body: ${{ steps.changelog.outputs.changelog }}
-        draft: ${{ contains(steps.changelog.outputs.changelog, '[DRAFT]') }}
+        draft: true
         prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
         generate_release_notes: true
       env:
