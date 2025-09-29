@@ -7,9 +7,6 @@ Creates tags and triggers automated releases
 import subprocess
 import sys
 import re
-import json
-import urllib.request
-from datetime import datetime
 from pathlib import Path
 
 def run_command(cmd, capture_output=True):
@@ -30,6 +27,10 @@ def increment_version(version, increment_type):
     """Increment version number based on type (major, minor, patch)"""
     # Remove 'v' prefix if present
     version = version.lstrip('v')
+    
+    # Strip RC/beta/alpha suffixes to get base version
+    if '-' in version:
+        version = version.split('-')[0]
     
     try:
         major, minor, patch = map(int, version.split('.'))
@@ -104,66 +105,6 @@ def get_firmware_version():
         pass
     return "unknown"
 
-def get_contributors():
-    """Fetch contributors from GitHub API and filter out bots/Claude"""
-    try:
-        # Try to get repo URL from git remote
-        remote_url = run_command("git remote get-url origin")
-        if not remote_url:
-            return []
-        
-        # Extract owner/repo from GitHub URL
-        if "github.com" in remote_url:
-            # Handle both SSH and HTTPS URLs
-            repo_path = remote_url.split("github.com")[-1].strip(":/").replace(".git", "")
-            owner, repo = repo_path.split("/")[:2]
-        else:
-            return []
-        
-        # Fetch contributors from GitHub API
-        api_url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
-        
-        with urllib.request.urlopen(api_url) as response:
-            contributors = json.loads(response.read())
-        
-        # Filter out bots and Claude-related accounts
-        excluded_patterns = [
-            'claude', 'bot', 'github-actions', 'dependabot', 
-            'renovate', 'greenkeeper', 'codecov'
-        ]
-        
-        human_contributors = []
-        for contributor in contributors:
-            login = contributor.get('login', '').lower()
-            if not any(pattern in login for pattern in excluded_patterns):
-                human_contributors.append({
-                    'login': contributor['login'],
-                    'contributions': contributor['contributions'],
-                    'html_url': contributor['html_url']
-                })
-        
-        # Sort by contribution count
-        human_contributors.sort(key=lambda x: x['contributions'], reverse=True)
-        return human_contributors
-        
-    except Exception as e:
-        print(f"Note: Could not fetch contributors: {e}")
-        return []
-
-def format_contributors_section(contributors):
-    """Format contributors into a nice acknowledgment section"""
-    if not contributors:
-        return ""
-    
-    section = "\n## 🙏 Contributors\n\n"
-    section += "Special thanks to everyone who contributed to this release:\n\n"
-    
-    for contributor in contributors:
-        section += f"- [@{contributor['login']}]({contributor['html_url']}) "
-        section += f"({contributor['contributions']} contribution{'s' if contributor['contributions'] != 1 else ''})\n"
-    
-    section += "\nYour contributions help make Smart Grind-by-Weight better for everyone! 🎉\n"
-    return section
 
 def update_firmware_version(new_version):
     """Update firmware version in build_info.h"""
@@ -297,19 +238,21 @@ def create_release():
     
     release_notes = '\n'.join(release_notes_lines).strip()
     
-    # Fetch contributors and add to release notes
-    print("\nFetching contributors...")
-    contributors = get_contributors()
-    contributors_section = format_contributors_section(contributors)
-    
-    # Combine release notes with contributors
+    # Use release notes as-is (GitHub will add automatic changelog and contributors)
     final_release_notes = release_notes
-    if contributors_section:
-        final_release_notes += contributors_section
+    
+    # Ask about draft release
+    print(f"\nRelease type:")
+    print("1. Published release (immediately visible to users)")
+    print("2. Draft release (can be reviewed and published later)")
+    
+    draft_choice = input("Enter choice (1-2): ").strip()
+    is_draft = draft_choice == '2'
     
     # Show preview
     print(f"\n--- Release Preview ---")
     print(f"Version: {new_version}")
+    print(f"Type: {'Draft' if is_draft else 'Published'}")
     if final_release_notes:
         print(f"Release Notes:")
         print(final_release_notes)
@@ -342,6 +285,10 @@ def create_release():
     
     # Create tag with release notes (including contributors)
     tag_message = final_release_notes if final_release_notes else f"Release {new_version}"
+    
+    # Add draft marker if this is a draft release
+    if is_draft:
+        tag_message = f"[DRAFT]\n\n{tag_message}"
     
     print(f"Creating annotated tag {new_version}...")
     # Use subprocess directly for complex multiline messages

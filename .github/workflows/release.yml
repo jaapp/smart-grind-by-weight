@@ -35,43 +35,27 @@ jobs:
     - name: Prepare release artifacts
       run: |
         mkdir -p release-artifacts
-        # Copy firmware binaries (only what users need)
-        find .pio/build -name "*.bin" -exec cp {} release-artifacts/ \;
+        # Copy firmware binaries (only what users need for BLE OTA)
+        find .pio/build -name "firmware.bin" -exec cp {} release-artifacts/ \;
         # Create a firmware package
         cd release-artifacts
         tar -czf firmware-${{ github.ref_name }}.tar.gz *.bin
         cd ..
         
-    - name: Generate changelog
+    - name: Prepare release notes
       id: changelog
       run: |
         # Get the tag message (custom release notes)
         TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
         
-        # Get the previous tag for automatic changelog
-        PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        
-        if [ -z "$PREV_TAG" ]; then
-          # First release
-          AUTO_CHANGELOG="Initial release"
-        else
-          # Generate changelog from commits since last tag
-          AUTO_CHANGELOG=$(git log --pretty=format:"- %s" $PREV_TAG..HEAD)
-        fi
-        
-        # Create release notes
+        # Create release notes with installation instructions
         cat > release-notes.md << EOF
         $TAG_MESSAGE
         
-        ## Automatic Changelog
-        
-        $AUTO_CHANGELOG
-        
         ## Installation
         
-        1. Download the firmware package below
-        2. Extract the files
-        3. Use the grinder tool to upload: \`python3 tools/grinder.py upload firmware.bin\`
+        1. Download \`firmware.bin\` below
+        2. Use the grinder tool to upload: \`python3 tools/grinder.py upload firmware.bin\`
         
         ## Build Information
         - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -90,7 +74,7 @@ jobs:
           release-artifacts/*.tar.gz
           release-artifacts/*.bin
         body: ${{ steps.changelog.outputs.changelog }}
-        draft: false
+        draft: ${{ contains(steps.changelog.outputs.changelog, '[DRAFT]') }}
         prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
         generate_release_notes: true
       env:
