@@ -189,7 +189,7 @@ python3 tools/grinder.py build-upload --force-full
 
 After flashing firmware, calibrate the load cell for accurate measurements:
 
-1. **Access calibration**: Settings → Swipe left to Tools tab → Press "CALIBRATE"
+1. **Access calibration**: Settings → Tools → Press "Calibrate"
 2. **Empty calibration**: Remove all weight from scale platform → Press OK
 3. **Weight calibration**: 
    - Place known weight on scale (e.g., coffee mug with water)
@@ -256,34 +256,36 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode)
 |   \-- GRIND button (red=weight, blue=time)
 |   \-- Time mode completion: OK + PULSE buttons
 |
-\-- Settings (swipe left/right between sub-tabs)
+\-- Settings (hierarchical menu navigation)
     |
     +-- System Info
     |   |-- Firmware version & build number
-    |   \-- System information
+    |   |-- Uptime display
+    |   |-- Memory usage
+    |   \-- Real-time weight sensor data (instant, smooth, samples, raw)
     |
-    +-- Settings (default tab)
+    +-- Bluetooth
     |   |-- Bluetooth toggle (30m timer)
     |   |-- Bluetooth startup toggle (configurable auto-enable)
-    |   \-- Brightness sliders
+    |   |-- Connection status display
+    |   \-- Auto-disable timer display
+    |
+    +-- Display
+    |   |-- Normal brightness slider
+    |   \-- Screensaver brightness slider
     |
     +-- Tools
+    |   |-- Tare button
     |   |-- Calibrate button
-    |   |-- Motor test button
-    |   \-- Tare button
+    |   \-- Motor test button
     |
     \-- Data
-        |
-        +-- Grind Logging
-        |   |-- Logging toggle (enable/disable session file writing)
-        |   |-- Sessions count
-        |   |-- Events count
-        |   |-- Measurements count
-        |   \-- Refresh stats button
-        |
-        \-- Reset
-            |-- Purge data button (clears logged grind sessions)
-            \-- Factory reset button
+        |-- Logging toggle (enable/disable session file writing)
+        |-- Sessions count
+        |-- Events count
+        |-- Measurements count
+        |-- Purge data button (clears logged grind sessions)
+        \-- Factory reset button
 
 During Grinding:
 |-- Weight display & progress
@@ -296,18 +298,19 @@ During Grinding:
 ## 🔵 Bluetooth Connectivity
 
 ### Startup Behavior
-- **Bluetooth startup is configurable** in **Settings → Settings tab → Startup**
+- **Bluetooth startup is configurable** in **Settings → Bluetooth → Startup**
 - When enabled: **Bluetooth automatically enables for 5 minutes** after power on
 - When disabled: Bluetooth remains off at startup (can still be enabled manually)
 - Indicated by blue Bluetooth symbol in top-right corner
 
 ### Manual Control
-- Enable Bluetooth manually in **Settings → Settings tab**
+- Enable Bluetooth manually in **Settings → Bluetooth**
 - **30-minute timer** when manually enabled
 - Toggle on/off as needed
+- Connection status and auto-disable timer displayed in real-time
 
 ### Grind Data Logging
-- **Grind session logging is configurable** in **Settings → Data tab → Grind Logging**
+- **Grind session logging is configurable** in **Settings → Data → Logging**
 - When enabled: Grind sessions are saved to flash storage for analysis
 - When disabled: Real-time grinding still works, but no session files are written to disk
 - Default setting: **Disabled** (to prevent unnecessary flash storage usage)
@@ -324,7 +327,7 @@ During Grinding:
 
 ⚠️ **Important**: Grind session logging is **disabled by default** to prevent unnecessary flash wear. To analyze grind data:
 
-1. **Enable logging** in **Settings → Data tab → Grind Logging** before grinding
+1. **Enable logging** in **Settings → Data → Logging** before grinding
 2. Perform your grind sessions (data will be saved to flash storage)
 3. **Export and analyze** the data using the tools below
 4. **Disable logging** again when analysis is complete (recommended for daily use)
