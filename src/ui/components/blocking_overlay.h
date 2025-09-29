@@ -8,6 +8,7 @@ enum class BlockingOperation {
     CALIBRATING,
     SETTLING,
     BLE_ENABLING,
+    LOADING_STATISTICS,
     CUSTOM
 };
 
