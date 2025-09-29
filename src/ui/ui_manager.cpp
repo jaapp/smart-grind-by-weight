@@ -250,6 +250,7 @@ void UIManager::setup_event_handlers() {
     lv_obj_add_event_cb(settings_screen.get_ble_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BLE_TOGGLE));
     lv_obj_add_event_cb(settings_screen.get_ble_startup_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BLE_STARTUP_TOGGLE));
     lv_obj_add_event_cb(settings_screen.get_logging_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(LOGGING_TOGGLE));
+    lv_obj_add_event_cb(settings_screen.get_grind_mode_swipe_toggle(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(GRIND_MODE_SWIPE_TOGGLE));
     lv_obj_add_event_cb(settings_screen.get_brightness_normal_slider(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BRIGHTNESS_NORMAL_SLIDER));
     lv_obj_add_event_cb(settings_screen.get_brightness_normal_slider(), EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED, EVENT_DATA(BRIGHTNESS_NORMAL_SLIDER_RELEASED));
     lv_obj_add_event_cb(settings_screen.get_brightness_screensaver_slider(), EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED, EVENT_DATA(BRIGHTNESS_SCREENSAVER_SLIDER));
@@ -624,6 +625,10 @@ void UIManager::handle_logging_toggle() {
     settings_handler->handle_logging_toggle();
 }
 
+void UIManager::handle_grind_mode_swipe_toggle() {
+    settings_handler->handle_grind_mode_swipe_toggle();
+}
+
 void UIManager::handle_brightness_normal_slider() {
     settings_handler->handle_brightness_normal_slider();
 }
@@ -734,6 +739,17 @@ void UIManager::toggle_mode() {
     if (current_tab >= 3) {
         return;
     }
+    
+    // Check if swipe gestures are enabled
+    Preferences prefs;
+    prefs.begin("swipe", true); // read-only
+    bool swipe_enabled = prefs.getBool("enabled", false);
+    prefs.end();
+    
+    if (!swipe_enabled) {
+        return; // Swipe gestures disabled, do nothing
+    }
+    
     current_mode = (current_mode == GrindMode::WEIGHT) ? GrindMode::TIME : GrindMode::WEIGHT;
     profile_controller->set_grind_mode(current_mode);
     refresh_ready_profiles();

@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"
-#include "ui_helpers.h"
+#include "../ui_helpers.h"
 
 void ReadyScreen::create() {
     screen = lv_obj_create(lv_scr_act());

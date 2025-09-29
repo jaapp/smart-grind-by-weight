@@ -212,11 +212,16 @@ All profiles are fully customizable. Default grind-by-weight targets (fallback t
 
 ### Navigation
 - **Swipe left/right** to navigate between menu tabs
-- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes
+- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes (when enabled in Settings → Grind Mode)
 - **Tap** to select profiles or buttons
 - **Long press** on profile targets to edit/customize them
 
 > **Color cues:** The GRIND button background turns **red** in weight mode and **blue** in time mode, so you always know which behaviour is armed.
+
+### Grind Mode Settings
+Access **Settings → Grind Mode** to configure:
+- **Swipe Gestures**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
+- **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
 
 ### Basic Operation
 These steps describe the default grind-by-weight workflow:
@@ -227,7 +232,7 @@ These steps describe the default grind-by-weight workflow:
 5. The system grinds to the precise target weight using the predictive algorithm
 6. GRIND COMPLETE shows the final settled weight in grams (with statistics)
 
-Need the stock timed run? Just swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight).
+Need the stock timed run? Enable swipe gestures in **Settings → Grind Mode**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in settings.
 
 > **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
 
@@ -241,7 +246,7 @@ Need the stock timed run? Just swipe up or down on the ready screen before you s
 ## 🗺️ User Interface Navigation
 
 ```
-Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode)
+Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode if enabled)
 |
 +-- Single Profile 
 |   |-- Weight display (long press to edit)
@@ -273,6 +278,10 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode)
     +-- Display
     |   |-- Normal brightness slider
     |   \-- Screensaver brightness slider
+    |
+    +-- Grind Mode
+    |   |-- Swipe Gestures toggle (enable/disable vertical swipes)
+    |   \-- Time Mode toggle (direct weight/time mode selection)
     |
     +-- Tools
     |   |-- Tare button

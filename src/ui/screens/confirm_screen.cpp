@@ -1,6 +1,6 @@
 #include "confirm_screen.h"
 #include <Arduino.h>
-#include "ui_helpers.h"
+#include "../ui_helpers.h"
 
 void ConfirmScreen::create() {
     screen = lv_obj_create(lv_scr_act());

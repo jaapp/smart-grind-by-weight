@@ -35,7 +35,7 @@ python3 tools/grinder.py analyze
 - **HardwareManager**: Central hardware coordinator
 - **GrindController**: 9-phase state machine with predictive flow control, 10 pulse corrections, and time mode additional pulses
 - **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered)
-- **UIManager**: 7 screens with LVGL integration, hierarchical settings menu with 5 organized sections, split-button layout for time mode pulses
+- **UIManager**: 7 screens with LVGL integration, hierarchical settings menu with 6 organized sections (Info, Bluetooth, Display, Grind Mode, Tools, Data), split-button layout for time mode pulses
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
@@ -46,6 +46,12 @@ python3 tools/grinder.py analyze
 - **Timeout**: 30-second maximum from grind start (includes taring), auto-stops and requires user acknowledgment
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
+
+**Grind Mode Settings:** Configurable through Settings → Grind Mode page
+- **Swipe Gestures Toggle**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
+- **Time Mode Toggle**: Direct grind mode selection between Weight/Time modes
+- **Preferences**: `swipe.enabled` (boolean) and existing `grind_mode` (0=Weight, 1=Time)
+- **Behavior**: Swipe gestures only work when enabled; direct mode selection always works
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color
@@ -83,3 +89,4 @@ python3 tools/grinder.py analyze
 * When you receive a task that is very large in scope or too vague, you will first try to break it down into smaller subtasks. If that feels difficult or still leaves you with too many open questions, push back to the user and ask them to consider breaking down the task for you, or guide them through that process. This is important because the larger the task, the more likely it is that things go wrong, wasting time and energy for everyone involved.
 - "requestFrom(): i2cWriteReadNonStop returned Error -1" serial messages  are harmless messages caused by polling the touch driver (no interrupts) and should be ignored
 - Use the src/config/constants.h aggregation file to include constants / settings - dont refer to config files directly.
+- When new features have been added and tested always update the docs as well

@@ -1,7 +1,7 @@
 #include "calibration_screen.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
-#include "ui_helpers.h"
+#include "../ui_helpers.h"
 
 void CalibrationScreen::create() {
     screen = lv_obj_create(lv_scr_act());

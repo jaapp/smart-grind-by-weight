@@ -328,6 +328,22 @@ void SettingsEventHandler::handle_logging_toggle() {
     LOG_DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
 }
 
+
+void SettingsEventHandler::handle_grind_mode_swipe_toggle() {
+    if (!ui_manager->settings_screen.get_grind_mode_swipe_toggle()) return;
+
+    // Get the current state of the toggle
+    bool swipe_enabled = lv_obj_has_state(ui_manager->settings_screen.get_grind_mode_swipe_toggle(), LV_STATE_CHECKED);
+
+    // Save to swipe preferences namespace
+    Preferences prefs;
+    prefs.begin("swipe", false); // read-write
+    prefs.putBool("enabled", swipe_enabled);
+    prefs.end();
+
+    LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
+}
+
 void SettingsEventHandler::handle_brightness_normal_slider() {
     if (!ui_manager->hardware_manager) return;
     

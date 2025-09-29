@@ -3,7 +3,7 @@
 #include "../../config/constants.h"
 #include "../../bluetooth/manager.h"
 #include "../../controllers/grind_controller.h"
-#include "ui_helpers.h"
+#include "../ui_helpers.h"
 
 class GrindingScreen;  // Forward declaration
 
@@ -14,6 +14,7 @@ private:
     lv_obj_t* info_tab;
     lv_obj_t* bluetooth_tab;
     lv_obj_t* display_tab;
+    lv_obj_t* grind_mode_tab;
     lv_obj_t* tools_tab;
     lv_obj_t* reset_tab;
     
@@ -43,6 +44,10 @@ private:
     lv_obj_t* purge_button;
     lv_obj_t* reset_button;
     
+    // Grind mode tab elements
+    lv_obj_t* grind_mode_radio_group;
+    lv_obj_t* grind_mode_swipe_toggle;
+    
     // Tools tab elements
     lv_obj_t* cal_button;
     lv_obj_t* motor_test_button;
@@ -67,6 +72,7 @@ public:
     void update_brightness_sliders();
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
+    void update_grind_mode_toggles();
     
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
@@ -82,11 +88,17 @@ public:
     lv_obj_t* get_refresh_stats_button() const { return refresh_stats_button; }
     lv_obj_t* get_brightness_normal_slider() const { return brightness_normal_slider; }
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
+    lv_obj_t* get_grind_mode_radio_group() const { return grind_mode_radio_group; }
+    lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
+    
+    // Method to handle grind mode selection from radio button callback
+    void handle_grind_mode_selection(int selected_index);
     
 private:
     void create_info_page(lv_obj_t* parent);
     void create_bluetooth_page(lv_obj_t* parent);
     void create_display_page(lv_obj_t* parent);
+    void create_grind_mode_page(lv_obj_t* parent);
     void create_tools_page(lv_obj_t* parent);
     void create_data_page(lv_obj_t* parent);
     lv_obj_t* create_separator(lv_obj_t* parent, const char* text = nullptr);

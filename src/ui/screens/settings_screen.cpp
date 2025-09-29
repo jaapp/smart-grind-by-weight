@@ -83,6 +83,9 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     display_tab = lv_menu_page_create(menu, "Display");
     create_display_page(display_tab);
 
+    grind_mode_tab = lv_menu_page_create(menu, "Grind Mode");
+    create_grind_mode_page(grind_mode_tab);
+
     tools_tab = lv_menu_page_create(menu, "Tools");
     create_tools_page(tools_tab);
 
@@ -98,6 +101,9 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
 
     lv_obj_t* display_item = create_menu_item(main_page, "Display");
     lv_menu_set_load_page_event(menu, display_item, display_tab);
+
+    lv_obj_t* grind_mode_item = create_menu_item(main_page, "Grind Mode");
+    lv_menu_set_load_page_event(menu, grind_mode_item, grind_mode_tab);
 
     lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
     lv_menu_set_load_page_event(menu, tools_item, tools_tab);
@@ -181,6 +187,52 @@ void SettingsScreen::create_display_page(lv_obj_t* parent) {
     create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
 }
 
+// Callback for grind mode radio button selection
+static void grind_mode_callback(int selected_index, void* user_data) {
+    SettingsScreen* screen = (SettingsScreen*)user_data;
+    if (screen) {
+        screen->handle_grind_mode_selection(selected_index);
+    }
+}
+
+void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
+    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Enable vertical scrolling on the grind mode page
+    lv_obj_set_scroll_dir(parent, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
+
+    // Mode Selection separator/label
+    create_separator(parent, "Mode Selection");
+
+    // Radio button group for grind mode selection at top
+    const char* grind_modes[] = {"Weight", "Time"};
+    grind_mode_radio_group = create_radio_button_group(
+        parent,
+        grind_modes,
+        2,
+        LV_FLEX_FLOW_ROW,
+        0,  // Weight initially selected
+        135, 100,  // Width, Height
+        grind_mode_callback,
+        this
+    );
+
+    // Descriptive label for swipe functionality
+    lv_obj_t* swipe_desc_label = lv_label_create(parent);
+    lv_label_set_text(swipe_desc_label, "Enable swiping vertically to switch between Weight/Time modes");
+    lv_obj_set_style_text_font(swipe_desc_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(swipe_desc_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_set_style_margin_bottom(swipe_desc_label, 10, 0);
+    lv_label_set_long_mode(swipe_desc_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(swipe_desc_label, 260);
+
+    // Swipe toggle using existing pattern
+    create_toggle_row(parent, "Swipe", &grind_mode_swipe_toggle);
+}
+
 void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
@@ -229,6 +281,7 @@ void SettingsScreen::show() {
     update_brightness_sliders();
     update_bluetooth_startup_toggle();
     update_logging_toggle();
+    update_grind_mode_toggles();
     refresh_statistics();
 }
 
@@ -461,6 +514,7 @@ lv_obj_t* SettingsScreen::create_toggle_row(lv_obj_t* parent, const char* text, 
     return row_container;
 }
 
+
 lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, lv_obj_t** label, lv_obj_t** slider, lv_color_t slider_color, uint32_t min, uint32_t max) {
     lv_obj_t* row_container = lv_obj_create(parent);
     style_as_button(row_container, 260, LV_SIZE_CONTENT);
@@ -519,4 +573,45 @@ lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, 
     lv_obj_set_style_text_align(*variable, LV_TEXT_ALIGN_RIGHT, 0);
 
     return label;
+}
+
+void SettingsScreen::update_grind_mode_toggles() {
+    if (!grind_mode_radio_group || !grind_mode_swipe_toggle) return;
+
+    // Read swipe enabled from "swipe" namespace
+    Preferences swipe_prefs;
+    swipe_prefs.begin("swipe", true); // read-only
+    bool swipe_enabled = swipe_prefs.getBool("enabled", false);
+    swipe_prefs.end();
+
+    // Read current grind mode from main grinder preferences using hardware manager
+    int mode_index = 0; // Default to Weight (index 0)
+    if (hardware_manager) {
+        Preferences* main_prefs = hardware_manager->get_preferences();
+        int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
+        mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
+    }
+
+    // Update radio button group selection
+    radio_button_group_set_selection(grind_mode_radio_group, mode_index);
+    
+    // Update swipe toggle state
+    if (swipe_enabled) {
+        lv_obj_add_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
+    } else {
+        lv_obj_clear_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
+    }
+}
+
+void SettingsScreen::handle_grind_mode_selection(int selected_index) {
+    // For now, just update preferences directly. The UIManager will pick up the change
+    // when update_grind_mode_toggles() is called
+    GrindMode new_mode = (selected_index == 0) ? GrindMode::WEIGHT : GrindMode::TIME;
+    
+    // Save directly to preferences using hardware manager
+    if (hardware_manager) {
+        Preferences* main_prefs = hardware_manager->get_preferences();
+        main_prefs->putInt("grind_mode", static_cast<int>(new_mode));
+        LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT in preferences" : "Grind mode set to TIME in preferences");
+    }
 }
