@@ -285,8 +285,15 @@ def create_release():
     tag_message = final_release_notes if final_release_notes else f"Release {new_version}"
     
     print(f"Creating annotated tag {new_version}...")
-    if not run_command(f'git tag -a {new_version} -m "{tag_message}"', capture_output=False):
-        print("Failed to create tag.")
+    # Use subprocess directly for complex multiline messages
+    try:
+        result = subprocess.run(['git', 'tag', '-a', new_version, '-m', tag_message], 
+                              capture_output=False, text=True)
+        if result.returncode != 0:
+            print("Failed to create tag.")
+            return False
+    except Exception as e:
+        print(f"Failed to create tag: {e}")
         return False
     
     # Push commit and tag
