@@ -1,4 +1,4 @@
-name: Automated Release
+name: Build and Release Firmware
 
 on:
   push:
