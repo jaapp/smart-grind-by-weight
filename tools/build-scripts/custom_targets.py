@@ -30,8 +30,8 @@ def upload_ble_action(source, target, env):
 
     # Run the unified grinder tool for upload
     print("--- Starting BLE upload ---")
-    grinder_tool = os.path.join(project_dir, "tools", "grinder")
-    env.Execute(f"{grinder_tool} upload {firmware_path}")
+    grinder_script = os.path.join(project_dir, "tools", "grinder.py")
+    env.Execute(f"python3 {grinder_script} upload {firmware_path}")
 
 # Register custom targets
 env.AddCustomTarget(
