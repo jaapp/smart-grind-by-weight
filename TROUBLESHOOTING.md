@@ -67,3 +67,26 @@ If you want to try a less aggressive approach first:
 4. Perform a clean build in PlatformIO
 
 **Note:** This issue is specific to the pioarduino platform fork usage and the way PlatformIO handles custom platform URLs.
+
+---
+
+## Grind Timeout Screen
+
+**Applies to:** Grinder timing out during operation, showing timeout screen after 30 seconds.
+
+### Symptoms
+- Grinder reaches timeout screen during grinding cycle
+- Long taring process (>10 seconds)
+- Unstable weight readings
+
+### Root Cause
+Extended taring due to load cell noise prevents grinding from completing within 30-second limit.
+
+### Resolution
+1. **Check load cell wiring:**
+   - Verify shielding wire connection per wiring diagram
+   - Shorten load cell cables if possible
+   - Ensure clean, solid connections
+
+2. **If wiring issues persist:**
+   - Increase `GRIND_SCALE_SETTLING_TOLERANCE_G` parameter for more noise tolerance
