@@ -146,11 +146,11 @@ static void factory_reset_callback() {
 
 static void perform_purge_operation() {
     LOG_DEBUG_PRINTLN("\n=== PURGE GRIND HISTORY INITIATED ===");
-    
+
     // Clear new time-series sessions from flash
     extern GrindLogger grind_logger;
     bool success = grind_logger.clear_all_sessions_from_flash();
-    
+
     if (success) {
         LOG_DEBUG_PRINTLN("Grind history purged successfully - reinitializing logger...");
     } else {
@@ -160,10 +160,11 @@ static void perform_purge_operation() {
 
 static void purge_operation_complete() {
     if (!confirmation_ui_manager) return;
-    
     // Return to developer screen
     confirmation_ui_manager->set_current_tab(3);
     confirmation_ui_manager->switch_to_state(UIState::SETTINGS);
+
+    confirmation_ui_manager->settings_screen.refresh_statistics(false);
 }
 
 static void purge_grind_history_callback() {

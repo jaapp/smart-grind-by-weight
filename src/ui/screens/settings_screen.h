@@ -67,7 +67,7 @@ public:
     void hide();
     void update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap);
     void update_ble_status();
-    void refresh_statistics();
+    void refresh_statistics(bool show_overlay = true);
     void update_brightness_labels(int normal_percent = -1, int screensaver_percent = -1); // Use negative value to leave unchanged
     void update_brightness_sliders();
     void update_bluetooth_startup_toggle();
