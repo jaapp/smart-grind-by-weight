@@ -49,6 +49,37 @@ def increment_version(version, increment_type):
     
     return f"v{major}.{minor}.{patch}"
 
+def get_next_rc_version(base_version):
+    """Get the next release candidate version by checking existing tags"""
+    # Remove 'v' prefix if present
+    base_version = base_version.lstrip('v')
+    
+    # Get all existing tags
+    all_tags = run_command("git tag -l")
+    if not all_tags:
+        return f"v{base_version}-rc.1"
+    
+    existing_tags = all_tags.split('\n')
+    
+    # Find existing RC tags for this base version
+    rc_numbers = []
+    for tag in existing_tags:
+        tag = tag.strip()
+        if tag.startswith(f"v{base_version}-rc."):
+            try:
+                rc_part = tag.split(f"v{base_version}-rc.")[-1]
+                rc_numbers.append(int(rc_part))
+            except ValueError:
+                continue
+    
+    # Get the next RC number
+    if rc_numbers:
+        next_rc = max(rc_numbers) + 1
+    else:
+        next_rc = 1
+    
+    return f"v{base_version}-rc.{next_rc}"
+
 def check_git_status():
     """Check if git working directory is clean"""
     status = run_command("git status --porcelain")
@@ -189,9 +220,10 @@ def create_release():
     print("1. Patch (bug fixes): v1.0.0 -> v1.0.1")
     print("2. Minor (new features): v1.0.0 -> v1.1.0") 
     print("3. Major (breaking changes): v1.0.0 -> v2.0.0")
-    print("4. Custom version")
+    print("4. Release Candidate (testing): auto-increments RC number")
+    print("5. Custom version")
     
-    choice = input("\nEnter choice (1-4): ").strip()
+    choice = input("\nEnter choice (1-5): ").strip()
     
     if choice == '1':
         new_version = increment_version(current_version, 'patch')
@@ -200,6 +232,33 @@ def create_release():
     elif choice == '3':
         new_version = increment_version(current_version, 'major')
     elif choice == '4':
+        # Release candidate - ask for base version
+        print("\nRelease Candidate Options:")
+        print("1. RC for patch version")
+        print("2. RC for minor version") 
+        print("3. RC for major version")
+        print("4. RC for custom version")
+        
+        rc_choice = input("Enter choice (1-4): ").strip()
+        
+        if rc_choice == '1':
+            base_version = increment_version(current_version, 'patch')
+        elif rc_choice == '2':
+            base_version = increment_version(current_version, 'minor')
+        elif rc_choice == '3':
+            base_version = increment_version(current_version, 'major')
+        elif rc_choice == '4':
+            base_version = input("Enter base version for RC (e.g., 1.2.3): ").strip()
+            if base_version.startswith('v'):
+                base_version = base_version[1:]
+        else:
+            print("Invalid choice.")
+            return False
+        
+        new_version = get_next_rc_version(base_version)
+        print(f"Next RC version: {new_version}")
+        
+    elif choice == '5':
         custom_version = input("Enter custom version (e.g., v1.2.3): ").strip()
         if not custom_version.startswith('v'):
             custom_version = 'v' + custom_version
