@@ -240,7 +240,7 @@ def create_release():
         print("Failed to stage version update.")
         return False
     
-    commit_message = f"chore: Update firmware version to {new_version.lstrip('v')}"
+    commit_message = f"chore: Creating release {new_version}"
     if not run_command(f'git commit -m "{commit_message}"', capture_output=False):
         print("Failed to commit version update.")
         return False
