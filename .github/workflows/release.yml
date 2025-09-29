@@ -32,13 +32,11 @@ jobs:
     - name: Prepare release artifacts
       run: |
         mkdir -p release-artifacts
-        # Copy firmware binaries
+        # Copy firmware binaries (only what users need)
         find .pio/build -name "*.bin" -exec cp {} release-artifacts/ \;
-        # Copy partition tables and other artifacts
-        find .pio/build -name "*.csv" -exec cp {} release-artifacts/ \;
         # Create a firmware package
         cd release-artifacts
-        tar -czf firmware-${{ github.ref_name }}.tar.gz *.bin *.csv
+        tar -czf firmware-${{ github.ref_name }}.tar.gz *.bin
         cd ..
         
     - name: Generate changelog
