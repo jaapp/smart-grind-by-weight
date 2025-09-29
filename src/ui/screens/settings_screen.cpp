@@ -357,7 +357,7 @@ void SettingsScreen::update_ble_status() {
     }
 }
 
-void SettingsScreen::refresh_statistics() {
+void SettingsScreen::refresh_statistics(bool show_overlay) {
     if (!visible) return;
 
     // Define the statistics loading operation
@@ -366,6 +366,12 @@ void SettingsScreen::refresh_statistics() {
         set_label_text_int(events_label, grind_logger.count_total_events_in_flash());
         set_label_text_int(measurements_label, grind_logger.count_total_measurements_in_flash());
     };
+
+    // Used for when we reload the statistics after a data purge
+    if (!show_overlay){
+        load_statistics_operation();
+        return;
+    }
 
     // Show blocking overlay while loading statistics
     auto& overlay = BlockingOperationOverlay::getInstance();
