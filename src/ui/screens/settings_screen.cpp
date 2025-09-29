@@ -5,6 +5,8 @@
 #include "../../hardware/hardware_manager.h"
 #include "grinding_screen.h"
 #include "../event_bridge_lvgl.h"
+#include "../../config/logging.h"
+#include "../components/blocking_overlay.h"
 
 static void back_event_handler(lv_event_t * e)
 {
@@ -74,45 +76,57 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     lv_obj_t* main_page = lv_menu_page_create(menu, "Settings");
 
     // Create sub-pages with titles
-    info_tab = lv_menu_page_create(menu, "Info");
-    create_info_page(info_tab);
+    info_page = lv_menu_page_create(menu, "Info");
+    create_info_page(info_page);
 
-    bluetooth_tab = lv_menu_page_create(menu, "Bluetooth");
-    create_bluetooth_page(bluetooth_tab);
+    bluetooth_page = lv_menu_page_create(menu, "Bluetooth");
+    create_bluetooth_page(bluetooth_page);
 
-    display_tab = lv_menu_page_create(menu, "Display");
-    create_display_page(display_tab);
-
-    grind_mode_tab = lv_menu_page_create(menu, "Grind Mode");
-    create_grind_mode_page(grind_mode_tab);
-
-    tools_tab = lv_menu_page_create(menu, "Tools");
-    create_tools_page(tools_tab);
-
-    reset_tab = lv_menu_page_create(menu, "Data");
-    create_data_page(reset_tab);
+    display_page = lv_menu_page_create(menu, "Display");
+    create_display_page(display_page);
+    
+    grind_mode_page = lv_menu_page_create(menu, "Grind Mode");
+    create_grind_mode_page(grind_mode_page);
+    
+    tools_page = lv_menu_page_create(menu, "Tools");
+    create_tools_page(tools_page);
+    
+    data_page = lv_menu_page_create(menu, "Data");
+    create_data_page(data_page);
 
     // Create menu items and link to sub-pages
     lv_obj_t* info_item = create_menu_item(main_page, "System Info");
-    lv_menu_set_load_page_event(menu, info_item, info_tab);
+    lv_menu_set_load_page_event(menu, info_item, info_page);
 
     lv_obj_t* bluetooth_item = create_menu_item(main_page, "Bluetooth");
-    lv_menu_set_load_page_event(menu, bluetooth_item, bluetooth_tab);
+    lv_menu_set_load_page_event(menu, bluetooth_item, bluetooth_page);
 
     lv_obj_t* display_item = create_menu_item(main_page, "Display");
-    lv_menu_set_load_page_event(menu, display_item, display_tab);
+    lv_menu_set_load_page_event(menu, display_item, display_page);
 
     lv_obj_t* grind_mode_item = create_menu_item(main_page, "Grind Mode");
-    lv_menu_set_load_page_event(menu, grind_mode_item, grind_mode_tab);
+    lv_menu_set_load_page_event(menu, grind_mode_item, grind_mode_page);
 
     lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
-    lv_menu_set_load_page_event(menu, tools_item, tools_tab);
+    lv_menu_set_load_page_event(menu, tools_item, tools_page);
 
     lv_obj_t* data_item = create_menu_item(main_page, "Data");
-    lv_menu_set_load_page_event(menu, data_item, reset_tab);
+    lv_menu_set_load_page_event(menu, data_item, data_page);
 
     // Set main page as active (menu will be the landing page)
     lv_menu_set_page(menu, main_page);
+
+    // Used for loading statistics when the data page is shown
+    auto changing_page_callback = [](lv_event_t * e) {
+        SettingsScreen * self = static_cast<SettingsScreen*>(lv_event_get_user_data(e));
+        lv_obj_t * menu = static_cast<lv_obj_t *>(lv_event_get_target(e));
+        lv_obj_t * cur = lv_menu_get_cur_main_page(menu);
+        if (cur == self->data_page) {
+            self->refresh_statistics();
+        }
+    };
+
+    lv_obj_add_event_cb(menu, changing_page_callback, LV_EVENT_VALUE_CHANGED, this);
 
     visible = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -281,7 +295,6 @@ void SettingsScreen::show() {
     update_bluetooth_startup_toggle();
     update_logging_toggle();
     update_grind_mode_toggles();
-    refresh_statistics();
 }
 
 void SettingsScreen::hide() {
@@ -347,9 +360,16 @@ void SettingsScreen::update_ble_status() {
 void SettingsScreen::refresh_statistics() {
     if (!visible) return;
 
-    set_label_text_int(sessions_label, grind_logger.get_total_flash_sessions());
-    set_label_text_int(events_label, grind_logger.count_total_events_in_flash());
-    set_label_text_int(measurements_label, grind_logger.count_total_measurements_in_flash());
+    // Define the statistics loading operation
+    auto load_statistics_operation = [this]() {
+        set_label_text_int(sessions_label, grind_logger.get_total_flash_sessions());
+        set_label_text_int(events_label, grind_logger.count_total_events_in_flash());
+        set_label_text_int(measurements_label, grind_logger.count_total_measurements_in_flash());
+    };
+
+    // Show blocking overlay while loading statistics
+    auto& overlay = BlockingOperationOverlay::getInstance();
+    overlay.show_and_execute(BlockingOperation::LOADING_STATISTICS, load_statistics_operation);
 }
 
 void SettingsScreen::update_brightness_sliders() {
