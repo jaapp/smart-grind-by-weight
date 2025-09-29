@@ -344,6 +344,35 @@ void SettingsEventHandler::handle_grind_mode_swipe_toggle() {
     LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
 }
 
+void SettingsEventHandler::handle_grind_mode_radio_button() {
+    // Need to get the selected index from the radio button group
+    // This will be called when radio button selection changes
+    
+    lv_obj_t* radio_group = ui_manager->settings_screen.get_grind_mode_radio_group();
+    if (!radio_group || !ui_manager->profile_controller) return;
+    
+    // Get the selected radio button index from the radio button group
+    int selected_index = radio_button_group_get_selection(radio_group);
+    if (selected_index < 0) return; // Invalid selection
+    
+    GrindMode new_mode = (selected_index == 0) ? GrindMode::WEIGHT : GrindMode::TIME;
+    
+    // Use ProfileController to properly save the grind mode
+    ui_manager->profile_controller->set_grind_mode(new_mode);
+    
+    // Update the current mode in UIManager to reflect the change
+    ui_manager->current_mode = new_mode;
+    
+    // Refresh the UI to show the new mode
+    ui_manager->refresh_ready_profiles();
+    ui_manager->edit_target = get_current_profile_target(*ui_manager->profile_controller, ui_manager->current_mode);
+    if (ui_manager->state_machine->is_state(UIState::EDIT)) {
+        ui_manager->update_edit_target_display();
+    }
+    
+    LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT via radio button" : "Grind mode set to TIME via radio button");
+}
+
 void SettingsEventHandler::handle_brightness_normal_slider() {
     if (!ui_manager->hardware_manager) return;
     

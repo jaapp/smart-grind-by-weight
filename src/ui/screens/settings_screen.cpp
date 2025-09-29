@@ -187,12 +187,11 @@ void SettingsScreen::create_display_page(lv_obj_t* parent) {
     create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
 }
 
+
 // Callback for grind mode radio button selection
 static void grind_mode_callback(int selected_index, void* user_data) {
-    SettingsScreen* screen = (SettingsScreen*)user_data;
-    if (screen) {
-        screen->handle_grind_mode_selection(selected_index);
-    }
+    // Trigger the event system instead of handling directly
+    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::GRIND_MODE_RADIO_BUTTON, nullptr);
 }
 
 void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
@@ -603,15 +602,3 @@ void SettingsScreen::update_grind_mode_toggles() {
     }
 }
 
-void SettingsScreen::handle_grind_mode_selection(int selected_index) {
-    // For now, just update preferences directly. The UIManager will pick up the change
-    // when update_grind_mode_toggles() is called
-    GrindMode new_mode = (selected_index == 0) ? GrindMode::WEIGHT : GrindMode::TIME;
-    
-    // Save directly to preferences using hardware manager
-    if (hardware_manager) {
-        Preferences* main_prefs = hardware_manager->get_preferences();
-        main_prefs->putInt("grind_mode", static_cast<int>(new_mode));
-        LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT in preferences" : "Grind mode set to TIME in preferences");
-    }
-}

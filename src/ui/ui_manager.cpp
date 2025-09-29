@@ -629,6 +629,10 @@ void UIManager::handle_grind_mode_swipe_toggle() {
     settings_handler->handle_grind_mode_swipe_toggle();
 }
 
+void UIManager::handle_grind_mode_radio_button() {
+    settings_handler->handle_grind_mode_radio_button();
+}
+
 void UIManager::handle_brightness_normal_slider() {
     settings_handler->handle_brightness_normal_slider();
 }

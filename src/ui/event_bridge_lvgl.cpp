@@ -112,6 +112,10 @@ void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {
             ui_manager->handle_grind_mode_swipe_toggle();
             break;
 
+        case EventType::GRIND_MODE_RADIO_BUTTON:
+            ui_manager->handle_grind_mode_radio_button();
+            break;
+
         case EventType::BRIGHTNESS_NORMAL_SLIDER:
             ui_manager->handle_brightness_normal_slider();
             break;

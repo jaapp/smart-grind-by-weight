@@ -91,9 +91,6 @@ public:
     lv_obj_t* get_grind_mode_radio_group() const { return grind_mode_radio_group; }
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
     
-    // Method to handle grind mode selection from radio button callback
-    void handle_grind_mode_selection(int selected_index);
-    
 private:
     void create_info_page(lv_obj_t* parent);
     void create_bluetooth_page(lv_obj_t* parent);
