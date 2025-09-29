@@ -118,13 +118,6 @@ struct GrindSession {
     float    initial_motor_stop_offset;
     float    latency_to_coast_ratio;
     float    flow_rate_threshold;
-    float    pulse_duration_large;
-    float    pulse_duration_medium;
-    float    pulse_duration_small;
-    float    pulse_duration_fine;
-    float    large_error_threshold;
-    float    medium_error_threshold;
-    float    small_error_threshold;
 
     // Compact fields and status
     uint8_t  profile_id;              // Active profile index
@@ -145,7 +138,7 @@ struct GrindSession {
 static_assert(sizeof(TimeSeriesSessionHeader) == 24, "Unexpected TimeSeriesSessionHeader size");
 static_assert(sizeof(GrindEvent) == 44, "Unexpected GrindEvent size");
 static_assert(sizeof(GrindMeasurement) == 24, "Unexpected GrindMeasurement size");
-static_assert(sizeof(GrindSession) == 108, "Unexpected GrindSession size");
+static_assert(sizeof(GrindSession) == 80, "Unexpected GrindSession size");
 
 // Time-series grind logging manager
 class GrindLogger {

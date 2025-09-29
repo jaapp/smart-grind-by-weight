@@ -230,13 +230,13 @@ void GrindControlTask::record_timing(uint32_t start_time, uint32_t end_time) {
         cycle_time_max_ms = cycle_duration;
     }
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Print task heartbeat every 10 seconds
     if (last_heartbeat_time == 0) {
         last_heartbeat_time = start_time;
     }
     
-    if (end_time - last_heartbeat_time >= REALTIME_HEARTBEAT_INTERVAL_MS) {
+    if (end_time - last_heartbeat_time >= SYS_REALTIME_HEARTBEAT_INTERVAL_MS) {
         print_heartbeat();
         reset_performance_metrics();
         last_heartbeat_time = end_time;
@@ -245,7 +245,7 @@ void GrindControlTask::record_timing(uint32_t start_time, uint32_t end_time) {
 }
 
 void GrindControlTask::print_heartbeat() const {
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     uint32_t avg_cycle_time = cycle_count > 0 ? cycle_time_sum_ms / cycle_count : 0;
     float target_weight = grind_controller ? grind_controller->get_target_weight() : 0.0f;
     float current_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;

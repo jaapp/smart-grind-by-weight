@@ -39,8 +39,6 @@
 #define HW_LOADCELL_SAMPLE_RATE_SPS 10                                         // Current sample rate setting
 #define HW_LOADCELL_SAMPLE_INTERVAL_MS (1000 / HW_LOADCELL_SAMPLE_RATE_SPS)   // Calculated sample interval
 
-
-
 //------------------------------------------------------------------------------
 // DISPLAY SPECIFICATIONS  
 //------------------------------------------------------------------------------

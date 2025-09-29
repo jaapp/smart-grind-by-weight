@@ -53,29 +53,12 @@
 // Legacy task scheduler intervals (deprecated - kept for compatibility)
 #define SYS_TASK_LOADCELL_INTERVAL_MS 20                                       // Load cell polling frequency (50Hz)
 
-//------------------------------------------------------------------------------
-// SYSTEM TIMEOUTS
-//------------------------------------------------------------------------------
-#define SYS_TIMEOUT_SHORT_MS 1000                                              // General short timeout for quick operations
-#define SYS_TIMEOUT_MEDIUM_MS 2000                                             // Medium timeout for moderate operations  
-#define SYS_TIMEOUT_LONG_MS 3000                                               // Long timeout for settling operations
-#define SYS_TIMEOUT_EXTENDED_MS 5000                                           // Extended timeout for complex operations
 
 //------------------------------------------------------------------------------
 // TIME CONVERSION CONSTANTS
 //------------------------------------------------------------------------------
 #define SYS_MS_PER_SECOND 1000                                                 // Milliseconds per second conversion
 
-//------------------------------------------------------------------------------
-// GRIND CONTROL ALGORITHM PARAMETERS  
-//------------------------------------------------------------------------------
-// Error thresholds for pulse duration calculation
-#define SYS_GRIND_ERROR_LARGE_THRESHOLD_G 1.0f                                 // Large error threshold
-#define SYS_GRIND_ERROR_MEDIUM_THRESHOLD_G 0.5f                                // Medium error threshold  
-#define SYS_GRIND_ERROR_SMALL_THRESHOLD_G 0.2f                                 // Small error threshold
-
-// Dynamic pulse algorithm parameters
-#define SYS_GRIND_SMALL_ERROR_FACTOR 1.0f                                      // Gentler correction factor for small errors
 
 //------------------------------------------------------------------------------
 // WEIGHT DISPLAY FILTER SETTINGS
@@ -84,9 +67,15 @@
 #define SYS_DISPLAY_FILTER_ALPHA_DOWN 0.9f                                     // Slower decay when weight decreases
 
 //------------------------------------------------------------------------------
-// JOG ACCELERATION MULTIPLIERS
+// JOG ACCELERATION CONFIGURATION
 //------------------------------------------------------------------------------
-// Using multipliers to overcome LVGL timer limits
+// Button jog/hold acceleration thresholds (when to transition between stages)
+#define USER_JOG_STAGE_1_INTERVAL_MS 100                                       // Stage 1: slow jog interval
+#define USER_JOG_STAGE_2_THRESHOLD_MS 2000                                     // Time to reach stage 2 acceleration
+#define USER_JOG_STAGE_3_THRESHOLD_MS 4000                                     // Time to reach stage 3 acceleration
+#define USER_JOG_STAGE_4_THRESHOLD_MS 6000                                     // Time to reach stage 4 acceleration
+
+// JOG acceleration multipliers (using multipliers to overcome LVGL timer limits)
 #define SYS_JOG_STAGE_1_MULTIPLIER 1                                           // Stage 1: single increment per timer tick
 #define SYS_JOG_STAGE_2_INTERVAL_MS 64                                         // Stage 2: LVGL minimum timer interval
 #define SYS_JOG_STAGE_2_MULTIPLIER 3                                           // Stage 2: 3 increments per 64ms = ~4.7g/s
@@ -104,8 +93,8 @@
 //------------------------------------------------------------------------------
 // DEBUG HEARTBEAT CONFIGURATION
 //------------------------------------------------------------------------------
-#define ENABLE_REALTIME_HEARTBEAT 1                                            // Enable Core 0/Core 1 heartbeat logging (0=disabled, 1=enabled)
-#define REALTIME_HEARTBEAT_INTERVAL_MS 10000                                   // Heartbeat interval in milliseconds
+#define SYS_ENABLE_REALTIME_HEARTBEAT 1                                            // Enable Core 0/Core 1 heartbeat logging (0=disabled, 1=enabled)
+#define SYS_REALTIME_HEARTBEAT_INTERVAL_MS 10000                                   // Heartbeat interval in milliseconds
 
 //------------------------------------------------------------------------------
 // PRINTF FORMAT STRINGS

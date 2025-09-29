@@ -32,7 +32,7 @@ Update `tools/grinder-ble` parsing based on ESP32 debug output:
 ```python
 # Key structs to maintain alignment for:
 LOG_SCHEMA_VERSION = 2    # Update when schema changes
-GRIND_SESSION_SIZE = 108  # Update based on sizeof(GrindSession)
+GRIND_SESSION_SIZE = 84  # Update based on sizeof(GrindSession)
 GRIND_EVENT_SIZE = 44     # Update based on sizeof(GrindEvent) 
 GRIND_MEASUREMENT_SIZE = 24  # Update based on sizeof(GrindMeasurement)
 
@@ -67,7 +67,7 @@ struct TimeSeriesSessionHeader {
 };
 ```
 
-### GrindSession (108 bytes)
+### GrindSession (84 bytes)
 ```cpp
 struct GrindSession {
     uint32_t session_id;              // 0
@@ -86,22 +86,15 @@ struct GrindSession {
     float initial_motor_stop_offset;  // 44
     float latency_to_coast_ratio;     // 48
     float flow_rate_threshold;        // 52
-    float pulse_duration_large;       // 56
-    float pulse_duration_medium;      // 60
-    float pulse_duration_small;       // 64
-    float pulse_duration_fine;        // 68
-    float large_error_threshold;      // 72
-    float medium_error_threshold;     // 76
-    float small_error_threshold;      // 80
 
-    uint8_t profile_id;               // 84
-    uint8_t grind_mode;               // 85 (enum GrindMode)
-    uint8_t max_pulse_attempts;       // 86
-    uint8_t pulse_count;              // 87
-    uint8_t termination_reason;       // 88 (enum GrindTerminationReason)
-    uint8_t reserved[3];              // 89-91
+    uint8_t profile_id;               // 60
+    uint8_t grind_mode;               // 61 (enum GrindMode)
+    uint8_t max_pulse_attempts;       // 62
+    uint8_t pulse_count;              // 63
+    uint8_t termination_reason;       // 64 (enum GrindTerminationReason)
+    uint8_t reserved[3];              // 65-67
 
-    char    result_status[16];        // 92-107 (null-terminated)
+    char    result_status[16];        // 68-83 (null-terminated)
 };
 ```
 

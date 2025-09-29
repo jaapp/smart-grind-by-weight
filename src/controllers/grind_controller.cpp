@@ -100,7 +100,6 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     
     
     grind_latency_ms = 0;
-    coast_time_ms = 0;
     predictive_end_weight = 0;
     final_weight = 0;
     motor_stop_target_weight = GRIND_UNDERSHOOT_TARGET_G; // Start with a safe default
@@ -304,7 +303,7 @@ void GrindController::update() {
 
         case GrindPhase::FINAL_SETTLING:
             // Wait for weight to settle with precision settling window
-            if (weight_sensor->check_settling_complete(HW_SCALE_PRECISION_SETTLING_TIME_MS)) {
+            if (weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS)) {
                 final_measurement(loop_data);
             }
             break;

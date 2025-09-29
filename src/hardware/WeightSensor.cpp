@@ -49,7 +49,7 @@ WeightSensor::WeightSensor() {
     
     // RealtimeController integration removed - handled by WeightSamplingTask
 
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Initialize SPS tracking
     sps_buffer_index = 0;
     sps_sample_count = 0;
@@ -192,7 +192,7 @@ void WeightSensor::tare() {
     
     // Wait for tare completion with timeout
     unsigned long start_time = millis();
-    while (doTare && millis() - start_time < HW_TARE_TIMEOUT_MS) {
+    while (doTare && millis() - start_time < GRIND_TARE_TIMEOUT_MS) {
         // Call update to ensure fresh samples are collected and tare state is updated
         update();
         
@@ -232,7 +232,7 @@ void WeightSensor::calibrate(float known_weight) {
     // Now perform calibration with high accuracy - CircularBufferMath handles all filtering
     
     unsigned long cal_start = millis();
-    while(!update_async() && millis() - cal_start < HW_CALIBRATION_TIMEOUT_MS) {
+    while(!update_async() && millis() - cal_start < GRIND_CALIBRATION_TIMEOUT_MS) {
         delay(10);
     }
     
@@ -296,23 +296,23 @@ bool WeightSensor::is_settled(uint32_t window_ms) {
 
 // WARNING: This method blocks execution until weight settles or times out!
 float WeightSensor::get_motor_settled_weight(float* settle_time_out) {
-    return get_settled_weight(HW_MOTOR_SETTLING_TIME_MS, settle_time_out);
+    return get_settled_weight(GRIND_MOTOR_SETTLING_TIME_MS, settle_time_out);
 }
 
 // WARNING: This method blocks execution until weight settles or times out!
 float WeightSensor::get_precision_settled_weight(float* settle_time_out) {
-    return get_settled_weight(HW_SCALE_PRECISION_SETTLING_TIME_MS, settle_time_out);
+    return get_settled_weight(GRIND_SCALE_PRECISION_SETTLING_TIME_MS, settle_time_out);
 }
 
 // WARNING: This method blocks execution until weight settles or times out!
 float WeightSensor::get_settled_weight(uint32_t window_ms, float* settle_time_out) {
-    LOG_SETTLING_DEBUG("Waiting for weight to settle (window=%lums, timeout=%lums)...\n", window_ms, HW_SCALE_SETTLING_TIMEOUT_MS);
+    LOG_SETTLING_DEBUG("Waiting for weight to settle (window=%lums, timeout=%lums)...\n", window_ms, GRIND_SCALE_SETTLING_TIMEOUT_MS);
     
     unsigned long start_time = millis();
     float settled_weight = 0.0f;
     
     // Blocking loop - keep updating and checking until settled or timeout
-    while (millis() - start_time < HW_SCALE_SETTLING_TIMEOUT_MS) {
+    while (millis() - start_time < GRIND_SCALE_SETTLING_TIMEOUT_MS) {
         // Call update to ensure fresh samples are collected
         update();
         
@@ -330,9 +330,9 @@ float WeightSensor::get_settled_weight(uint32_t window_ms, float* settle_time_ou
     }
     
     // Timeout occurred - return best available measurement
-    LOG_SETTLING_DEBUG("Weight settling timed out after %lums\n", HW_SCALE_SETTLING_TIMEOUT_MS);
+    LOG_SETTLING_DEBUG("Weight settling timed out after %lums\n", GRIND_SCALE_SETTLING_TIMEOUT_MS);
     if (settle_time_out) {
-        *settle_time_out = HW_SCALE_SETTLING_TIMEOUT_MS;
+        *settle_time_out = GRIND_SCALE_SETTLING_TIMEOUT_MS;
     }
     return raw_to_weight(raw_filter.get_smoothed_raw(window_ms));
 }
@@ -573,7 +573,7 @@ float WeightSensor::get_saved_calibration_factor() {
     return USER_DEFAULT_CALIBRATION_FACTOR;
 }
 
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
 void WeightSensor::record_sample_timestamp() {
     uint32_t now = millis();
     

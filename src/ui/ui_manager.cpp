@@ -1010,7 +1010,7 @@ void UIManager::update_screen_timeout_state() {
     
     // Screen should stay bright if there's been recent touch OR weight activity
     uint32_t ms_since_last_activity = min(ms_since_touch, ms_since_weight_activity);
-    bool should_be_dimmed = ms_since_last_activity >= USER_SCREEN_TIMEOUT_MS;
+    bool should_be_dimmed = ms_since_last_activity >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS;
     
     if (should_be_dimmed && !screen_dimmed) {
         hardware_manager->get_display()->set_brightness(get_screensaver_brightness());

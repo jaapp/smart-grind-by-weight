@@ -78,7 +78,7 @@ private:
     bool initialize_adc_hardware();
     void update_temperature_if_available();
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // SPS tracking for performance monitoring
     static const int SPS_TRACKING_BUFFER_SIZE = 160;  // ~2 seconds at 80 SPS (ample headroom at lower SPS)
     uint32_t sps_timestamps[SPS_TRACKING_BUFFER_SIZE];
@@ -116,7 +116,7 @@ public:
     
     // Core data acquisition and processing
     void update();
-    bool is_settled(uint32_t window_ms = HW_SCALE_PRECISION_SETTLING_TIME_MS);
+    bool is_settled(uint32_t window_ms = GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
     
     // Non-blocking HX711 data acquisition (merged from HX711Core)
     bool data_waiting_async();
@@ -182,7 +182,7 @@ public:
     // Weight activity timing (for screen timeout reset)
     uint32_t get_ms_since_last_weight_activity() const;
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // SPS performance monitoring
     void record_sample_timestamp();                                  // Record when a sample was taken (called by Core 0)
     float get_current_sps() const;                                   // Get samples per second over last 2 seconds

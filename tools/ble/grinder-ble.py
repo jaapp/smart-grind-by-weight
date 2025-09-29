@@ -121,7 +121,7 @@ BLE_OTA_IDLE = 0x00
 
 # Binary log schema definitions (must match firmware)
 LOG_SCHEMA_VERSION = 2
-SESSION_STRUCT_SIZE = 108
+SESSION_STRUCT_SIZE = 80
 EVENT_STRUCT_SIZE = 44
 MEASUREMENT_STRUCT_SIZE = 24
 BLE_OTA_READY = 0x01
@@ -629,7 +629,7 @@ class GrinderBLETool:
         """Parse data from a single session file.
         Format on device (LittleFS):
         [TimeSeriesSessionHeader (24 bytes)]
-        [GrindSession (108 bytes)]
+        [GrindSession (80 bytes)]
         [GrindEvent x event_count (44 bytes each)]
         [GrindMeasurement x measurement_count (24 bytes each)]
         """
@@ -656,7 +656,7 @@ class GrinderBLETool:
                 f"[WARNING] Session {session_id} uses schema {schema_version}, expected {LOG_SCHEMA_VERSION}. Attempting to parse anyway."
             )
         
-        # Extract full GrindSession struct at exact offsets (108-byte struct)
+        # Extract full GrindSession struct at exact offsets (80-byte struct)
         session_bytes = file_data[offset:offset + SESSION_STRUCT_SIZE]
 
         parsed_session_id = struct.unpack_from('<I', session_bytes, 0)[0]
@@ -675,21 +675,14 @@ class GrinderBLETool:
         initial_motor_stop_offset = struct.unpack_from('<f', session_bytes, 44)[0]
         latency_to_coast_ratio = struct.unpack_from('<f', session_bytes, 48)[0]
         flow_rate_threshold = struct.unpack_from('<f', session_bytes, 52)[0]
-        pulse_duration_large = struct.unpack_from('<f', session_bytes, 56)[0]
-        pulse_duration_medium = struct.unpack_from('<f', session_bytes, 60)[0]
-        pulse_duration_small = struct.unpack_from('<f', session_bytes, 64)[0]
-        pulse_duration_fine = struct.unpack_from('<f', session_bytes, 68)[0]
-        large_error_threshold = struct.unpack_from('<f', session_bytes, 72)[0]
-        medium_error_threshold = struct.unpack_from('<f', session_bytes, 76)[0]
-        small_error_threshold = struct.unpack_from('<f', session_bytes, 80)[0]
 
-        profile_id = struct.unpack_from('<B', session_bytes, 84)[0]
-        grind_mode = struct.unpack_from('<B', session_bytes, 85)[0]
-        max_pulse_attempts = struct.unpack_from('<B', session_bytes, 86)[0]
-        pulse_count = struct.unpack_from('<B', session_bytes, 87)[0]
-        termination_reason = struct.unpack_from('<B', session_bytes, 88)[0]
+        profile_id = struct.unpack_from('<B', session_bytes, 56)[0]
+        grind_mode = struct.unpack_from('<B', session_bytes, 57)[0]
+        max_pulse_attempts = struct.unpack_from('<B', session_bytes, 58)[0]
+        pulse_count = struct.unpack_from('<B', session_bytes, 59)[0]
+        termination_reason = struct.unpack_from('<B', session_bytes, 60)[0]
 
-        result_bytes = session_bytes[92:108]
+        result_bytes = session_bytes[64:80]
 
         # Extract result_status from byte array and clean it
         result_status = result_bytes.decode('utf-8', errors='ignore').rstrip('\x00')
@@ -719,13 +712,6 @@ class GrinderBLETool:
             'termination_reason': termination_reason,
             'latency_to_coast_ratio': latency_to_coast_ratio,
             'flow_rate_threshold': flow_rate_threshold,
-            'pulse_duration_large': pulse_duration_large,
-            'pulse_duration_medium': pulse_duration_medium,
-            'pulse_duration_small': pulse_duration_small,
-            'pulse_duration_fine': pulse_duration_fine,
-            'large_error_threshold': large_error_threshold,
-            'medium_error_threshold': medium_error_threshold,
-            'small_error_threshold': small_error_threshold,
             'schema_version': schema_version,
             'result_status': result_status,
             'session_size_bytes': hdr_session_size,
@@ -871,13 +857,6 @@ class GrinderBLETool:
                     termination_reason INTEGER,
                     latency_to_coast_ratio REAL,
                     flow_rate_threshold REAL,
-                    pulse_duration_large REAL,
-                    pulse_duration_medium REAL,
-                    pulse_duration_small REAL,
-                    pulse_duration_fine REAL,
-                    large_error_threshold REAL,
-                    medium_error_threshold REAL,
-                    small_error_threshold REAL,
                     schema_version INTEGER,
                     result_status TEXT,
                     checksum INTEGER,
@@ -909,7 +888,7 @@ class GrinderBLETool:
             # Insert data
             
             # Build placeholders dynamically to match column count
-            _cols_sessions = """session_id, session_timestamp, profile_id, grind_mode, target_weight, target_time_ms, tolerance, final_weight, start_weight, error_grams, time_error_ms, total_time_ms, total_motor_on_time_ms, pulse_count, max_pulse_attempts, termination_reason, latency_to_coast_ratio, flow_rate_threshold, pulse_duration_large, pulse_duration_medium, pulse_duration_small, pulse_duration_fine, large_error_threshold, medium_error_threshold, small_error_threshold, schema_version, result_status, checksum, session_size_bytes"""
+            _cols_sessions = """session_id, session_timestamp, profile_id, grind_mode, target_weight, target_time_ms, tolerance, final_weight, start_weight, error_grams, time_error_ms, total_time_ms, total_motor_on_time_ms, pulse_count, max_pulse_attempts, termination_reason, latency_to_coast_ratio, flow_rate_threshold, schema_version, result_status, checksum, session_size_bytes"""
             _params_sessions = [
                     (
                         s['session_id'], s['session_timestamp'], s['profile_id'], s.get('grind_mode', 0),
@@ -917,10 +896,7 @@ class GrinderBLETool:
                         s['final_weight'], s.get('start_weight', 0.0), s['error_grams'], s.get('time_error_ms', 0),
                         s['total_time_ms'], s['total_motor_on_time_ms'], s['pulse_count'], s.get('max_pulse_attempts', 0),
                         s.get('termination_reason', 255), s.get('latency_to_coast_ratio', 0.0), s.get('flow_rate_threshold', 0.0),
-                        s.get('pulse_duration_large', 0.0), s.get('pulse_duration_medium', 0.0),
-                        s.get('pulse_duration_small', 0.0), s.get('pulse_duration_fine', 0.0),
-                        s.get('large_error_threshold', 0.0), s.get('medium_error_threshold', 0.0),
-                        s.get('small_error_threshold', 0.0), s.get('schema_version', LOG_SCHEMA_VERSION),
+                        s.get('schema_version', LOG_SCHEMA_VERSION),
                         s['result_status'], s.get('checksum', 0), s.get('session_size_bytes', 0)
                     )
                     for s in sessions

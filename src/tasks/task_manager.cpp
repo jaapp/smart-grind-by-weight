@@ -487,9 +487,9 @@ void TaskManager::record_task_timing(int task_index, uint32_t start_time, uint32
         metrics.cycle_time_max_ms = cycle_duration;
     }
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Print task heartbeat every 10 seconds
-    if (end_time - metrics.last_heartbeat_time >= REALTIME_HEARTBEAT_INTERVAL_MS) {
+    if (end_time - metrics.last_heartbeat_time >= SYS_REALTIME_HEARTBEAT_INTERVAL_MS) {
         const char* task_names[] = {"WeightSampling", "GrindControl", "UIRender", "Bluetooth", "FileIO"};
         print_task_heartbeat(task_index, task_names[task_index]);
         
@@ -504,7 +504,7 @@ void TaskManager::record_task_timing(int task_index, uint32_t start_time, uint32
 }
 
 void TaskManager::print_task_heartbeat(int task_index, const char* task_name) const {
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     const TaskMetrics& metrics = task_metrics[task_index];
     uint32_t avg_cycle_time = metrics.cycle_count > 0 ? metrics.cycle_time_sum_ms / metrics.cycle_count : 0;
     

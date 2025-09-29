@@ -441,13 +441,7 @@ void GrindLogger::initialize_session_config() {
     current_session->max_pulse_attempts = GRIND_MAX_PULSE_ATTEMPTS;
     current_session->latency_to_coast_ratio = GRIND_LATENCY_TO_COAST_RATIO;
     current_session->flow_rate_threshold = GRIND_FLOW_DETECTION_THRESHOLD_GPS;
-    current_session->pulse_duration_large = HW_PULSE_LARGE_ERROR_MS;
-    current_session->pulse_duration_medium = HW_PULSE_MEDIUM_ERROR_MS;
-    current_session->pulse_duration_small = HW_PULSE_SMALL_ERROR_MS;
-    current_session->pulse_duration_fine = HW_PULSE_FINE_ERROR_MS;
-    current_session->large_error_threshold = SYS_GRIND_ERROR_LARGE_THRESHOLD_G;
-    current_session->medium_error_threshold = SYS_GRIND_ERROR_MEDIUM_THRESHOLD_G;
-    current_session->small_error_threshold = SYS_GRIND_ERROR_SMALL_THRESHOLD_G;
+    // pulse_safety_factor_near_target field removed (was always 1.0f)
 }
 
 
@@ -887,13 +881,7 @@ void GrindLogger::print_struct_layout_debug() {
     LOG_BLE("initial_motor_stop_offset offset: %zu\n", (size_t)&sess->initial_motor_stop_offset);
     LOG_BLE("latency_to_coast_ratio offset: %zu\n", (size_t)&sess->latency_to_coast_ratio);
     LOG_BLE("flow_rate_threshold offset: %zu\n", (size_t)&sess->flow_rate_threshold);
-    LOG_BLE("pulse_duration_large offset: %zu\n", (size_t)&sess->pulse_duration_large);
-    LOG_BLE("pulse_duration_medium offset: %zu\n", (size_t)&sess->pulse_duration_medium);
-    LOG_BLE("pulse_duration_small offset: %zu\n", (size_t)&sess->pulse_duration_small);
-    LOG_BLE("pulse_duration_fine offset: %zu\n", (size_t)&sess->pulse_duration_fine);
-    LOG_BLE("large_error_threshold offset: %zu\n", (size_t)&sess->large_error_threshold);
-    LOG_BLE("medium_error_threshold offset: %zu\n", (size_t)&sess->medium_error_threshold);
-    LOG_BLE("small_error_threshold offset: %zu\n", (size_t)&sess->small_error_threshold);
+    // pulse_safety_factor_near_target field removed
     LOG_BLE("profile_id offset: %zu\n", (size_t)&sess->profile_id);
     LOG_BLE("grind_mode offset: %zu\n", (size_t)&sess->grind_mode);
     LOG_BLE("max_pulse_attempts offset: %zu\n", (size_t)&sess->max_pulse_attempts);

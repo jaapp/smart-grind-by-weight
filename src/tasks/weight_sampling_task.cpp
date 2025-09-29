@@ -239,7 +239,7 @@ void WeightSamplingTask::sample_and_feed_weight_sensor() {
     // (Extracted from RealtimeController::sample_and_feed_weight_sensor)
     bool sample_taken = weight_sensor->sample_and_feed_filter();
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Record timestamp for SPS tracking when a sample was actually taken
     if (sample_taken) {
         weight_sensor->record_sample_timestamp();
@@ -270,13 +270,13 @@ void WeightSamplingTask::record_timing(uint32_t start_time, uint32_t end_time) {
         cycle_time_max_ms = cycle_duration;
     }
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Print task heartbeat every 10 seconds
     if (last_heartbeat_time == 0) {
         last_heartbeat_time = start_time;
     }
     
-    if (end_time - last_heartbeat_time >= REALTIME_HEARTBEAT_INTERVAL_MS) {
+    if (end_time - last_heartbeat_time >= SYS_REALTIME_HEARTBEAT_INTERVAL_MS) {
         print_heartbeat();
         reset_performance_metrics();
         last_heartbeat_time = end_time;
@@ -285,7 +285,7 @@ void WeightSamplingTask::record_timing(uint32_t start_time, uint32_t end_time) {
 }
 
 void WeightSamplingTask::print_heartbeat() const {
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     uint32_t avg_cycle_time = cycle_count > 0 ? cycle_time_sum_ms / cycle_count : 0;
     float current_sps = weight_sensor ? weight_sensor->get_current_sps() : 0.0f;
     int current_sample_count = weight_sensor ? weight_sensor->get_sample_count() : 0;

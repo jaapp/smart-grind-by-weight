@@ -21,7 +21,7 @@ UIManager ui_manager;
 BluetoothManager g_bluetooth_manager;
 BluetoothManager& bluetooth_manager = g_bluetooth_manager;
 
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
 static uint32_t core1_cycle_count_10s = 0;
 static uint32_t core1_cycle_time_sum_ms = 0;
@@ -130,7 +130,7 @@ void setup() {
 void loop() {
 
 
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Core 1 main loop timing (monitor main loop health)
     uint32_t cycle_start_time = millis();
     core1_cycle_count_10s++;
@@ -154,7 +154,7 @@ void loop() {
     // UI events are now processed inside the UI render FreeRTOS task
     // to serialize all LVGL updates on a single thread.
     
-#if ENABLE_REALTIME_HEARTBEAT
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     // Calculate Core 1 main loop timing
     uint32_t cycle_end_time = millis();
     uint32_t cycle_duration = cycle_end_time - cycle_start_time;
@@ -163,7 +163,7 @@ void loop() {
     if (cycle_duration > core1_cycle_time_max_ms) core1_cycle_time_max_ms = cycle_duration;
     
     // Core 1 Main Loop Heartbeat - Monitor main loop health (every 10 seconds)
-    if (cycle_end_time - core1_last_heartbeat_time >= REALTIME_HEARTBEAT_INTERVAL_MS) {
+    if (cycle_end_time - core1_last_heartbeat_time >= SYS_REALTIME_HEARTBEAT_INTERVAL_MS) {
         uint32_t avg_cycle_time = core1_cycle_count_10s > 0 ? core1_cycle_time_sum_ms / core1_cycle_count_10s : 0;
         
         // Get system states
