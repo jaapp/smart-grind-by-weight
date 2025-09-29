@@ -408,6 +408,26 @@ class GrinderTool:
             self.print_success("Build artifacts cleaned")
         
         return result.returncode
+    
+    def cmd_release(self, args: argparse.Namespace) -> int:
+        """Create a tagged release using the release helper script."""
+        self.print_header("Creating Tagged Release")
+        
+        release_script = self.script_dir / "release.py"
+        
+        # Make sure the release script exists
+        if not release_script.exists():
+            self.print_error("Release script not found!")
+            self.print_info("The release.py script should be in the tools/ directory")
+            return 1
+        
+        # Run the release script
+        try:
+            result = subprocess.run([sys.executable, str(release_script)])
+            return result.returncode
+        except Exception as e:
+            self.print_error(f"Failed to run release script: {e}")
+            return 1
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser with all subcommands."""
@@ -473,6 +493,7 @@ def create_parser() -> argparse.ArgumentParser:
     monitor_parser = subparsers.add_parser('monitor', help='Monitor live debug output via BLE (alias for debug)')
     monitor_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     clean_parser = subparsers.add_parser('clean', help='Clean build artifacts')
+    release_parser = subparsers.add_parser('release', help='Create tagged release (triggers automated GitHub release)')
     
     return parser
 
@@ -511,6 +532,8 @@ async def main():
             return tool.cmd_install(args)
         elif args.command == 'clean':
             return tool.cmd_clean(args)
+        elif args.command == 'release':
+            return tool.cmd_release(args)
         else:
             tool.print_error(f"Unknown command: {args.command}")
             parser.print_help()

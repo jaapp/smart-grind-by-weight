@@ -1,0 +1,96 @@
+name: Automated Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.2.3
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for changelog
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    
+    - name: Install PlatformIO
+      run: |
+        pip install platformio
+        pio upgrade
+    
+    - name: Build firmware
+      run: |
+        python3 tools/grinder.py build
+        
+    - name: Prepare release artifacts
+      run: |
+        mkdir -p release-artifacts
+        # Copy firmware binaries
+        find .pio/build -name "*.bin" -exec cp {} release-artifacts/ \;
+        # Copy partition tables and other artifacts
+        find .pio/build -name "*.csv" -exec cp {} release-artifacts/ \;
+        # Create a firmware package
+        cd release-artifacts
+        tar -czf firmware-${{ github.ref_name }}.tar.gz *.bin *.csv
+        cd ..
+        
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the tag message (custom release notes)
+        TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+        
+        # Get the previous tag for automatic changelog
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        
+        if [ -z "$PREV_TAG" ]; then
+          # First release
+          AUTO_CHANGELOG="Initial release"
+        else
+          # Generate changelog from commits since last tag
+          AUTO_CHANGELOG=$(git log --pretty=format:"- %s" $PREV_TAG..HEAD)
+        fi
+        
+        # Create release notes
+        cat > release-notes.md << EOF
+        $TAG_MESSAGE
+        
+        ## Automatic Changelog
+        
+        $AUTO_CHANGELOG
+        
+        ## Installation
+        
+        1. Download the firmware package below
+        2. Extract the files
+        3. Use the grinder tool to upload: \`python3 tools/grinder.py upload firmware.bin\`
+        
+        ## Build Information
+        - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        - Commit: ${{ github.sha }}
+        - Tag: ${{ github.ref_name }}
+        EOF
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat release-notes.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release-artifacts/*.tar.gz
+          release-artifacts/*.bin
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

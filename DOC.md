@@ -9,7 +9,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 - [Parts List](#️-parts-list)
 - [Assembly Video](#-assembly-video)
 - [Installation & Wiring](#-installation--wiring)
-- [Build Instructions](#-build-instructions)
+- [Firmware Installation](#-firmware-installation)
 - [Initial Calibration](#️-initial-calibration)
 - [Usage Guide](#-usage-guide)
 - [User Interface Navigation](#️-user-interface-navigation)
@@ -148,40 +148,51 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 
 ---
 
-## 🚀 Build Instructions
+## 🚀 Firmware Installation
 
-### Development Platform
+### Using Pre-built Firmware (Recommended for Users)
 
-This project uses the **pioarduino ESP32 platform** (a community fork) instead of the standard Espressif ESP32 platform. This ensures proper support for our device.
-
-**Platform Details:**
-- **Platform**: [pioarduino/platform-espressif32](https://github.com/pioarduino/platform-espressif32) (stable release)
-- **Framework**: Arduino ESP32 Core 3.x (controlled by pioarduino platform)
-- **Target**: ESP32-S3 with AMOLED touch display
-
-The platform dependency is automatically handled by PlatformIO via the `platformio.ini` configuration.
-
-### Initial USB Flashing
-```bash
-# Install Python dependencies (auto-handled by grinder tool)
-python3 tools/grinder.py install
-
-# Build and upload via USB
-python3 tools/grinder.py build
-pio run --target upload -e waveshare-esp32s3-touch-amoled-164
-```
+1. **Download firmware** from the [Releases page](https://github.com/jaapp/smart-grind-by-weight/releases)
+2. **Extract the firmware package** and locate the `.bin` file
+3. **Flash via USB** (first time only):
+   ```bash
+   # Install Python dependencies
+   python3 tools/grinder.py install
+   
+   # Upload firmware via USB cable
+   python3 tools/grinder.py upload firmware.bin
+   ```
 
 ### BLE OTA Updates (After Initial Setup)
+
+Once your device is running, you can update wirelessly without needing a USB cable:
+
+#### Prerequisites for BLE Updates
+1. **Enable Bluetooth on device**: Settings → Bluetooth → Toggle ON (or enable startup auto-enable)
+2. **Keep laptop/computer close** to the Waveshare board during upload (within 1-2 meters for reliable connection)
+3. **Download new firmware** from [Releases page](https://github.com/jaapp/smart-grind-by-weight/releases)
+
+#### Upload Process
 ```bash
-# Build firmware and upload wirelessly
-python3 tools/grinder.py build-upload
+# Upload new firmware via Bluetooth (automatically uses full upload for .bin files)
+python3 tools/grinder.py upload firmware.bin
 
-# Or upload specific firmware
-python3 tools/grinder.py upload path/to/firmware.bin
+# Scan for devices if connection fails
+python3 tools/grinder.py scan
 
-# Force full firmware update (skip delta patching)
-python3 tools/grinder.py build-upload --force-full
+# Get device info to verify connection
+python3 tools/grinder.py info
 ```
+
+**⚠️ Important Notes:**
+- **Proximity matters**: Keep your computer within 1-2 meters of the device during upload
+- **Bluetooth auto-timeout**: Device Bluetooth turns off after 30 minutes (re-enable if needed)
+- **Full update**: When uploading `.bin` files, the system automatically performs a complete firmware update
+- **Upload time**: Expect 2-5 minutes for a complete firmware update over BLE
+
+### Building from Source (Developers Only)
+
+If you want to modify the code or contribute to development, see **[DEVELOPMENT.md](DEVELOPMENT.md)** for complete build instructions and development setup.
 
 ---
 

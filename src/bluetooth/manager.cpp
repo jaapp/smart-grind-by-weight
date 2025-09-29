@@ -858,7 +858,7 @@ void BluetoothManager::update_system_info() {
         "\"flash_size\":%u,"
         "\"cpu_freq\":%u"
         "}",
-        BUILD_INTERNAL_FIRMWARE_VERSION,
+        BUILD_FIRMWARE_VERSION,
         BUILD_NUMBER,
         uptime_hours,
         uptime_minutes % 60,
