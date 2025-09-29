@@ -356,7 +356,12 @@ float WeightSensor::get_weight_low_latency() const {
 }
 
 float WeightSensor::get_display_weight() {
-    return raw_to_weight(raw_filter.get_display_raw());
+    float weight = raw_to_weight(raw_filter.get_display_raw());
+    // Clamp tiny values around zero to prevent -0.0g display
+    if (weight > -0.05f && weight < 0.05f) {
+        weight = 0.0f;
+    }
+    return weight;
 }
 
 float WeightSensor::get_weight_high_latency() const {
