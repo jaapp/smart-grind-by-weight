@@ -81,7 +81,7 @@ void WeightGrindStrategy::run_predictive_phase(GrindController& controller,
         if (current_flow_rate >= GRIND_FLOW_DETECTION_THRESHOLD_GPS) {
             controller.grind_latency_ms = loop_data.now - controller.phase_start_time;
             controller.flow_start_confirmed = true;
-            LOG_BLE("[PREDICTIVE] Flow start CONFIRMED! Latency: %lums, Flow: %.2fg/s\n",
+            LOG_BLE("[PREDICTIVE] Flow start CONFIRMED! Latency: %.1fms, Flow: %.2fg/s\n",
                     controller.grind_latency_ms, current_flow_rate);
         }
     }

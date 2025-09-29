@@ -57,7 +57,7 @@ void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const
     lv_obj_set_style_pad_gap(parent, 0, 0);
 
     lv_obj_t* name_label;
-    lv_obj_t* profile_container = create_profile_label(parent, &name_label, &weight_labels[profile_index]);
+    (void)create_profile_label(parent, &name_label, &weight_labels[profile_index]);
     lv_label_set_text(name_label, profile_name);
     lv_obj_add_flag(name_label, LV_OBJ_FLAG_CLICKABLE);
     

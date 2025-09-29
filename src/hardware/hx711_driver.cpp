@@ -145,7 +145,7 @@ void HX711Driver::conversion_24bit() {
     // HX711_ADC data validation
     if (raw_data > 0xFFFFFF) {
         // Data out of range - this shouldn't happen with proper 24-bit data
-        LOG_BLE("HX711Driver: Data out of range - raw=0x%08x\n", raw_data);
+        LOG_BLE("HX711Driver: Data out of range - raw=0x%08lx\n", raw_data);
         return; // Skip this invalid reading
     }
     

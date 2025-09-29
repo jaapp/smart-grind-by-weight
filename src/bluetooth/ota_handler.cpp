@@ -294,8 +294,8 @@ bool OTAHandler::finalize_update() {
         LOG_OTA_DEBUG("esp_ota_get_running_partition() FAILED\n");
         return false;
     }
-    LOG_OTA_DEBUG("Running partition: %s (addr=0x%x, size=%lu)\n", 
-                  running_partition->label, running_partition->address, 
+    LOG_OTA_DEBUG("Running partition: %s (addr=0x%lx, size=%lu)\n", 
+                  running_partition->label, (unsigned long)running_partition->address, 
                   (unsigned long)running_partition->size);
 
     LOG_OTA_DEBUG("Getting next update partition...\n");
@@ -305,8 +305,8 @@ bool OTAHandler::finalize_update() {
         LOG_OTA_DEBUG("esp_ota_get_next_update_partition() FAILED\n");
         return false;
     }
-    LOG_OTA_DEBUG("Update partition: %s (addr=0x%x, size=%lu)\n", 
-                  update_partition->label, update_partition->address, 
+    LOG_OTA_DEBUG("Update partition: %s (addr=0x%lx, size=%lu)\n", 
+                  update_partition->label, (unsigned long)update_partition->address, 
                   (unsigned long)update_partition->size);
     
     LOG_BLE("OTA Info: Running from '%s', updating to '%s'\n", 
