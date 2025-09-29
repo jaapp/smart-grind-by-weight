@@ -811,7 +811,10 @@ void GrindController::start_additional_pulse() {
     
     additional_pulse_count++;
     
-    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums)\n", 
+    // Reset timeout timer to prevent timeout during additional pulses
+    start_time = millis();
+    
+    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums) - timeout timer reset\n", 
             millis(), additional_pulse_count, (unsigned long)pulse_duration_ms);
     
     // Transition to additional pulse phase (without loop_data since this is a manual action)
