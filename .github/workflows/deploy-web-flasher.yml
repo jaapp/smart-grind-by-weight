@@ -25,6 +25,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
+      - name: Populate firmware assets from releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          rm -rf tools/web-flasher/firmware
+          mkdir -p tools/web-flasher/firmware
+
+          REPO="${{ github.repository }}"
+          echo "Fetching release list for $REPO"
+
+          tags=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            --paginate \
+            "/repos/${REPO}/releases?per_page=100" \
+            --jq 'map(select(.draft == false)) | .[].tag_name')
+
+          if [ -z "$tags" ]; then
+            echo "No published releases found"
+            exit 0
+          fi
+
+          for tag in $tags; do
+            download_dir="tools/web-flasher/firmware/${tag}"
+            mkdir -p "$download_dir"
+            echo "Downloading assets for $tag"
+            gh release download "$tag" \
+              --repo "$REPO" \
+              --dir "$download_dir" \
+              --clobber
+          done
+        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         

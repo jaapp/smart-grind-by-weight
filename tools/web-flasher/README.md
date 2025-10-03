@@ -39,12 +39,9 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 4. Click "Connect to Device"
 5. Click "Flash Firmware" when connected
 
-## Firmware URLs
+## Firmware Sources
 
-Use direct links to firmware files from GitHub releases:
-```
-https://github.com/jaapp/smart-grind-by-weight/releases/download/v1.0.0/smart-grind-by-weight-v1.0.0.bin
-```
+The firmware list is pulled straight from GitHub Releases—no files are stored in this repo. If you need the exact asset mapping, see `DOC.md`.
 
 ## Technical Details
 

@@ -34,9 +34,9 @@ Once you push a tag (like `v1.0.0`):
    - Generates OTA patches with heatshrink compression
 
 2. **Updates Web Flasher**
-   - Commits firmware files to `tools/web-flasher/firmware/` on main branch
-   - Auto-generates ESP Web Tools manifest files
-   - Triggers GitHub Pages deployment to https://jaapp.github.io/smart-grind-by-weight/
+   - Generates the ESP Web Tools manifest alongside bootloader, partition, OTA, and blank NVS images
+   - Uploads each artifact to the GitHub Release
+   - The hosted web flasher queries GitHub releases directly, so no binary files are committed back to `main`
 
 3. **Creates GitHub Release (as draft)**
    - Includes automatic changelog from commits since last tag

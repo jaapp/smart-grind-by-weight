@@ -144,22 +144,51 @@ jobs:
           cat release-notes.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            release-artifacts/*.tar.gz
-            release-artifacts/*.bin
-          body: ${{ steps.changelog.outputs.changelog }}
-          draft: true
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
-          generate_release_notes: true
+      - name: Create or update draft release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Trigger web-flasher deployment
         run: |
-          # Trigger web flasher deployment workflow manually
-          gh workflow run deploy-web-flasher.yml
+          set -euo pipefail
+
+          TAG=${{ github.ref_name }}
+          TITLE=${TAG}
+
+          if [ "${IS_PRERELEASE}" = "true" ]; then
+            PRERELEASE_CREATE_FLAG="--prerelease"
+            PRERELEASE_EDIT_FLAG="--prerelease=true"
+          else
+            PRERELEASE_CREATE_FLAG=""
+            PRERELEASE_EDIT_FLAG="--prerelease=false"
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Updating notes and draft state."
+            gh release edit "$TAG" --draft=true $PRERELEASE_EDIT_FLAG --title "$TITLE" --notes-file release-notes.md
+          else
+            echo "Creating new draft release $TAG"
+            gh release create "$TAG" --draft $PRERELEASE_CREATE_FLAG --title "$TITLE" --notes-file release-notes.md
+          fi
+
+      - name: Upload release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG=${{ github.ref_name }}
+
+          echo "Uploading firmware assets for $TAG"
+          gh release upload "$TAG" "release-artifacts/${FIRMWARE_FILE}" --clobber
+          gh release upload "$TAG" "release-artifacts/${BOOTLOADER_FILE}" --clobber
+          gh release upload "$TAG" "release-artifacts/${PARTITIONS_FILE}" --clobber
+          gh release upload "$TAG" "release-artifacts/${OTA_FILE}" --clobber
+          gh release upload "$TAG" "release-artifacts/${MANIFEST_FILE}" --clobber
+          gh release upload "$TAG" "release-artifacts/${BLANK_FILE}" --clobber
+          gh release upload "$TAG" "release-artifacts/${PACKAGE_FILE}" --clobber
+
+      - name: Trigger web flasher deployment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh workflow run deploy-web-flasher.yml
