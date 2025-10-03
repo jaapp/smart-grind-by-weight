@@ -113,41 +113,46 @@ jobs:
         run: |
           set -euo pipefail
 
-          export RELEASE_TAG="$TAG"
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          TAG=${{ github.ref_name }}
+          export TAG
+
           python3 - <<'PY'
-          import os
-          import textwrap
-          from datetime import datetime, timezone
+          if True:
+              import os
+              import textwrap
+              from datetime import datetime, timezone
 
-          tag = os.environ["RELEASE_TAG"]
-          commit = os.environ["GITHUB_SHA"]
-          build_date = datetime.now(timezone.utc).strftime(
-              "%Y-%m-%d %H:%M:%S UTC"
-          )
+              tag = os.environ["TAG"]
+              commit = os.environ["GITHUB_SHA"]
+              build_date = datetime.now(timezone.utc).strftime(
+                  "%Y-%m-%d %H:%M:%S UTC"
+              )
 
-          notes = textwrap.dedent(
-              f"""
-              ## Installation
+              notes = textwrap.dedent(
+                  f"""
+                  ## Installation
 
-              ### Web Installer (Recommended)
-              Visit https://jaapp.github.io/smart-grind-by-weight/
-              and select the desired firmware version.
+                  ### Web Installer (Recommended)
+                  Visit https://jaapp.github.io/smart-grind-by-weight/
+                  and select the desired firmware version.
 
-              ### Command Line (Alternative)
-              1. Download the firmware `.bin` asset from the release.
-              2. Run:
-                 python3 tools/grinder.py upload \
-                 smart-grind-by-weight-{tag}.bin
+                  ### Command Line (Alternative)
+                  1. Download the firmware .bin asset from this release.
+                  2. Run:
+                     python3 tools/grinder.py upload \
+                     smart-grind-by-weight-{tag}.bin
 
-              ## Build Information
-              - Build Date: {build_date}
-              - Commit: {commit}
-              - Tag: {tag}
-              """
-          ).strip() + "\n"
+                  ## Build Information
+                  - Build Date: {build_date}
+                  - Commit: {commit}
+                  - Tag: {tag}
+                  """
+              ).strip() + "\n"
 
-          with open("release-notes.md", "w", encoding="utf-8") as handle:
-              handle.write(notes)
+              with open("release-notes.md", "w", encoding="utf-8") as handle:
+                  handle.write(notes)
           PY
 
           echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
