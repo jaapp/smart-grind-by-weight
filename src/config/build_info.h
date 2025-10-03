@@ -4,7 +4,7 @@
 #include "../../include/git_info.h"
 
 // Build information - BUILD_FIRMWARE_VERSION is automatically updated by release scripts
-#define BUILD_FIRMWARE_VERSION "1.3.0-rc.9"                                          // Firmware version string (updated by release automation)
+#define BUILD_FIRMWARE_VERSION "1.3.0-rc.10"                                          // Firmware version string (updated by release automation)
 // BUILD_NUMBER is now defined in git_info.h as an auto-incrementing integer
 #define BUILD_DATE __DATE__                                                // Compiler-provided build date
 #define BUILD_TIME __TIME__                                                // Compiler-provided build time
