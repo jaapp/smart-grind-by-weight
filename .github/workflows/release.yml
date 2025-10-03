@@ -39,87 +39,64 @@ jobs:
         run: |
           mkdir -p release-artifacts
           VERSION=${{ github.ref_name }}
-          # Copy firmware binary from the main environment with versioned name
+
+          # Copy firmware binaries with versioned names
           cp .pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin release-artifacts/smart-grind-by-weight-${VERSION}.bin
-        
-          # Copy versioned firmware to tools/web-flasher for CORS-free hosting
-          mkdir -p tools/web-flasher/firmware
-        
-          # Copy firmware with version in filename (application only)
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}.bin
-        
-          # Copy versioned partition files (partition tables can change between versions)
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/bootloader.bin tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}-bootloader.bin
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/partitions.bin tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}-partitions.bin
-        
-          # Create blank 8KB NVS partition file if it doesn't exist (0xe000 to 0x10000)
-          if [ ! -f tools/web-flasher/firmware/blank_8KB.bin ]; then
-            dd if=/dev/zero of=tools/web-flasher/firmware/blank_8KB.bin bs=8192 count=1
-          fi
-        
-          # Generate web-specific OTA patch files with version
+          cp .pio/build/waveshare-esp32s3-touch-amoled-164/bootloader.bin release-artifacts/smart-grind-by-weight-${VERSION}-bootloader.bin
+          cp .pio/build/waveshare-esp32s3-touch-amoled-164/partitions.bin release-artifacts/smart-grind-by-weight-${VERSION}-partitions.bin
+
+          # Create blank 8KB NVS partition file (0xe000 to 0x10000)
+          dd if=/dev/zero of=release-artifacts/blank_8KB.bin bs=8192 count=1
+
+          # Generate web-specific OTA patch file
           pip install detools
-          if [ -f "tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}.bin" ]; then
-            echo "Generating web OTA patch for smart-grind-by-weight-${VERSION}.bin"
-            # Create empty file for delta base
-            touch empty.bin
-            # Generate compressed patch against empty file (web flasher only)
-            detools create_patch -c heatshrink empty.bin "tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}.bin" "tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}-web-ota.bin"
-            echo "Web OTA patch created: smart-grind-by-weight-${VERSION}-web-ota.bin ($(du -h "tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}-web-ota.bin" | cut -f1))"
-          fi
-        
-          # Generate individual manifest files for each firmware version
-          echo "Generating manifest files..."
-          cd tools/web-flasher/firmware
-          for firmware_file in smart-grind-by-weight-v*.bin; do
-            if [[ -f "$firmware_file" && "$firmware_file" != *"-web-ota.bin" && "$firmware_file" != *"-bootloader.bin" && "$firmware_file" != *"-partitions.bin" ]]; then
-              # Extract version from filename
-              firmware_version=$(echo "$firmware_file" | sed 's/smart-grind-by-weight-v\(.*\)\.bin/\1/')
-              manifest_file="${firmware_file%.bin}.manifest.json"
-              
-              # Create manifest file with proper ESP32-S3 partition layout using versioned partition files
-              bootloader_file="${firmware_file%.bin}-bootloader.bin"
-              partitions_file="${firmware_file%.bin}-partitions.bin"
-              
-              printf '{\n  "name": "Smart Grind By Weight",\n  "version": "%s",\n  "home_assistant_domain": "grinder",\n  "new_install_skip_erase": true,\n  "builds": [\n    {\n      "chipFamily": "ESP32-S3",\n      "parts": [\n        {\n          "path": "%s",\n          "offset": 0\n        },\n        {\n          "path": "%s",\n          "offset": 32768\n        },\n        {\n          "path": "blank_8KB.bin",\n          "offset": 57344\n        },\n        {\n          "path": "%s",\n          "offset": 3276800\n        }\n      ]\n    }\n  ]\n}\n' "$firmware_version" "$bootloader_file" "$partitions_file" "$firmware_file" > "$manifest_file"
-              echo "Generated manifest: $manifest_file"
-            fi
-          done
-          cd ../../..
-          # Create a firmware package
+          echo "Generating web OTA patch for smart-grind-by-weight-${VERSION}.bin"
+          touch empty.bin
+          detools create_patch -c heatshrink empty.bin "release-artifacts/smart-grind-by-weight-${VERSION}.bin" "release-artifacts/smart-grind-by-weight-${VERSION}-web-ota.bin"
+          echo "Web OTA patch created: smart-grind-by-weight-${VERSION}-web-ota.bin ($(du -h "release-artifacts/smart-grind-by-weight-${VERSION}-web-ota.bin" | cut -f1))"
+
+          # Generate manifest file
+          echo "Generating manifest file..."
           cd release-artifacts
-          tar -czf smart-grind-by-weight-${{ github.ref_name }}.tar.gz *.bin
+          VERSION_NUMBER=$(echo "${VERSION}" | sed 's/^v//')
+
+          cat > "smart-grind-by-weight-${VERSION}.manifest.json" << EOF
+          {
+            "name": "Smart Grind By Weight",
+            "version": "${VERSION_NUMBER}",
+            "home_assistant_domain": "grinder",
+            "new_install_skip_erase": true,
+            "builds": [
+              {
+                "chipFamily": "ESP32-S3",
+                "parts": [
+                  {
+                    "path": "smart-grind-by-weight-${VERSION}-bootloader.bin",
+                    "offset": 0
+                  },
+                  {
+                    "path": "smart-grind-by-weight-${VERSION}-partitions.bin",
+                    "offset": 32768
+                  },
+                  {
+                    "path": "blank_8KB.bin",
+                    "offset": 57344
+                  },
+                  {
+                    "path": "smart-grind-by-weight-${VERSION}.bin",
+                    "offset": 3276800
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+          echo "Generated manifest: smart-grind-by-weight-${VERSION}.manifest.json"
+
+          # Create a firmware package
+          tar -czf smart-grind-by-weight-${VERSION}.tar.gz *.bin *.manifest.json
           cd ..
-        
-      - name: Commit web-flasher firmware files
-        run: |
-          # Configure git
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-        
-          # Switch to main branch (we're in detached HEAD from tag checkout)
-          git checkout main
-          git pull origin main
-        
-          # Copy the versioned firmware files to the main branch
-          mkdir -p tools/web-flasher/firmware
-          VERSION=${{ github.ref_name }}
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}.bin 2>/dev/null || true
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/bootloader.bin tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}-bootloader.bin 2>/dev/null || true
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/partitions.bin tools/web-flasher/firmware/smart-grind-by-weight-${VERSION}-partitions.bin 2>/dev/null || true
-          find . -name "*-web-ota.bin" -exec cp {} tools/web-flasher/firmware/ \; 2>/dev/null || true
-          find . -name "blank_8KB.bin" -exec cp {} tools/web-flasher/firmware/ \; 2>/dev/null || true
-        
-        
-          # Add the generated firmware files and manifests for web flasher
-          git add tools/web-flasher/firmware/*.bin tools/web-flasher/firmware/*.manifest.json
-        
-          # Only commit if there are changes
-          if ! git diff --staged --quiet; then
-            git commit -m "chore: Update web-flasher firmware for release ${{ github.ref_name }}"
-            git push origin main
-          fi
-        
+
       - name: Prepare release notes
         id: changelog
         run: |
@@ -153,6 +130,16 @@ jobs:
           TAG=${{ github.ref_name }}
           TITLE=${TAG}
 
+          # Default to stable release; override when tag indicates prerelease
+          IS_PRERELEASE="false"
+
+          # Detect if this is a prerelease (RC, alpha, beta, etc.)
+          if [[ "$TAG" == *"-rc."* ]] || [[ "$TAG" == *"-alpha"* ]] || [[ "$TAG" == *"-beta"* ]]; then
+            IS_PRERELEASE="true"
+          fi
+
+          echo "IS_PRERELEASE=${IS_PRERELEASE}" >> "$GITHUB_ENV"
+
           if [ "${IS_PRERELEASE}" = "true" ]; then
             PRERELEASE_CREATE_FLAG="--prerelease"
             PRERELEASE_EDIT_FLAG="--prerelease=true"
@@ -176,15 +163,16 @@ jobs:
           set -euo pipefail
 
           TAG=${{ github.ref_name }}
+          IS_PRERELEASE=${IS_PRERELEASE:-false}
 
-          echo "Uploading firmware assets for $TAG"
-          gh release upload "$TAG" "release-artifacts/${FIRMWARE_FILE}" --clobber
-          gh release upload "$TAG" "release-artifacts/${BOOTLOADER_FILE}" --clobber
-          gh release upload "$TAG" "release-artifacts/${PARTITIONS_FILE}" --clobber
-          gh release upload "$TAG" "release-artifacts/${OTA_FILE}" --clobber
-          gh release upload "$TAG" "release-artifacts/${MANIFEST_FILE}" --clobber
-          gh release upload "$TAG" "release-artifacts/${BLANK_FILE}" --clobber
-          gh release upload "$TAG" "release-artifacts/${PACKAGE_FILE}" --clobber
+          echo "Uploading firmware assets for $TAG (prerelease: ${IS_PRERELEASE})"
+          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}.bin" --clobber
+          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}-bootloader.bin" --clobber
+          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}-partitions.bin" --clobber
+          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}-web-ota.bin" --clobber
+          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}.manifest.json" --clobber
+          gh release upload "$TAG" "release-artifacts/blank_8KB.bin" --clobber
+          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}.tar.gz" --clobber
 
       - name: Trigger web flasher deployment
         env:

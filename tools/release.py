@@ -238,38 +238,7 @@ def clean_old_rc_tags():
             print(f"  - {tag}")
         return False
 
-    # Clean up web-flasher firmware files for deleted RC tags
-    print("\nCleaning web-flasher firmware files...")
-    web_flasher_dir = Path(__file__).parent / "web-flasher" / "firmware"
-    if web_flasher_dir.exists():
-        deleted_firmware_files = []
-        for tag in tags_to_delete:
-            # Remove 'v' prefix for filename matching
-            version = tag.lstrip('v')
-            # Find all files matching this version
-            pattern = f"smart-grind-by-weight-{version}*"
-            matching_files = list(web_flasher_dir.glob(pattern))
-
-            for file_path in matching_files:
-                try:
-                    file_path.unlink()
-                    deleted_firmware_files.append(file_path.name)
-                except Exception as e:
-                    print(f"  ⚠️  Failed to delete {file_path.name}: {e}")
-
-        if deleted_firmware_files:
-            print(f"  ✅ Deleted {len(deleted_firmware_files)} firmware files")
-            # Stage the deletions
-            run_command(f'git add {web_flasher_dir}')
-        else:
-            print("  No firmware files found to delete")
-    else:
-        print("  Web-flasher directory not found, skipping firmware cleanup")
-
     print(f"\n✅ Successfully deleted {len(tags_to_delete)} old RC tags (local and remote)!")
-    if deleted_firmware_files:
-        print(f"✅ Deleted {len(deleted_firmware_files)} firmware files from web-flasher")
-        print("\n⚠️  Don't forget to commit the firmware file deletions!")
     return True
 
 def create_release():
