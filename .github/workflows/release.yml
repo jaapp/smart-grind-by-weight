@@ -67,34 +67,35 @@ jobs:
 
           VERSION_NUMBER=${VERSION#v}
           python3 - "$OUT_DIR" "$BASE" "$VERSION_NUMBER" <<'PY'
-            import json
-            import os
-            import sys
+          if True:
+              import json
+              import os
+              import sys
 
-            out_dir, base, version = sys.argv[1:4]
+              out_dir, base, version = sys.argv[1:4]
 
-            manifest = {
-                "name": "Smart Grind By Weight",
-                "version": version,
-                "home_assistant_domain": "grinder",
-                "new_install_skip_erase": True,
-                "builds": [
-                    {
-                        "chipFamily": "ESP32-S3",
-                        "parts": [
-                            {"path": f"{base}-bootloader.bin", "offset": 0},
-                            {"path": f"{base}-partitions.bin", "offset": 32768},
-                            {"path": "blank_8KB.bin", "offset": 57344},
-                            {"path": f"{base}.bin", "offset": 3276800},
-                        ],
-                    }
-                ],
-            }
+              manifest = {
+                  "name": "Smart Grind By Weight",
+                  "version": version,
+                  "home_assistant_domain": "grinder",
+                  "new_install_skip_erase": True,
+                  "builds": [
+                      {
+                          "chipFamily": "ESP32-S3",
+                          "parts": [
+                              {"path": f"{base}-bootloader.bin", "offset": 0},
+                              {"path": f"{base}-partitions.bin", "offset": 32768},
+                              {"path": "blank_8KB.bin", "offset": 57344},
+                              {"path": f"{base}.bin", "offset": 3276800},
+                          ],
+                      }
+                  ],
+              }
 
-            path = os.path.join(out_dir, f"{base}.manifest.json")
-            with open(path, "w", encoding="utf-8") as handle:
-                json.dump(manifest, handle, indent=2)
-                handle.write("\n")
+              path = os.path.join(out_dir, f"{base}.manifest.json")
+              with open(path, "w", encoding="utf-8") as handle:
+                  json.dump(manifest, handle, indent=2)
+                  handle.write("\n")
           PY
 
           FILES=(
