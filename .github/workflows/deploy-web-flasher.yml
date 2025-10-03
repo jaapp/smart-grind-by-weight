@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - 'tools/web-flasher/**'  # Deploy when web-flasher files change (after firmware commit)
+  release:
+    types: [ published, unpublished, deleted ]
   workflow_dispatch:
 
 permissions:
