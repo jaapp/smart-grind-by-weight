@@ -114,46 +114,24 @@ jobs:
           set -euo pipefail
 
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
           TAG=${{ github.ref_name }}
-          export TAG
+          COMMIT=${{ github.sha }}
 
-          python3 - <<'PY'
-          if True:
-              import os
-              import textwrap
-              from datetime import datetime, timezone
-
-              tag = os.environ["TAG"]
-              commit = os.environ["GITHUB_SHA"]
-              build_date = datetime.now(timezone.utc).strftime(
-                  "%Y-%m-%d %H:%M:%S UTC"
-              )
-
-              notes = textwrap.dedent(
-                  f"""
-                  ## Installation
-
-                  ### Web Installer (Recommended)
-                  Visit https://jaapp.github.io/smart-grind-by-weight/
-                  and select the desired firmware version.
-
-                  ### Command Line (Alternative)
-                  1. Download the firmware .bin asset from this release.
-                  2. Run:
-                     python3 tools/grinder.py upload \
-                     smart-grind-by-weight-{tag}.bin
-
-                  ## Build Information
-                  - Build Date: {build_date}
-                  - Commit: {commit}
-                  - Tag: {tag}
-                  """
-              ).strip() + "\n"
-
-              with open("release-notes.md", "w", encoding="utf-8") as handle:
-                  handle.write(notes)
-          PY
+          {
+            printf '## Installation\n\n'
+            printf '### Web Installer (Recommended)\n'
+            printf 'Visit https://jaapp.github.io/smart-grind-by-weight/\n'
+            printf 'and select the desired firmware version.\n\n'
+            printf '### Command Line (Alternative)\n'
+            printf '1. Download the firmware .bin asset from this release.\n'
+            printf '2. Run:\n'
+            printf '   python3 tools/grinder.py upload '
+            printf '   smart-grind-by-weight-%s.bin\n\n' "$TAG"
+            printf '## Build Information\n'
+            printf '- Build Date: %s\n' "$BUILD_DATE"
+            printf '- Commit: %s\n' "$COMMIT"
+            printf '- Tag: %s\n' "$TAG"
+          } > release-notes.md
 
           echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
           cat release-notes.md >> "$GITHUB_OUTPUT"
