@@ -269,60 +269,46 @@ function sleep(ms) {
 }
 
 // Firmware download
-async function downloadFirmware(primaryUrl, fallbackUrls = []) {
-    const sources = [primaryUrl, ...fallbackUrls.filter(Boolean)];
-    let lastError = null;
+async function downloadFirmware(url) {
+    if (!url) {
+        throw new Error('No firmware URL provided');
+    }
 
-    for (const source of sources) {
-        if (!source) {
-            continue;
-        }
+    updateStatus(`Downloading firmware from ${url}`, 'info');
+    updateProgress(0);
 
-        updateStatus(`Downloading firmware from ${source}`, 'info');
-        updateProgress(0);
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
 
-        try {
-            const response = await fetch(source);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+    const contentLength = parseInt(response.headers.get('content-length'));
+    const reader = response.body.getReader();
+    const chunks = [];
+    let receivedBytes = 0;
 
-            const contentLength = parseInt(response.headers.get('content-length'));
-            const reader = response.body.getReader();
-            const chunks = [];
-            let receivedBytes = 0;
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+        chunks.push(value);
+        receivedBytes += value.length;
 
-                chunks.push(value);
-                receivedBytes += value.length;
-
-                if (contentLength) {
-                    const progress = (receivedBytes / contentLength) * 100;
-                    updateProgress(progress);
-                }
-            }
-
-            const firmware = new Uint8Array(receivedBytes);
-            let offset = 0;
-            for (const chunk of chunks) {
-                firmware.set(chunk, offset);
-                offset += chunk.length;
-            }
-
-            updateStatus(`Downloaded ${Math.round(firmware.length / 1024)}KB firmware`, 'success');
-            return firmware;
-        } catch (error) {
-            console.error('Firmware download attempt failed:', source, error);
-            lastError = error;
+        if (contentLength) {
+            const progress = (receivedBytes / contentLength) * 100;
+            updateProgress(progress);
         }
     }
 
-    const errorMessage = lastError ? lastError.message : 'Unknown download error';
-    updateStatus(`Download failed: ${errorMessage}`, 'error');
-    throw lastError || new Error(errorMessage);
+    const firmware = new Uint8Array(receivedBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+        firmware.set(chunk, offset);
+        offset += chunk.length;
+    }
+
+    updateStatus(`Downloaded ${Math.round(firmware.length / 1024)}KB firmware`, 'success');
+    return firmware;
 }
 
 // BLE Connection
@@ -419,6 +405,11 @@ function extractVersionFromUrl(url, fallbackVersion = null) {
     if (fallbackVersion) {
         return fallbackVersion;
     }
+
+    const pagesMatch = url.match(/firmware\/v([^/]+)\//i);
+    if (pagesMatch) {
+        return pagesMatch[1];
+    }
     // Extract version directly from GitHub release URL
     const versionMatch = url.match(/\/releases\/download\/v?(\d+\.\d+\.\d+(?:-[\w\.]+)?)/);
     if (versionMatch) {
@@ -444,10 +435,6 @@ async function flashFirmware() {
     
     const selectedOption = firmwareSelect.selectedOptions[0];
     const firmwareUrl = selectedOption ? (selectedOption.dataset?.ota || firmwareSelect.value) : firmwareSelect.value;
-    const firmwareFallbacks = [];
-    if (selectedOption?.dataset?.otaFallback) {
-        firmwareFallbacks.push(selectedOption.dataset.otaFallback);
-    }
     if (!firmwareUrl) {
         updateStatus('Please select a firmware version', 'error');
         return;
@@ -463,7 +450,7 @@ async function flashFirmware() {
     
     try {
         // Download firmware
-        const firmwareData = await downloadFirmware(firmwareUrl, firmwareFallbacks);
+        const firmwareData = await downloadFirmware(firmwareUrl);
         const patchData = prepareFirmwareData(firmwareData);
         
         updateStatus('Starting firmware update...', 'info');
@@ -483,7 +470,7 @@ async function flashFirmware() {
         }
         
         // Extract expected version from URL
-        const expectedVersion = extractVersionFromUrl(firmwareUrl, selectedOption?.dataset?.version);
+        const expectedVersion = selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl);
         if (expectedVersion) {
             updateStatus(`Installing version: ${expectedVersion}`, 'info');
         }
@@ -627,7 +614,6 @@ function updateManifestFirmware() {
     const select = document.getElementById('usbFirmwareSelect');
     const selectedOption = select.selectedOptions[0];
     const manifestUrl = selectedOption?.dataset?.manifest || select.value;
-    const manifestFallback = selectedOption?.dataset?.manifestFallback;
     const displayLabel = selectedOption?.dataset?.display || manifestUrl;
 
     if (manifestUrl) {
@@ -641,11 +627,6 @@ function updateManifestFirmware() {
         // Update the ESP Web Tools button's manifest attribute (use proxy when needed for CORS)
         const installButton = document.getElementById('usbInstallButton');
         installButton.setAttribute('manifest', manifestUrl);
-        if (manifestFallback) {
-            installButton.dataset.manifestFallback = manifestFallback;
-        } else {
-            delete installButton.dataset.manifestFallback;
-        }
     } else {
         document.getElementById('usbStatus').style.display = 'none';
     }
@@ -694,53 +675,29 @@ async function loadReleases() {
 
         normalized.forEach(release => {
             const label = release.prerelease ? `${release.displayLabel} (pre-release)` : release.displayLabel;
+            const manifestUrl = release.manifest?.pagesUrl;
+            const otaUrl = release.ota?.pagesUrl;
 
-            if (release.manifest && (!release.prerelease || showRC)) {
-                const manifestPrimary = release.manifest.pagesUrl || release.manifest.downloadUrl;
-                const manifestFallback = release.manifest.downloadUrl && release.manifest.downloadUrl !== manifestPrimary
-                    ? release.manifest.downloadUrl
-                    : '';
-
+            if (manifestUrl && (!release.prerelease || showRC)) {
                 const option = document.createElement('option');
-                option.value = manifestPrimary || '';
+                option.value = manifestUrl;
                 option.textContent = label;
                 option.dataset.display = label;
                 option.dataset.version = release.version;
                 option.dataset.releaseTag = release.tag;
-                option.dataset.manifest = manifestPrimary || '';
-                if (manifestFallback) {
-                    option.dataset.manifestFallback = manifestFallback;
-                }
-                if (release.firmware?.pagesUrl) {
-                    option.dataset.firmware = release.firmware.pagesUrl;
-                } else if (release.firmware?.downloadUrl) {
-                    option.dataset.firmware = release.firmware.downloadUrl;
-                }
+                option.dataset.manifest = manifestUrl;
                 option.dataset.prerelease = release.prerelease ? 'true' : 'false';
                 usbSelect.appendChild(option);
             }
 
-            if (release.ota && (!release.prerelease || showRCOTA)) {
-                const otaPrimary = release.ota.pagesUrl || release.ota.downloadUrl;
-                const otaFallback = release.ota.downloadUrl && release.ota.downloadUrl !== otaPrimary
-                    ? release.ota.downloadUrl
-                    : '';
-
+            if (otaUrl && (!release.prerelease || showRCOTA)) {
                 const option = document.createElement('option');
-                option.value = otaPrimary || '';
+                option.value = otaUrl;
                 option.textContent = label;
                 option.dataset.display = label;
                 option.dataset.version = release.version;
                 option.dataset.releaseTag = release.tag;
-                option.dataset.ota = otaPrimary || '';
-                if (otaFallback) {
-                    option.dataset.otaFallback = otaFallback;
-                }
-                if (release.firmware?.pagesUrl) {
-                    option.dataset.firmware = release.firmware.pagesUrl;
-                } else if (release.firmware?.downloadUrl) {
-                    option.dataset.firmware = release.firmware.downloadUrl;
-                }
+                option.dataset.ota = otaUrl;
                 option.dataset.prerelease = release.prerelease ? 'true' : 'false';
                 otaSelect.appendChild(option);
             }

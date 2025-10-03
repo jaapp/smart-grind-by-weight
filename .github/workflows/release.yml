@@ -1,126 +1,157 @@
+# yamllint disable rule:truthy
+---
 name: Build and Release Firmware
 
 on:
   push:
     tags:
-      - 'v*'  # Triggers on version tags like v1.0.0, v1.2.3
+      - 'v*'
 
 permissions:
   contents: write
   actions: write
-  
+
 jobs:
   release:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for changelog
-    
+          fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-    
+
       - name: Install PlatformIO
         run: |
-          pip install platformio
-    
+          python3 -m pip install --no-cache-dir platformio
+
       - name: Build firmware
         run: |
-          # Use platformio directly like local development to ensure identical build
-          # Install dependencies first to ensure exact versions
+          set -euo pipefail
+
           pio pkg install
           pio run -e waveshare-esp32s3-touch-amoled-164
-        
+
       - name: Prepare release artifacts
         run: |
-          mkdir -p release-artifacts
+          set -euo pipefail
+
           VERSION=${{ github.ref_name }}
+          BUILD_DIR=".pio/build/waveshare-esp32s3-touch-amoled-164"
+          OUT_DIR="release-artifacts"
+          BASE="smart-grind-by-weight-${VERSION}"
 
-          # Copy firmware binaries with versioned names
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin release-artifacts/smart-grind-by-weight-${VERSION}.bin
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/bootloader.bin release-artifacts/smart-grind-by-weight-${VERSION}-bootloader.bin
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/partitions.bin release-artifacts/smart-grind-by-weight-${VERSION}-partitions.bin
+          mkdir -p "$OUT_DIR"
 
-          # Create blank 8KB NVS partition file (0xe000 to 0x10000)
-          dd if=/dev/zero of=release-artifacts/blank_8KB.bin bs=8192 count=1
+          cp "$BUILD_DIR/firmware.bin" "$OUT_DIR/${BASE}.bin"
+          cp "$BUILD_DIR/bootloader.bin" "$OUT_DIR/${BASE}-bootloader.bin"
+          cp "$BUILD_DIR/partitions.bin" "$OUT_DIR/${BASE}-partitions.bin"
 
-          # Generate web-specific OTA patch file
-          pip install detools
-          echo "Generating web OTA patch for smart-grind-by-weight-${VERSION}.bin"
+          dd if=/dev/zero of="$OUT_DIR/blank_8KB.bin" bs=8192 count=1
+
+          python3 -m pip install --no-cache-dir detools
+          echo "Generating web OTA patch for ${BASE}.bin"
+          pushd "$OUT_DIR" >/dev/null
           touch empty.bin
-          detools create_patch -c heatshrink empty.bin "release-artifacts/smart-grind-by-weight-${VERSION}.bin" "release-artifacts/smart-grind-by-weight-${VERSION}-web-ota.bin"
-          echo "Web OTA patch created: smart-grind-by-weight-${VERSION}-web-ota.bin ($(du -h "release-artifacts/smart-grind-by-weight-${VERSION}-web-ota.bin" | cut -f1))"
+          detools create_patch \
+            -c heatshrink \
+            empty.bin \
+            "${BASE}.bin" \
+            "${BASE}-web-ota.bin"
+          rm empty.bin
 
-          # Generate manifest file
-          echo "Generating manifest file..."
-          cd release-artifacts
-          VERSION_NUMBER=$(echo "${VERSION}" | sed 's/^v//')
+          VERSION_NUMBER=${VERSION#v}
+          python3 - "$OUT_DIR" "$BASE" "$VERSION_NUMBER" <<'PY'
+            import json
+            import os
+            import sys
 
-          cat > "smart-grind-by-weight-${VERSION}.manifest.json" << EOF
-          {
-            "name": "Smart Grind By Weight",
-            "version": "${VERSION_NUMBER}",
-            "home_assistant_domain": "grinder",
-            "new_install_skip_erase": true,
-            "builds": [
-              {
-                "chipFamily": "ESP32-S3",
-                "parts": [
-                  {
-                    "path": "smart-grind-by-weight-${VERSION}-bootloader.bin",
-                    "offset": 0
-                  },
-                  {
-                    "path": "smart-grind-by-weight-${VERSION}-partitions.bin",
-                    "offset": 32768
-                  },
-                  {
-                    "path": "blank_8KB.bin",
-                    "offset": 57344
-                  },
-                  {
-                    "path": "smart-grind-by-weight-${VERSION}.bin",
-                    "offset": 3276800
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-          echo "Generated manifest: smart-grind-by-weight-${VERSION}.manifest.json"
+            out_dir, base, version = sys.argv[1:4]
 
-          # Create a firmware package
-          tar -czf smart-grind-by-weight-${VERSION}.tar.gz *.bin *.manifest.json
-          cd ..
+            manifest = {
+                "name": "Smart Grind By Weight",
+                "version": version,
+                "home_assistant_domain": "grinder",
+                "new_install_skip_erase": True,
+                "builds": [
+                    {
+                        "chipFamily": "ESP32-S3",
+                        "parts": [
+                            {"path": f"{base}-bootloader.bin", "offset": 0},
+                            {"path": f"{base}-partitions.bin", "offset": 32768},
+                            {"path": "blank_8KB.bin", "offset": 57344},
+                            {"path": f"{base}.bin", "offset": 3276800},
+                        ],
+                    }
+                ],
+            }
+
+            path = os.path.join(out_dir, f"{base}.manifest.json")
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(manifest, handle, indent=2)
+                handle.write("\n")
+          PY
+
+          FILES=(
+            "${BASE}.bin"
+            "${BASE}-bootloader.bin"
+            "${BASE}-partitions.bin"
+            "${BASE}-web-ota.bin"
+            "${BASE}.manifest.json"
+            "blank_8KB.bin"
+          )
+          tar -czf "${BASE}.tar.gz" "${FILES[@]}"
+          popd >/dev/null
 
       - name: Prepare release notes
         id: changelog
         run: |
-          # Create simple release notes with installation instructions
-          cat > release-notes.md << EOF
-          ## Installation
-        
-          ### Web Installer (Recommended)
-          Visit [Web Installer](https://jaapp.github.io/smart-grind-by-weight/) and select firmware version ${{ github.ref_name }}
-        
-          ### Command Line (Alternative)
-          1. Download \`smart-grind-by-weight-${{ github.ref_name }}.bin\` below
-          2. Use the grinder tool to upload: \`python3 tools/grinder.py upload smart-grind-by-weight-${{ github.ref_name }}.bin\`
-        
-          ## Build Information
-          - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          - Commit: ${{ github.sha }}
-          - Tag: ${{ github.ref_name }}
-          EOF
-        
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat release-notes.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        
+          set -euo pipefail
+
+          python3 - "$TAG" "${{ github.sha }}" <<'PY'
+            from datetime import datetime, timezone
+            import sys
+            import textwrap
+
+            tag, commit = sys.argv[1:3]
+            build_date = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+            content = textwrap.dedent(
+                f"""
+                ## Installation
+
+                ### Web Installer (Recommended)
+                Visit https://jaapp.github.io/smart-grind-by-weight/
+                and select the desired firmware version.
+
+                ### Command Line (Alternative)
+                1. Download the firmware `.bin` asset from the release
+                2. Run:
+                   ```bash
+                   python3 tools/grinder.py upload <downloaded-file>.bin
+                   ```
+
+                ## Build Information
+                - Build Date: {build_date}
+                - Commit: {commit}
+                - Tag: {tag}
+                """
+            ).lstrip()
+
+            with open("release-notes.md", "w", encoding="utf-8") as handle:
+                handle.write(content)
+          PY
+
+          echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
+          cat release-notes.md >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Create or update draft release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,12 +160,11 @@ jobs:
 
           TAG=${{ github.ref_name }}
           TITLE=${TAG}
-
-          # Default to stable release; override when tag indicates prerelease
           IS_PRERELEASE="false"
 
-          # Detect if this is a prerelease (RC, alpha, beta, etc.)
-          if [[ "$TAG" == *"-rc."* ]] || [[ "$TAG" == *"-alpha"* ]] || [[ "$TAG" == *"-beta"* ]]; then
+          if [[ "$TAG" == *"-rc."* ]] \
+            || [[ "$TAG" == *"-alpha"* ]] \
+            || [[ "$TAG" == *"-beta"* ]]; then
             IS_PRERELEASE="true"
           fi
 
@@ -150,10 +180,17 @@ jobs:
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Updating notes and draft state."
-            gh release edit "$TAG" --draft=true $PRERELEASE_EDIT_FLAG --title "$TITLE" --notes-file release-notes.md
+            gh release edit "$TAG" \
+              --draft=true \
+              $PRERELEASE_EDIT_FLAG \
+              --title "$TITLE" \
+              --notes-file release-notes.md
           else
             echo "Creating new draft release $TAG"
-            gh release create "$TAG" --draft $PRERELEASE_CREATE_FLAG --title "$TITLE" --notes-file release-notes.md
+            gh release create "$TAG" \
+              --draft $PRERELEASE_CREATE_FLAG \
+              --title "$TITLE" \
+              --notes-file release-notes.md
           fi
 
       - name: Upload release assets
@@ -163,16 +200,24 @@ jobs:
           set -euo pipefail
 
           TAG=${{ github.ref_name }}
-          IS_PRERELEASE=${IS_PRERELEASE:-false}
+          OUT_DIR="release-artifacts"
+          BASE="smart-grind-by-weight-${TAG}"
+          ASSETS=(
+            "${BASE}.bin"
+            "${BASE}-bootloader.bin"
+            "${BASE}-partitions.bin"
+            "${BASE}-web-ota.bin"
+            "${BASE}.manifest.json"
+            "blank_8KB.bin"
+            "${BASE}.tar.gz"
+          )
 
-          echo "Uploading firmware assets for $TAG (prerelease: ${IS_PRERELEASE})"
-          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}.bin" --clobber
-          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}-bootloader.bin" --clobber
-          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}-partitions.bin" --clobber
-          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}-web-ota.bin" --clobber
-          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}.manifest.json" --clobber
-          gh release upload "$TAG" "release-artifacts/blank_8KB.bin" --clobber
-          gh release upload "$TAG" "release-artifacts/smart-grind-by-weight-${TAG}.tar.gz" --clobber
+          echo "Uploading firmware assets for $TAG"
+          echo "Prerelease flag: ${IS_PRERELEASE:-false}"
+
+          for asset in "${ASSETS[@]}"; do
+            gh release upload "$TAG" "$OUT_DIR/$asset" --clobber
+          done
 
       - name: Trigger web flasher deployment
         env:
