@@ -266,6 +266,10 @@ void TaskManager::suspend_hardware_tasks() {
     if (task_handles.grind_control_task) {
         vTaskSuspend(task_handles.grind_control_task);
     }
+
+    if (task_handles.file_io_task) {
+        vTaskSuspend(task_handles.file_io_task);
+    }
     
     ota_suspended = true;
 }
@@ -281,6 +285,10 @@ void TaskManager::resume_hardware_tasks() {
     
     if (task_handles.grind_control_task) {
         vTaskResume(task_handles.grind_control_task);
+    }
+
+    if (task_handles.file_io_task) {
+        vTaskResume(task_handles.file_io_task);
     }
     
     ota_suspended = false;
