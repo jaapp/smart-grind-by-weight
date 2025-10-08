@@ -20,26 +20,29 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 - [Troubleshooting](#-troubleshooting)
 
 ---
-
 ## 🛠️ Parts List
 
-### Electronics
-- **[Waveshare ESP32-S3 1.64inch AMOLED Touch Display](https://www.waveshare.com/esp32-s3-touch-amoled-1.64.htm)** - Main controller
-- **HX711 ADC module** - Load cell amplifier
-- **MAVIN or T70 load cell** (0.3 - 1KG range) - Don't use cheap unshielded small load cells, you'll hurt the accuracy
-  - **1kg**: Recommended. Suits portafilter use cases.
-  - **0.3kg**: Only suitable for dosing cups.
-  - Examples:
+> **Note:** All links are **for reference only** — sellers and items are **not personally verified** unless explicitly stated.
+
+- **[Waveshare ESP32-S3 1.64" AMOLED Touch Display](https://www.waveshare.com/esp32-s3-touch-amoled-1.64.htm)** — Main controller
+- **[HX711 ADC module](https://nl.aliexpress.com/item/1005006851380544.html)** — Load cell amplifier
+- **MAVIN or T70 load cell** (0.3 – 1 kg range) — Weight sensor  
+  ⚠️ Avoid cheap unshielded small load cells — accuracy will suffer
+  - **1 kg:** Recommended. Suits portafilter use cases.
+  - **0.3 kg:** Only suitable for dosing cups.
+  - **Examples:**
     - [AliExpress T70](https://nl.aliexpress.com/item/1005009409460619.html)
     - [TinyTronics MAVIN](https://www.tinytronics.nl/en/sensors/weight-pressure-force/load-cells/mavin-load-cell-0.3kg)
-    - [Mavin 0.3 or 1kg](https://www.alibaba.com/product-detail/subject_1601564701384.html)
-    - [T70 1kg](https://nl.aliexpress.com/item/1005008658337192.html)
-  - **Tested**: Only the 1KG T70 load cell and 0.3KG Mavin load cell have been personally tested
-- **6× M3 screws** (±10mm long)
-- **1000μF capacitor** (10V) - Power filtering
-- **Wires and dupont connectors**
-- **Angled pin headers** (not the straight kind)
-- **JST-PH 4 pin male connector** (optional - if you don't want to solder to Eureka)
+    - [Mavin 0.3 / 1 kg](https://www.alibaba.com/product-detail/subject_1601564701384.html)
+    - [T70 1 kg](https://nl.aliexpress.com/item/1005008658337192.html)
+  - **Tested:** Only the 1 kg T70 and 0.3 kg Mavin load cells have been personally verified
+- **6× M3 screws** (≈10 mm) — Mounting hardware
+- **1000 µF capacitor** (10 V) — Power filtering [Example (untested)](https://nl.aliexpress.com/item/1005008995345289.html)
+- **Wires & Dupont connectors** — General wiring  
+  Example: [22 AWG silicone wire set](https://www.aliexpress.com/item/2255800441309579.html)
+- **Dupont connector kit** — [Example (untested)](https://nl.aliexpress.com/item/1005008995345289.html)
+- **Angled pin headers** — [Example (untested)](https://nl.aliexpress.com/item/1005006149080284.html)
+- **[JST-PH 4-pin male connector (optional)](https://nl.aliexpress.com/item/1005009479983500.html)** — Optional solder-free connection to Eureka
 
 [<img src="media/waveshare_board_wired_up_1.jpg" alt="Wired Waveshare Board" width="30%">](media/waveshare_board_wired_up_1.jpg)
 
