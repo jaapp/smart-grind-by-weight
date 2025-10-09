@@ -18,6 +18,7 @@ private:
     lv_obj_t* grind_mode_page;
     lv_obj_t* tools_page;
     lv_obj_t* data_page;
+    lv_obj_t* stats_page;
     lv_obj_t* diagnostics_page;
 
     // Info tab elements
@@ -31,6 +32,16 @@ private:
     lv_obj_t* events_label;
     lv_obj_t* measurements_label;
     lv_obj_t* refresh_stats_button;
+
+    // Lifetime statistics labels
+    lv_obj_t* stat_total_grinds_label;
+    lv_obj_t* stat_shots_label;
+    lv_obj_t* stat_motor_runtime_label;
+    lv_obj_t* stat_device_uptime_label;
+    lv_obj_t* stat_total_weight_label;
+    lv_obj_t* stat_mode_grinds_label;
+    lv_obj_t* stat_avg_accuracy_label;
+    lv_obj_t* stat_total_pulses_label;
     
     // Settings tab elements
     lv_obj_t* ble_toggle;
@@ -112,6 +123,7 @@ private:
     void create_grind_mode_page(lv_obj_t* parent);
     void create_tools_page(lv_obj_t* parent);
     void create_data_page(lv_obj_t* parent);
+    void create_stats_page(lv_obj_t* parent);
     void create_diagnostics_page(lv_obj_t* parent);
     lv_obj_t* create_separator(lv_obj_t* parent, const char* text = nullptr);
     lv_obj_t* create_menu_item(lv_obj_t* parent, const char* text);
@@ -124,4 +136,5 @@ private:
                                        const char *value);
     lv_obj_t *create_data_label(lv_obj_t *parent, const char *name,
                                 lv_obj_t **variable);
+    lv_obj_t *create_description_label(lv_obj_t *parent, const char *text);
 };

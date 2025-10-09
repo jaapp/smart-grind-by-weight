@@ -3,6 +3,7 @@
 #include <esp_system.h>
 #include "hardware/hardware_manager.h"
 #include "system/state_machine.h"
+#include "system/statistics_manager.h"
 #include "controllers/profile_controller.h"
 #include "controllers/grind_controller.h"
 #include "ui/ui_manager.h"
@@ -67,6 +68,7 @@ void setup() {
     
     hardware_manager.init();
     profile_controller.init(hardware_manager.get_preferences());
+    statistics_manager.init(hardware_manager.get_preferences());
     grind_controller.init(hardware_manager.get_load_cell(), hardware_manager.get_grinder(), hardware_manager.get_preferences());
     
     // Set up the reference so HardwareManager can query GrindController state
@@ -149,6 +151,27 @@ void loop() {
     core1_cycle_count_10s++;
     if (core1_last_heartbeat_time == 0) core1_last_heartbeat_time = cycle_start_time;
 #endif
+
+    // Update device uptime statistics every 15 minutes, reporting back in hours
+    static uint32_t last_uptime_update = 0;
+    static uint32_t pending_uptime_minutes = 0;
+    uint32_t current_time = millis();
+    if (last_uptime_update == 0) {
+        last_uptime_update = current_time;
+    }
+    constexpr uint32_t kUptimeIntervalMs = 900000; // 15 minutes
+    constexpr uint32_t kUptimeIntervalMinutes = 15;
+    uint32_t elapsed_ms = current_time - last_uptime_update;
+    if (elapsed_ms >= kUptimeIntervalMs) {
+        uint32_t intervals = elapsed_ms / kUptimeIntervalMs;
+        pending_uptime_minutes += intervals * kUptimeIntervalMinutes;
+        last_uptime_update += intervals * kUptimeIntervalMs;
+
+        while (pending_uptime_minutes >= 60) {
+            statistics_manager.update_uptime(1);
+            pending_uptime_minutes -= 60;
+        }
+    }
     
     // Check OTA state and suspend hardware tasks if needed
     static bool hardware_suspended = false;

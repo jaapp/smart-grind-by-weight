@@ -5,6 +5,7 @@
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../config/constants.h"
+#include "../system/statistics_manager.h"
 
 namespace {
 
@@ -164,6 +165,18 @@ void GrindLogger::end_grind_session(const char* final_result, float final_weight
     // Don't save sessions that were ended abnormally (e.g., cancelled or timed out).
     bool is_abnormal_termination = (strcmp(final_result, "STOPPED_BY_USER") == 0) ||
                                    (termination_reason == GrindTerminationReason::TIMEOUT);
+
+    // Update statistics for successful grinds (not abnormal terminations)
+    if (!is_abnormal_termination) {
+        bool is_weight_mode = (mode == GrindMode::WEIGHT);
+        statistics_manager.update_grind_session(
+            final_weight,
+            current_session->error_grams,
+            pulse_count,
+            is_weight_mode,
+            current_session->total_motor_on_time_ms
+        );
+    }
 
     // Check if logging is enabled before saving to flash
     Preferences logging_prefs;

@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "../../config/constants.h"
 #include "../../logging/grind_logging.h"
+#include "../../system/statistics_manager.h"
 #include "../../hardware/hardware_manager.h"
 #include "grinding_screen.h"
 #include "../event_bridge_lvgl.h"
@@ -92,8 +93,11 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     tools_page = lv_menu_page_create(menu, "Tools");
     create_tools_page(tools_page);
     
-    data_page = lv_menu_page_create(menu, "Data");
+    data_page = lv_menu_page_create(menu, "Logs & Data");
     create_data_page(data_page);
+
+    stats_page = lv_menu_page_create(menu, "Lifetime Stats");
+    create_stats_page(stats_page);
 
     diagnostics_page = lv_menu_page_create(menu, "Diagnostics");
     create_diagnostics_page(diagnostics_page);
@@ -117,18 +121,21 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
     lv_menu_set_load_page_event(menu, tools_item, tools_page);
 
-    lv_obj_t* data_item = create_menu_item(main_page, "Data");
+    lv_obj_t* data_item = create_menu_item(main_page, "Logs & Data");
     lv_menu_set_load_page_event(menu, data_item, data_page);
+
+    lv_obj_t* stats_item = create_menu_item(main_page, "Lifetime Stats");
+    lv_menu_set_load_page_event(menu, stats_item, stats_page);
 
     // Set main page as active (menu will be the landing page)
     lv_menu_set_page(menu, main_page);
 
-    // Used for loading statistics when the data page is shown
+    // Refresh lifetime/log statistics whenever the Data or Stats page is displayed
     auto changing_page_callback = [](lv_event_t * e) {
         SettingsScreen * self = static_cast<SettingsScreen*>(lv_event_get_user_data(e));
         lv_obj_t * menu = static_cast<lv_obj_t *>(lv_event_get_target(e));
         lv_obj_t * cur = lv_menu_get_cur_main_page(menu);
-        if (cur == self->data_page) {
+        if (cur == self->data_page || cur == self->stats_page) {
             self->refresh_statistics();
         }
     };
@@ -151,7 +158,9 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
 
     char build_info[64];
     snprintf(build_info, sizeof(build_info), "#%d", BUILD_NUMBER);
-    
+
+    create_description_label(parent, "Device metrics and current status snapshot.");
+
     create_static_data_label(parent, "Firmware:", "v" BUILD_FIRMWARE_VERSION);
     create_static_data_label(parent, "Build:", build_info);    
     
@@ -276,21 +285,46 @@ void SettingsScreen::create_data_page(lv_obj_t* parent) {
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
+    create_description_label(parent, "Saved grind logs stored on the grinder for export/analysis.");
 
     create_toggle_row(parent, "Logging", &logging_toggle);
 
+    // Log data section
+    create_separator(parent, "Log Data");
     create_data_label(parent, "Sessions:", &sessions_label);
     create_data_label(parent, "Events:", &events_label);
     create_data_label(parent, "Metrics:", &measurements_label);
 
-    refresh_stats_button = create_button(parent, "Refresh Stats");
-    lv_obj_add_flag(refresh_stats_button, LV_OBJ_FLAG_HIDDEN); // Refresh button is not used anymore
     // Reset separator
     create_separator(parent, "Reset");
 
-    purge_button = create_button(parent, "Purge History", lv_color_hex(THEME_COLOR_WARNING));
+    purge_button = create_button(parent, "Purge Logs", lv_color_hex(THEME_COLOR_WARNING));
     lv_obj_set_style_margin_bottom(purge_button, 10, 0);
     reset_button = create_button(parent, "Factory Reset", lv_color_hex(THEME_COLOR_ERROR));
+}
+
+void SettingsScreen::create_stats_page(lv_obj_t* parent) {
+    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_set_scroll_dir(parent, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
+
+    create_description_label(parent, "Lifetime totals for the grinder.");
+
+    create_separator(parent, "Lifetime Statistics");
+    create_data_label(parent, "Total Grinds:", &stat_total_grinds_label);
+    create_data_label(parent, "Shots (S/D/C):", &stat_shots_label);
+    create_data_label(parent, "Motor Runtime:", &stat_motor_runtime_label);
+    create_data_label(parent, "Device Uptime:", &stat_device_uptime_label);
+    create_data_label(parent, "Total Weight:", &stat_total_weight_label);
+    create_data_label(parent, "Mode (W/T):", &stat_mode_grinds_label);
+    create_data_label(parent, "Avg Accuracy:", &stat_avg_accuracy_label);
+    create_data_label(parent, "Total Pulses:", &stat_total_pulses_label);
+
+    refresh_stats_button = create_button(parent, "Refresh Stats");
+    lv_obj_set_style_margin_top(refresh_stats_button, 10, 0);
 }
 
 void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
@@ -480,9 +514,69 @@ void SettingsScreen::refresh_statistics(bool show_overlay) {
 
     // Define the statistics loading operation
     auto load_statistics_operation = [this]() {
+        // Log data
         set_label_text_int(sessions_label, grind_logger.get_total_flash_sessions());
         set_label_text_int(events_label, grind_logger.count_total_events_in_flash());
         set_label_text_int(measurements_label, grind_logger.count_total_measurements_in_flash());
+
+        // Lifetime statistics
+        set_label_text_int(stat_total_grinds_label, statistics_manager.get_total_grinds());
+
+        // Shot type breakdown (Single/Double/Custom)
+        char shot_text[32];
+        snprintf(shot_text, sizeof(shot_text), "%lu / %lu / %lu",
+                 statistics_manager.get_single_shots(),
+                 statistics_manager.get_double_shots(),
+                 statistics_manager.get_custom_shots());
+        lv_label_set_text(stat_shots_label, shot_text);
+
+        // Motor runtime (convert seconds to hours:minutes)
+        uint64_t runtime_ms = statistics_manager.get_motor_runtime_ms();
+        uint32_t runtime_sec = static_cast<uint32_t>(runtime_ms / 1000ULL);
+        uint32_t hours = runtime_sec / 3600;
+        uint32_t minutes = (runtime_sec % 3600) / 60;
+        uint32_t seconds = runtime_sec % 60;
+        char runtime_text[32];
+        if (runtime_sec >= 3600) {
+            snprintf(runtime_text, sizeof(runtime_text), "%luh %lum", hours, minutes);
+        } else if (runtime_sec >= 60) {
+            snprintf(runtime_text, sizeof(runtime_text), "%lum %lus", minutes, seconds);
+        } else if (runtime_ms >= 1000) {
+            float seconds_float = static_cast<float>(runtime_ms) / 1000.0f;
+            snprintf(runtime_text, sizeof(runtime_text), "%.1fs", seconds_float);
+        } else {
+            snprintf(runtime_text, sizeof(runtime_text), "%llums", static_cast<unsigned long long>(runtime_ms));
+        }
+        lv_label_set_text(stat_motor_runtime_label, runtime_text);
+
+        // Device uptime
+        char uptime_text[32];
+        snprintf(uptime_text, sizeof(uptime_text), "%lu hours", statistics_manager.get_device_uptime_hrs());
+        lv_label_set_text(stat_device_uptime_label, uptime_text);
+
+        // Total weight
+        char weight_text[32];
+        snprintf(weight_text, sizeof(weight_text), "%.2f kg", statistics_manager.get_total_weight_kg());
+        lv_label_set_text(stat_total_weight_label, weight_text);
+
+        // Mode grinds (Weight/Time)
+        char mode_text[32];
+        snprintf(mode_text, sizeof(mode_text), "%lu / %lu",
+                 statistics_manager.get_weight_mode_grinds(),
+                 statistics_manager.get_time_mode_grinds());
+        lv_label_set_text(stat_mode_grinds_label, mode_text);
+
+        // Average accuracy
+        char accuracy_text[32];
+        snprintf(accuracy_text, sizeof(accuracy_text), "%.2fg", statistics_manager.get_avg_accuracy_g());
+        lv_label_set_text(stat_avg_accuracy_label, accuracy_text);
+
+        // Total pulses (also show average)
+        char pulses_text[32];
+        snprintf(pulses_text, sizeof(pulses_text), "%lu (avg: %.1f)",
+                 statistics_manager.get_total_pulses(),
+                 statistics_manager.get_avg_pulses());
+        lv_label_set_text(stat_total_pulses_label, pulses_text);
     };
 
     // Used for when we reload the statistics after a data purge
@@ -703,17 +797,41 @@ lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, 
     lv_obj_set_layout(container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_flex_align(container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END);
-    
+
     lv_obj_t* label = lv_label_create(container);
     lv_label_set_text(label, name);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    
+
     *variable = lv_label_create(container);
     lv_label_set_text(*variable, "");
     lv_obj_set_style_text_font(*variable, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(*variable, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
     lv_obj_set_style_text_align(*variable, LV_TEXT_ALIGN_RIGHT, 0);
+
+    return label;
+}
+
+lv_obj_t* SettingsScreen::create_description_label(lv_obj_t* parent, const char* text) {
+    // Create container with padding (similar to create_data_label)
+    lv_obj_t* container = lv_obj_create(parent);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(container, 0, 0);
+    lv_obj_set_style_pad_all(container, 0, 0);
+    lv_obj_set_style_pad_left(container, 10, 0);
+    lv_obj_set_style_pad_right(container, 14, 0);
+    lv_obj_set_style_margin_top(container, 12, 0);
+    lv_obj_set_style_margin_bottom(container, 12, 0);
+    lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
+    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Create label inside container
+    lv_obj_t* label = lv_label_create(container);
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(label, LV_PCT(100));
 
     return label;
 }

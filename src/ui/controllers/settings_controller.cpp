@@ -11,6 +11,7 @@
 #include "../../controllers/grind_mode_traits.h"
 #include "../../logging/grind_logging.h"
 #include "../../system/diagnostics_controller.h"
+#include "../../system/statistics_manager.h"
 #include "../components/blocking_overlay.h"
 #include "../components/ui_operations.h"
 #include "../event_bridge_lvgl.h"
@@ -98,12 +99,11 @@ void SettingsUIController::handle_reset() {
 
     ui_manager_->show_confirmation(
         "FACTORY RESET",
-        "This will reset all settings to factory defaults:"
-        "\n\n"
+        "This will reset all settings to factory defaults:\n\n"
         "• Profile weights\n"
         "• Calibration data\n"
-        "• Grind history"
-        "\n\n"
+        "• Grind history\n"
+        "• Lifetime statistics\n\n"
         "This action cannot be undone.",
         "RESET",
         lv_color_hex(THEME_COLOR_ERROR),
@@ -117,11 +117,12 @@ void SettingsUIController::handle_purge() {
     if (!ui_manager_) return;
 
     ui_manager_->show_confirmation(
-        "PURGE GRIND HISTORY",
-        "This will permanently delete all grind history data from flash memory."
+        "PURGE LOGS",
+        "This will remove all saved grind log files from flash.\n"
+        "Lifetime statistics will be preserved."
         "\n\n"
         "This action cannot be undone.",
-        "PURGE",
+        "PURGE LOGS",
         lv_color_hex(THEME_COLOR_ERROR),
         [this]() { execute_purge_operation(); },
         "CANCEL",
@@ -396,19 +397,19 @@ void SettingsUIController::execute_purge_operation() {
     };
 
     auto purge_task = []() {
-        LOG_DEBUG_PRINTLN("\n=== PURGE GRIND HISTORY INITIATED ===");
+        LOG_DEBUG_PRINTLN("\n=== PURGE GRIND LOGS INITIATED ===");
         extern GrindLogger grind_logger;
         bool success = grind_logger.clear_all_sessions_from_flash();
         if (success) {
-            LOG_DEBUG_PRINTLN("Grind history purged successfully - reinitializing logger...");
+            LOG_DEBUG_PRINTLN("Grind logs purged successfully - reinitializing logger...");
         } else {
-            LOG_DEBUG_PRINTLN("ERROR: Failed to purge all grind history data!");
+            LOG_DEBUG_PRINTLN("ERROR: Failed to purge all grind log data!");
         }
     };
 
     auto& overlay = BlockingOperationOverlay::getInstance();
     overlay.show_and_execute(BlockingOperation::CUSTOM, purge_task, completion,
-                             "PURGING HISTORY...\nPlease wait");
+                             "PURGING LOGS...\nPlease wait");
 }
 
 void SettingsUIController::run_motor_test() {
@@ -419,6 +420,10 @@ void SettingsUIController::run_motor_test() {
 
     ui_manager_->set_background_active(true);
     grinder->start_pulse_rmt(1000);
+
+    // Update statistics for motor test (1000ms = 1 second)
+    statistics_manager.update_motor_test(1000);
+
     stop_motor_timer();
     motor_timer_ = lv_timer_create(static_motor_timer_cb, 2000, this);
     if (motor_timer_) {

@@ -3,6 +3,7 @@
 #include "../hardware/circular_buffer_math/circular_buffer_math.h"
 #include "../config/constants.h"
 #include "../system/diagnostics_controller.h"
+#include "../system/statistics_manager.h"
 #include <Arduino.h>
 #include <cstdarg>
 #include <cstring>
@@ -856,18 +857,21 @@ void GrindController::start_additional_pulse() {
     }
     
     additional_pulse_count++;
-    
+
+    // Update statistics for time mode pulse
+    statistics_manager.update_time_pulse();
+
     // Reset timeout timer to prevent timeout during additional pulses
     start_time = millis();
-    
-    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums) - timeout timer reset\n", 
+
+    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums) - timeout timer reset\n",
             millis(), additional_pulse_count, (unsigned long)pulse_duration_ms);
-    
+
     // Transition to additional pulse phase (without loop_data since this is a manual action)
     GrindLoopData empty_loop_data = {};
     empty_loop_data.now = millis();
     switch_phase(GrindPhase::TIME_ADDITIONAL_PULSE, empty_loop_data);
-    
+
     // Start the pulse
     grinder->start_pulse_rmt(pulse_duration_ms);
     
