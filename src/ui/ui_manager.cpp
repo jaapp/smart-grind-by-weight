@@ -278,7 +278,6 @@ void UIManager::register_controller_events() {
     if (edit_controller_) edit_controller_->register_events();
     if (grinding_controller_) grinding_controller_->register_events();
     if (settings_controller_) settings_controller_->register_events();
-    if (status_indicator_controller_) status_indicator_controller_->register_events();
     if (calibration_controller_) calibration_controller_->register_events();
     if (confirm_controller_) confirm_controller_->register_events();
     if (ota_data_export_controller_) ota_data_export_controller_->register_events();

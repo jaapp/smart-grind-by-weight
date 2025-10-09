@@ -11,7 +11,6 @@ public:
     explicit StatusIndicatorController(UIManager* manager);
 
     void build();
-    void register_events();
     void update();
 
 private:

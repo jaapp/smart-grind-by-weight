@@ -23,8 +23,7 @@ void StatusIndicatorController::build() {
     lv_obj_set_style_text_color(ble_status_icon_, lv_color_hex(THEME_COLOR_ACCENT), 0);
     lv_obj_align(ble_status_icon_, LV_ALIGN_TOP_RIGHT, -10, 10);
     lv_obj_add_flag(ble_status_icon_, LV_OBJ_FLAG_HIDDEN);
-    // Extend touch target area without changing visual size (48x48 touch target)
-    lv_obj_set_ext_click_area(ble_status_icon_, 12);
+    lv_obj_clear_flag(ble_status_icon_, LV_OBJ_FLAG_CLICKABLE);
 
     // Create warning icon (left of BLE icon)
     warning_icon_ = lv_label_create(lv_scr_act());
@@ -33,34 +32,10 @@ void StatusIndicatorController::build() {
     lv_obj_set_style_text_color(warning_icon_, lv_color_hex(THEME_COLOR_WARNING), 0);
     lv_obj_align(warning_icon_, LV_ALIGN_TOP_RIGHT, -45, 10);
     lv_obj_add_flag(warning_icon_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(warning_icon_, LV_OBJ_FLAG_CLICKABLE);
-    // Extend touch target area without changing visual size (48x48 touch target)
-    lv_obj_set_ext_click_area(warning_icon_, 12);
+    lv_obj_clear_flag(warning_icon_, LV_OBJ_FLAG_CLICKABLE);
 
     update_ble_status_icon();
     update_warning_icon();
-}
-
-void StatusIndicatorController::register_events() {
-    if (!warning_icon_) {
-        return;
-    }
-
-    lv_obj_add_event_cb(warning_icon_, [](lv_event_t* e) {
-        if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-        auto* controller = static_cast<StatusIndicatorController*>(lv_event_get_user_data(e));
-        if (!controller || !controller->ui_manager_) return;
-
-        // Navigate to Settings → Diagnostics page
-        controller->ui_manager_->switch_to_state(UIState::SETTINGS);
-
-        // Set the menu to show the diagnostics page
-        lv_obj_t* menu = controller->ui_manager_->settings_screen.get_tabview();
-        lv_obj_t* diagnostics_page = controller->ui_manager_->settings_screen.get_diagnostics_page();
-        if (menu && diagnostics_page) {
-            lv_menu_set_page(menu, diagnostics_page);
-        }
-    }, LV_EVENT_CLICKED, this);
 }
 
 void StatusIndicatorController::update() {
