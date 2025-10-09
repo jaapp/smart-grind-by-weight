@@ -387,16 +387,15 @@ async function flashFirmware() {
             chunkCount++;
             // Update progress every 10 chunks (much faster UI)
             if (chunkCount % 10 === 0 || i + CHUNK_SIZE >= patchData.length) {
-                const progress = Math.round(((i + chunk.length) / patchData.length) * 90); // Reserve 10% for apply phase
+                const progress = Math.round(((i + chunk.length) / patchData.length) * 100);
                 updateProgress(progress);
                 updateStatus(`Uploading: ${progress}%`, 'info');
             }
             
             // No delay - let browser BLE handle flow control naturally
         }
-        
+
         updateStatus('Upload complete, applying update...', 'info');
-        updateProgress(95);
         
         // Send end command
         try {
