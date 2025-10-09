@@ -77,10 +77,16 @@ void setup() {
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
     bool ota_failed = !failed_ota_build.isEmpty();
-    
+
+    // Check calibration status to determine initial screen
+    bool is_calibrated = hardware_manager.get_weight_sensor()->is_calibrated();
+
     if (ota_failed) {
         LOG_BLE("BOOT: Starting in OTA failure state for expected build %s\n", failed_ota_build.c_str());
         state_machine.init(UIState::OTA_UPDATE_FAILED);
+    } else if (!is_calibrated) {
+        LOG_BLE("BOOT: Device not calibrated - starting in CALIBRATION state\n");
+        state_machine.init(UIState::CALIBRATION);
     } else {
         state_machine.init(UIState::READY);
     }
