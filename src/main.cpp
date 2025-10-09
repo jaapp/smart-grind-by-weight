@@ -167,9 +167,9 @@ void loop() {
         pending_uptime_minutes += intervals * kUptimeIntervalMinutes;
         last_uptime_update += intervals * kUptimeIntervalMs;
 
-        while (pending_uptime_minutes >= 60) {
-            statistics_manager.update_uptime(1);
-            pending_uptime_minutes -= 60;
+        if (pending_uptime_minutes > 0) {
+            statistics_manager.update_uptime(pending_uptime_minutes);
+            pending_uptime_minutes = 0;
         }
     }
     

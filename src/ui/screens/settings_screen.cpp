@@ -551,7 +551,9 @@ void SettingsScreen::refresh_statistics(bool show_overlay) {
 
         // Device uptime
         char uptime_text[32];
-        snprintf(uptime_text, sizeof(uptime_text), "%lu hours", statistics_manager.get_device_uptime_hrs());
+        uint32_t uptime_hours = statistics_manager.get_device_uptime_hrs();
+        uint32_t uptime_minutes = statistics_manager.get_device_uptime_min_remainder();
+        snprintf(uptime_text, sizeof(uptime_text), "%luh %lum", uptime_hours, uptime_minutes);
         lv_label_set_text(stat_device_uptime_label, uptime_text);
 
         // Total weight
