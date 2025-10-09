@@ -82,9 +82,14 @@ void CalibrationUIController::update() {
 
         // In weight step, verify user has placed weight on scale
         if (current_step == CAL_STEP_WEIGHT) {
+#if DEBUG_ENABLE_LOADCELL_MOCK
+            // Always show OK button when using mock driver
+            ui_manager_->calibration_screen.set_ok_button_enabled(true);
+#else
             int32_t adc_delta = abs(raw_reading - baseline_adc_value_);
             bool weight_detected = adc_delta >= HW_LOADCELL_CAL_MIN_ADC_VALUE;
             ui_manager_->calibration_screen.set_ok_button_enabled(weight_detected);
+#endif
         }
     }
 }
