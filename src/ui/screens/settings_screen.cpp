@@ -315,14 +315,14 @@ void SettingsScreen::create_stats_page(lv_obj_t* parent) {
     create_description_label(parent, "Lifetime totals for the grinder.");
 
     create_separator(parent, "Lifetime Statistics");
-    create_data_label(parent, "Total Grinds:", &stat_total_grinds_label);
-    create_data_label(parent, "Shots (S/D/C):", &stat_shots_label);
-    create_data_label(parent, "Motor Runtime:", &stat_motor_runtime_label);
-    create_data_label(parent, "Device Uptime:", &stat_device_uptime_label);
-    create_data_label(parent, "Total Weight:", &stat_total_weight_label);
-    create_data_label(parent, "Mode (W/T):", &stat_mode_grinds_label);
-    create_data_label(parent, "Avg Accuracy:", &stat_avg_accuracy_label);
-    create_data_label(parent, "Total Pulses:", &stat_total_pulses_label);
+    create_data_label(parent, "Total Grinds:", &stat_total_grinds_label, true);
+    create_data_label(parent, "Shots (S/D/C):", &stat_shots_label, true);
+    create_data_label(parent, "Motor Runtime:", &stat_motor_runtime_label, true);
+    create_data_label(parent, "Device Uptime:", &stat_device_uptime_label, true);
+    create_data_label(parent, "Total Weight:", &stat_total_weight_label, true);
+    create_data_label(parent, "Mode (W/T):", &stat_mode_grinds_label, true);
+    create_data_label(parent, "Avg Accuracy:", &stat_avg_accuracy_label, true);
+    create_data_label(parent, "Total Pulses:", &stat_total_pulses_label, true);
 
     refresh_stats_button = create_button(parent, "Refresh Stats");
     lv_obj_set_style_margin_top(refresh_stats_button, 10, 0);
@@ -344,7 +344,7 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     // Status indicator
     create_data_label(parent, "Status:", &diag_status_label);
 
-    // Calibration factor
+    // Calibration factor - stacked for long decimal values
     create_data_label(parent, "Cal. factor:", &diag_calibration_factor_label);
 
     // Info label (only shown when not calibrated)
@@ -364,7 +364,7 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     // Noise Floor separator
     create_separator(parent, "Noise Floor");
 
-    // Std dev readings (moved from System Info)
+    // Std dev readings (moved from System Info) - stacked for precision values
     create_data_label(parent, "Std Dev (g):", &diag_std_dev_g_label);
     create_data_label(parent, "Std Dev (ADC):", &diag_std_dev_adc_label);
     create_data_label(parent, "Noise level:", &diag_noise_level_label);
@@ -373,7 +373,7 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     create_separator(parent, "Motor Response");
 
     // Motor latency
-    create_data_label(parent, "Motor Latency:", &diag_motor_latency_label);
+    create_data_label(parent, "Motor Latency:", &diag_motor_latency_label, true);
 
     // Static info label about calibration dependency
     lv_obj_t* cal_info = lv_label_create(parent);
