@@ -23,7 +23,7 @@ public:
     const char* name() const override { return "Weight"; }
 
 private:
-    float get_effective_flow_rate(const GrindController& controller) const;
+    float get_clamped_pulse_flow_rate(const GrindController& controller) const;
     float calculate_pulse_duration_ms(const GrindController& controller, float error_grams) const;
     void run_predictive_phase(GrindController& controller, const GrindLoopData& loop_data) const;
     void run_pulse_decision_phase(GrindController& controller, const GrindLoopData& loop_data) const;

@@ -47,11 +47,11 @@ int WeightGrindStrategy::progress_percent(const GrindSessionDescriptor&,
     return 0;
 }
 
-float WeightGrindStrategy::get_effective_flow_rate(const GrindController& controller) const {
+float WeightGrindStrategy::get_clamped_pulse_flow_rate(const GrindController& controller) const {
     float flow_rate = controller.pulse_flow_rate;
 
     if (flow_rate < GRIND_FLOW_RATE_MIN_SANE_GPS) {
-        flow_rate = GRIND_FLOW_RATE_REFERENCE_GPS;
+        flow_rate = GRIND_PULSE_FLOW_RATE_FALLBACK_GPS;
     } else if (flow_rate > GRIND_FLOW_RATE_MAX_SANE_GPS) {
         flow_rate = GRIND_FLOW_RATE_MAX_SANE_GPS;
     }
@@ -61,8 +61,8 @@ float WeightGrindStrategy::get_effective_flow_rate(const GrindController& contro
 
 float WeightGrindStrategy::calculate_pulse_duration_ms(const GrindController& controller,
                                                        float error_grams) const {
-    float effective_flow_rate = get_effective_flow_rate(controller);
-    float base_duration = (error_grams / effective_flow_rate) * 1000.0f;
+    float clamped_flow_rate = get_clamped_pulse_flow_rate(controller);
+    float base_duration = (error_grams / clamped_flow_rate) * 1000.0f;
     float final_duration = max(GRIND_MOTOR_MIN_PULSE_DURATION_MS, min(base_duration, GRIND_MOTOR_MAX_PULSE_DURATION_MS));
     return final_duration;
 }
