@@ -46,8 +46,8 @@
 // TIMING CONSTRAINTS (Hardware-dependent)
 //------------------------------------------------------------------------------
 // Motor response latency - runtime configurable via auto-tune
-#define GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS 75.0f                             // Safe default motor response latency
-#define GRIND_MOTOR_MAX_PULSE_DURATION_MS 225.0f                                  // Maximum pulse duration above latency (latency + 225ms)
+#define GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS 50.0f                             // Safe default motor response latency
+#define GRIND_MOTOR_MAX_PULSE_DURATION_MS 250.0f                                  // Maximum pulse duration above latency (latency + GRIND_MOTOR_MAX_PULSE_DURATION_MS)
 
 // Motor timing
 #define GRIND_MOTOR_SETTLING_TIME_MS 200                                          // Motor vibration settling time

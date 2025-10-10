@@ -62,12 +62,18 @@ float WeightGrindStrategy::get_clamped_pulse_flow_rate(const GrindController& co
 float WeightGrindStrategy::calculate_pulse_duration_ms(const GrindController& controller,
                                                        float error_grams) const {
     float clamped_flow_rate = get_clamped_pulse_flow_rate(controller);
-    float base_duration = (error_grams / clamped_flow_rate) * 1000.0f;
 
-    // Use runtime motor latency values instead of compile-time constants
-    float min_pulse_ms = controller.get_min_pulse_duration();
-    float max_pulse_ms = controller.get_max_pulse_duration();
-    float final_duration = max(min_pulse_ms, min(base_duration, max_pulse_ms));
+    // Calculate the productive grinding time needed (excludes startup latency)
+    float productive_duration_ms = (error_grams / clamped_flow_rate) * 1000.0f;
+
+    // Motor latency is the base time needed to start the system
+    float motor_latency_ms = controller.get_motor_response_latency();
+
+    // Clamp productive duration to valid range (0 to max additional time)
+    float clamped_productive_ms = max(0.0f, min(productive_duration_ms, GRIND_MOTOR_MAX_PULSE_DURATION_MS));
+
+    // Total pulse = latency (startup) + productive grinding time
+    float final_duration = motor_latency_ms + clamped_productive_ms;
 
     return final_duration;
 }
