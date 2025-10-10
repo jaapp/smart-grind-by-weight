@@ -46,31 +46,32 @@ void AutoTuneUIController::update() {
         return;
     }
 
-    // If autotune was started but screen is not showing progress, show it
-    if (autotune_started_ && autotune_controller->is_active()) {
-        // Update progress display
-        const AutoTuneProgress& progress = autotune_controller->get_progress();
-        ui_manager_->autotune_screen.update_progress(progress);
+    // Advance backend state machine first
+    autotune_controller->update();
 
-        // Check if completed
-        if (progress.phase == AutoTunePhase::COMPLETE_SUCCESS) {
-            const AutoTuneResult& result = autotune_controller->get_result();
-            ui_manager_->autotune_screen.show_success_screen(result.latency_ms, progress.previous_latency_ms);
-
-            // Update diagnostics display
-            ui_manager_->settings_screen.update_diagnostics(hw_manager->get_weight_sensor());
-
-            autotune_started_ = false;
-        } else if (progress.phase == AutoTunePhase::COMPLETE_FAILURE) {
-            const AutoTuneResult& result = autotune_controller->get_result();
-            ui_manager_->autotune_screen.show_failure_screen(result.error_message);
-            autotune_started_ = false;
-        }
+    if (!autotune_started_) {
+        return;
     }
 
-    // Call backend update if active
+    const AutoTuneProgress& progress = autotune_controller->get_progress();
+
+    if (progress.phase == AutoTunePhase::COMPLETE_SUCCESS) {
+        const AutoTuneResult& result = autotune_controller->get_result();
+        ui_manager_->autotune_screen.show_success_screen(result.latency_ms, progress.previous_latency_ms);
+        ui_manager_->settings_screen.update_diagnostics(hw_manager->get_weight_sensor());
+        autotune_started_ = false;
+        return;
+    }
+
+    if (progress.phase == AutoTunePhase::COMPLETE_FAILURE) {
+        const AutoTuneResult& result = autotune_controller->get_result();
+        ui_manager_->autotune_screen.show_failure_screen(result.error_message);
+        autotune_started_ = false;
+        return;
+    }
+
     if (autotune_controller->is_active()) {
-        autotune_controller->update();
+        ui_manager_->autotune_screen.update_progress(progress);
     }
 }
 
