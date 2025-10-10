@@ -369,12 +369,6 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     create_data_label(parent, "Std Dev (ADC):", &diag_std_dev_adc_label);
     create_data_label(parent, "Noise level:", &diag_noise_level_label);
 
-    // Motor Response separator
-    create_separator(parent, "Motor Response");
-
-    // Motor latency
-    create_data_label(parent, "Motor Latency:", &diag_motor_latency_label, true);
-
     // Static info label about calibration dependency
     lv_obj_t* cal_info = lv_label_create(parent);
     lv_label_set_text(cal_info, "Noise level readings depend on proper calibration.");
@@ -383,6 +377,12 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     lv_obj_set_style_margin_top(cal_info, 10, 0);
     lv_label_set_long_mode(cal_info, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(cal_info, 260);
+
+    // Motor Response separator
+    create_separator(parent, "Motor Response");
+
+    // Motor latency
+    create_data_label(parent, "Motor Latency:", &diag_motor_latency_label, true);
 }
 
 void SettingsScreen::show() {
