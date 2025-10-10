@@ -52,21 +52,22 @@ If this value is too high, the pulse correction algorithm wastes coffee on pulse
 ```cpp
 // Default and bounds (compile-time)
 #define GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS 75.0f  // Safe default
-#define GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS 30.0f      // Lower search bound
-#define GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS 150.0f     // Upper search bound
+#define GRIND_AUTOTUNE_LATENCY_MIN_MS 30.0f            // Lower search bound
+#define GRIND_AUTOTUNE_LATENCY_MAX_MS 200.0f           // Upper search bound
+#define GRIND_MOTOR_MAX_PULSE_DURATION_MS 225.0f       // Maximum pulse duration above latency
 
 // Runtime values (loaded from Preferences)
-float motor_response_latency_ms;  // Stored in NVS: "grind.motor_latency_ms"
+float motor_response_latency_ms;  // Stored in NVS: "motor_lat_ms"
 float min_pulse_duration_ms;      // = motor_response_latency_ms
-float max_pulse_duration_ms;      // = 225.0f + motor_response_latency_ms
+float max_pulse_duration_ms;      // = motor_response_latency_ms + GRIND_MOTOR_MAX_PULSE_DURATION_MS
 ```
 
 ### Storage
 
-- **Preference key**: `grind.motor_latency_ms`
+- **Preference key**: `motor_lat_ms`
 - **Type**: Float (milliseconds)
 - **Default**: 75.0ms
-- **Valid range**: [30.0, 150.0]
+- **Valid range**: [30.0, 200.0]
 - **Persistence**: Saved to NVS after successful auto-tune
 
 ## Binary Sweep Algorithm
@@ -103,11 +104,11 @@ float max_pulse_duration_ms;      // = 225.0f + motor_response_latency_ms
 
 **State Variables**:
 ```cpp
-float current_pulse_ms = GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS;  // Start at 150ms
-float step_size = LATENCY_MAX - LATENCY_MIN;                   // Initial: 150 - 30 = 120ms
-float last_success_ms = 0.0f;                                  // Last working pulse
-enum { UP, DOWN } direction = DOWN;                            // Search direction
-bool found_lower_bound = false;                                // Found no-grounds threshold?
+float current_pulse_ms = GRIND_AUTOTUNE_LATENCY_MAX_MS;  // Start at 200ms
+float step_size = LATENCY_MAX - LATENCY_MIN;             // Initial: 200 - 30 = 170ms
+float last_success_ms = 0.0f;                            // Last working pulse
+enum { UP, DOWN } direction = DOWN;                      // Search direction
+bool found_lower_bound = false;                          // Found no-grounds threshold?
 int iteration = 0;
 ```
 
@@ -219,7 +220,7 @@ RETURN FAILURE: "Auto-tune failed - using default 75ms"
 
 1. **Iteration limit**: Hard stop at 50 iterations in Phase 1
 2. **Settling timeout**: Abandon pulse if scale doesn't settle within 5 seconds
-3. **Bounds enforcement**: Never test pulses outside [30ms, 150ms] range
+3. **Bounds enforcement**: Never test pulses outside [30ms, 200ms] range
 4. **Verification limit**: Max 5 verification rounds (prevents infinite climbing)
 5. **Success validation**: Require ≥80% success rate (accounts for chaotic behavior)
 6. **Fallback**: On any failure, revert to default 75ms and display warning
@@ -336,7 +337,7 @@ RETURN FAILURE: "Auto-tune failed - using default 75ms"
 ```
 
 **Display Logic**:
-- Show current value from Preferences: `grind.motor_latency_ms`
+- Show current value from Preferences: `motor_lat_ms`
 - If not set, show default: "75 ms (default)"
 - Update immediately after successful auto-tune
 

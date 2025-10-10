@@ -221,7 +221,7 @@ public:
     float get_motor_response_latency() const { return motor_response_latency_ms; }
     void set_motor_response_latency(float value);
     float get_min_pulse_duration() const { return motor_response_latency_ms; }
-    float get_max_pulse_duration() const { return motor_response_latency_ms + GRIND_MOTOR_MAX_PULSE_EXTENSION_MS; }
+    float get_max_pulse_duration() const { return motor_response_latency_ms + GRIND_MOTOR_MAX_PULSE_DURATION_MS; }
     void load_motor_latency();
     void save_motor_latency(float value);
     

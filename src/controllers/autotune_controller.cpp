@@ -66,8 +66,8 @@ bool AutoTuneController::start() {
     cancel_requested = false;
 
     // Initialize binary search state
-    current_pulse_ms = GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS;
-    step_size = GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS - GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS;
+    current_pulse_ms = GRIND_AUTOTUNE_LATENCY_MAX_MS;
+    step_size = GRIND_AUTOTUNE_LATENCY_MAX_MS - GRIND_AUTOTUNE_LATENCY_MIN_MS;
     last_success_ms = 0.0f;
     direction = DOWN;
     found_lower_bound = false;
@@ -268,13 +268,13 @@ void AutoTuneController::update_binary_search_phase() {
 
             // Bounds checking
             current_pulse_ms = constrain(current_pulse_ms,
-                                          GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS,
-                                          GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
+                                          GRIND_AUTOTUNE_LATENCY_MIN_MS,
+                                          GRIND_AUTOTUNE_LATENCY_MAX_MS);
 
             // Check if we hit lower bound
-            if (current_pulse_ms <= GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS) {
+            if (current_pulse_ms <= GRIND_AUTOTUNE_LATENCY_MIN_MS) {
                 const bool min_success_confirmed = (last_success_ms > 0.0f) &&
-                                                   (last_success_ms <= GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS + 0.0001f);
+                                                   (last_success_ms <= GRIND_AUTOTUNE_LATENCY_MIN_MS + 0.0001f);
                 const bool needs_more_resolution = found_lower_bound && (step_size > GRIND_AUTOTUNE_TARGET_ACCURACY_MS);
                 const bool needs_min_confirmation = !found_lower_bound && !min_success_confirmed;
 

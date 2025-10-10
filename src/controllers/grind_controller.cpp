@@ -904,8 +904,8 @@ void GrindController::load_motor_latency() {
     motor_response_latency_ms = preferences->getFloat("motor_lat_ms", GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
 
     // Validate loaded value
-    if (motor_response_latency_ms < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS ||
-        motor_response_latency_ms > GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS) {
+    if (motor_response_latency_ms < GRIND_AUTOTUNE_LATENCY_MIN_MS ||
+        motor_response_latency_ms > GRIND_AUTOTUNE_LATENCY_MAX_MS) {
         LOG_BLE("Warning: Invalid motor latency %.1fms in preferences, using default %.1fms\n",
                 motor_response_latency_ms, GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
         motor_response_latency_ms = GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS;
@@ -921,9 +921,9 @@ void GrindController::save_motor_latency(float value) {
     }
 
     // Validate value
-    if (value < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS || value > GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS) {
+    if (value < GRIND_AUTOTUNE_LATENCY_MIN_MS || value > GRIND_AUTOTUNE_LATENCY_MAX_MS) {
         LOG_BLE("ERROR: Cannot save invalid motor latency %.1fms (range: %.1f-%.1fms)\n",
-                value, GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS, GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
+                value, GRIND_AUTOTUNE_LATENCY_MIN_MS, GRIND_AUTOTUNE_LATENCY_MAX_MS);
         return;
     }
 
@@ -938,9 +938,9 @@ void GrindController::save_motor_latency(float value) {
 
 void GrindController::set_motor_response_latency(float value) {
     // Validate value
-    if (value < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS || value > GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS) {
+    if (value < GRIND_AUTOTUNE_LATENCY_MIN_MS || value > GRIND_AUTOTUNE_LATENCY_MAX_MS) {
         LOG_BLE("ERROR: Cannot set invalid motor latency %.1fms (range: %.1f-%.1fms)\n",
-                value, GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS, GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
+                value, GRIND_AUTOTUNE_LATENCY_MIN_MS, GRIND_AUTOTUNE_LATENCY_MAX_MS);
         return;
     }
 

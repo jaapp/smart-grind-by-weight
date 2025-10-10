@@ -47,9 +47,7 @@
 //------------------------------------------------------------------------------
 // Motor response latency - runtime configurable via auto-tune
 #define GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS 75.0f                             // Safe default motor response latency
-#define GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS 30.0f                                 // Lower search bound for auto-tune
-#define GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS 200.0f                                // Upper search bound for auto-tune
-#define GRIND_MOTOR_MAX_PULSE_EXTENSION_MS 225.0f                                 // Extension above latency for max pulse (latency + 225ms)
+#define GRIND_MOTOR_MAX_PULSE_DURATION_MS 225.0f                                  // Maximum pulse duration above latency (latency + 225ms)
 
 // Motor timing
 #define GRIND_MOTOR_SETTLING_TIME_MS 200                                          // Motor vibration settling time
@@ -76,6 +74,8 @@
 //------------------------------------------------------------------------------
 // MOTOR RESPONSE AUTO-TUNE ALGORITHM
 //------------------------------------------------------------------------------
+#define GRIND_AUTOTUNE_LATENCY_MIN_MS 30.0f                                       // Lower search bound for latency
+#define GRIND_AUTOTUNE_LATENCY_MAX_MS 200.0f                                      // Upper search bound for latency
 #define GRIND_AUTOTUNE_PRIMING_PULSE_MS 500                                       // Initial chute priming pulse
 #define GRIND_AUTOTUNE_TARGET_ACCURACY_MS 5.0f                                   // Target resolution (10ms steps)
 #define GRIND_AUTOTUNE_SUCCESS_RATE 0.80f                                         // 80% success threshold (4/5 pulses)
