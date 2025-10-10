@@ -101,3 +101,39 @@ Check Settings → Diagnostics → "Noise Floor" section (see [Diagnostics Syste
 
 3. **If wiring issues persist:**
    - Increase `GRIND_SCALE_SETTLING_TOLERANCE_G` parameter for more noise tolerance
+
+---
+
+## Unreliable Pulse Corrections
+
+**Applies to:** Pulse corrections failing to produce grounds consistently, requiring multiple correction cycles.
+
+### Symptoms
+- Multiple pulse attempts needed to reach target weight
+- Inconsistent grounds production during pulse phase
+- Overshooting or undershooting target weight frequently
+
+### Root Cause
+Motor response latency mismatch between firmware settings and actual hardware characteristics. Default 50ms may not match your specific grinder's relay type (solid-state vs mechanical), voltage (110V vs 220V), or burr inertia.
+
+### Resolution
+
+**Recommended:** Use the Auto-Tune Motor Response feature to automatically calibrate optimal pulse duration for your hardware:
+
+1. **Access auto-tune**: Settings → Tools → Auto-Tune Motor Response
+2. **Prepare system**:
+   - Ensure beans are in hopper
+   - Place dosing cup on scale
+   - System will automatically tare
+3. **Run calibration**: Process takes 1-2 minutes
+   - Priming phase: 500ms pulse to position beans
+   - Binary search: Finds minimum reliable pulse duration
+   - Verification: Confirms 80%+ success rate across 5 test pulses
+4. **Check result**: New motor latency value displayed on completion
+   - Typical range: 30-200ms depending on hardware
+   - Value saved automatically to device preferences
+   - Displayed in Settings → Diagnostics
+
+**Verify calibration**: Check Settings → Diagnostics → Motor Latency to see current value. Re-run auto-tune if you change grinders, modify relay hardware, or continue experiencing unreliable pulse corrections.
+
+**Manual fallback:** If auto-tune fails, system reverts to safe 50ms default. Check grinder power connection, hopper bean level, and scale setup.

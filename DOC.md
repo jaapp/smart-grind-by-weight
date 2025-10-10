@@ -206,6 +206,10 @@ After flashing firmware, calibrate the load cell for accurate measurements:
 
 **Tip**: A coffee mug with water makes ideal calibration weight - weigh it on kitchen scale first.
 
+### Auto-Tune Motor Response
+
+The auto-tune feature models your grinder's motor response behavior by measuring the physical lag between relay activation and grounds production. This accounts for hardware variations like voltage differences (110V vs 220V), relay types (solid-state vs mechanical), and burr inertia across different grinder models. The default 50ms value works well for most setups, but if you experience unreliable pulse corrections or want to minimize coffee waste through hardware-specific optimization, run auto-tune via **Settings → Tools → Auto-Tune Motor Response**. The 1-2 minute calibration process finds the minimum reliable pulse duration for your specific hardware and saves it automatically.
+
 ### Diagnostics System
 
 The system includes comprehensive load cell health monitoring accessible via **Settings → Diagnostics**. A warning icon (⚠) appears in the top-right corner when diagnostics are active - tap it to navigate directly to the diagnostics page.
@@ -214,6 +218,10 @@ The system includes comprehensive load cell health monitoring accessible via **S
 1. **Load Cell Not Calibrated** - Appears until calibration is completed via Settings → Tools → Calibrate
 2. **Sustained Noise** - Triggers after 60 seconds of excessive noise; clears after 120 seconds of acceptable levels
 3. **Mechanical Instability** - Detects sudden weight drops during grinding (3+ events); auto-resets on next grind or via manual reset
+
+**Displayed Values:**
+- **Motor Latency** - Current motor response latency in milliseconds (default: 50ms, or calibrated value from auto-tune)
+- **Calibration Factor** - Load cell calibration factor from Settings → Tools → Calibrate
 
 **Noise Floor Diagnostics:**
 
@@ -320,6 +328,7 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     +-- Tools
     |   |-- Tare button
     |   |-- Calibrate button
+    |   |-- Auto-Tune Motor Response button
     |   \-- Motor test button
     |
     \-- Data
@@ -382,20 +391,50 @@ python3 tools/grinder.py export          # Export grind data to database
 
 ## 🧠 Algorithm Details
 
-### Why This Algorithm Works
+### Grinding Algorithm
 
-- **Zero-shot learning algorithm**: Needs no prior knowledge or manually tuned variables. Instantly adapts to changes in temperature, humidity, grinding coarseness, bean type, etc.
-- **Two-tier approach**: Grinding is noisy (mechanical, electrical) so we use a sophisticated approach:
-  - **Predictive Phase**: Grind as fast as possible using predictive algorithm to barely UNDERSHOOT target weight (overshoot is unrecoverable)
-  - **Learning Phase**: Learns flow rate and grind latency (bean to cup time) to predict when to stop motor (coast time)
-  - **Pulse Phase**: Uses worst-case (95th percentile) flow rate for conservative pulsing until target ± tolerance is reached
+The system uses a **zero-shot learning algorithm** requiring no prior knowledge or manually tuned variables. It instantly adapts to changes in temperature, humidity, grinding coarseness, bean type, and hardware characteristics.
 
-### Key Algorithm Steps
+**Multi-Phase Approach:**
 
-1. **Determine grind latency** from first detectable flow over 500ms confirmation window
-2. **Compute motor stop target weight** from latency × flow × coast ratio (USER_LATENCY_TO_COAST_RATIO)
-3. **Stop at target - motor_stop_target_weight**, then apply bounded pulses based on 95th percentile flow rate
-4. **Conservative approach**: Err on undershooting to prevent overshoot, repeat until target ± tolerance reached
+1. **Initialization & Taring Phase**
+   - Automatic tare on grind button press
+   - 30-second timeout from grind start to completion
+   - Noise-adaptive settling detection
+
+2. **Predictive Phase**
+   - Learns flow rate and motor-to-cup latency (relay + motor inertia + burr spin-up)
+   - Predicts when to stop motor based on measured flow and coast characteristics
+   - Target: barely undershoot target weight (overshoot is unrecoverable)
+   - Uses runtime-configurable motor response latency (30-200ms, default 50ms)
+
+3. **Pulse Correction Phase**
+   - Conservative pulse duration calculation using 95th percentile flow rate
+   - Bounded pulses respect hardware-specific motor response latency
+   - Pulses range from motor latency minimum to latency + 225ms maximum
+   - Mechanical instability detection (3+ sudden weight drops triggers diagnostic)
+   - Repeats until target ± tolerance reached
+
+4. **Time Mode Additional Pulses**
+   - Dedicated `TIME_ADDITIONAL_PULSE` phase for post-completion grinding
+   - 100ms fixed pulse duration
+   - Split-button UI: OK + PULSE buttons on completion screen
+
+**Motor Response Latency Model:**
+
+The motor response latency represents the physical system lag between relay activation and grounds production. This value is hardware-specific and accounts for:
+- Relay closure time (solid-state vs mechanical relays)
+- Motor inertia (110V vs 220V motors)
+- Burr spin-up characteristics (different grinder models/designs)
+
+The latency value is automatically calibrated via **Auto-Tune Motor Response** (Settings → Tools) using binary search with statistical verification, or uses a safe 50ms default. This enables universal grinder compatibility without firmware modifications.
+
+**Key Features:**
+- Noise-resistant through multi-modal load cell measurement (instant, smoothed, filtered)
+- Hardware-adaptive pulse control via runtime motor latency
+- Conservative approach: undershoots target, then corrects with bounded pulses
+- Mechanical instability detection with hysteresis and persistence
+- 30-second grind timeout protection with user acknowledgment requirement
 
 ---
 
