@@ -26,7 +26,10 @@ void AutoTuneScreen::create() {
     lv_obj_set_flex_align(content_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(content_container, 8, 0);
 
-    const lv_coord_t content_width = lv_obj_get_width(content_container);
+    lv_coord_t content_width = lv_obj_get_width(content_container);
+    if (content_width <= 0) {
+        content_width = 280;
+    }
 
     // Title label
     title_label = lv_label_create(screen);
@@ -64,12 +67,12 @@ void AutoTuneScreen::create() {
     lv_label_set_text(pulse_value_label, "--");
 
     // Last pulse summary row
-    last_pulse_row = create_data_label(content_container, "Last Pulse", &last_pulse_value_label);
+    last_pulse_row = create_data_label(content_container, "Prev", &last_pulse_value_label);
     lv_obj_set_width(last_pulse_row, LV_PCT(100));
     lv_label_set_text(last_pulse_value_label, "--");
 
     // Verification summary row
-    verification_row = create_data_label(content_container, "Verification", &verification_value_label, true);
+    verification_row = create_data_label(content_container, "Verification", &verification_value_label);
     lv_obj_set_width(verification_row, LV_PCT(100));
     char verif_initial[32];
     snprintf(verif_initial, sizeof(verif_initial), "-- / %d", GRIND_AUTOTUNE_VERIFICATION_PULSES);
@@ -294,7 +297,7 @@ void AutoTuneScreen::update_progress(const AutoTuneProgress& progress) {
     // Update pulse (next scheduled)
     char pulse_text[64];
     if (progress.phase == AutoTunePhase::PRIMING) {
-        snprintf(pulse_text, sizeof(pulse_text), "Priming %d ms", GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+        snprintf(pulse_text, sizeof(pulse_text), "%d ms", GRIND_AUTOTUNE_PRIMING_PULSE_MS);
     } else if (progress.current_pulse_ms > 0.0f) {
         snprintf(pulse_text, sizeof(pulse_text), "%.1f ms", progress.current_pulse_ms);
     } else {
@@ -316,10 +319,10 @@ void AutoTuneScreen::update_progress(const AutoTuneProgress& progress) {
     // Update verification value (right-aligned)
     char verif_text[32];
     if (progress.phase == AutoTunePhase::VERIFICATION) {
-        snprintf(verif_text, sizeof(verif_text), "%d / %d Success",
+        snprintf(verif_text, sizeof(verif_text), "%d / %d Ok",
                  progress.verification_success_count, GRIND_AUTOTUNE_VERIFICATION_PULSES);
     } else {
-        snprintf(verif_text, sizeof(verif_text), "-- / %d Success",
+        snprintf(verif_text, sizeof(verif_text), "-- / %d Ok",
                  GRIND_AUTOTUNE_VERIFICATION_PULSES);
     }
     lv_label_set_text(verification_value_label, verif_text);
