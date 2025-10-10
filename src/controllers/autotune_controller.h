@@ -45,6 +45,10 @@ struct AutoTuneProgress {
     int verification_success_count;
     float final_latency_ms;
     float previous_latency_ms;
+
+    // Console message tracking
+    char last_message[256];
+    bool has_new_message;
 };
 
 class AutoTuneController {
@@ -102,6 +106,7 @@ public:
     AutoTunePhase get_phase() const { return current_phase; }
     const AutoTuneProgress& get_progress() const { return progress; }
     const AutoTuneResult& get_result() const { return result; }
+    void clear_message_flag() { progress.has_new_message = false; }
 
 private:
     // Phase state machines (non-blocking)
@@ -131,5 +136,6 @@ private:
 
     // Helper methods
     void update_progress();
+    void log_message(const char* format, ...);
     const char* get_phase_name(AutoTunePhase phase) const;
 };

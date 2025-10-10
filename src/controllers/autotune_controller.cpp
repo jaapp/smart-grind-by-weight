@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <cmath>
 #include <cstring>
+#include <cstdarg>
 
 #if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
 #include "../hardware/mock_hx711_driver.h"
@@ -38,6 +39,7 @@ AutoTuneController::AutoTuneController()
 
     memset(&progress, 0, sizeof(progress));
     progress.phase = AutoTunePhase::IDLE;
+    progress.has_new_message = false;
 }
 
 void AutoTuneController::init(WeightSensor* ws, Grinder* gr, GrindController* gc) {
@@ -61,6 +63,7 @@ bool AutoTuneController::start() {
 
     memset(&progress, 0, sizeof(progress));
     progress.phase = AutoTunePhase::IDLE;
+    progress.has_new_message = false;
 
     is_running = true;
     cancel_requested = false;
@@ -136,6 +139,7 @@ void AutoTuneController::update_priming_phase() {
         case AutoTuneSubPhase::IDLE:
             // Start priming pulse
             LOG_BLE("AutoTune Phase 0: Priming chute with %dms pulse\n", GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+            log_message("Priming...");
             start_pulse(GRIND_AUTOTUNE_PRIMING_PULSE_MS);
             break;
 
@@ -155,11 +159,16 @@ void AutoTuneController::update_priming_phase() {
             update_scale_settling();
             break;
 
-        case AutoTuneSubPhase::MEASURE_COMPLETE:
+        case AutoTuneSubPhase::MEASURE_COMPLETE: {
             // Priming complete, now tare
             LOG_BLE("AutoTune: Priming complete, taring scale\n");
+            float weight_delta = last_settled_weight - 0.0f;
+            log_message("  %dms -> %.1fg %s",
+                       GRIND_AUTOTUNE_PRIMING_PULSE_MS, weight_delta,
+                       weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G ? "[OK]" : "[X]");
             start_tare();
             break;
+        }
 
         case AutoTuneSubPhase::TARING:
             update_tare();
@@ -177,8 +186,14 @@ void AutoTuneController::update_binary_search_phase() {
                 return;
             }
 
+            // Log phase header on first iteration
+            if (iteration == 0) {
+                log_message("\nBinary Search:");
+            }
+
             LOG_BLE("AutoTune Iteration %d: Testing pulse %.1fms (step: %.1fms, dir: %s)\n",
                     iteration, current_pulse_ms, step_size, direction == UP ? "UP" : "DOWN");
+            log_message("Test %.0fms", current_pulse_ms);
 
             // Capture pre-pulse weight
             pre_pulse_weight = weight_sensor->get_weight_high_latency();
@@ -216,6 +231,10 @@ void AutoTuneController::update_binary_search_phase() {
             bool pulse_produced_grounds = (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
             progress.last_pulse_success = pulse_produced_grounds;
 
+            // Log result
+            log_message("  -> %.1fg %s", weight_delta,
+                       pulse_produced_grounds ? "[OK]" : "[X]");
+
             if (pulse_produced_grounds) {
                 // Pulse successful - grounds were produced
                 last_success_ms = current_pulse_ms;
@@ -225,6 +244,7 @@ void AutoTuneController::update_binary_search_phase() {
                     LOG_BLE("AutoTune: Binary search complete - found boundary at %.1fms\n", last_success_ms);
                     candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
                     LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+                    log_message("\nFound %.0fms", candidate_ms);
                     switch_phase(AutoTunePhase::VERIFICATION);
                     return;
                 }
@@ -245,6 +265,10 @@ void AutoTuneController::update_binary_search_phase() {
                 // Check termination condition
                 if (step_size <= GRIND_AUTOTUNE_TARGET_ACCURACY_MS) {
                     if (last_success_ms == 0.0f) {
+                        log_message("\nNo grounds\nCheck:");
+                        log_message("- Beans loaded");
+                        log_message("- Power on");
+                        log_message("- Cup placed");
                         complete_with_failure("No successful pulse found");
                         return;
                     }
@@ -252,6 +276,7 @@ void AutoTuneController::update_binary_search_phase() {
                     LOG_BLE("AutoTune: Binary search complete - accuracy target reached\n");
                     candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
                     LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+                    log_message("\nFound %.0fms", candidate_ms);
                     switch_phase(AutoTunePhase::VERIFICATION);
                     return;
                 }
@@ -287,6 +312,7 @@ void AutoTuneController::update_binary_search_phase() {
                     LOG_BLE("AutoTune: Hit lower search bound\n");
                     candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
                     LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+                    log_message("\nFound %.0fms", candidate_ms);
                     switch_phase(AutoTunePhase::VERIFICATION);
                     return;
                 }
@@ -315,8 +341,13 @@ void AutoTuneController::update_verification_phase() {
                 LOG_BLE("AutoTune: Verification round %d result: %d/%d (%.0f%%)\n",
                         verification_round + 1, verification_success_count, GRIND_AUTOTUNE_VERIFICATION_PULSES, success_rate * 100.0f);
 
+                // Log pass/fail rate
+                log_message("%.0f%% %s", success_rate * 100.0f,
+                           success_rate >= GRIND_AUTOTUNE_SUCCESS_RATE ? "Pass [OK]" : "Fail [X]");
+
                 if (success_rate >= GRIND_AUTOTUNE_SUCCESS_RATE) {
                     // SUCCESS
+                    log_message("\nComplete!");
                     complete_with_success(candidate_ms);
                     return;
                 }
@@ -326,6 +357,8 @@ void AutoTuneController::update_verification_phase() {
 
                 if (verification_round >= 5) {
                     LOG_BLE("AutoTune: Verification failed after 5 rounds\n");
+                    log_message("\nFailed 5 rounds");
+                    log_message("Default %.0fms", (float)GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
                     complete_with_failure("Failed verification after 5 rounds");
                     return;
                 }
@@ -333,10 +366,16 @@ void AutoTuneController::update_verification_phase() {
                 candidate_ms = candidate_ms + GRIND_AUTOTUNE_TARGET_ACCURACY_MS;
                 current_pulse_ms = candidate_ms;
                 LOG_BLE("AutoTune: Increasing candidate to %.1fms for next round\n", candidate_ms);
+                log_message("Retry %.0fms", candidate_ms);
 
                 verification_pulse_count = 0;
                 verification_success_count = 0;
                 update_progress();
+            }
+
+            // Log verification header on first pulse
+            if (verification_pulse_count == 0) {
+                log_message("\nVerify (%d/%d):", verification_round + 1, 5);
             }
 
             // Start next verification pulse
@@ -371,13 +410,19 @@ void AutoTuneController::update_verification_phase() {
 
             last_executed_pulse_ms = active_pulse_ms;
 
-            if (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G) {
+            bool pulse_success = (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
+            if (pulse_success) {
                 verification_success_count++;
             }
 
+            // Log verification pulse result
+            log_message("%d/%d %s", verification_pulse_count + 1,
+                       GRIND_AUTOTUNE_VERIFICATION_PULSES,
+                       pulse_success ? "[OK]" : "[X]");
+
             verification_pulse_count++;
             progress.verification_success_count = verification_success_count;
-            progress.last_pulse_success = (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
+            progress.last_pulse_success = pulse_success;
             update_progress();
 
             // Ready for next pulse
@@ -557,6 +602,17 @@ void AutoTuneController::update_progress() {
 
     LOG_BLE("AutoTune Progress: Phase=%s, Iteration=%d, Pulse=%.1fms, Step=%.1fms\n",
             get_phase_name(current_phase), iteration, current_pulse_ms, step_size);
+}
+
+void AutoTuneController::log_message(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsnprintf(progress.last_message, sizeof(progress.last_message), format, args);
+    va_end(args);
+    progress.has_new_message = true;
+
+    // Also log to BLE for debugging
+    LOG_BLE("AutoTune Console: %s\n", progress.last_message);
 }
 
 const char* AutoTuneController::get_phase_name(AutoTunePhase phase) const {

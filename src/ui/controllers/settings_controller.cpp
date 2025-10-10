@@ -162,10 +162,9 @@ void SettingsUIController::handle_autotune() {
         ui_manager_->show_confirmation(
             "Auto-Tune Setup",
             "Before starting:\n\n"
-            "- Place cup under grinder\n"
-            "- Verify bean hopper is not empty\n"
-            "- Process takes ~2 minutes\n\n"
-            "Continue?",
+            "- Beans loaded\n"
+            "- Cup on scale\n\n"
+            "Process takes ~1 min.",
             "START",
             lv_color_hex(THEME_COLOR_ACCENT),
             [autotune_controller]() { autotune_controller->confirm_and_begin(); },

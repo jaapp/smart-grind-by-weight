@@ -72,6 +72,10 @@ void AutoTuneUIController::update() {
 
     if (autotune_controller->is_active()) {
         ui_manager_->autotune_screen.update_progress(progress);
+        // Clear message flag after UI has read it
+        if (progress.has_new_message) {
+            autotune_controller->clear_message_flag();
+        }
     }
 }
 
@@ -82,6 +86,8 @@ void AutoTuneUIController::start_autotune() {
 }
 
 void AutoTuneUIController::confirm_and_begin() {
+    // This is called AFTER user has already confirmed in settings screen
+    // So we just start the autotune process directly
     if (!ui_manager_) {
         LOG_BLE("ERROR: Cannot start autotune - no UI manager\n");
         return;
@@ -99,11 +105,11 @@ void AutoTuneUIController::confirm_and_begin() {
         return;
     }
 
-    // Switch to autotune screen (state machine transition happens in switch_to_state)
-    ui_manager_->switch_to_state(UIState::AUTOTUNING);
+    LOG_BLE("AutoTune UI: Starting autotune process\n");
 
-    // Show progress screen
-    ui_manager_->autotune_screen.show_progress_screen();
+    // Switch to autotune screen and show console
+    ui_manager_->switch_to_state(UIState::AUTOTUNING);
+    ui_manager_->autotune_screen.show_console_screen();
 
     // Start the autotune process
     if (autotune_controller->start()) {
@@ -111,7 +117,6 @@ void AutoTuneUIController::confirm_and_begin() {
         LOG_BLE("AutoTune UI: Started successfully\n");
     } else {
         LOG_BLE("ERROR: AutoTune failed to start\n");
-        // Return to settings screen
         ui_manager_->switch_to_state(UIState::SETTINGS);
     }
 }
@@ -140,14 +145,13 @@ void AutoTuneUIController::handle_cancel() {
 }
 
 void AutoTuneUIController::handle_ok() {
+    // Completion acknowledged - return to settings
     LOG_BLE("AutoTune UI: OK button pressed (completion acknowledged)\n");
-
     autotune_started_ = false;
 
     if (!ui_manager_) {
         return;
     }
 
-    // Return to settings screen
     ui_manager_->switch_to_state(UIState::SETTINGS);
 }
