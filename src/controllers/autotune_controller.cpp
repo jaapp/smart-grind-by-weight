@@ -2,11 +2,16 @@
 #include <Arduino.h>
 #include <cmath>
 
+#if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
+#include "../hardware/mock_hx711_driver.h"
+#endif
+
 AutoTuneController::AutoTuneController()
     : weight_sensor(nullptr)
     , grinder(nullptr)
     , grind_controller(nullptr)
     , current_phase(AutoTunePhase::IDLE)
+    , sub_phase(AutoTuneSubPhase::IDLE)
     , is_running(false)
     , cancel_requested(false)
     , current_pulse_ms(0.0f)
@@ -16,8 +21,13 @@ AutoTuneController::AutoTuneController()
     , found_lower_bound(false)
     , iteration(0)
     , verification_round(0)
+    , verification_pulse_count(0)
+    , verification_success_count(0)
     , candidate_ms(0.0f)
     , last_settled_weight(0.0f)
+    , pre_pulse_weight(0.0f)
+    , phase_start_time(0)
+    , settling_start_time(0)
 {
     result.success = false;
     result.latency_ms = 0.0f;
@@ -44,11 +54,10 @@ bool AutoTuneController::start() {
         return false;
     }
 
-    LOG_BLE("=== Starting Motor Response Latency Auto-Tune ===\n");
+    LOG_BLE("=== Starting Motor Response Latency Auto-Tune (Non-Blocking) ===\n");
 
     is_running = true;
     cancel_requested = false;
-    current_phase = AutoTunePhase::PRIMING;
 
     // Initialize binary search state
     current_pulse_ms = GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS;
@@ -60,12 +69,15 @@ bool AutoTuneController::start() {
 
     // Initialize verification state
     verification_round = 0;
+    verification_pulse_count = 0;
+    verification_success_count = 0;
     candidate_ms = 0.0f;
 
     // Store previous latency for comparison
     progress.previous_latency_ms = grind_controller->get_motor_response_latency();
 
-    update_progress();
+    // Start with priming phase
+    switch_phase(AutoTunePhase::PRIMING);
 
     return true;
 }
@@ -88,278 +100,364 @@ void AutoTuneController::update() {
 
     switch (current_phase) {
         case AutoTunePhase::PRIMING:
-            run_priming_phase();
+            update_priming_phase();
             break;
 
         case AutoTunePhase::BINARY_SEARCH:
-            run_binary_search_phase();
+            update_binary_search_phase();
             break;
 
         case AutoTunePhase::VERIFICATION:
-            run_verification_phase();
+            update_verification_phase();
             break;
 
         case AutoTunePhase::COMPLETE_SUCCESS:
         case AutoTunePhase::COMPLETE_FAILURE:
+        case AutoTunePhase::IDLE:
             // Terminal states - do nothing
             break;
+    }
+}
+
+//==============================================================================
+// Phase State Machines (Non-Blocking)
+//==============================================================================
+
+void AutoTuneController::update_priming_phase() {
+    switch (sub_phase) {
+        case AutoTuneSubPhase::IDLE:
+            // Start priming pulse
+            LOG_BLE("AutoTune Phase 0: Priming chute with %dms pulse\n", GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+            start_pulse(GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+            break;
+
+        case AutoTuneSubPhase::PULSE_EXECUTE:
+            update_pulse_execute();
+            break;
+
+        case AutoTuneSubPhase::MOTOR_SETTLING:
+            update_motor_settling();
+            break;
+
+        case AutoTuneSubPhase::SCALE_SETTLING:
+            update_scale_settling();
+            break;
+
+        case AutoTuneSubPhase::MEASURE_COMPLETE:
+            // Priming complete, now tare
+            LOG_BLE("AutoTune: Priming complete, taring scale\n");
+            start_tare();
+            break;
+
+        case AutoTuneSubPhase::TARING:
+            update_tare();
+            break;
+    }
+}
+
+void AutoTuneController::update_binary_search_phase() {
+    switch (sub_phase) {
+        case AutoTuneSubPhase::IDLE:
+            // Safety check - max iterations
+            if (iteration >= GRIND_AUTOTUNE_MAX_ITERATIONS) {
+                LOG_BLE("AutoTune: Max iterations (%d) reached\n", GRIND_AUTOTUNE_MAX_ITERATIONS);
+                complete_with_failure("Max iterations reached");
+                return;
+            }
+
+            LOG_BLE("AutoTune Iteration %d: Testing pulse %.1fms (step: %.1fms, dir: %s)\n",
+                    iteration, current_pulse_ms, step_size, direction == UP ? "UP" : "DOWN");
+
+            // Capture pre-pulse weight
+            pre_pulse_weight = weight_sensor->get_weight_high_latency();
+
+            // Start test pulse
+            start_pulse(current_pulse_ms);
+            break;
+
+        case AutoTuneSubPhase::PULSE_EXECUTE:
+            update_pulse_execute();
+            break;
+
+        case AutoTuneSubPhase::MOTOR_SETTLING:
+            update_motor_settling();
+            break;
+
+        case AutoTuneSubPhase::SCALE_SETTLING:
+            update_scale_settling();
+            break;
+
+        case AutoTuneSubPhase::MEASURE_COMPLETE: {
+            // Get settled weight and calculate delta
+            float settled_weight = last_settled_weight;
+            float weight_delta = settled_weight - pre_pulse_weight;
+
+            LOG_BLE("AutoTune: Weight delta = %.3fg → %s\n",
+                    weight_delta, weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G ? "GROUNDS" : "NO GROUNDS");
+
+            bool pulse_produced_grounds = (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
+            progress.last_pulse_success = pulse_produced_grounds;
+            update_progress();
+
+            if (pulse_produced_grounds) {
+                // Pulse successful - grounds were produced
+                last_success_ms = current_pulse_ms;
+
+                // Check termination condition
+                if (found_lower_bound && step_size <= GRIND_AUTOTUNE_TARGET_ACCURACY_MS) {
+                    LOG_BLE("AutoTune: Binary search complete - found boundary at %.1fms\n", last_success_ms);
+                    candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
+                    LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+                    switch_phase(AutoTunePhase::VERIFICATION);
+                    return;
+                }
+
+                // Check for direction reversal
+                if (direction == UP) {
+                    step_size = step_size / 2.0f;
+                    direction = DOWN;
+                }
+
+                // Move DOWN to find lower boundary
+                current_pulse_ms = current_pulse_ms - step_size;
+
+            } else {
+                // Pulse failed - no grounds produced
+                found_lower_bound = true;
+
+                // Check termination condition
+                if (step_size <= GRIND_AUTOTUNE_TARGET_ACCURACY_MS) {
+                    if (last_success_ms == 0.0f) {
+                        complete_with_failure("No successful pulse found");
+                        return;
+                    }
+
+                    LOG_BLE("AutoTune: Binary search complete - accuracy target reached\n");
+                    candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
+                    LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+                    switch_phase(AutoTunePhase::VERIFICATION);
+                    return;
+                }
+
+                // Check for direction reversal
+                if (direction == DOWN) {
+                    step_size = step_size / 2.0f;
+                    direction = UP;
+                }
+
+                // Move UP to find working pulse
+                current_pulse_ms = current_pulse_ms + step_size;
+            }
+
+            // Bounds checking
+            current_pulse_ms = constrain(current_pulse_ms,
+                                          GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS,
+                                          GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
+
+            // Check if we hit lower bound
+            if (current_pulse_ms <= GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS && found_lower_bound) {
+                if (last_success_ms == 0.0f) {
+                    complete_with_failure("Hit lower bound - no successful pulse");
+                    return;
+                }
+
+                LOG_BLE("AutoTune: Hit lower search bound\n");
+                candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
+                LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+                switch_phase(AutoTunePhase::VERIFICATION);
+                return;
+            }
+
+            iteration++;
+            update_progress();
+
+            // Ready for next iteration
+            switch_sub_phase(AutoTuneSubPhase::IDLE);
+            break;
+        }
 
         default:
             break;
     }
 }
 
-void AutoTuneController::run_priming_phase() {
-    LOG_BLE("AutoTune Phase 0: Priming chute with %dms pulse\n", GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+void AutoTuneController::update_verification_phase() {
+    switch (sub_phase) {
+        case AutoTuneSubPhase::IDLE:
+            // Check if we've completed all pulses in this round
+            if (verification_pulse_count >= GRIND_AUTOTUNE_VERIFICATION_PULSES) {
+                // Evaluate round results
+                float success_rate = (float)verification_success_count / (float)GRIND_AUTOTUNE_VERIFICATION_PULSES;
+                LOG_BLE("AutoTune: Verification round %d result: %d/%d (%.0f%%)\n",
+                        verification_round + 1, verification_success_count, GRIND_AUTOTUNE_VERIFICATION_PULSES, success_rate * 100.0f);
 
-    // Execute priming pulse
-    grinder->start_pulse_rmt(GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+                if (success_rate >= GRIND_AUTOTUNE_SUCCESS_RATE) {
+                    // SUCCESS
+                    complete_with_success(candidate_ms);
+                    return;
+                }
 
-    // Wait for pulse to complete
-    while (!grinder->is_pulse_complete()) {
-        delay(10);
-    }
+                // Insufficient reliability - increase by 10ms and try again
+                verification_round++;
 
-    LOG_BLE("AutoTune: Priming pulse complete, waiting for settling\n");
+                if (verification_round >= 5) {
+                    LOG_BLE("AutoTune: Verification failed after 5 rounds\n");
+                    complete_with_failure("Failed verification after 5 rounds");
+                    return;
+                }
 
-    // Wait for motor settling
-    delay(GRIND_MOTOR_SETTLING_TIME_MS);
+                candidate_ms = candidate_ms + GRIND_AUTOTUNE_TARGET_ACCURACY_MS;
+                LOG_BLE("AutoTune: Increasing candidate to %.1fms for next round\n", candidate_ms);
 
-    // Wait for scale settling
-    float settled_weight = 0.0f;
-    if (!wait_for_settling(&settled_weight)) {
-        complete_with_failure("Settling timeout during priming");
-        return;
-    }
-
-    LOG_BLE("AutoTune: Scale settled at %.3fg, taring scale\n", settled_weight);
-
-    // Tare the scale (blocking operation)
-    weight_sensor->tare();
-
-    LOG_BLE("AutoTune: Tare complete, starting binary search\n");
-
-    // Move to binary search phase
-    current_phase = AutoTunePhase::BINARY_SEARCH;
-    last_settled_weight = 0.0f;
-    update_progress();
-}
-
-void AutoTuneController::run_binary_search_phase() {
-    // Safety check - max iterations
-    if (iteration >= GRIND_AUTOTUNE_MAX_ITERATIONS) {
-        LOG_BLE("AutoTune: Max iterations (%d) reached\n", GRIND_AUTOTUNE_MAX_ITERATIONS);
-        complete_with_failure("Max iterations reached");
-        return;
-    }
-
-    LOG_BLE("AutoTune Iteration %d: Testing pulse %.1fms (step: %.1fms, dir: %s)\n",
-            iteration, current_pulse_ms, step_size, direction == UP ? "UP" : "DOWN");
-
-    // Execute pulse and measure weight change
-    float weight_delta = 0.0f;
-    if (!execute_pulse_and_measure(current_pulse_ms, &weight_delta)) {
-        complete_with_failure("Pulse execution failed");
-        return;
-    }
-
-    bool pulse_produced_grounds = (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
-
-    LOG_BLE("AutoTune: Weight delta = %.3fg → %s\n",
-            weight_delta, pulse_produced_grounds ? "GROUNDS" : "NO GROUNDS");
-
-    progress.last_pulse_success = pulse_produced_grounds;
-    update_progress();
-
-    if (pulse_produced_grounds) {
-        // Pulse successful - grounds were produced
-        last_success_ms = current_pulse_ms;
-
-        // Check termination condition
-        if (found_lower_bound && step_size <= GRIND_AUTOTUNE_TARGET_ACCURACY_MS) {
-            LOG_BLE("AutoTune: Binary search complete - found boundary at %.1fms\n", last_success_ms);
-
-            // Round up to nearest 10ms
-            candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
-            LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
-
-            // Move to verification phase
-            current_phase = AutoTunePhase::VERIFICATION;
-            verification_round = 0;
-            update_progress();
-            return;
-        }
-
-        // Check for direction reversal
-        if (direction == UP) {
-            step_size = step_size / 2.0f;
-            direction = DOWN;
-            LOG_BLE("AutoTune: Direction reversal - halving step to %.1fms\n", step_size);
-        }
-
-        // Move DOWN to find lower boundary
-        current_pulse_ms = current_pulse_ms - step_size;
-
-    } else {
-        // Pulse failed - no grounds produced
-        found_lower_bound = true;
-
-        // Check termination condition
-        if (step_size <= GRIND_AUTOTUNE_TARGET_ACCURACY_MS) {
-            LOG_BLE("AutoTune: Binary search complete - accuracy target reached\n");
-
-            if (last_success_ms == 0.0f) {
-                complete_with_failure("No successful pulse found");
-                return;
+                verification_pulse_count = 0;
+                verification_success_count = 0;
+                update_progress();
             }
 
-            // Round up to nearest 10ms
-            candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
-            LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
+            // Start next verification pulse
+            LOG_BLE("AutoTune: Verification round %d, pulse %d/%d (%.1fms)\n",
+                    verification_round + 1, verification_pulse_count + 1,
+                    GRIND_AUTOTUNE_VERIFICATION_PULSES, candidate_ms);
 
-            // Move to verification phase
-            current_phase = AutoTunePhase::VERIFICATION;
-            verification_round = 0;
+            pre_pulse_weight = weight_sensor->get_weight_high_latency();
+            start_pulse(candidate_ms);
+            break;
+
+        case AutoTuneSubPhase::PULSE_EXECUTE:
+            update_pulse_execute();
+            break;
+
+        case AutoTuneSubPhase::MOTOR_SETTLING:
+            update_motor_settling();
+            break;
+
+        case AutoTuneSubPhase::SCALE_SETTLING:
+            update_scale_settling();
+            break;
+
+        case AutoTuneSubPhase::MEASURE_COMPLETE: {
+            float settled_weight = last_settled_weight;
+            float weight_delta = settled_weight - pre_pulse_weight;
+
+            if (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G) {
+                verification_success_count++;
+            }
+
+            verification_pulse_count++;
+            progress.verification_success_count = verification_success_count;
             update_progress();
-            return;
+
+            // Ready for next pulse
+            switch_sub_phase(AutoTuneSubPhase::IDLE);
+            break;
         }
 
-        // Check for direction reversal
-        if (direction == DOWN) {
-            step_size = step_size / 2.0f;
-            direction = UP;
-            LOG_BLE("AutoTune: Direction reversal - halving step to %.1fms\n", step_size);
-        }
-
-        // Move UP to find working pulse
-        current_pulse_ms = current_pulse_ms + step_size;
+        default:
+            break;
     }
-
-    // Bounds checking
-    current_pulse_ms = constrain(current_pulse_ms,
-                                  GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS,
-                                  GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
-
-    // Check if we hit lower bound
-    if (current_pulse_ms <= GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS && found_lower_bound) {
-        LOG_BLE("AutoTune: Hit lower search bound\n");
-
-        if (last_success_ms == 0.0f) {
-            complete_with_failure("Hit lower bound - no successful pulse");
-            return;
-        }
-
-        // Round up to nearest 10ms
-        candidate_ms = ceil(last_success_ms / 10.0f) * 10.0f;
-        LOG_BLE("AutoTune: Candidate rounded to %.1fms\n", candidate_ms);
-
-        // Move to verification phase
-        current_phase = AutoTunePhase::VERIFICATION;
-        verification_round = 0;
-        update_progress();
-        return;
-    }
-
-    iteration++;
-    update_progress();
 }
 
-void AutoTuneController::run_verification_phase() {
-    LOG_BLE("AutoTune Phase 2: Verification round %d, testing %.1fms\n",
-            verification_round + 1, candidate_ms);
+//==============================================================================
+// Sub-Phase Execution (Matches GrindController Pattern)
+//==============================================================================
 
-    int success_count = 0;
+void AutoTuneController::start_pulse(float pulse_duration_ms) {
+    LOG_BLE("AutoTune: Starting pulse %.1fms\n", pulse_duration_ms);
 
-    // Run 5 verification pulses
-    for (int i = 0; i < GRIND_AUTOTUNE_VERIFICATION_PULSES; i++) {
-        if (cancel_requested) {
-            complete_with_failure("Cancelled during verification");
-            return;
-        }
+    grinder->start_pulse_rmt(static_cast<uint32_t>(pulse_duration_ms));
 
-        LOG_BLE("AutoTune: Verification pulse %d/%d\n", i + 1, GRIND_AUTOTUNE_VERIFICATION_PULSES);
+    // Notify mock driver for weight simulation
+#if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
+    MockHX711Driver::notify_pulse(static_cast<uint32_t>(pulse_duration_ms));
+#endif
 
-        float weight_delta = 0.0f;
-        if (!execute_pulse_and_measure(candidate_ms, &weight_delta)) {
-            complete_with_failure("Verification pulse failed");
-            return;
-        }
-
-        if (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G) {
-            success_count++;
-        }
-
-        // Update progress
-        progress.verification_success_count = success_count;
-        update_progress();
-    }
-
-    float success_rate = (float)success_count / (float)GRIND_AUTOTUNE_VERIFICATION_PULSES;
-    LOG_BLE("AutoTune: Verification round %d result: %d/%d (%.0f%%)\n",
-            verification_round + 1, success_count, GRIND_AUTOTUNE_VERIFICATION_PULSES, success_rate * 100.0f);
-
-    if (success_rate >= GRIND_AUTOTUNE_SUCCESS_RATE) {
-        // SUCCESS - save to NVS
-        LOG_BLE("AutoTune: Verification successful - saving %.1fms to NVS\n", candidate_ms);
-        complete_with_success(candidate_ms);
-        return;
-    }
-
-    // Insufficient reliability - increase by 10ms and try again
-    verification_round++;
-
-    if (verification_round >= 5) {
-        LOG_BLE("AutoTune: Verification failed after 5 rounds\n");
-        complete_with_failure("Failed verification after 5 rounds");
-        return;
-    }
-
-    candidate_ms = candidate_ms + GRIND_AUTOTUNE_TARGET_ACCURACY_MS;
-    LOG_BLE("AutoTune: Increasing candidate to %.1fms for next round\n", candidate_ms);
-
-    progress.verification_success_count = 0;
-    update_progress();
+    switch_sub_phase(AutoTuneSubPhase::PULSE_EXECUTE);
 }
 
-bool AutoTuneController::execute_pulse_and_measure(float pulse_duration_ms, float* weight_delta_out) {
-    // Start pulse
-    grinder->start_pulse_rmt(pulse_duration_ms);
-
-    // Wait for pulse to complete
-    while (!grinder->is_pulse_complete()) {
-        delay(10);
+void AutoTuneController::update_pulse_execute() {
+    // Non-blocking poll - returns to main loop if not complete
+    if (!grinder->is_pulse_complete()) {
+        return;
     }
 
-    // Wait for motor settling
-    delay(GRIND_MOTOR_SETTLING_TIME_MS);
+    LOG_BLE("AutoTune: Pulse complete, motor settling\n");
+    switch_sub_phase(AutoTuneSubPhase::MOTOR_SETTLING);
+}
 
-    // Wait for scale settling
+void AutoTuneController::update_motor_settling() {
+    unsigned long elapsed = millis() - settling_start_time;
+
+    if (elapsed < GRIND_MOTOR_SETTLING_TIME_MS) {
+        return;  // Still settling, return to main loop
+    }
+
+    LOG_BLE("AutoTune: Motor settled, scale settling\n");
+    switch_sub_phase(AutoTuneSubPhase::SCALE_SETTLING);
+}
+
+void AutoTuneController::update_scale_settling() {
+    unsigned long elapsed = millis() - settling_start_time;
+
+    // Check for timeout
+    if (elapsed > GRIND_AUTOTUNE_SETTLING_TIMEOUT_MS) {
+        LOG_BLE("ERROR: Scale settling timeout\n");
+        complete_with_failure("Settling timeout");
+        return;
+    }
+
+    // Non-blocking settling check
     float settled_weight = 0.0f;
-    if (!wait_for_settling(&settled_weight)) {
-        LOG_BLE("ERROR: Settling timeout during pulse measurement\n");
-        return false;
+    if (weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS, &settled_weight)) {
+        LOG_BLE("AutoTune: Scale settled at %.3fg\n", settled_weight);
+        last_settled_weight = settled_weight;
+        switch_sub_phase(AutoTuneSubPhase::MEASURE_COMPLETE);
     }
-
-    // Calculate weight delta
-    *weight_delta_out = settled_weight - last_settled_weight;
-    last_settled_weight = settled_weight;
-
-    return true;
+    // Otherwise return to main loop and check again next update
 }
 
-bool AutoTuneController::wait_for_settling(float* settled_weight_out) {
-    // Use the existing WeightSensor settling method with timeout
-    unsigned long start_time = millis();
+//==============================================================================
+// Tare Handling
+//==============================================================================
 
-    while (millis() - start_time < GRIND_AUTOTUNE_SETTLING_TIMEOUT_MS) {
-        if (weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS, settled_weight_out)) {
-            return true;
-        }
-        delay(50);
+void AutoTuneController::start_tare() {
+    LOG_BLE("AutoTune: Starting tare\n");
+    weight_sensor->tareNoDelay();  // Non-blocking tare
+    switch_sub_phase(AutoTuneSubPhase::TARING);
+}
+
+void AutoTuneController::update_tare() {
+    // Non-blocking poll
+    if (!weight_sensor->getTareStatus()) {
+        return;  // Still taring, return to main loop
     }
 
-    return false;  // Timeout
+    LOG_BLE("AutoTune: Tare complete, starting binary search\n");
+    last_settled_weight = 0.0f;
+    pre_pulse_weight = 0.0f;
+    switch_phase(AutoTunePhase::BINARY_SEARCH);
 }
+
+//==============================================================================
+// Phase Transitions
+//==============================================================================
+
+void AutoTuneController::switch_phase(AutoTunePhase new_phase) {
+    current_phase = new_phase;
+    sub_phase = AutoTuneSubPhase::IDLE;
+    phase_start_time = millis();
+
+    LOG_BLE("AutoTune: Phase transition → %s\n", get_phase_name(new_phase));
+    update_progress();
+}
+
+void AutoTuneController::switch_sub_phase(AutoTuneSubPhase new_sub_phase) {
+    sub_phase = new_sub_phase;
+    settling_start_time = millis();
+}
+
+//==============================================================================
+// Completion
+//==============================================================================
 
 void AutoTuneController::complete_with_success(float final_latency_ms) {
     LOG_BLE("=== AutoTune Complete: SUCCESS ===\n");
@@ -394,6 +492,10 @@ void AutoTuneController::complete_with_failure(const char* error_msg) {
 
     is_running = false;
 }
+
+//==============================================================================
+// Progress Tracking
+//==============================================================================
 
 void AutoTuneController::update_progress() {
     progress.phase = current_phase;

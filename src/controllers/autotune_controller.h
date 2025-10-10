@@ -15,6 +15,16 @@ enum class AutoTunePhase {
     COMPLETE_FAILURE        // Failed to find reliable value
 };
 
+// Internal execution sub-phases (matches GrindController pattern)
+enum class AutoTuneSubPhase {
+    IDLE,
+    PULSE_EXECUTE,          // Executing pulse via RMT
+    MOTOR_SETTLING,         // Waiting for motor vibrations to settle
+    SCALE_SETTLING,         // Waiting for scale to settle
+    MEASURE_COMPLETE,       // Ready to process result
+    TARING                  // Performing tare operation
+};
+
 // Auto-tune result structure
 struct AutoTuneResult {
     bool success;
@@ -42,6 +52,7 @@ private:
     GrindController* grind_controller;
 
     AutoTunePhase current_phase;
+    AutoTuneSubPhase sub_phase;
     bool is_running;
     bool cancel_requested;
 
@@ -56,10 +67,17 @@ private:
 
     // Verification state
     int verification_round;
+    int verification_pulse_count;
+    int verification_success_count;
     float candidate_ms;
 
-    // Last weight for delta calculation
+    // Weight tracking
     float last_settled_weight;
+    float pre_pulse_weight;
+
+    // Timing tracking
+    unsigned long phase_start_time;
+    unsigned long settling_start_time;
 
     // Result tracking
     AutoTuneResult result;
@@ -73,7 +91,7 @@ public:
     // Main control methods
     bool start();  // Returns false if preconditions not met
     void cancel();
-    void update(); // Call from main loop to process state machine
+    void update(); // Call from main loop (non-blocking state machine)
 
     // Status methods
     bool is_active() const { return is_running; }
@@ -82,16 +100,31 @@ public:
     const AutoTuneResult& get_result() const { return result; }
 
 private:
-    // Phase implementation methods
-    void run_priming_phase();
-    void run_binary_search_phase();
-    void run_verification_phase();
+    // Phase state machines (non-blocking)
+    void update_priming_phase();
+    void update_binary_search_phase();
+    void update_verification_phase();
+
+    // Sub-phase execution (matches GrindController pattern)
+    void start_pulse(float pulse_duration_ms);
+    void update_pulse_execute();
+    void update_motor_settling();
+    void update_scale_settling();
+    void process_measurement_result(float weight_delta);
+
+    // Tare handling
+    void start_tare();
+    void update_tare();
+
+    // Phase transition
+    void switch_phase(AutoTunePhase new_phase);
+    void switch_sub_phase(AutoTuneSubPhase new_sub_phase);
+
+    // Completion
     void complete_with_success(float final_latency_ms);
     void complete_with_failure(const char* error_msg);
 
     // Helper methods
-    bool execute_pulse_and_measure(float pulse_duration_ms, float* weight_delta_out);
-    bool wait_for_settling(float* settled_weight_out);
     void update_progress();
     const char* get_phase_name(AutoTunePhase phase) const;
 };
