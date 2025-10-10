@@ -41,18 +41,15 @@ void GrindingScreenChart::create() {
     // Initialize data tracking
     target_weight_value = 18.0f;
     chart_start_time_ms = 0;
-    predicted_grind_time_ms = (uint32_t)(1000.0f + (target_weight_value / REFERENCE_FLOW_RATE_GPS) * 1000.0f);
-    predicted_chart_points = (predicted_grind_time_ms / DATA_POINT_INTERVAL_MS);
-    if (predicted_chart_points > MAX_CHART_POINTS) {
-        predicted_chart_points = MAX_CHART_POINTS;
-    }
+    predicted_grind_time_ms = 0;
+    predicted_chart_points = 0;
+    predicted_time_override_ms = 0;
     max_y_value = target_weight_value + 0.2f;
     last_data_point_time_ms = 0;
     time_mode = false;
     target_time_seconds = 0.0f;
     
-    // Set chart to use predicted number of points, enable sliding window
-    lv_chart_set_point_count(chart, predicted_chart_points);
+    // Set chart update mode (point count is finalized after series creation)
     lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT); // Slide data left when full
     
     // Set Y-axis ranges (scale by 10 to handle decimals)
@@ -82,6 +79,9 @@ void GrindingScreenChart::create() {
     
     // Flow rate and target series will inherit line styling
     
+    // Configure the initial point count based on defaults
+    update_chart_point_configuration();
+
     // Initialize all series with zero values
     reset_chart_data();
 
@@ -133,13 +133,7 @@ void GrindingScreenChart::update_profile_name(const char* name) {
 void GrindingScreenChart::update_target_weight(float weight) {
     target_weight_value = weight;
     max_y_value = target_weight_value + 1.2f;
-    
-    // Recalculate predicted chart width based on new target weight
-    predicted_grind_time_ms = (uint32_t)(1000.0f + (target_weight_value / REFERENCE_FLOW_RATE_GPS) * 1000.0f);
-    predicted_chart_points = (predicted_grind_time_ms / DATA_POINT_INTERVAL_MS);
-    if (predicted_chart_points > MAX_CHART_POINTS) {
-        predicted_chart_points = MAX_CHART_POINTS;
-    }
+    update_chart_point_configuration();
     
     if (!time_mode) {
         // Update the weight display spans for current/target format
@@ -195,6 +189,9 @@ void GrindingScreenChart::update_target_time(float seconds) {
         lv_span_set_text(separator_span, target_text);
         lv_spangroup_refresh(weight_spangroup);
     }
+
+    uint32_t predicted_ms = (seconds > 0.0f) ? static_cast<uint32_t>(seconds * 1000.0f) : 0;
+    set_chart_time_prediction(predicted_ms);
 }
 
 void GrindingScreenChart::update_current_weight(float weight) {
@@ -267,21 +264,26 @@ void GrindingScreenChart::add_chart_data_point(float current_weight, float flow_
 }
 
 void GrindingScreenChart::set_chart_time_prediction(uint32_t predicted_time_ms) {
-    predicted_grind_time_ms = predicted_time_ms;
-    // LVGL charts don't have explicit X-axis scaling, so this mainly affects data collection frequency
+    predicted_time_override_ms = predicted_time_ms;
+    update_chart_point_configuration();
 }
 
 void GrindingScreenChart::reset_chart_data() {
     chart_start_time_ms = 0;
     last_data_point_time_ms = 0;
-    
-    // Clear all series data using current predicted chart points
-    for (int i = 0; i < predicted_chart_points; i++) {
-        lv_chart_set_value_by_id(chart, weight_series, i, 0);
-        lv_chart_set_value_by_id(chart, flow_rate_series, i, 0);
+
+    if (!chart) {
+        return;
     }
-    
-    lv_chart_refresh(chart);
+
+    if (weight_series) {
+        lv_chart_set_all_values(chart, weight_series, 0);
+    }
+    if (flow_rate_series) {
+        lv_chart_set_all_values(chart, flow_rate_series, 0);
+    }
+
+    predicted_chart_points = static_cast<uint16_t>(lv_chart_get_point_count(chart));
 }
 
 void GrindingScreenChart::set_time_mode(bool enabled) {
@@ -292,4 +294,45 @@ void GrindingScreenChart::set_time_mode(bool enabled) {
         // Revert to weight display formatting using the last known target weight
         update_target_weight(target_weight_value);
     }
+}
+
+void GrindingScreenChart::update_chart_point_configuration() {
+    if (!chart) {
+        return;
+    }
+
+    uint32_t effective_time_ms = predicted_time_override_ms;
+    if (effective_time_ms == 0) {
+        float predicted_ms = 1000.0f + (target_weight_value / REFERENCE_FLOW_RATE_GPS) * 1000.0f;
+        effective_time_ms = static_cast<uint32_t>(predicted_ms);
+    }
+
+    if (effective_time_ms < DATA_POINT_INTERVAL_MS) {
+        effective_time_ms = DATA_POINT_INTERVAL_MS;
+    }
+
+    uint32_t new_count_32 = (effective_time_ms + DATA_POINT_INTERVAL_MS - 1) / DATA_POINT_INTERVAL_MS;
+    if (new_count_32 < MIN_CHART_POINTS) {
+        new_count_32 = MIN_CHART_POINTS;
+    }
+    if (new_count_32 > MAX_CHART_POINTS) {
+        new_count_32 = MAX_CHART_POINTS;
+    }
+
+    uint16_t new_count = static_cast<uint16_t>(new_count_32);
+    uint16_t current_count = static_cast<uint16_t>(lv_chart_get_point_count(chart));
+
+    if (new_count != current_count) {
+        lv_chart_set_point_count(chart, new_count);
+        if (weight_series) {
+            lv_chart_set_all_values(chart, weight_series, 0);
+        }
+        if (flow_rate_series) {
+            lv_chart_set_all_values(chart, flow_rate_series, 0);
+        }
+        current_count = new_count;
+    }
+
+    predicted_chart_points = current_count;
+    predicted_grind_time_ms = static_cast<uint32_t>(current_count) * DATA_POINT_INTERVAL_MS;
 }

@@ -133,3 +133,7 @@ void GrindingScreen::set_mode(GrindMode mode) {
     arc_screen.set_time_mode(time_enabled);
     chart_screen.set_time_mode(time_enabled);
 }
+
+void GrindingScreen::set_chart_time_prediction(uint32_t predicted_time_ms) {
+    chart_screen.set_chart_time_prediction(predicted_time_ms);
+}

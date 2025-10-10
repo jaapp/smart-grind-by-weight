@@ -37,6 +37,7 @@ public:
     void add_chart_data_point(float current_weight, float flow_rate, uint32_t current_time_ms) override;
     void reset_chart_data();
     void set_mode(GrindMode mode);
+    void set_chart_time_prediction(uint32_t predicted_time_ms);
 
     // ADDED: Public accessors for individual screen objects
     lv_obj_t* get_arc_screen_obj() const { return arc_screen.get_screen(); }

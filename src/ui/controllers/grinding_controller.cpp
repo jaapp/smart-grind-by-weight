@@ -319,6 +319,7 @@ void GrindingUIController::update_grinding_targets() {
     }
 
     const auto& session = ui_manager_->grind_controller->get_session_descriptor();
+    ui_manager_->grinding_screen.set_chart_time_prediction(session.target_time_ms);
     ui_manager_->grinding_screen.update_target_weight(session.target_weight);
     if (session.mode == GrindMode::TIME && session.target_time_ms > 0) {
         float target_time_seconds = static_cast<float>(session.target_time_ms) / 1000.0f;
