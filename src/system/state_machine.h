@@ -9,6 +9,7 @@ enum class UIState {
     SETTINGS,
     CALIBRATION,
     CONFIRM,
+    AUTOTUNING,
     OTA_UPDATE,
     OTA_UPDATE_FAILED
 };

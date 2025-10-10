@@ -63,7 +63,12 @@ float WeightGrindStrategy::calculate_pulse_duration_ms(const GrindController& co
                                                        float error_grams) const {
     float clamped_flow_rate = get_clamped_pulse_flow_rate(controller);
     float base_duration = (error_grams / clamped_flow_rate) * 1000.0f;
-    float final_duration = max(GRIND_MOTOR_MIN_PULSE_DURATION_MS, min(base_duration, GRIND_MOTOR_MAX_PULSE_DURATION_MS));
+
+    // Use runtime motor latency values instead of compile-time constants
+    float min_pulse_ms = controller.get_min_pulse_duration();
+    float max_pulse_ms = controller.get_max_pulse_duration();
+    float final_duration = max(min_pulse_ms, min(base_duration, max_pulse_ms));
+
     return final_duration;
 }
 

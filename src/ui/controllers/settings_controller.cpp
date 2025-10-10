@@ -33,6 +33,7 @@ void SettingsUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::SETTINGS_PURGE, [this](lv_event_t*) { handle_purge(); });
     EventBridgeLVGL::register_handler(ET::SETTINGS_MOTOR_TEST, [this](lv_event_t*) { handle_motor_test(); });
     EventBridgeLVGL::register_handler(ET::SETTINGS_TARE, [this](lv_event_t*) { handle_tare(); });
+    EventBridgeLVGL::register_handler(ET::SETTINGS_AUTOTUNE, [this](lv_event_t*) { handle_autotune(); });
     EventBridgeLVGL::register_handler(ET::SETTINGS_DIAGNOSTIC_RESET, [this](lv_event_t*) { handle_diagnostics_reset(); });
     EventBridgeLVGL::register_handler(ET::SETTINGS_BACK, [this](lv_event_t*) { handle_back(); });
     EventBridgeLVGL::register_handler(ET::SETTINGS_REFRESH_STATS, [this](lv_event_t*) { handle_refresh_stats(); });
@@ -63,6 +64,7 @@ void SettingsUIController::register_events() {
     register_lvgl_event(ui_manager_->settings_screen.get_diag_reset_button(), LV_EVENT_CLICKED, ET::SETTINGS_DIAGNOSTIC_RESET);
     register_lvgl_event(ui_manager_->settings_screen.get_motor_test_button(), LV_EVENT_CLICKED, ET::SETTINGS_MOTOR_TEST);
     register_lvgl_event(ui_manager_->settings_screen.get_tare_button(), LV_EVENT_CLICKED, ET::SETTINGS_TARE);
+    register_lvgl_event(ui_manager_->settings_screen.get_autotune_button(), LV_EVENT_CLICKED, ET::SETTINGS_AUTOTUNE);
     register_lvgl_event(ui_manager_->settings_screen.get_refresh_stats_button(), LV_EVENT_CLICKED, ET::SETTINGS_REFRESH_STATS);
     register_lvgl_event(ui_manager_->settings_screen.get_ble_toggle(), LV_EVENT_VALUE_CHANGED, ET::BLE_TOGGLE);
     register_lvgl_event(ui_manager_->settings_screen.get_ble_startup_toggle(), LV_EVENT_VALUE_CHANGED, ET::BLE_STARTUP_TOGGLE);
@@ -149,6 +151,16 @@ void SettingsUIController::handle_motor_test() {
 void SettingsUIController::handle_tare() {
     if (!ui_manager_) return;
     UIOperations::execute_tare(ui_manager_->get_hardware_manager());
+}
+
+void SettingsUIController::handle_autotune() {
+    if (!ui_manager_) return;
+
+    // Get the autotune UI controller and start the process
+    auto autotune_controller = ui_manager_->autotune_controller_.get();
+    if (autotune_controller) {
+        autotune_controller->start_autotune();
+    }
 }
 
 void SettingsUIController::handle_back() {

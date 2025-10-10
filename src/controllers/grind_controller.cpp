@@ -90,6 +90,9 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
 
     strategy_context.controller = this;
     active_strategy = nullptr;
+
+    // Load motor response latency from preferences
+    load_motor_latency();
 }
 
 void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grind_mode) {
@@ -883,6 +886,60 @@ void GrindController::start_additional_pulse() {
 
 bool GrindController::can_pulse() const {
     // Only allow pulses in time mode when grind is completed and not in pulse phase
-    return mode == GrindMode::TIME && 
+    return mode == GrindMode::TIME &&
            phase == GrindPhase::COMPLETED;
+}
+
+//==============================================================================
+// Motor Response Latency Management
+//==============================================================================
+
+void GrindController::load_motor_latency() {
+    if (!preferences) {
+        motor_response_latency_ms = GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS;
+        LOG_BLE("Motor latency: Using default %.1fms (no preferences)\n", motor_response_latency_ms);
+        return;
+    }
+
+    motor_response_latency_ms = preferences->getFloat("grind.motor_latency_ms", GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
+
+    // Validate loaded value
+    if (motor_response_latency_ms < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS ||
+        motor_response_latency_ms > GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS) {
+        LOG_BLE("Warning: Invalid motor latency %.1fms in preferences, using default %.1fms\n",
+                motor_response_latency_ms, GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
+        motor_response_latency_ms = GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS;
+    } else {
+        LOG_BLE("Motor latency: Loaded %.1fms from preferences\n", motor_response_latency_ms);
+    }
+}
+
+void GrindController::save_motor_latency(float value) {
+    if (!preferences) {
+        LOG_BLE("ERROR: Cannot save motor latency - no preferences available\n");
+        return;
+    }
+
+    // Validate value
+    if (value < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS || value > GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS) {
+        LOG_BLE("ERROR: Cannot save invalid motor latency %.1fms (range: %.1f-%.1fms)\n",
+                value, GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS, GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
+        return;
+    }
+
+    motor_response_latency_ms = value;
+    preferences->putFloat("grind.motor_latency_ms", value);
+    LOG_BLE("Motor latency: Saved %.1fms to preferences\n", value);
+}
+
+void GrindController::set_motor_response_latency(float value) {
+    // Validate value
+    if (value < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS || value > GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS) {
+        LOG_BLE("ERROR: Cannot set invalid motor latency %.1fms (range: %.1f-%.1fms)\n",
+                value, GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS, GRIND_MOTOR_RESPONSE_LATENCY_MAX_MS);
+        return;
+    }
+
+    motor_response_latency_ms = value;
+    LOG_BLE("Motor latency: Set to %.1fms (not saved to NVS)\n", value);
 }

@@ -165,6 +165,9 @@ private:
 
     DiagnosticsController* diagnostics_controller_ = nullptr;
 
+    // Motor response latency - runtime configurable
+    float motor_response_latency_ms;
+
 public:
     void init(WeightSensor* lc, Grinder* gr, Preferences* prefs);
     void start_grind(float target_weight, uint32_t target_time_ms, GrindMode grind_mode);
@@ -213,6 +216,14 @@ public:
     void reset_mechanical_anomaly_count();
 
     void set_diagnostics_controller(DiagnosticsController* diagnostics) { diagnostics_controller_ = diagnostics; }
+
+    // Motor response latency accessors
+    float get_motor_response_latency() const { return motor_response_latency_ms; }
+    void set_motor_response_latency(float value);
+    float get_min_pulse_duration() const { return motor_response_latency_ms; }
+    float get_max_pulse_duration() const { return motor_response_latency_ms + GRIND_MOTOR_MAX_PULSE_EXTENSION_MS; }
+    void load_motor_latency();
+    void save_motor_latency(float value);
     
     // Removed - predictive logic now inline in update_realtime()
     

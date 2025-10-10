@@ -273,6 +273,7 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
 
     tare_button = create_button(parent, "Tare Scale");
     cal_button = create_button(parent, "Calibrate");
+    autotune_button = create_button(parent, "Auto-Tune Motor Response");
     motor_test_button = create_button(parent, "Motor Test");
 }
 
@@ -368,6 +369,12 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     create_data_label(parent, "Std Dev (ADC):", &diag_std_dev_adc_label);
     create_data_label(parent, "Noise level:", &diag_noise_level_label);
 
+    // Motor Response separator
+    create_separator(parent, "Motor Response");
+
+    // Motor latency
+    create_data_label(parent, "Motor Latency:", &diag_motor_latency_label);
+
     // Static info label about calibration dependency
     lv_obj_t* cal_info = lv_label_create(parent);
     lv_label_set_text(cal_info, "Noise level readings depend on proper calibration.");
@@ -450,6 +457,16 @@ void SettingsScreen::update_diagnostics(WeightSensor* weight_sensor) {
     char cal_factor_text[32];
     snprintf(cal_factor_text, sizeof(cal_factor_text), "%.2f", cal_factor);
     lv_label_set_text(diag_calibration_factor_label, cal_factor_text);
+
+    // Update motor latency
+    if (grind_controller) {
+        float motor_latency = grind_controller->get_motor_response_latency();
+        char latency_text[32];
+        snprintf(latency_text, sizeof(latency_text), "%.0f ms", motor_latency);
+        lv_label_set_text(diag_motor_latency_label, latency_text);
+    } else {
+        lv_label_set_text(diag_motor_latency_label, "-- ms");
+    }
 
     // Get highest priority diagnostic
     DiagnosticCode diagnostic = diagnostics_controller->get_highest_priority_warning();
