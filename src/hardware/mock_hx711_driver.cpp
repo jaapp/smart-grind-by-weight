@@ -41,6 +41,7 @@ void MockHX711Driver::reset_state() {
     pulse_end_ms = 0;
     pulse_stop_ms = 0;
     pulse_ramp_start_ms = 0;
+    pulse_duration_ms = 0;
 }
 
 bool MockHX711Driver::begin() {
@@ -304,8 +305,17 @@ void MockHX711Driver::handle_pulse_request(unsigned long now_ms, uint32_t durati
     pulse_stop_pending = false;
     pulse_start_ms = now_ms;
     pulse_end_ms = now_ms + duration_ms;
-    pending_pulse_mass_g += DEBUG_MOCK_FLOW_RATE_GPS * (static_cast<float>(duration_ms) / 1000.0f);
+    pulse_duration_ms = duration_ms;
     pulse_ramp_start_ms = now_ms;
+
+    // Only add mass if pulse duration exceeds motor latency threshold
+    // This simulates the real motor behavior where short pulses don't produce grounds
+    if (static_cast<float>(duration_ms) >= DEBUG_MOCK_MOTOR_LATENCY_MS) {
+        pending_pulse_mass_g += DEBUG_MOCK_FLOW_RATE_GPS * (static_cast<float>(duration_ms) / 1000.0f);
+    } else {
+        // Pulse too short - no grounds will be produced
+        pending_pulse_mass_g = 0.0f;
+    }
 }
 
 void MockHX711Driver::notify_grinder_start() {
