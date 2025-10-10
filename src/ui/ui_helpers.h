@@ -22,6 +22,8 @@ lv_obj_t* create_dual_button_row(lv_obj_t* parent, lv_obj_t** left_button, lv_ob
                                 lv_color_t right_color = lv_color_hex(THEME_COLOR_NEUTRAL), 
                                 int height = 80, const lv_font_t* font = &lv_font_montserrat_28);
 
+lv_obj_t* create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** value_label, bool stacked = false);
+
 // Callback signature for radio button selection changes
 typedef void (*radio_button_callback_t)(int selected_index, void* user_data);
 

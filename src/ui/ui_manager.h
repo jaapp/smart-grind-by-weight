@@ -12,8 +12,10 @@
 #include "screens/confirm_screen.h"
 #include "screens/ota_screen.h"
 #include "screens/ota_update_failed_screen.h"
+#include "screens/autotune_screen.h"
 #include "event_bridge_lvgl.h"
 #include "controllers/calibration_controller.h"
+#include "controllers/autotune_controller.h"
 #include "controllers/confirm_controller.h"
 #include "controllers/edit_controller.h"
 #include "controllers/grinding_controller.h"
@@ -87,6 +89,7 @@ private:
     std::unique_ptr<SettingsUIController> settings_controller_;
     std::unique_ptr<StatusIndicatorController> status_indicator_controller_;
     std::unique_ptr<CalibrationUIController> calibration_controller_;
+    std::unique_ptr<AutoTuneUIController> autotune_controller_;
     std::unique_ptr<ConfirmUIController> confirm_controller_;
     std::unique_ptr<OtaDataExportController> ota_data_export_controller_;
     std::unique_ptr<ScreenTimeoutController> screen_timeout_controller_;
@@ -100,6 +103,7 @@ public:
     SettingsScreen settings_screen;
     CalibrationScreen calibration_screen;
     ConfirmScreen confirm_screen;
+    AutoTuneScreen autotune_screen;
     OTAScreen ota_screen;
     OtaUpdateFailedScreen ota_update_failed_screen;
 

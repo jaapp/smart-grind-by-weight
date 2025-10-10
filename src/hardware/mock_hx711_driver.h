@@ -82,4 +82,5 @@ private:
     unsigned long pulse_end_ms;
     unsigned long pulse_stop_ms;
     unsigned long pulse_ramp_start_ms;
+    uint32_t pulse_duration_ms;  // Requested pulse duration for latency check
 };

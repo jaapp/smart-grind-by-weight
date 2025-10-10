@@ -41,6 +41,7 @@ void MockHX711Driver::reset_state() {
     pulse_end_ms = 0;
     pulse_stop_ms = 0;
     pulse_ramp_start_ms = 0;
+    pulse_duration_ms = 0;
 }
 
 bool MockHX711Driver::begin() {
@@ -221,7 +222,7 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
             unsigned long elapsed = now_ms - pulse_ramp_start_ms;
             flow_factor = std::min(1.0f, static_cast<float>(elapsed) / static_cast<float>(DEBUG_MOCK_FLOW_RAMP_MS));
         }
-        if (flow_factor > 0.0f) {
+        if (flow_factor > 0.0f && pending_pulse_mass_g > 0.0f) {
             pulse_flow = true;
         }
     } else if (pulse_started && pulse_stop_pending) {
@@ -232,7 +233,7 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
             flow_factor = 0.0f;
         }
 
-        if (flow_factor > 0.0f) {
+        if (flow_factor > 0.0f && pending_pulse_mass_g > 0.0f) {
             pulse_flow = true;
         }
 
@@ -246,14 +247,12 @@ float MockHX711Driver::process_pulse_state(unsigned long now_ms, bool& pulse_flo
     }
 
     float addition = 0.0f;
-    if (flow_factor > 0.0f) {
+    if (flow_factor > 0.0f && pending_pulse_mass_g > 0.0f) {
         addition = grams_per_sample() * flow_factor;
-        if (pending_pulse_mass_g > 0.0f) {
-            addition = std::min(addition, pending_pulse_mass_g);
-            pending_pulse_mass_g -= addition;
-            if (pending_pulse_mass_g <= 0.0001f) {
-                pending_pulse_mass_g = 0.0f;
-            }
+        addition = std::min(addition, pending_pulse_mass_g);
+        pending_pulse_mass_g -= addition;
+        if (pending_pulse_mass_g <= 0.0001f) {
+            pending_pulse_mass_g = 0.0f;
         }
     } else if (!pulse_command_active && !pulse_stop_pending) {
         pending_pulse_mass_g = 0.0f;
@@ -304,8 +303,17 @@ void MockHX711Driver::handle_pulse_request(unsigned long now_ms, uint32_t durati
     pulse_stop_pending = false;
     pulse_start_ms = now_ms;
     pulse_end_ms = now_ms + duration_ms;
-    pending_pulse_mass_g += DEBUG_MOCK_FLOW_RATE_GPS * (static_cast<float>(duration_ms) / 1000.0f);
+    pulse_duration_ms = duration_ms;
     pulse_ramp_start_ms = now_ms;
+
+    // Only add mass if pulse duration exceeds motor latency threshold
+    // This simulates the real motor behavior where short pulses don't produce grounds
+    if (static_cast<float>(duration_ms) >= DEBUG_MOCK_MOTOR_LATENCY_MS) {
+        pending_pulse_mass_g += DEBUG_MOCK_FLOW_RATE_GPS * (static_cast<float>(duration_ms - DEBUG_MOCK_MOTOR_LATENCY_MS) / 1000.0f);
+    } else {
+        // Pulse too short - no grounds will be produced
+        pending_pulse_mass_g = 0.0f;
+    }
 }
 
 void MockHX711Driver::notify_grinder_start() {

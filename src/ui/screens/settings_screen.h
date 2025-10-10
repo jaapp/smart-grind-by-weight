@@ -64,6 +64,7 @@ private:
     lv_obj_t* cal_button;
     lv_obj_t* motor_test_button;
     lv_obj_t* tare_button;
+    lv_obj_t* autotune_button;
 
     // Diagnostics tab elements
     lv_obj_t* diag_status_label;
@@ -71,6 +72,7 @@ private:
     lv_obj_t* diag_std_dev_g_label;
     lv_obj_t* diag_std_dev_adc_label;
     lv_obj_t* diag_noise_level_label;
+    lv_obj_t* diag_motor_latency_label;
     lv_obj_t* diag_info_label;
     lv_obj_t* diag_reset_button;
 
@@ -106,6 +108,7 @@ public:
     lv_obj_t* get_reset_button() const { return reset_button; }
     lv_obj_t* get_motor_test_button() const { return motor_test_button; }
     lv_obj_t* get_tare_button() const { return tare_button; }
+    lv_obj_t* get_autotune_button() const { return autotune_button; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
     lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
     lv_obj_t* get_logging_toggle() const { return logging_toggle; }
@@ -135,6 +138,6 @@ private:
     lv_obj_t *create_static_data_label(lv_obj_t *parent, const char *name,
                                        const char *value);
     lv_obj_t *create_data_label(lv_obj_t *parent, const char *name,
-                                lv_obj_t **variable);
+                                lv_obj_t **variable, bool stacked = false);
     lv_obj_t *create_description_label(lv_obj_t *parent, const char *text);
 };

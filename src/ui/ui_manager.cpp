@@ -78,6 +78,7 @@ void UIManager::create_ui() {
     settings_screen.create(bluetooth_manager, grind_controller, &grinding_screen, hardware_manager, diagnostics_controller_.get());
     calibration_screen.create();
     confirm_screen.create();
+    autotune_screen.create();
     ota_screen.create();
     ota_update_failed_screen.create();
     
@@ -100,6 +101,7 @@ void UIManager::create_ui() {
     settings_screen.hide();
     calibration_screen.hide();
     confirm_screen.hide();
+    autotune_screen.hide();
     ota_screen.hide();
     ota_update_failed_screen.hide();
     
@@ -147,7 +149,13 @@ void UIManager::update() {
                 calibration_controller_->update();
             }
             break;
-            
+
+        case UIState::AUTOTUNING:
+            if (autotune_controller_) {
+                autotune_controller_->update();
+            }
+            break;
+
         case UIState::READY:
             // Ready state - no special handling needed
             break;
@@ -175,6 +183,7 @@ void UIManager::switch_to_state(UIState new_state) {
     settings_screen.hide();
     calibration_screen.hide();
     confirm_screen.hide();
+    autotune_screen.hide();
     ota_screen.hide();
     ota_update_failed_screen.hide();
 
@@ -224,6 +233,10 @@ void UIManager::switch_to_state(UIState new_state) {
             confirm_screen.show();
             break;
 
+        case UIState::AUTOTUNING:
+            autotune_screen.show();
+            break;
+
         case UIState::OTA_UPDATE:
             ota_screen.show();
             ota_screen.update_progress(0);
@@ -260,6 +273,7 @@ void UIManager::init_controllers() {
     settings_controller_ = std::make_unique<SettingsUIController>(this);
     status_indicator_controller_ = std::make_unique<StatusIndicatorController>(this);
     calibration_controller_ = std::make_unique<CalibrationUIController>(this);
+    autotune_controller_ = std::make_unique<AutoTuneUIController>(this);
     confirm_controller_ = std::make_unique<ConfirmUIController>(this);
     ota_data_export_controller_ = std::make_unique<OtaDataExportController>(this);
     screen_timeout_controller_ = std::make_unique<ScreenTimeoutController>(this);
@@ -279,6 +293,7 @@ void UIManager::register_controller_events() {
     if (grinding_controller_) grinding_controller_->register_events();
     if (settings_controller_) settings_controller_->register_events();
     if (calibration_controller_) calibration_controller_->register_events();
+    if (autotune_controller_) autotune_controller_->register_events();
     if (confirm_controller_) confirm_controller_->register_events();
     if (ota_data_export_controller_) ota_data_export_controller_->register_events();
     if (screen_timeout_controller_) screen_timeout_controller_->register_events();

@@ -273,6 +273,7 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
 
     tare_button = create_button(parent, "Tare Scale");
     cal_button = create_button(parent, "Calibrate");
+    autotune_button = create_button(parent, "Tune Pulses");
     motor_test_button = create_button(parent, "Motor Test");
 }
 
@@ -314,14 +315,14 @@ void SettingsScreen::create_stats_page(lv_obj_t* parent) {
     create_description_label(parent, "Lifetime totals for the grinder.");
 
     create_separator(parent, "Lifetime Statistics");
-    create_data_label(parent, "Total Grinds:", &stat_total_grinds_label);
-    create_data_label(parent, "Shots (S/D/C):", &stat_shots_label);
-    create_data_label(parent, "Motor Runtime:", &stat_motor_runtime_label);
-    create_data_label(parent, "Device Uptime:", &stat_device_uptime_label);
-    create_data_label(parent, "Total Weight:", &stat_total_weight_label);
-    create_data_label(parent, "Mode (W/T):", &stat_mode_grinds_label);
-    create_data_label(parent, "Avg Accuracy:", &stat_avg_accuracy_label);
-    create_data_label(parent, "Total Pulses:", &stat_total_pulses_label);
+    create_data_label(parent, "Total Grinds:", &stat_total_grinds_label, true);
+    create_data_label(parent, "Shots (S/D/C):", &stat_shots_label, true);
+    create_data_label(parent, "Motor Runtime:", &stat_motor_runtime_label, true);
+    create_data_label(parent, "Device Uptime:", &stat_device_uptime_label, true);
+    create_data_label(parent, "Total Weight:", &stat_total_weight_label, true);
+    create_data_label(parent, "Mode (W/T):", &stat_mode_grinds_label, true);
+    create_data_label(parent, "Avg Accuracy:", &stat_avg_accuracy_label, true);
+    create_data_label(parent, "Total Pulses:", &stat_total_pulses_label, true);
 
     refresh_stats_button = create_button(parent, "Refresh Stats");
     lv_obj_set_style_margin_top(refresh_stats_button, 10, 0);
@@ -343,7 +344,7 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     // Status indicator
     create_data_label(parent, "Status:", &diag_status_label);
 
-    // Calibration factor
+    // Calibration factor - stacked for long decimal values
     create_data_label(parent, "Cal. factor:", &diag_calibration_factor_label);
 
     // Info label (only shown when not calibrated)
@@ -363,7 +364,7 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     // Noise Floor separator
     create_separator(parent, "Noise Floor");
 
-    // Std dev readings (moved from System Info)
+    // Std dev readings (moved from System Info) - stacked for precision values
     create_data_label(parent, "Std Dev (g):", &diag_std_dev_g_label);
     create_data_label(parent, "Std Dev (ADC):", &diag_std_dev_adc_label);
     create_data_label(parent, "Noise level:", &diag_noise_level_label);
@@ -376,6 +377,12 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     lv_obj_set_style_margin_top(cal_info, 10, 0);
     lv_label_set_long_mode(cal_info, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(cal_info, 260);
+
+    // Motor Response separator
+    create_separator(parent, "Motor Response");
+
+    // Motor latency
+    create_data_label(parent, "Motor Latency:", &diag_motor_latency_label, true);
 }
 
 void SettingsScreen::show() {
@@ -450,6 +457,16 @@ void SettingsScreen::update_diagnostics(WeightSensor* weight_sensor) {
     char cal_factor_text[32];
     snprintf(cal_factor_text, sizeof(cal_factor_text), "%.2f", cal_factor);
     lv_label_set_text(diag_calibration_factor_label, cal_factor_text);
+
+    // Update motor latency
+    if (grind_controller) {
+        float motor_latency = grind_controller->get_motor_response_latency();
+        char latency_text[32];
+        snprintf(latency_text, sizeof(latency_text), "%.0f ms", motor_latency);
+        lv_label_set_text(diag_motor_latency_label, latency_text);
+    } else {
+        lv_label_set_text(diag_motor_latency_label, "-- ms");
+    }
 
     // Get highest priority diagnostic
     DiagnosticCode diagnostic = diagnostics_controller->get_highest_priority_warning();
@@ -786,32 +803,8 @@ lv_obj_t* SettingsScreen::create_static_data_label(lv_obj_t* parent, const char*
     return data_label;
 }
 
-lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** variable) {
-    lv_obj_t* container = lv_obj_create(parent);
-    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(container, 0, 0);
-    lv_obj_set_style_pad_all(container, 2, 0);
-    lv_obj_set_style_pad_left(container, 10, 0);
-    lv_obj_set_style_pad_right(container, 14, 0); // Just a bit away from the scroll bar
-    lv_obj_set_style_margin_all(container, 0, 0);
-    lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
-
-    lv_obj_set_layout(container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END);
-
-    lv_obj_t* label = lv_label_create(container);
-    lv_label_set_text(label, name);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-
-    *variable = lv_label_create(container);
-    lv_label_set_text(*variable, "");
-    lv_obj_set_style_text_font(*variable, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(*variable, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_style_text_align(*variable, LV_TEXT_ALIGN_RIGHT, 0);
-
-    return label;
+lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** variable, bool stacked) {
+    return ::create_data_label(parent, name, variable, stacked);
 }
 
 lv_obj_t* SettingsScreen::create_description_label(lv_obj_t* parent, const char* text) {
