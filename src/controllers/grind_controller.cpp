@@ -901,7 +901,7 @@ void GrindController::load_motor_latency() {
         return;
     }
 
-    motor_response_latency_ms = preferences->getFloat("grind.motor_latency_ms", GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
+    motor_response_latency_ms = preferences->getFloat("motor_lat_ms", GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
 
     // Validate loaded value
     if (motor_response_latency_ms < GRIND_MOTOR_RESPONSE_LATENCY_MIN_MS ||
@@ -928,8 +928,12 @@ void GrindController::save_motor_latency(float value) {
     }
 
     motor_response_latency_ms = value;
-    preferences->putFloat("grind.motor_latency_ms", value);
-    LOG_BLE("Motor latency: Saved %.1fms to preferences\n", value);
+    size_t written = preferences->putFloat("motor_lat_ms", value);
+    if (written == 0) {
+        LOG_BLE("ERROR: Failed to save motor latency to NVS\n");
+    } else {
+        LOG_BLE("Motor latency: Saved %.1fms to preferences\n", value);
+    }
 }
 
 void GrindController::set_motor_response_latency(float value) {
