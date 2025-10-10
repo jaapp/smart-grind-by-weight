@@ -6,13 +6,20 @@
 class AutoTuneScreen {
 private:
     lv_obj_t* screen;
+    lv_obj_t* content_container;
     lv_obj_t* title_label;
     lv_obj_t* phase_label;
-    lv_obj_t* step_size_label;
-    lv_obj_t* iteration_label;
-    lv_obj_t* pulse_label;
-    lv_obj_t* result_label;
-    lv_obj_t* verification_label;
+    lv_obj_t* step_size_row;
+    lv_obj_t* iteration_row;
+    lv_obj_t* pulse_row;
+    lv_obj_t* last_pulse_row;
+    lv_obj_t* verification_row;
+    lv_obj_t* button_row;
+    lv_obj_t* step_size_value_label;
+    lv_obj_t* iteration_value_label;
+    lv_obj_t* pulse_value_label;
+    lv_obj_t* last_pulse_value_label;
+    lv_obj_t* verification_value_label;
     lv_obj_t* progress_bar;
     lv_obj_t* cancel_button;
     lv_obj_t* ok_button;

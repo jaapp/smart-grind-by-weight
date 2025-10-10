@@ -76,6 +76,12 @@ void AutoTuneUIController::update() {
 }
 
 void AutoTuneUIController::start_autotune() {
+    // Deprecated - use confirm_and_begin() instead
+    // This is kept for backwards compatibility
+    confirm_and_begin();
+}
+
+void AutoTuneUIController::confirm_and_begin() {
     if (!ui_manager_) {
         LOG_BLE("ERROR: Cannot start autotune - no UI manager\n");
         return;

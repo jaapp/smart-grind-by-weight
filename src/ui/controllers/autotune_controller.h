@@ -12,6 +12,7 @@ public:
     void update();
 
     void start_autotune();
+    void confirm_and_begin();
     void handle_cancel();
     void handle_ok();
 

@@ -20,6 +20,7 @@ enum class AutoTuneSubPhase {
     IDLE,
     PULSE_EXECUTE,          // Executing pulse via RMT
     MOTOR_SETTLING,         // Waiting for motor vibrations to settle
+    COLLECTION_DELAY,       // Allow grounds to collect in cup
     SCALE_SETTLING,         // Waiting for scale to settle
     MEASURE_COMPLETE,       // Ready to process result
     TARING                  // Performing tare operation
@@ -37,6 +38,7 @@ struct AutoTuneProgress {
     AutoTunePhase phase;
     int iteration;
     float current_pulse_ms;
+    float last_pulse_ms;
     float step_size_ms;
     bool last_pulse_success;
     int verification_round;
@@ -58,6 +60,8 @@ private:
 
     // Binary search state
     float current_pulse_ms;
+    float active_pulse_ms;
+    float last_executed_pulse_ms;
     float step_size;
     float last_success_ms;
     enum SearchDirection { UP, DOWN };
@@ -109,6 +113,7 @@ private:
     void start_pulse(float pulse_duration_ms);
     void update_pulse_execute();
     void update_motor_settling();
+    void update_collection_delay();
     void update_scale_settling();
     void process_measurement_result(float weight_delta);
 

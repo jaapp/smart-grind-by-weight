@@ -156,10 +156,22 @@ void SettingsUIController::handle_tare() {
 void SettingsUIController::handle_autotune() {
     if (!ui_manager_) return;
 
-    // Get the autotune UI controller and start the process
+    // Show confirmation screen with setup instructions
     auto autotune_controller = ui_manager_->autotune_controller_.get();
     if (autotune_controller) {
-        autotune_controller->start_autotune();
+        ui_manager_->show_confirmation(
+            "Auto-Tune Setup",
+            "Before starting:\n\n"
+            "- Place cup under grinder\n"
+            "- Verify bean hopper is not empty\n"
+            "- Process takes ~2 minutes\n\n"
+            "Continue?",
+            "START",
+            lv_color_hex(THEME_COLOR_ACCENT),
+            [autotune_controller]() { autotune_controller->confirm_and_begin(); },
+            "CANCEL",
+            [this]() { return_to_settings(); }
+        );
     }
 }
 

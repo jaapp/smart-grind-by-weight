@@ -81,5 +81,6 @@
 #define GRIND_AUTOTUNE_SUCCESS_RATE 0.80f                                         // 80% success threshold (4/5 pulses)
 #define GRIND_AUTOTUNE_VERIFICATION_PULSES 5                                      // Verification attempts per candidate
 #define GRIND_AUTOTUNE_MAX_ITERATIONS 50                                          // Hard stop safety limit
+#define GRIND_AUTOTUNE_COLLECTION_DELAY_MS 1500                                   // Minimum wait after pulse for grounds to drop
 #define GRIND_AUTOTUNE_SETTLING_TIMEOUT_MS 5000                                   // Max wait per pulse for scale settling
 #define GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G GRIND_SCALE_SETTLING_TOLERANCE_G        // 0.010g detection threshold

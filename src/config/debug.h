@@ -38,6 +38,6 @@
 #define DEBUG_MOCK_FLOW_RAMP_MS 350                                               // Ramp duration for simulated flow transitions
 #define DEBUG_MOCK_START_DELAY_MS 500                                             // Delay from motor start command to weight increase (continuous grind)
 #define DEBUG_MOCK_STOP_DELAY_MS 400                                              // Delay from motor stop command to weight stop
-#define DEBUG_MOCK_MOTOR_LATENCY_MS 45.0f                                         // Hidden minimum pulse duration to produce grounds (for auto-tune testing)
+#define DEBUG_MOCK_MOTOR_LATENCY_MS 42.0f                                         // Hidden minimum pulse duration to produce grounds (for auto-tune testing)
 
 

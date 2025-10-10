@@ -138,6 +138,6 @@ private:
     lv_obj_t *create_static_data_label(lv_obj_t *parent, const char *name,
                                        const char *value);
     lv_obj_t *create_data_label(lv_obj_t *parent, const char *name,
-                                lv_obj_t **variable);
+                                lv_obj_t **variable, bool stacked = false);
     lv_obj_t *create_description_label(lv_obj_t *parent, const char *text);
 };
