@@ -232,7 +232,7 @@ void AutoTuneController::update_binary_search_phase() {
             progress.last_pulse_success = pulse_produced_grounds;
 
             // Log result
-            log_message("  -> %.1fg %s", weight_delta,
+            log_message("  -> %.2fg %s", weight_delta,
                        pulse_produced_grounds ? "[OK]" : "[X]");
 
             if (pulse_produced_grounds) {
@@ -375,7 +375,7 @@ void AutoTuneController::update_verification_phase() {
 
             // Log verification header on first pulse
             if (verification_pulse_count == 0) {
-                log_message("\nVerify (%d/%d):", verification_round + 1, 5);
+                log_message("\nVerify %.0fms (%d/%d):", candidate_ms, verification_round + 1, 5);
             }
 
             // Start next verification pulse

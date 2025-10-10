@@ -74,7 +74,7 @@ void AutoTuneScreen::create() {
     lv_obj_set_style_text_font(previous_latency_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(previous_latency_label, lv_color_hex(0x888888), 0);
     lv_obj_set_style_text_align(previous_latency_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(previous_latency_label, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_align(previous_latency_label, LV_ALIGN_TOP_MID, 0, 80);
 
     // Buttons
     button_row = create_dual_button_row(screen, &cancel_button, &ok_button,
