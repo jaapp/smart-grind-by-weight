@@ -34,7 +34,7 @@ bool HX711Driver::begin(uint8_t gain_value) {
     gpio_reset_pin((gpio_num_t)dout_pin);
     
     pinMode(sck_pin, OUTPUT);
-    pinMode(dout_pin, INPUT);
+    pinMode(dout_pin, INPUT_PULLDOWN);
     set_gain(gain_value);
     power_up();
     
@@ -52,7 +52,19 @@ bool HX711Driver::begin(uint8_t gain_value) {
     }
     
     if (data_waiting_async()) {
-        update_async();  // Consume first reading
+        if (!update_async()) {
+            LOG_BLE("HX711Driver: Failed to read first sample\n");
+            return false;
+        }
+
+        // After a successful read the HX711 should release DOUT HIGH until the next conversion.
+        // If it remains LOW we likely don't have a real HX711 connected (pulldown holding the line).
+        delayMicroseconds(10);
+        if (digitalRead(dout_pin) == LOW) {
+            LOG_BLE("HX711Driver: DOUT stuck LOW after first read - HX711 not connected?\n");
+            return false;
+        }
+
         data_ready_flag = true;
         LOG_BLE("HX711Driver: First sample acquired successfully\n");
         return true;

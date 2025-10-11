@@ -19,8 +19,9 @@ void DiagnosticsController::update(HardwareManager* hw_mgr, GrindController* gri
     WeightSensor* sensor = hw_mgr->get_weight_sensor();
     if (!sensor) return;
 
-    // Phase 1: Only check calibration flag
+    // Phase 1: Calibration flag and boot diagnostics
     check_load_cell_calibration(sensor);
+    check_load_cell_boot_fault(sensor);
 
     // Phase 5: Add noise monitoring
     check_load_cell_noise(sensor, uptime_ms);
@@ -38,6 +39,28 @@ void DiagnosticsController::check_load_cell_calibration(WeightSensor* sensor) {
         set_diagnostic_active(DiagnosticCode::LOAD_CELL_NOT_CALIBRATED);
     } else {
         clear_diagnostic(DiagnosticCode::LOAD_CELL_NOT_CALIBRATED);
+    }
+}
+
+void DiagnosticsController::check_load_cell_boot_fault(WeightSensor* sensor) {
+    if (!sensor) return;
+
+    using HardwareFault = WeightSensor::HardwareFault;
+
+    HardwareFault fault = sensor->get_hardware_fault();
+    switch (fault) {
+        case HardwareFault::NONE:
+            clear_diagnostic(DiagnosticCode::HX711_NOT_CONNECTED);
+            clear_diagnostic(DiagnosticCode::HX711_NO_DATA);
+            break;
+        case HardwareFault::NOT_CONNECTED:
+            set_diagnostic_active(DiagnosticCode::HX711_NOT_CONNECTED);
+            clear_diagnostic(DiagnosticCode::HX711_NO_DATA);
+            break;
+        case HardwareFault::NO_DATA:
+            set_diagnostic_active(DiagnosticCode::HX711_NO_DATA);
+            clear_diagnostic(DiagnosticCode::HX711_NOT_CONNECTED);
+            break;
     }
 }
 
@@ -103,10 +126,18 @@ void DiagnosticsController::check_mechanical_stability(GrindController* grind_ct
 
 DiagnosticCode DiagnosticsController::get_highest_priority_warning() const {
     // Priority order (highest to lowest):
-    // 1. MECHANICAL_INSTABILITY - immediate safety concern
-    // 2. LOAD_CELL_NOISY_SUSTAINED - affects grind quality
-    // 3. LOAD_CELL_NOT_CALIBRATED - initial setup issue
+    // 1. HX711_NOT_CONNECTED - load cell hardware missing
+    // 2. HX711_NO_DATA - load cell present but unusable
+    // 3. MECHANICAL_INSTABILITY - immediate safety concern
+    // 4. LOAD_CELL_NOISY_SUSTAINED - affects grind quality
+    // 5. LOAD_CELL_NOT_CALIBRATED - initial setup issue
 
+    if (find_diagnostic(DiagnosticCode::HX711_NOT_CONNECTED)) {
+        return DiagnosticCode::HX711_NOT_CONNECTED;
+    }
+    if (find_diagnostic(DiagnosticCode::HX711_NO_DATA)) {
+        return DiagnosticCode::HX711_NO_DATA;
+    }
     if (find_diagnostic(DiagnosticCode::MECHANICAL_INSTABILITY)) {
         return DiagnosticCode::MECHANICAL_INSTABILITY;
     }
@@ -153,6 +184,10 @@ void DiagnosticsController::reset_all_transient_diagnostics() {
 
 const char* DiagnosticsController::get_diagnostic_message(DiagnosticCode code) const {
     switch (code) {
+        case DiagnosticCode::HX711_NOT_CONNECTED:
+            return "HX711 sensor not connected. Check wiring and restart.";
+        case DiagnosticCode::HX711_NO_DATA:
+            return "HX711 not providing valid data. Check load cell wiring and restart.";
         case DiagnosticCode::LOAD_CELL_NOT_CALIBRATED:
             return "Load cell not calibrated. Go to Tools → Calibrate";
         case DiagnosticCode::LOAD_CELL_NOISY_SUSTAINED:

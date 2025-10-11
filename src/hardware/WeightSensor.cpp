@@ -35,6 +35,7 @@ WeightSensor::WeightSensor() {
     last_update = 0;
     data_available = false;
     prefs = nullptr;
+    hardware_fault_ = HardwareFault::NONE;
 
     // Initialize tare state
     doTare = false;
@@ -100,6 +101,7 @@ void WeightSensor::init(Preferences* preferences) {
     doTare = false;
     tareTimes = 0;
     tareStatus = false;
+    hardware_fault_ = HardwareFault::NONE;
 
     calibration_flag_cached_ = false;
     calibration_flag_value_ = false;
@@ -238,6 +240,10 @@ void WeightSensor::calibrate(float known_weight) {
 #endif
     if (known_weight <= 0) {
         LOG_BLE("ERROR: Invalid calibration weight\n");
+        return;
+    }
+    if (has_hardware_fault()) {
+        LOG_BLE("ERROR: Cannot calibrate - HX711 hardware fault active\n");
         return;
     }
     
@@ -603,7 +609,7 @@ bool WeightSensor::sample_and_feed_filter() {
     // Core 0 ADC sampling and filter feeding (hardware-abstracted)
     // Returns true if new sample was processed, false if no data available
     
-    if (!adc_driver) {
+    if (!adc_driver || has_hardware_fault()) {
         return false; // No ADC driver available
     }
     

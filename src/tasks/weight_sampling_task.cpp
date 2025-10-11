@@ -176,6 +176,9 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
         return false;
     }
     
+    hardware_initialized = false;
+    hardware_validation_passed = false;
+    
     LOG_BLE("WeightSamplingTask: Initializing WeightSensor hardware on Core 0...\n");
     
     // Hardware reset sequence (extracted from RealtimeController)
@@ -184,7 +187,15 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     weight_sensor->power_up();
     vTaskDelay(pdMS_TO_TICKS(500));  // Use vTaskDelay instead of delay()
     
-    weight_sensor->begin();
+    bool begin_success = weight_sensor->begin();
+    if (!begin_success) {
+        LOG_BLE("ERROR: HX711 begin() failed - sensor not responding\n");
+        weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NOT_CONNECTED);
+        weight_sensor->power_down();
+        return false;
+    }
+    
+    weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NONE);
     
     // Apply saved calibration factor
     float saved_cal_factor = weight_sensor->get_saved_calibration_factor();
@@ -203,8 +214,12 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     // Validate hardware responds
     if (!weight_sensor->validate_hardware()) {
         LOG_BLE("ERROR: WeightSensor hardware validation failed - check wiring!\n");
+        weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NO_DATA);
+        weight_sensor->power_down();
         return false;
     }
+    
+    weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NONE);
     
     // Verify initialization
     LOG_BLE("  WeightSensor initialization complete:\n");

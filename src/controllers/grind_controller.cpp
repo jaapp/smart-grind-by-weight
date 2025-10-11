@@ -99,6 +99,11 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     LOG_BLE("[%lums CONTROLLER] start_grind() called with target=%.1fg, time=%lums, mode=%s\n",
             millis(), target, (unsigned long)time_ms, grind_mode == GrindMode::TIME ? "TIME" : "WEIGHT");
     if (!weight_sensor || !grinder) return;
+    if (weight_sensor->has_hardware_fault()) {
+        LOG_BLE("ERROR: Cannot start grind - load cell hardware fault detected (%d)\n",
+                static_cast<int>(weight_sensor->get_hardware_fault()));
+        return;
+    }
     
     target_weight = target;
     target_time_ms = time_ms;

@@ -11,6 +11,8 @@ class WeightSensor;
 // Diagnostic codes representing different system issues
 enum class DiagnosticCode {
     NONE = 0,                       // No diagnostics active
+    HX711_NOT_CONNECTED,            // HX711 board missing or not responding at boot
+    HX711_NO_DATA,                  // HX711 responding but no valid data
     LOAD_CELL_NOT_CALIBRATED,       // Load cell hasn't been calibrated yet
     LOAD_CELL_NOISY_SUSTAINED,      // Sustained excessive noise (60s+) - Phase 5
     MECHANICAL_INSTABILITY          // Mechanical issues during grinding - Phase 6
@@ -56,6 +58,7 @@ public:
 private:
     // Individual diagnostic checkers
     void check_load_cell_calibration(WeightSensor* sensor);
+    void check_load_cell_boot_fault(WeightSensor* sensor);
     void check_load_cell_noise(WeightSensor* sensor, uint32_t uptime_ms);
     void check_mechanical_stability(GrindController* grind_ctrl);
 

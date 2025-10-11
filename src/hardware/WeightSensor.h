@@ -9,6 +9,7 @@
 #include <freertos/task.h>
 #include <Arduino.h>
 #include <memory>
+#include <atomic>
 
 
 /*
@@ -29,6 +30,13 @@
  * - Multi-ADC hardware support
  */
 class WeightSensor {
+public:
+    enum class HardwareFault {
+        NONE = 0,
+        NOT_CONNECTED,
+        NO_DATA
+    };
+    
 private:
     // HX711 hardware driver
     std::unique_ptr<LoadCellDriver> adc_driver;
@@ -48,6 +56,7 @@ private:
     Preferences* prefs;
     
     bool data_available;
+    std::atomic<HardwareFault> hardware_fault_;
     
     // Tare implementation (hardware-independent)
     static const uint8_t DATA_SET = 16 + 1 + 1;  // SAMPLES + IGN_HIGH_SAMPLE + IGN_LOW_SAMPLE
@@ -70,8 +79,8 @@ private:
     
     // Cached calibration flag state to avoid repeated NVS lookups
     mutable bool calibration_flag_cached_;
-    mutable bool calibration_flag_value_;
-    mutable bool calibration_namespace_initialized_;
+   mutable bool calibration_flag_value_;
+   mutable bool calibration_namespace_initialized_;
 
     // Single calibration conversion point
     float raw_to_weight(int32_t raw_adc_value) const {
@@ -183,6 +192,11 @@ public:
     // Calibration flag (for diagnostics)
     bool is_calibrated() const;
     void set_calibrated(bool calibrated);
+    
+    // Hardware fault reporting for diagnostics
+    HardwareFault get_hardware_fault() const { return hardware_fault_.load(); }
+    void set_hardware_fault(HardwareFault fault) { hardware_fault_.store(fault); }
+    bool has_hardware_fault() const { return get_hardware_fault() != HardwareFault::NONE; }
 
     // Hardware validation and information
     bool validate_hardware();
