@@ -87,7 +87,7 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     display_page = lv_menu_page_create(menu, "Display");
     create_display_page(display_page);
     
-    grind_mode_page = lv_menu_page_create(menu, "Grind Mode");
+    grind_mode_page = lv_menu_page_create(menu, "Grind Settings");
     create_grind_mode_page(grind_mode_page);
     
     tools_page = lv_menu_page_create(menu, "Tools");
@@ -115,7 +115,7 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     lv_obj_t* display_item = create_menu_item(main_page, "Display");
     lv_menu_set_load_page_event(menu, display_item, display_page);
 
-    lv_obj_t* grind_mode_item = create_menu_item(main_page, "Grind Mode");
+    lv_obj_t* grind_mode_item = create_menu_item(main_page, "Grind Settings");
     lv_menu_set_load_page_event(menu, grind_mode_item, grind_mode_page);
 
     lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
@@ -261,10 +261,11 @@ void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_toggle_row(parent, "Swipe", &grind_mode_swipe_toggle);
 
     // Automatic actions section
-    create_separator(parent, "Auto Actions");
-    create_description_label(parent, "React to dosing cup placement/removal without touching the screen.");
-    create_toggle_row(parent, "Start on Cup", &auto_start_toggle);
-    create_toggle_row(parent, "Return on Removal", &auto_return_toggle);
+    create_separator(parent, "Automation");
+    create_description_label(parent, "Start the selected profile as soon as the cup lands on the scale.");
+    create_toggle_row(parent, "Start", &auto_start_toggle);
+    create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
+    create_toggle_row(parent, "Return", &auto_return_toggle);
 }
 
 void SettingsScreen::create_tools_page(lv_obj_t* parent) {
