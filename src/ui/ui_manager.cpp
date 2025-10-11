@@ -338,7 +338,6 @@ void UIManager::refresh_auto_action_settings() {
     auto_actions_.last_auto_start_ms = now;
     auto_actions_.last_auto_return_ms = now;
 
-    auto_actions_.cup_present = false;
     auto_actions_.baseline_weight = 0.0f;
     auto_actions_.baseline_timestamp_ms = now;
     auto_actions_.last_debug_log_ms = now;
@@ -390,7 +389,6 @@ void UIManager::update_auto_actions() {
         auto_actions_.baseline_timestamp_ms = now;
         auto_actions_.last_debug_log_ms = now;
         auto_actions_.enabled = true;
-        auto_actions_.cup_present = (weight >= threshold);
         auto_actions_.last_sample_count = sample_count;
 #if DEBUG_UI_SYSTEM
         LOG_BLE("[AUTO ACTION DEBUG] Automation armed (samples=%lu baseline=%.1fg)\n",
@@ -466,16 +464,15 @@ void UIManager::update_auto_actions() {
 
 #if DEBUG_UI_SYSTEM
     if ((now - auto_actions_.last_debug_log_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
-        LOG_BLE("[AUTO ACTION DEBUG] enabled=%d stable=%c baseline=%.1fg current=%.1fg delta=%.1fg cup=%d samples=%lu ready_tab=%d grind_active=%d auto_start=%d within_window=%d\n",
+        LOG_BLE("[AUTO ACTION DEBUG] enabled=%d stable=%c baseline=%.1fg current=%.1fg delta=%.1fg samples=%lu ready_tab=%d grind_active=%d auto_start=%d within_window=%d\n",
                 auto_actions_.enabled ? 1 : 0,
                 is_stable ? 'Y' : 'N',
                 static_cast<double>(auto_actions_.baseline_weight),
                 static_cast<double>(weight),
                 static_cast<double>(delta),
-                auto_actions_.cup_present ? 1 : 0,
                 static_cast<unsigned long>(sample_count),
                 is_ready_tab ? 1 : 0,
-                (grind_controller && grind_controller->is_active()) ? 1 : 0,
+                grinder_active ? 1 : 0,
                 auto_actions_.auto_start_enabled ? 1 : 0,
                 within_window ? 1 : 0);
         auto_actions_.last_debug_log_ms = now;
