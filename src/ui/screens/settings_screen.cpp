@@ -102,13 +102,8 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     diagnostics_page = lv_menu_page_create(menu, "Diagnostics");
     create_diagnostics_page(diagnostics_page);
 
-    // Create menu items and link to sub-pages
-    lv_obj_t* info_item = create_menu_item(main_page, "System Info");
-    lv_menu_set_load_page_event(menu, info_item, info_page);
-
-    lv_obj_t* diagnostics_item = create_menu_item(main_page, "Diagnostics");
-    lv_menu_set_load_page_event(menu, diagnostics_item, diagnostics_page);
-
+    // Create menu items grouped with separators
+    create_separator(main_page, "Settings");
     lv_obj_t* bluetooth_item = create_menu_item(main_page, "Bluetooth");
     lv_menu_set_load_page_event(menu, bluetooth_item, bluetooth_page);
 
@@ -118,8 +113,16 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     lv_obj_t* grind_mode_item = create_menu_item(main_page, "Grind Settings");
     lv_menu_set_load_page_event(menu, grind_mode_item, grind_mode_page);
 
+    create_separator(main_page, "Maintenance");
     lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
     lv_menu_set_load_page_event(menu, tools_item, tools_page);
+
+    create_separator(main_page, "Info");
+    lv_obj_t* diagnostics_item = create_menu_item(main_page, "Diagnostics");
+    lv_menu_set_load_page_event(menu, diagnostics_item, diagnostics_page);
+
+    lv_obj_t* info_item = create_menu_item(main_page, "System Info");
+    lv_menu_set_load_page_event(menu, info_item, info_page);
 
     lv_obj_t* data_item = create_menu_item(main_page, "Logs & Data");
     lv_menu_set_load_page_event(menu, data_item, data_page);
