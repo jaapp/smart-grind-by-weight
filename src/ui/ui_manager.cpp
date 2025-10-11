@@ -378,7 +378,7 @@ void UIManager::update_auto_actions() {
     float weight = sensor->get_display_weight();
     constexpr uint32_t kMinSamples = HW_LOADCELL_SAMPLE_RATE_SPS * 2;
     constexpr float kRemovalFloorFactor = 0.3f;
-    const float threshold = USER_AUTO_GRIND_TRIGGER_DELTA_G;
+    float threshold = USER_AUTO_GRIND_TRIGGER_DELTA_G;
 
     if (!auto_actions_.enabled) {
         if (sample_count < kMinSamples || !is_stable) {
