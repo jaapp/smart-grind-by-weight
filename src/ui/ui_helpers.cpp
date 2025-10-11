@@ -161,11 +161,14 @@ struct RadioButtonGroupData {
 // Internal event handler for radio button clicks
 static void radio_button_event_handler(lv_event_t* e) {
     lv_obj_t* clicked_button = (lv_obj_t*)lv_event_get_target(e);
+    if (!clicked_button || !lv_obj_is_valid(clicked_button)) return;
+
     lv_obj_t* group = lv_obj_get_parent(clicked_button);
+    if (!group || !lv_obj_is_valid(group)) return;
+
     RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
-    
-    if (!data) return;
-    
+    if (!data || !data->buttons) return;
+
     // Find which button was clicked
     int clicked_index = -1;
     for (int i = 0; i < data->button_count; i++) {
@@ -174,21 +177,23 @@ static void radio_button_event_handler(lv_event_t* e) {
             break;
         }
     }
-    
+
     if (clicked_index == -1 || clicked_index == data->selected_index) return;
-    
+
     // Update selection
     data->selected_index = clicked_index;
-    
+
     // Update visual states
     for (int i = 0; i < data->button_count; i++) {
-        if (i == clicked_index) {
-            lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_PRIMARY), 0);
-        } else {
-            lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+        if (data->buttons[i] && lv_obj_is_valid(data->buttons[i])) {
+            if (i == clicked_index) {
+                lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_PRIMARY), 0);
+            } else {
+                lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+            }
         }
     }
-    
+
     // Call user callback
     if (data->callback) {
         data->callback(clicked_index, data->user_data);
@@ -198,14 +203,31 @@ static void radio_button_event_handler(lv_event_t* e) {
 // Event handler to free memory on object deletion
 static void radio_button_group_delete_handler(lv_event_t* e) {
     lv_obj_t* group = (lv_obj_t*)lv_event_get_target(e);
-    RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
-    
-    if (data) {
-        if (data->buttons) {
-            free(data->buttons);
-        }
-        free(data);
+    if (!group) {
+        Serial.println("[RADIO_BTN] Delete handler called with null group");
+        return;
     }
+
+    RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
+    // Check if already freed (user_data is nullptr)
+    if (!data) {
+        Serial.println("[RADIO_BTN] Delete handler called but data already freed");
+        return;
+    }
+
+    Serial.printf("[%lums RADIO_BTN] Freeing radio button group data\n", millis());
+
+    // Clear user data first to prevent double-free if this handler is called again
+    lv_obj_set_user_data(group, nullptr);
+
+    // Now safe to free
+    if (data->buttons) {
+        free(data->buttons);
+        data->buttons = nullptr;
+    }
+    free(data);
+
+    Serial.printf("[%lums RADIO_BTN] Radio button group freed successfully\n", millis());
 }
 
 lv_obj_t* create_radio_button_group(
@@ -274,22 +296,26 @@ lv_obj_t* create_radio_button_group(
 }
 
 void radio_button_group_set_selection(lv_obj_t* group, int selected_index) {
+    if (!group) return;
     RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
-    if (!data || selected_index < 0 || selected_index >= data->button_count) return;
-    
+    if (!data || !data->buttons || selected_index < 0 || selected_index >= data->button_count) return;
+
     data->selected_index = selected_index;
-    
+
     // Update visual states
     for (int i = 0; i < data->button_count; i++) {
-        if (i == selected_index) {
-            lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_PRIMARY), 0);
-        } else {
-            lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+        if (data->buttons[i] && lv_obj_is_valid(data->buttons[i])) {
+            if (i == selected_index) {
+                lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_PRIMARY), 0);
+            } else {
+                lv_obj_set_style_bg_color(data->buttons[i], lv_color_hex(THEME_COLOR_NEUTRAL), 0);
+            }
         }
     }
 }
 
 int radio_button_group_get_selection(lv_obj_t* group) {
+    if (!group) return -1;
     RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
-    return data ? data->selected_index : -1;
+    return (data && data->buttons) ? data->selected_index : -1;
 }

@@ -26,13 +26,26 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     grinding_screen = grind_screen;
     hardware_manager = hw_mgr;
     diagnostics_controller = diag_ctrl;
-    
+
     screen = lv_obj_create(lv_scr_act());
     lv_obj_set_size(screen, LV_PCT(100), LV_PCT(100));
     lv_obj_align(screen, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
+
+    visible = false;
+    lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
+
+    // Don't create menu UI yet - will be created on first show()
+}
+
+void SettingsScreen::create_menu_ui() {
+    if (menu) {
+        return; // Already created
+    }
+
+    LOG_BLE("[%lums SETTINGS] Creating menu UI\n", millis());
 
     // Create menu instead of tabview
     menu = lv_menu_create(screen);
@@ -145,8 +158,7 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
 
     lv_obj_add_event_cb(menu, changing_page_callback, LV_EVENT_VALUE_CHANGED, this);
 
-    visible = false;
-    lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
+    LOG_BLE("[%lums SETTINGS] Menu UI created successfully\n", millis());
 }
 
 void SettingsScreen::create_info_page(lv_obj_t* parent) {
@@ -396,6 +408,11 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
 }
 
 void SettingsScreen::show() {
+    LOG_BLE("[%lums SETTINGS] Showing settings screen\n", millis());
+
+    // Create menu UI if it doesn't exist (deleted on hide)
+    create_menu_ui();
+
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = true;
     update_ble_status();
@@ -403,11 +420,49 @@ void SettingsScreen::show() {
     update_bluetooth_startup_toggle();
     update_logging_toggle();
     update_grind_mode_toggles();
+
+    LOG_BLE("[%lums SETTINGS] Settings screen shown successfully\n", millis());
 }
 
 void SettingsScreen::hide() {
+    if (!visible) {
+        return; // Already hidden, nothing to do
+    }
+
+    LOG_BLE("[%lums SETTINGS] Hiding settings screen\n", millis());
+
+    // Delete the menu and all its children to free memory
+    // This will trigger the DELETE event handlers, including the radio button cleanup
+    if (menu) {
+        LOG_BLE("[%lums SETTINGS] Deleting LVGL menu and children\n", millis());
+        lv_obj_del(menu);
+        menu = nullptr;
+
+        // Clear all page pointers since they're children of the menu
+        info_page = nullptr;
+        bluetooth_page = nullptr;
+        display_page = nullptr;
+        grind_mode_page = nullptr;
+        tools_page = nullptr;
+        data_page = nullptr;
+        stats_page = nullptr;
+        diagnostics_page = nullptr;
+
+        // Clear all widget pointers
+        grind_mode_radio_group = nullptr;
+        ble_toggle = nullptr;
+        ble_startup_toggle = nullptr;
+        logging_toggle = nullptr;
+        grind_mode_swipe_toggle = nullptr;
+        auto_start_toggle = nullptr;
+        auto_return_toggle = nullptr;
+
+        LOG_BLE("[%lums SETTINGS] Menu deleted successfully\n", millis());
+    }
+
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = false;
+    LOG_BLE("[%lums SETTINGS] Settings screen hidden successfully\n", millis());
 }
 
 void SettingsScreen::update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap) {

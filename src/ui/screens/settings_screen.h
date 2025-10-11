@@ -124,6 +124,7 @@ public:
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
     
 private:
+    void create_menu_ui();
     void create_info_page(lv_obj_t* parent);
     void create_bluetooth_page(lv_obj_t* parent);
     void create_display_page(lv_obj_t* parent);
