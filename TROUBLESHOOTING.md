@@ -1,5 +1,18 @@
 # Troubleshooting Guide
 
+## HX711 Not Detected / Wrong Sample Rate
+
+**Applies to:** First-boot issues when the load cell board is missing, miswired, or strapped for 80 SPS.
+
+### Symptoms
+- Startup log shows `HX711_NOT_CONNECTED` or `HX711_SAMPLE_RATE_INVALID`.
+- Weight display stays at `0.00 g`; grinding and calibration remain disabled.
+
+### Quick Fixes
+- **NOT_CONNECTED:** Verify VCC/GND/SCK/DOUT wiring and that the HX711 board is powered.
+- **SAMPLE_RATE_INVALID:** Ensure the HX711 `RATE` pin is tied to GND for 10 SPS; a floating/high pin forces 80 SPS and will now block startup.
+- After correcting hardware, reboot the scale. The diagnostic clears automatically when healthy samples are detected.
+
 ## Unknown board ID 'esp32-s3-devkitc-1'
 
 **Applies to:** Windows development environments using PlatformIO with ESP32-S3 boards.

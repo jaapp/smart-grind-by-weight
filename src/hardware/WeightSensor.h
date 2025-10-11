@@ -34,7 +34,8 @@ public:
     enum class HardwareFault {
         NONE = 0,
         NOT_CONNECTED,
-        NO_DATA
+        NO_DATA,
+        INVALID_SAMPLE_RATE
     };
     
 private:
@@ -57,6 +58,7 @@ private:
     
     bool data_available;
     std::atomic<HardwareFault> hardware_fault_;
+    float detected_sample_rate_sps_;
     
     // Tare implementation (hardware-independent)
     static const uint8_t DATA_SET = 16 + 1 + 1;  // SAMPLES + IGN_HIGH_SAMPLE + IGN_LOW_SAMPLE
@@ -204,6 +206,7 @@ public:
     bool supports_temperature_sensor() const;
     float get_temperature() const;  // Returns NaN if not supported
     uint32_t get_max_sample_rate() const;
+    float get_detected_sample_rate_sps() const { return detected_sample_rate_sps_; }
     
     // WeightSamplingTask integration interface
     bool sample_and_feed_filter();                                   // Core 0 sampling method for WeightSamplingTask

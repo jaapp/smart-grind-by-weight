@@ -20,7 +20,8 @@
 
 HX711Driver::HX711Driver(uint8_t sck_pin, uint8_t dout_pin) 
     : sck_pin(sck_pin), dout_pin(dout_pin), gain(1), last_raw_data(0), 
-      data_ready_flag(false), conversion_start_time(0), conversion_time(0) {
+      data_ready_flag(false), conversion_start_time(0), conversion_time(0),
+      estimated_sample_rate_sps(HW_LOADCELL_SAMPLE_RATE_SPS) {
 }
 
 bool HX711Driver::begin() {
@@ -126,8 +127,13 @@ bool HX711Driver::update_async() {
 
 void HX711Driver::conversion_24bit() {
     // Record conversion timing
-    conversion_time = micros() - conversion_start_time;
-    conversion_start_time = micros();
+    unsigned long now = micros();
+    if (conversion_start_time == 0) {
+        conversion_time = 0;
+    } else {
+        conversion_time = now - conversion_start_time;
+    }
+    conversion_start_time = now;
     
     uint32_t raw_data = 0;  // Use explicit 32-bit unsigned for ESP32 consistency
     
@@ -179,11 +185,17 @@ bool HX711Driver::validate_hardware() {
            validation_timeout, HW_LOADCELL_SAMPLE_RATE_SPS);
     
     unsigned long start_time = millis();
+    uint64_t conversion_time_sum = 0;
+    int conversion_time_samples = 0;
     int successful_reads = 0;
     
     while (millis() - start_time < validation_timeout && successful_reads < 3) {
         if (data_waiting_async()) {
             if (update_async()) {
+                if (conversion_time > 0) {
+                    conversion_time_sum += conversion_time;
+                    conversion_time_samples++;
+                }
                 successful_reads++;
                 LOG_BLE("HX711Driver: Validation read %d/3 successful\n", successful_reads);
             }
@@ -191,8 +203,17 @@ bool HX711Driver::validate_hardware() {
         delay(sample_interval_ms / 4); // Poll at 4x the sample rate
     }
     
-    LOG_BLE("HX711Driver: Hardware validation completed - %d/3 successful reads in %lums\n", 
-           successful_reads, millis() - start_time);
+    if (conversion_time_samples > 0) {
+        double avg_conversion_us = static_cast<double>(conversion_time_sum) / conversion_time_samples;
+        if (avg_conversion_us > 0.0) {
+            estimated_sample_rate_sps = static_cast<float>(1'000'000.0 / avg_conversion_us);
+        }
+    } else {
+        estimated_sample_rate_sps = HW_LOADCELL_SAMPLE_RATE_SPS;
+    }
+    
+    LOG_BLE("HX711Driver: Hardware validation completed - %d/3 successful reads in %lums (rate ≈ %.1f SPS)\n", 
+           successful_reads, millis() - start_time, estimated_sample_rate_sps);
     
     return successful_reads >= 3;
 }

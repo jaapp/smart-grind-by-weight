@@ -31,6 +31,7 @@ private:
     bool data_ready_flag;
     unsigned long conversion_start_time;
     unsigned long conversion_time;
+    float estimated_sample_rate_sps;
     
     // HX711-specific timing constants
     static const uint8_t SCK_DELAY = 1;           // Microsecond delay after SCK toggle
@@ -64,6 +65,7 @@ public:
     bool supports_temperature_sensor() const override { return false; }
     float get_temperature() const override { return NAN; }
     uint32_t get_max_sample_rate() const override { return HW_LOADCELL_SAMPLE_RATE_SPS; }
+    float get_estimated_sample_rate_sps() const { return estimated_sample_rate_sps; }
 
     uint8_t get_current_gain() const;
     const char* get_driver_name() const override { return "HX711"; }

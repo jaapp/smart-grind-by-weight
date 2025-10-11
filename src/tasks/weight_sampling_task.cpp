@@ -194,7 +194,6 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
         weight_sensor->power_down();
         return false;
     }
-    
     weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NONE);
     
     // Apply saved calibration factor
@@ -214,7 +213,9 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     // Validate hardware responds
     if (!weight_sensor->validate_hardware()) {
         LOG_BLE("ERROR: WeightSensor hardware validation failed - check wiring!\n");
-        weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NO_DATA);
+        if (weight_sensor->get_hardware_fault() == WeightSensor::HardwareFault::NONE) {
+            weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NO_DATA);
+        }
         weight_sensor->power_down();
         return false;
     }
@@ -226,6 +227,7 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     LOG_BLE("    Calibration factor: %.2f\n", weight_sensor->get_calibration_factor());
     LOG_BLE("    Tare offset: %ld\n", weight_sensor->get_zero_offset());
     LOG_BLE("    Hardware ready: %s\n", weight_sensor->is_data_ready() ? "TRUE" : "FALSE");
+    LOG_BLE("    Sample rate detected: %.1f SPS\n", weight_sensor->get_detected_sample_rate_sps());
     
     // Mark WeightSensor as hardware-ready
     weight_sensor->set_hardware_initialized();

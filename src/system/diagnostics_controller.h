@@ -12,7 +12,7 @@ class WeightSensor;
 enum class DiagnosticCode {
     NONE = 0,                       // No diagnostics active
     HX711_NOT_CONNECTED,            // HX711 board missing or not responding at boot
-    HX711_NO_DATA,                  // HX711 responding but no valid data
+    HX711_SAMPLE_RATE_INVALID,      // HX711 wired for incorrect sample rate (80 SPS)
     LOAD_CELL_NOT_CALIBRATED,       // Load cell hasn't been calibrated yet
     LOAD_CELL_NOISY_SUSTAINED,      // Sustained excessive noise (60s+) - Phase 5
     MECHANICAL_INSTABILITY          // Mechanical issues during grinding - Phase 6

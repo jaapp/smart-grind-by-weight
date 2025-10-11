@@ -36,6 +36,7 @@ WeightSensor::WeightSensor() {
     data_available = false;
     prefs = nullptr;
     hardware_fault_ = HardwareFault::NONE;
+    detected_sample_rate_sps_ = HW_LOADCELL_SAMPLE_RATE_SPS;
 
     // Initialize tare state
     doTare = false;
@@ -102,6 +103,7 @@ void WeightSensor::init(Preferences* preferences) {
     tareTimes = 0;
     tareStatus = false;
     hardware_fault_ = HardwareFault::NONE;
+    detected_sample_rate_sps_ = HW_LOADCELL_SAMPLE_RATE_SPS;
 
     calibration_flag_cached_ = false;
     calibration_flag_value_ = false;
@@ -168,7 +170,41 @@ void WeightSensor::power_up() {
 // power_up_sequence() method removed - now handled by ADC driver
 
 bool WeightSensor::validate_hardware() {
-    return adc_driver ? adc_driver->validate_hardware() : false;
+    if (!adc_driver) {
+        detected_sample_rate_sps_ = 0.0f;
+        return false;
+    }
+    
+    bool valid = adc_driver->validate_hardware();
+    
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    detected_sample_rate_sps_ = HW_LOADCELL_SAMPLE_RATE_SPS;
+    if (valid && hardware_fault_ == HardwareFault::NONE) {
+        hardware_fault_ = HardwareFault::NONE;
+    }
+    return valid;
+#else
+    detected_sample_rate_sps_ = HW_LOADCELL_SAMPLE_RATE_SPS;
+    HX711Driver* hx_driver = static_cast<HX711Driver*>(adc_driver.get());
+    detected_sample_rate_sps_ = hx_driver ? hx_driver->get_estimated_sample_rate_sps() : HW_LOADCELL_SAMPLE_RATE_SPS;
+    
+    if (!valid) {
+        return false;
+    }
+    
+    constexpr float kSampleRateUpperThreshold = HW_LOADCELL_SAMPLE_RATE_SPS * 4.0f; // Expect 10 SPS; anything >40 SPS is invalid
+    if (detected_sample_rate_sps_ > kSampleRateUpperThreshold) {
+        LOG_BLE("ERROR: HX711 sample rate detected at %.1f SPS (expected ≈ %d SPS)\n",
+                detected_sample_rate_sps_, HW_LOADCELL_SAMPLE_RATE_SPS);
+        if (hardware_fault_ == HardwareFault::NONE) {
+            hardware_fault_ = HardwareFault::INVALID_SAMPLE_RATE;
+        }
+        return false;
+    }
+    
+    hardware_fault_ = HardwareFault::NONE;
+    return true;
+#endif
 }
 
 // New hardware abstraction methods
