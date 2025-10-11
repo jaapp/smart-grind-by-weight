@@ -409,46 +409,56 @@ void UIManager::update_auto_actions() {
     uint32_t elapsed = now - auto_actions_.baseline_timestamp_ms;
     float delta = weight - auto_actions_.baseline_weight;
     bool within_window = elapsed <= USER_AUTO_GRIND_TRIGGER_WINDOW_MS;
-    bool handled = false;
-
     const bool is_ready_tab = (state_machine->is_state(UIState::READY) && current_tab < 3);
+    const bool grinder_active = (grind_controller && grind_controller->is_active());
+    const bool rearm_ready = (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
 
-    if (!auto_actions_.cup_present &&
+    bool start_conditions_met = (delta >= threshold && weight >= threshold && within_window);
+
+    if (start_conditions_met) {
+        if (!auto_actions_.auto_start_enabled) {
+            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (auto_start disabled)\n");
+        } else if (!is_ready_tab) {
+            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (not on ready tab/state = %d / tab=%d)\n",
+                    state_machine->is_state(UIState::READY) ? 1 : 0, current_tab);
+        } else if (grinder_active) {
+            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (grinder already active)\n");
+        } else if (!rearm_ready) {
+            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (rearm delay %lums remaining)\n",
+                    static_cast<unsigned long>(USER_AUTO_GRIND_REARM_DELAY_MS -
+                                               (now - auto_actions_.last_auto_start_ms)));
+        } else if (!grinding_controller_) {
+            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (grinding controller missing)\n");
+        } else {
+            LOG_BLE("[AUTO ACTION] Weight increased by %.1fg in %lums - auto-starting grind\n",
+                    static_cast<double>(delta), static_cast<unsigned long>(elapsed));
+            auto_actions_.last_auto_start_ms = now;
+            grinding_controller_->handle_grind_button();
+            auto_actions_.baseline_weight = weight;
+            auto_actions_.baseline_timestamp_ms = now;
+#if DEBUG_UI_SYSTEM
+            auto_actions_.last_debug_log_ms = now;
+#endif
+            return;
+        }
+    }
+
+    if (auto_actions_.auto_return_enabled &&
         within_window &&
-        delta >= threshold &&
-        weight >= threshold &&
-        auto_actions_.auto_start_enabled &&
-        is_ready_tab &&
-        grind_controller && !grind_controller->is_active() &&
-        grinding_controller_ &&
-        (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
-        LOG_BLE("[AUTO ACTION] Weight increased by %.1fg in %lums - auto-starting grind\n",
-                static_cast<double>(delta), static_cast<unsigned long>(elapsed));
-        auto_actions_.last_auto_start_ms = now;
-        grinding_controller_->handle_grind_button();
-        auto_actions_.cup_present = true;
-        handled = true;
-    } else if (auto_actions_.cup_present &&
-               within_window &&
-               (-delta) >= threshold &&
-               weight <= threshold * kRemovalFloorFactor &&
-               auto_actions_.auto_return_enabled &&
-               (state_machine->is_state(UIState::GRIND_COMPLETE) || state_machine->is_state(UIState::GRIND_TIMEOUT)) &&
-               grind_controller && grind_controller->is_active() &&
-               (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
+        (-delta) >= threshold &&
+        weight <= threshold * kRemovalFloorFactor &&
+        (state_machine->is_state(UIState::GRIND_COMPLETE) || state_machine->is_state(UIState::GRIND_TIMEOUT)) &&
+        grinder_active &&
+        (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
         LOG_BLE("[AUTO ACTION] Cup removed - returning to ready screen\n");
         auto_actions_.last_auto_return_ms = now;
         grind_controller->return_to_idle();
-        auto_actions_.cup_present = false;
-        handled = true;
-    }
-
-    if (!handled) {
-        if (delta >= threshold && weight >= threshold) {
-            auto_actions_.cup_present = true;
-        } else if ((-delta) >= threshold && weight <= threshold * kRemovalFloorFactor) {
-            auto_actions_.cup_present = false;
-        }
+        auto_actions_.baseline_weight = weight;
+        auto_actions_.baseline_timestamp_ms = now;
+#if DEBUG_UI_SYSTEM
+        auto_actions_.last_debug_log_ms = now;
+#endif
+        return;
     }
 
     auto_actions_.baseline_weight = weight;
