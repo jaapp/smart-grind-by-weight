@@ -23,7 +23,7 @@
 #define DEBUG_SERIAL_OUTPUT 1                                             // Enable serial debug output
 #define DEBUG_GRIND_CONTROLLER 0                                          // Enable detailed grind debugging
 #define DEBUG_LOAD_CELL 0                                                 // Enable detailed load cell debugging  
-#define DEBUG_UI_SYSTEM 0                                                 // Enable detailed UI debugging
+#define DEBUG_UI_SYSTEM 1                                                 // Enable detailed UI debugging
 #define DEBUG_CALIBRATION 0                                               // Enable detailed calibration debugging
 #define DEBUG_WEIGHT_SETTLING 0                                           // Enable weight settling debugging
 
