@@ -1,6 +1,7 @@
 #include "autotune_screen.h"
 #include "../ui_helpers.h"
 #include <Arduino.h>
+#include <algorithm>
 #include <cstring>
 
 void AutoTuneScreen::create() {
@@ -169,14 +170,23 @@ void AutoTuneScreen::show_failure_screen(const char* error_message) {
         snprintf(detail_buffer, sizeof(detail_buffer), "%s%s", failure_detail, needs_period ? "." : "");
     }
 
-    if (detail_buffer[0] != '\0') {
-        snprintf(full_message, sizeof(full_message),
-                 "Could not find reliable minimum pulse duration. %s Check grinder power connection, beans in hopper, and ensure a cup is on the scale.",
-                 detail_buffer);
-    } else {
-        snprintf(full_message, sizeof(full_message),
-                 "Could not find reliable minimum pulse duration. Check grinder power connection, beans in hopper, and ensure a cup is on the scale.");
+    snprintf(full_message, sizeof(full_message),
+             "Could not find reliable minimum pulse duration.");
+
+    size_t used = strlen(full_message);
+    if (detail_buffer[0] != '\0' && used < sizeof(full_message) - 1) {
+        int written = snprintf(full_message + used, sizeof(full_message) - used,
+                               " %s", detail_buffer);
+        if (written > 0) {
+            used = std::min(sizeof(full_message) - 1, used + static_cast<size_t>(written));
+        }
     }
+
+    if (used < sizeof(full_message) - 1) {
+        snprintf(full_message + used, sizeof(full_message) - used,
+                 " Check grinder power, confirm beans are in the hopper, and ensure a cup is on the scale.");
+    }
+
     lv_label_set_text(message_label, full_message);
     lv_obj_align(message_label, LV_ALIGN_CENTER, 0, -20);
 

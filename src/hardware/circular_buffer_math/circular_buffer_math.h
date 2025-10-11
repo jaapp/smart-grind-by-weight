@@ -76,6 +76,8 @@ public:
     int32_t get_raw_low_latency() const;       // 50ms window - for real-time control  
     int32_t get_display_raw();                 // 250ms window + asymmetric filter - for UI
     int32_t get_raw_high_latency() const;      // 250ms window - for final measurements
+    bool get_window_delta(uint32_t window_ms, int32_t* delta_out,
+                          uint32_t* span_ms_out = nullptr, int* samples_out = nullptr) const;
     
     // Raw access for diagnostics
     uint16_t get_sample_count() const { return samples_count; }

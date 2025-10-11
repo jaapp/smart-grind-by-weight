@@ -430,6 +430,44 @@ float WeightSensor::get_weight_high_latency() const {
     return raw_to_weight(raw_filter.get_raw_high_latency());
 }
 
+bool WeightSensor::get_weight_delta(uint32_t window_ms, float* delta_out,
+                                    int* sample_count_out, uint32_t* span_ms_out) const {
+    if (!delta_out) {
+        return false;
+    }
+
+    if (fabsf(cal_factor) < 1e-6f) {
+        *delta_out = 0.0f;
+        if (sample_count_out) {
+            *sample_count_out = 0;
+        }
+        if (span_ms_out) {
+            *span_ms_out = 0;
+        }
+        return false;
+    }
+
+    int32_t raw_delta = 0;
+    uint32_t span_ms = 0;
+    int samples = 0;
+    bool has_delta = raw_filter.get_window_delta(window_ms, &raw_delta, &span_ms, &samples);
+
+    if (sample_count_out) {
+        *sample_count_out = samples;
+    }
+    if (span_ms_out) {
+        *span_ms_out = span_ms;
+    }
+
+    if (!has_delta) {
+        *delta_out = 0.0f;
+        return false;
+    }
+
+    *delta_out = raw_delta / cal_factor;
+    return true;
+}
+
 // Flow rate analysis using CircularBufferMath - convert raw flow to weight flow
 float WeightSensor::get_flow_rate(uint32_t window_ms) const {
     float raw_flow = raw_filter.get_raw_flow_rate(window_ms);

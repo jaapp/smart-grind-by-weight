@@ -337,18 +337,6 @@ void UIManager::refresh_auto_action_settings() {
     uint32_t now = millis();
     auto_actions_.last_auto_start_ms = now;
     auto_actions_.last_auto_return_ms = now;
-
-    auto_actions_.baseline_weight = 0.0f;
-    auto_actions_.baseline_timestamp_ms = now;
-    auto_actions_.last_debug_log_ms = now;
-    auto_actions_.enabled = false;
-    auto_actions_.last_sample_count = 0;
-
-    if (hardware_manager) {
-        if (auto* sensor = hardware_manager->get_weight_sensor()) {
-            auto_actions_.baseline_weight = sensor->get_display_weight();
-        }
-    }
 }
 
 void UIManager::update_auto_actions() {
@@ -357,125 +345,83 @@ void UIManager::update_auto_actions() {
         return;
     }
 
-    UIState current_state = state_machine->get_current_state();
+    auto* sensor = hardware_manager->get_weight_sensor();
+    if (!sensor || !sensor->data_ready() || sensor->is_tare_in_progress()) {
+        return;
+    }
+
+    const UIState current_state = state_machine->get_current_state();
     if (current_state == UIState::GRINDING || current_state == UIState::CALIBRATION) {
         return;
     }
 
-    auto* sensor = hardware_manager->get_weight_sensor();
-    if (!sensor) {
-        return;
-    }
-
-    if (!sensor->data_ready() || sensor->is_tare_in_progress()) {
-        return;
-    }
-
-    uint32_t now = millis();
-    uint32_t sample_count = static_cast<uint32_t>(sensor->get_sample_count());
-    bool is_stable = sensor->is_settled(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
-    float weight = sensor->get_display_weight();
-    constexpr uint32_t kMinSamples = HW_LOADCELL_SAMPLE_RATE_SPS * 2;
-    constexpr float kRemovalFloorFactor = 0.3f;
-    float threshold = USER_AUTO_GRIND_TRIGGER_DELTA_G;
-
-    if (!auto_actions_.enabled) {
-        if (sample_count < kMinSamples || !is_stable) {
-            auto_actions_.last_sample_count = sample_count;
-            return;
-        }
-
-        auto_actions_.baseline_weight = weight;
-        auto_actions_.baseline_timestamp_ms = now;
-        auto_actions_.last_debug_log_ms = now;
-        auto_actions_.enabled = true;
-        auto_actions_.last_sample_count = sample_count;
-#if DEBUG_UI_SYSTEM
-        LOG_BLE("[AUTO ACTION DEBUG] Automation armed (samples=%lu baseline=%.1fg)\n",
-                static_cast<unsigned long>(sample_count),
-                static_cast<double>(weight));
-#endif
-        return;
-    }
-
-    auto_actions_.last_sample_count = sample_count;
-
-    if (!is_stable) {
-        return;
-    }
-
-    uint32_t elapsed = now - auto_actions_.baseline_timestamp_ms;
-    float delta = weight - auto_actions_.baseline_weight;
-    bool within_window = elapsed <= USER_AUTO_GRIND_TRIGGER_WINDOW_MS;
-    const bool is_ready_tab = (state_machine->is_state(UIState::READY) && current_tab < 3);
+    const uint32_t now = millis();
     const bool grinder_active = (grind_controller && grind_controller->is_active());
-    const bool rearm_ready = (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
+    const bool on_ready_tab = state_machine->is_state(UIState::READY) && current_tab < 3;
 
-    bool start_conditions_met = (delta >= threshold && weight >= threshold && within_window);
+    if (auto_actions_.auto_start_enabled && on_ready_tab && !grinder_active && grinding_controller_) {
+        auto* filter = sensor->get_raw_filter();
+        if (filter && filter->get_buffer_time_span_ms() >= USER_AUTO_GRIND_TRIGGER_WINDOW_MS) {
+            constexpr int kBaseSampleRequirement =
+                (HW_LOADCELL_SAMPLE_RATE_SPS * USER_AUTO_GRIND_TRIGGER_WINDOW_MS) / 1000;
+            constexpr int kMinSamplesForWindow = (kBaseSampleRequirement > 2) ? kBaseSampleRequirement : 2;
 
-    if (start_conditions_met) {
-        if (!auto_actions_.auto_start_enabled) {
-            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (auto_start disabled)\n");
-        } else if (!is_ready_tab) {
-            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (not on ready tab/state = %d / tab=%d)\n",
-                    state_machine->is_state(UIState::READY) ? 1 : 0, current_tab);
-        } else if (grinder_active) {
-            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (grinder already active)\n");
-        } else if (!rearm_ready) {
-            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (rearm delay %lums remaining)\n",
-                    static_cast<unsigned long>(USER_AUTO_GRIND_REARM_DELAY_MS -
-                                               (now - auto_actions_.last_auto_start_ms)));
-        } else if (!grinding_controller_) {
-            LOG_BLE("[AUTO ACTION DEBUG] Delta ignored (grinding controller missing)\n");
-        } else {
-            LOG_BLE("[AUTO ACTION] Weight increased by %.1fg in %lums - auto-starting grind\n",
-                    static_cast<double>(delta), static_cast<unsigned long>(elapsed));
-            auto_actions_.last_auto_start_ms = now;
-            grinding_controller_->handle_grind_button();
-            auto_actions_.baseline_weight = weight;
-            auto_actions_.baseline_timestamp_ms = now;
+            if (sensor->get_sample_count() >= kMinSamplesForWindow) {
+                float delta_g = 0.0f;
+                int samples_used = 0;
+                uint32_t span_ms = 0;
+
+                if (sensor->get_weight_delta(USER_AUTO_GRIND_TRIGGER_WINDOW_MS, &delta_g, &samples_used, &span_ms) &&
+                    samples_used >= kMinSamplesForWindow &&
+                    span_ms <= USER_AUTO_GRIND_TRIGGER_WINDOW_MS) {
+                    const bool rearm_ready =
+                        (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
+
+                    if (delta_g >= USER_AUTO_GRIND_TRIGGER_DELTA_G && rearm_ready) {
+                        LOG_BLE("[AUTO ACTION] %.1fg added in last %lums - auto-starting grind\n",
+                                static_cast<double>(delta_g),
+                                static_cast<unsigned long>(span_ms));
+                        auto_actions_.last_auto_start_ms = now;
+                        grinding_controller_->handle_grind_button();
+                    }
 #if DEBUG_UI_SYSTEM
-            auto_actions_.last_debug_log_ms = now;
+                    else {
+                        static uint32_t last_debug_ms = 0;
+                        if (now - last_debug_ms >= USER_AUTO_GRIND_REARM_DELAY_MS) {
+                            LOG_BLE("[AUTO ACTION DEBUG] samples=%d delta=%.1fg span=%lums threshold=%.1fg ready=%d active=%d rearm=%d\n",
+                                    samples_used,
+                                    static_cast<double>(delta_g),
+                                    static_cast<unsigned long>(span_ms),
+                                    static_cast<double>(USER_AUTO_GRIND_TRIGGER_DELTA_G),
+                                    on_ready_tab ? 1 : 0,
+                                    grinder_active ? 1 : 0,
+                                    rearm_ready ? 1 : 0);
+                            last_debug_ms = now;
+                        }
+                    }
 #endif
-            return;
+                }
+            }
         }
     }
 
-    if (auto_actions_.auto_return_enabled &&
-        within_window &&
-        (-delta) >= threshold &&
-        weight <= threshold * kRemovalFloorFactor &&
-        (state_machine->is_state(UIState::GRIND_COMPLETE) || state_machine->is_state(UIState::GRIND_TIMEOUT)) &&
-        grinder_active &&
-        (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
-        LOG_BLE("[AUTO ACTION] Cup removed - returning to ready screen\n");
-        auto_actions_.last_auto_return_ms = now;
-        grind_controller->return_to_idle();
-        auto_actions_.baseline_weight = weight;
-        auto_actions_.baseline_timestamp_ms = now;
-#if DEBUG_UI_SYSTEM
-        auto_actions_.last_debug_log_ms = now;
-#endif
+    if (!auto_actions_.auto_return_enabled) {
         return;
     }
 
-    auto_actions_.baseline_weight = weight;
-    auto_actions_.baseline_timestamp_ms = now;
+    if (state_machine->is_state(UIState::GRIND_COMPLETE) ||
+        state_machine->is_state(UIState::GRIND_TIMEOUT)) {
+        constexpr float kCompleteExitThresholdG = 2.0f;  // Treat scale as empty once within ±2g
+        const float live_weight = sensor->get_weight_low_latency();
+        const bool rearm_ready =
+            (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
 
-#if DEBUG_UI_SYSTEM
-    if ((now - auto_actions_.last_debug_log_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
-        LOG_BLE("[AUTO ACTION DEBUG] enabled=%d stable=%c baseline=%.1fg current=%.1fg delta=%.1fg samples=%lu ready_tab=%d grind_active=%d auto_start=%d within_window=%d\n",
-                auto_actions_.enabled ? 1 : 0,
-                is_stable ? 'Y' : 'N',
-                static_cast<double>(auto_actions_.baseline_weight),
-                static_cast<double>(weight),
-                static_cast<double>(delta),
-                static_cast<unsigned long>(sample_count),
-                is_ready_tab ? 1 : 0,
-                grinder_active ? 1 : 0,
-                auto_actions_.auto_start_enabled ? 1 : 0,
-                within_window ? 1 : 0);
-        auto_actions_.last_debug_log_ms = now;
+        if (std::fabs(live_weight) <= kCompleteExitThresholdG && rearm_ready) {
+            LOG_BLE("[AUTO ACTION] Detected near-empty scale - returning to ready screen\n");
+            auto_actions_.last_auto_return_ms = now;
+            if (grind_controller) {
+                grind_controller->return_to_idle();
+            }
+        }
     }
-#endif
 }

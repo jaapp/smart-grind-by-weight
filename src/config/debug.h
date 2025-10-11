@@ -23,7 +23,7 @@
 #define DEBUG_SERIAL_OUTPUT 1                                             // Enable serial debug output
 #define DEBUG_GRIND_CONTROLLER 0                                          // Enable detailed grind debugging
 #define DEBUG_LOAD_CELL 0                                                 // Enable detailed load cell debugging  
-#define DEBUG_UI_SYSTEM 1                                                 // Enable detailed UI debugging
+#define DEBUG_UI_SYSTEM 0                                                 // Enable detailed UI debugging
 #define DEBUG_CALIBRATION 0                                               // Enable detailed calibration debugging
 #define DEBUG_WEIGHT_SETTLING 0                                           // Enable weight settling debugging
 
@@ -39,5 +39,4 @@
 #define DEBUG_MOCK_START_DELAY_MS 500                                             // Delay from motor start command to weight increase (continuous grind)
 #define DEBUG_MOCK_STOP_DELAY_MS 400                                              // Delay from motor stop command to weight stop
 #define DEBUG_MOCK_MOTOR_LATENCY_MS 42.0f                                         // Hidden minimum pulse duration to produce grounds (for auto-tune testing)
-
 

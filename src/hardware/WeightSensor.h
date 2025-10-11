@@ -163,6 +163,9 @@ public:
     float get_weight_low_latency() const;                    // 50ms window - for real-time control
     float get_display_weight();                              // 250ms + asymmetric filter - for UI
     float get_weight_high_latency() const;                   // 250ms window - for final measurements
+    bool get_weight_delta(uint32_t window_ms, float* delta_out,
+                          int* sample_count_out = nullptr,
+                          uint32_t* span_ms_out = nullptr) const;
     
     // Flow rate analysis using CircularBufferMath
     float get_flow_rate(uint32_t window_ms = 200) const;     // Flow rate calculation (default 200ms window)

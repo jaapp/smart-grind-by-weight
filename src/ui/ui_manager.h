@@ -148,10 +148,5 @@ private:
         bool auto_return_enabled = false;
         uint32_t last_auto_start_ms = 0;
         uint32_t last_auto_return_ms = 0;
-        float baseline_weight = 0.0f;
-        uint32_t baseline_timestamp_ms = 0;
-        uint32_t last_debug_log_ms = 0;
-        bool enabled = false;
-        uint32_t last_sample_count = 0;
     } auto_actions_;
 };

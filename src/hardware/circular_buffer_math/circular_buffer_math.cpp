@@ -188,6 +188,73 @@ uint32_t CircularBufferMath::get_buffer_time_span_ms() const {
     return circular_buffer[newest_index].timestamp_ms - circular_buffer[oldest_index].timestamp_ms;
 }
 
+bool CircularBufferMath::get_window_delta(uint32_t window_ms, int32_t* delta_out,
+                                          uint32_t* span_ms_out, int* samples_out) const {
+    if (!delta_out || samples_count < 2) {
+        if (delta_out) {
+            *delta_out = 0;
+        }
+        if (span_ms_out) {
+            *span_ms_out = 0;
+        }
+        if (samples_out) {
+            *samples_out = 0;
+        }
+        return false;
+    }
+
+    uint32_t current_time = millis();
+    uint32_t window_start = current_time - window_ms;
+
+    int collected = 0;
+    int32_t newest_raw = 0;
+    int32_t oldest_raw = 0;
+    uint32_t newest_ts = 0;
+    uint32_t oldest_ts = 0;
+
+    for (int i = 0; i < samples_count; ++i) {
+        uint16_t index = (write_index - 1 - i + MAX_BUFFER_SIZE) % MAX_BUFFER_SIZE;
+        const AdcSample& sample = circular_buffer[index];
+
+        if (sample.timestamp_ms < window_start) {
+            break;
+        }
+
+        if (collected == 0) {
+            newest_raw = sample.raw_value;
+            newest_ts = sample.timestamp_ms;
+        }
+
+        oldest_raw = sample.raw_value;
+        oldest_ts = sample.timestamp_ms;
+        ++collected;
+    }
+
+    if (samples_out) {
+        *samples_out = collected;
+    }
+
+    if (collected < 2) {
+        *delta_out = 0;
+        if (span_ms_out) {
+            *span_ms_out = 0;
+        }
+        return false;
+    }
+
+    *delta_out = newest_raw - oldest_raw;
+
+    if (span_ms_out) {
+        if (newest_ts >= oldest_ts) {
+            *span_ms_out = newest_ts - oldest_ts;
+        } else {
+            *span_ms_out = (UINT32_MAX - oldest_ts) + newest_ts + 1;
+        }
+    }
+
+    return true;
+}
+
 bool CircularBufferMath::is_settled(uint32_t window_ms, int32_t threshold_raw_units) const {
     float std_dev = get_standard_deviation_raw(window_ms);
     bool settled = std_dev <= threshold_raw_units;
@@ -461,4 +528,3 @@ void CircularBufferMath::clear_all_samples() {
         circular_buffer[i].timestamp_ms = 0;
     }
 }
-
