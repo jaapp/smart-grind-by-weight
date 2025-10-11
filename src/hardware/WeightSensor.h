@@ -68,10 +68,6 @@ private:
     bool tareTimeoutFlag;
     unsigned long tareTimeOut;
     
-    // Weight activity tracking
-    float last_significant_weight;
-    uint32_t last_weight_activity_time;
-    
     // Stable reading diagnostic tracking (sustained settling check for UI)
     mutable unsigned long not_settled_start_time;
     mutable bool currently_not_settled;
@@ -163,6 +159,11 @@ public:
     float get_weight_low_latency() const;                    // 50ms window - for real-time control
     float get_display_weight();                              // 250ms + asymmetric filter - for UI
     float get_weight_high_latency() const;                   // 250ms window - for final measurements
+    bool get_weight_delta(uint32_t window_ms, float* delta_out,
+                          int* sample_count_out = nullptr,
+                          uint32_t* span_ms_out = nullptr) const;
+    float get_weight_range(uint32_t window_ms) const;
+    bool weight_range_exceeds(uint32_t window_ms, float threshold_g) const;
     
     // Flow rate analysis using CircularBufferMath
     float get_flow_rate(uint32_t window_ms = 200) const;     // Flow rate calculation (default 200ms window)
@@ -215,9 +216,6 @@ public:
     CircularBufferMath* get_raw_filter() { return &raw_filter; }     // Direct access to raw data math helper
     float get_saved_calibration_factor();                            // Get calibration factor from preferences
     void set_hardware_initialized() { data_available = true; }       // Mark hardware as ready
-
-    // Weight activity timing (for screen timeout reset)
-    uint32_t get_ms_since_last_weight_activity() const;
     
     // Diagnostic methods for noise analysis
     float get_standard_deviation_g(uint32_t window_ms = 500) const;     // Standard deviation in grams

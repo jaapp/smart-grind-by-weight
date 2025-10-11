@@ -104,6 +104,9 @@ void CalibrationUIController::handle_ok() {
                 // Capture baseline ADC value after taring
                 baseline_adc_value_ = ui_manager_->get_hardware_manager()->get_weight_sensor()->get_raw_adc_instant();
                 ui_manager_->calibration_screen.set_step(CAL_STEP_WEIGHT);
+                if (ui_manager_) {
+                    ui_manager_->refresh_auto_action_settings();
+                }
             });
             break;
         case CAL_STEP_WEIGHT: {
@@ -111,6 +114,9 @@ void CalibrationUIController::handle_ok() {
             UIOperations::execute_calibration(ui_manager_->get_hardware_manager(), cal_weight, [this]() {
                 ui_manager_->calibration_screen.set_step(CAL_STEP_NOISE_CHECK);
                 start_noise_check();
+                if (ui_manager_) {
+                    ui_manager_->refresh_auto_action_settings();
+                }
             });
             break;
         }
@@ -133,6 +139,7 @@ void CalibrationUIController::handle_cancel() {
     baseline_adc_value_ = 0;
     ui_manager_->set_current_tab(3);
     ui_manager_->switch_to_state(UIState::SETTINGS);
+    ui_manager_->refresh_auto_action_settings();
 }
 
 void CalibrationUIController::handle_plus(lv_event_code_t code) {
@@ -303,4 +310,6 @@ void CalibrationUIController::complete_calibration() {
     if (weight_sensor) {
         ui_manager_->calibration_screen.update_current_weight(weight_sensor->get_display_weight());
     }
+
+    ui_manager_->refresh_auto_action_settings();
 }

@@ -25,6 +25,8 @@ public:
     void handle_logging_toggle();
     void handle_grind_mode_swipe_toggle();
     void handle_grind_mode_radio_button();
+    void handle_auto_start_toggle();
+    void handle_auto_return_toggle();
     void handle_brightness_normal_slider();
     void handle_brightness_normal_slider_released();
     void handle_brightness_screensaver_slider();

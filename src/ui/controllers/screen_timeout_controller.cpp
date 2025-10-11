@@ -1,7 +1,5 @@
 #include "screen_timeout_controller.h"
 
-#include <algorithm>
-
 #include "../../config/constants.h"
 #include "../../hardware/display_manager.h"
 #include "../../hardware/hardware_manager.h"
@@ -46,10 +44,11 @@ void ScreenTimeoutController::update() {
 
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
     auto* sensor = hardware->get_weight_sensor();
-    uint32_t ms_since_weight_activity = sensor ? sensor->get_ms_since_last_weight_activity() : ms_since_touch;
+    bool recent_weight_activity = sensor &&
+                                  sensor->weight_range_exceeds(USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
+                                                               USER_WEIGHT_ACTIVITY_THRESHOLD_G);
 
-    uint32_t ms_since_last_activity = std::min(ms_since_touch, ms_since_weight_activity);
-    bool should_dim = ms_since_last_activity >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS;
+    bool should_dim = (ms_since_touch >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS) && !recent_weight_activity;
 
     if (should_dim && !screen_dimmed_) {
         float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;

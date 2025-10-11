@@ -36,7 +36,7 @@ python3 tools/grinder.py analyze
 - **GrindController**: 9-phase state machine with predictive flow control, 10 pulse corrections, mechanical instability detection, and time mode additional pulses
 - **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered), calibration flag, noise diagnostics
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
-- **UIManager**: 7 screens with LVGL integration, hierarchical settings menu with 7 organized sections (Info, Diagnostics, Bluetooth, Display, Grind Mode, Tools, Data), warning icon indicator, split-button layout for time mode pulses
+- **UIManager**: 7 screens with LVGL integration, hierarchical settings menu with 7 organized sections (Info, Diagnostics, Bluetooth, Display, Grind Settings, Tools, Data), warning icon indicator, split-button layout for time mode pulses
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
@@ -48,7 +48,7 @@ python3 tools/grinder.py analyze
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
 
-**Grind Mode Settings:** Configurable through Settings → Grind Mode page
+**Grind Settings:** Configurable through Settings → Grind Settings page
 - **Swipe Gestures Toggle**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
 - **Time Mode Toggle**: Direct grind mode selection between Weight/Time modes
 - **Preferences**: `swipe.enabled` (boolean) and existing `grind_mode` (0=Weight, 1=Time)

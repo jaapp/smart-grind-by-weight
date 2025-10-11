@@ -254,16 +254,18 @@ All profiles are fully customizable. Default grind-by-weight targets (fallback t
 
 ### Navigation
 - **Swipe left/right** to navigate between menu tabs
-- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes (when enabled in Settings → Grind Mode)
+- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes (when enabled in Settings → Grind Settings)
 - **Tap** to select profiles or buttons
 - **Long press** on profile targets to edit/customize them
 
 > **Color cues:** The GRIND button background turns **red** in weight mode and **blue** in time mode, so you always know which behaviour is armed.
 
-### Grind Mode Settings
-Access **Settings → Grind Mode** to configure:
+### Grind Settings
+Access **Settings → Grind Settings** to configure:
 - **Swipe Gestures**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
+- **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
+- **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
 
 ### Basic Operation
 These steps describe the default grind-by-weight workflow:
@@ -274,7 +276,9 @@ These steps describe the default grind-by-weight workflow:
 5. The system grinds to the precise target weight using the predictive algorithm
 6. GRIND COMPLETE shows the final settled weight in grams (with statistics)
 
-Need the stock timed run? Enable swipe gestures in **Settings → Grind Mode**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in settings.
+> Optional automation (Settings → Grind Settings): enable the new auto-start toggle to begin grinding as soon as the scale sees ~50 g arrive (no tare needed); the system waits for the load cell to gather enough quiet samples before arming itself, then auto-return jumps back to Ready whenever that cup is lifted off again.
+
+Need the stock timed run? Enable swipe gestures in **Settings → Grind Settings**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in settings.
 
 > **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
 
@@ -327,9 +331,11 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   |-- Normal brightness slider
     |   \-- Screensaver brightness slider
     |
-    +-- Grind Mode
+    +-- Grind Settings
     |   |-- Swipe Gestures toggle (enable/disable vertical swipes)
-    |   \-- Time Mode toggle (direct weight/time mode selection)
+    |   |-- Time Mode toggle (direct weight/time mode selection)
+    |   |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
+    |   \-- Return on Removal toggle (drop back to Ready when that weight leaves)
     |
     +-- Tools
     |   |-- Tare button
