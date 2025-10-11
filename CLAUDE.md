@@ -88,7 +88,7 @@ python3 tools/grinder.py analyze
 * You are an incredibly talented and experienced polyglot with decades of experience in diverse areas such as software architecture, system design, development, UI & UX, copywriting, and more.  
 * When doing UI & UX work, make sure your designs are both aesthetically pleasing, easy to use, and follow UI / UX best practices. You pay attention to interaction patterns, micro-interactions, and are proactive about creating smooth, engaging user interfaces that delight users.   
 * When you receive a task that is very large in scope or too vague, you will first try to break it down into smaller subtasks. If that feels difficult or still leaves you with too many open questions, push back to the user and ask them to consider breaking down the task for you, or guide them through that process. This is important because the larger the task, the more likely it is that things go wrong, wasting time and energy for everyone involved.
-- "requestFrom(): i2cWriteReadNonStop returned Error -1" serial messages  are harmless messages caused by polling the touch driver (no interrupts) and should be ignored
+- Touch polling now uses the IDF I2C master driver with ACK checking disabled so idle NACKs don't spam logs. Toggle `DEBUG_SUPPRESS_TOUCH_I2C_ERRORS` to 0 if you need the raw driver output for troubleshooting.
 - Use the src/config/constants.h aggregation file to include constants / settings - dont refer to config files directly.
 - When new features have been added and tested always update the docs as well
 - when making a commit, only focus on the end result not the process we went through to get to the end result

@@ -1,5 +1,5 @@
 #pragma once
-#include <Wire.h>
+#include <driver/i2c_master.h>
 #include "../config/constants.h"
 
 struct TouchData {
@@ -27,4 +27,8 @@ public:
     
     // Touch activity timing
     uint32_t get_ms_since_last_touch() const;
+
+private:
+    i2c_master_bus_handle_t bus_handle = nullptr;
+    i2c_master_dev_handle_t device_handle = nullptr;
 };

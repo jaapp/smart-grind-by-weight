@@ -27,6 +27,10 @@
 #define DEBUG_CALIBRATION 0                                               // Enable detailed calibration debugging
 #define DEBUG_WEIGHT_SETTLING 0                                           // Enable weight settling debugging
 
+// Touch I2C polling creates expected NACKs when the controller has no data.
+// Suppress noisy low-level logs while keeping higher-level drivers quiet.
+#define DEBUG_SUPPRESS_TOUCH_I2C_ERRORS 1
+
 //------------------------------------------------------------------------------
 // MOCK HARDWARE DETAILED CONFIGURATION
 //------------------------------------------------------------------------------
