@@ -195,6 +195,19 @@ static void radio_button_event_handler(lv_event_t* e) {
     }
 }
 
+// Event handler to free memory on object deletion
+static void radio_button_group_delete_handler(lv_event_t* e) {
+    lv_obj_t* group = (lv_obj_t*)lv_event_get_target(e);
+    RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
+    
+    if (data) {
+        if (data->buttons) {
+            free(data->buttons);
+        }
+        free(data);
+    }
+}
+
 lv_obj_t* create_radio_button_group(
     lv_obj_t* parent,
     const char* options[],
@@ -253,6 +266,9 @@ lv_obj_t* create_radio_button_group(
     
     // Store data in container
     lv_obj_set_user_data(group_container, data);
+
+    // Add cleanup handler
+    lv_obj_add_event_cb(group_container, radio_button_group_delete_handler, LV_EVENT_DELETE, nullptr);
     
     return group_container;
 }
