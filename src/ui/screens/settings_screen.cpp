@@ -259,6 +259,12 @@ void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Swipe toggle using existing pattern
     create_toggle_row(parent, "Swipe", &grind_mode_swipe_toggle);
+
+    // Automatic actions section
+    create_separator(parent, "Auto Actions");
+    create_description_label(parent, "React to dosing cup placement/removal without touching the screen.");
+    create_toggle_row(parent, "Start on Cup", &auto_start_toggle);
+    create_toggle_row(parent, "Return on Removal", &auto_return_toggle);
 }
 
 void SettingsScreen::create_tools_page(lv_obj_t* parent) {
@@ -832,8 +838,6 @@ lv_obj_t* SettingsScreen::create_description_label(lv_obj_t* parent, const char*
 }
 
 void SettingsScreen::update_grind_mode_toggles() {
-    if (!grind_mode_radio_group || !grind_mode_swipe_toggle) return;
-
     // Read swipe enabled from "swipe" namespace
     Preferences swipe_prefs;
     swipe_prefs.begin("swipe", true); // read-only
@@ -848,13 +852,38 @@ void SettingsScreen::update_grind_mode_toggles() {
         mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
     }
 
-    // Update radio button group selection
-    radio_button_group_set_selection(grind_mode_radio_group, mode_index);
-    
-    // Update swipe toggle state
-    if (swipe_enabled) {
-        lv_obj_add_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
-    } else {
-        lv_obj_clear_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
+    if (grind_mode_radio_group) {
+        radio_button_group_set_selection(grind_mode_radio_group, mode_index);
+    }
+
+    if (grind_mode_swipe_toggle) {
+        if (swipe_enabled) {
+            lv_obj_add_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    // Auto actions toggles (defaults disabled)
+    Preferences auto_prefs;
+    auto_prefs.begin("autogrind", true);
+    bool auto_start_enabled = auto_prefs.getBool("auto_start", false);
+    bool auto_return_enabled = auto_prefs.getBool("auto_return", false);
+    auto_prefs.end();
+
+    if (auto_start_toggle) {
+        if (auto_start_enabled) {
+            lv_obj_add_state(auto_start_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(auto_start_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    if (auto_return_toggle) {
+        if (auto_return_enabled) {
+            lv_obj_add_state(auto_return_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(auto_return_toggle, LV_STATE_CHECKED);
+        }
     }
 }

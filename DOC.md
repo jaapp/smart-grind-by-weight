@@ -264,6 +264,8 @@ All profiles are fully customizable. Default grind-by-weight targets (fallback t
 Access **Settings → Grind Mode** to configure:
 - **Swipe Gestures**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
+- **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
+- **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
 
 ### Basic Operation
 These steps describe the default grind-by-weight workflow:
@@ -273,6 +275,8 @@ These steps describe the default grind-by-weight workflow:
 4. Press the GRIND button – the scale will tare automatically
 5. The system grinds to the precise target weight using the predictive algorithm
 6. GRIND COMPLETE shows the final settled weight in grams (with statistics)
+
+> Optional automation (Settings → Grind Mode): enable the new auto-start toggle to begin grinding as soon as the scale sees ~50 g arrive (no tare needed); the system waits for the load cell to gather enough quiet samples before arming itself, then auto-return jumps back to Ready whenever that cup is lifted off again.
 
 Need the stock timed run? Enable swipe gestures in **Settings → Grind Mode**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in settings.
 
@@ -329,7 +333,9 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |
     +-- Grind Mode
     |   |-- Swipe Gestures toggle (enable/disable vertical swipes)
-    |   \-- Time Mode toggle (direct weight/time mode selection)
+    |   |-- Time Mode toggle (direct weight/time mode selection)
+    |   |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
+    |   \-- Return on Removal toggle (drop back to Ready when that weight leaves)
     |
     +-- Tools
     |   |-- Tare button

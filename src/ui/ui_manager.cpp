@@ -1,5 +1,7 @@
 #include "ui_manager.h"
 #include <Arduino.h>
+#include <Preferences.h>
+#include <cmath>
 #include "../config/constants.h"
 #include "screens/calibration_screen.h"
 #include "../logging/grind_logging.h"
@@ -39,6 +41,8 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
 
     // Register controller event hooks now that the UI elements exist
     register_controller_events();
+
+    refresh_auto_action_settings();
 
     if (grind_controller) {
         grind_controller->set_diagnostics_controller(diagnostics_controller_.get());
@@ -163,6 +167,8 @@ void UIManager::update() {
         default:
             break;
     }
+
+    update_auto_actions();
 
     if (grinding_controller_) {
         grinding_controller_->update(current);
@@ -318,5 +324,179 @@ void UIManager::set_background_active(bool active) {
     lv_color_t bg_color = active ? lv_color_hex(THEME_COLOR_GRINDER_ACTIVE) : inactive_color;
     lv_style_set_bg_color(&style_bg, bg_color);
     lv_obj_add_style(lv_scr_act(), &style_bg, 0);
+#endif
+}
+
+void UIManager::refresh_auto_action_settings() {
+    Preferences prefs;
+    prefs.begin("autogrind", true);
+    auto_actions_.auto_start_enabled = prefs.getBool("auto_start", false);
+    auto_actions_.auto_return_enabled = prefs.getBool("auto_return", false);
+    prefs.end();
+
+    uint32_t now = millis();
+    auto_actions_.last_auto_start_ms = now;
+    auto_actions_.last_auto_return_ms = now;
+
+    auto_actions_.cup_present = false;
+    auto_actions_.baseline_weight = 0.0f;
+    auto_actions_.baseline_timestamp_ms = now;
+    auto_actions_.last_debug_log_ms = now;
+    auto_actions_.enabled = false;
+    auto_actions_.last_sample_count = 0;
+    auto_actions_.change_active = false;
+    auto_actions_.change_start_ms = 0;
+    auto_actions_.change_start_weight = 0.0f;
+
+    if (hardware_manager) {
+        if (auto* sensor = hardware_manager->get_weight_sensor()) {
+            auto_actions_.baseline_weight = sensor->get_display_weight();
+        }
+    }
+}
+
+void UIManager::update_auto_actions() {
+    if ((!auto_actions_.auto_start_enabled && !auto_actions_.auto_return_enabled) ||
+        !hardware_manager || !state_machine) {
+        return;
+    }
+
+    UIState current_state = state_machine->get_current_state();
+    if (current_state == UIState::GRINDING || current_state == UIState::CALIBRATION) {
+        auto_actions_.change_active = false;
+        return;
+    }
+
+    auto* sensor = hardware_manager->get_weight_sensor();
+    if (!sensor) {
+        return;
+    }
+
+    if (!sensor->data_ready() || sensor->is_tare_in_progress()) {
+        return;
+    }
+
+    uint32_t now = millis();
+    uint32_t sample_count = static_cast<uint32_t>(sensor->get_sample_count());
+    bool is_stable = sensor->is_settled(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+    float weight = sensor->get_display_weight();
+    float debug_delta_pre_update = weight - auto_actions_.baseline_weight;
+    constexpr uint32_t kMinSamples = HW_LOADCELL_SAMPLE_RATE_SPS * 2;
+    constexpr float kRemovalFloorFactor = 0.3f; // fraction of threshold for removal floor
+    const float threshold = USER_AUTO_GRIND_TRIGGER_DELTA_G;
+
+    if (!auto_actions_.enabled) {
+        if (sample_count < kMinSamples || !is_stable) {
+            auto_actions_.last_sample_count = sample_count;
+            return;
+        }
+
+        auto_actions_.baseline_weight = weight;
+        auto_actions_.baseline_timestamp_ms = now;
+        auto_actions_.last_debug_log_ms = now;
+        auto_actions_.enabled = true;
+        auto_actions_.cup_present = (weight >= threshold);
+        auto_actions_.last_sample_count = sample_count;
+        auto_actions_.change_active = false;
+        auto_actions_.change_start_ms = 0;
+        auto_actions_.change_start_weight = weight;
+#if DEBUG_UI_SYSTEM
+        LOG_BLE("[AUTO ACTION DEBUG] Automation armed (samples=%lu baseline=%.1fg)",
+                static_cast<unsigned long>(sample_count),
+                static_cast<double>(weight));
+#endif
+        return;
+    }
+
+    auto_actions_.last_sample_count = sample_count;
+
+    if (!auto_actions_.change_active) {
+        if (!is_stable) {
+            auto_actions_.change_active = true;
+            auto_actions_.change_start_ms = now;
+            auto_actions_.change_start_weight = auto_actions_.baseline_weight;
+        } else {
+            auto_actions_.baseline_weight = weight;
+            auto_actions_.baseline_timestamp_ms = now;
+            auto_actions_.cup_present = (weight >= threshold);
+        }
+        return;
+    }
+
+    // We are observing a change window
+    if (!is_stable) {
+        if ((now - auto_actions_.change_start_ms) > USER_AUTO_GRIND_TRIGGER_WINDOW_MS) {
+            // Treat as drift - wait for next stable window to refresh baseline
+            auto_actions_.change_active = false;
+            auto_actions_.change_start_ms = now;
+            auto_actions_.change_start_weight = auto_actions_.baseline_weight;
+        }
+        return;
+    }
+
+    // Settled again - evaluate the delta
+    uint32_t elapsed = now - auto_actions_.change_start_ms;
+    float delta = weight - auto_actions_.change_start_weight;
+    bool within_window = elapsed <= USER_AUTO_GRIND_TRIGGER_WINDOW_MS;
+    bool handled = false;
+
+    if (within_window) {
+        if (!auto_actions_.cup_present &&
+            delta >= threshold &&
+            weight >= threshold &&
+            auto_actions_.auto_start_enabled &&
+            state_machine->is_state(UIState::READY) &&
+            current_tab < 3 &&
+            grind_controller && !grind_controller->is_active() &&
+            grinding_controller_ &&
+            (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
+            LOG_BLE("[AUTO ACTION] Weight increased by %.1fg in %lums - auto-starting grind",
+                    static_cast<double>(delta), static_cast<unsigned long>(elapsed));
+            auto_actions_.last_auto_start_ms = now;
+            grinding_controller_->handle_grind_button();
+            auto_actions_.cup_present = true;
+            handled = true;
+        } else if (auto_actions_.cup_present &&
+                   (-delta) >= threshold &&
+                   weight <= threshold * kRemovalFloorFactor &&
+                   auto_actions_.auto_return_enabled &&
+                   (state_machine->is_state(UIState::GRIND_COMPLETE) || state_machine->is_state(UIState::GRIND_TIMEOUT)) &&
+                   grind_controller && grind_controller->is_active() &&
+                   (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
+            LOG_BLE("[AUTO ACTION] Cup removed - returning to ready screen");
+            auto_actions_.last_auto_return_ms = now;
+            grind_controller->return_to_idle();
+            auto_actions_.cup_present = false;
+            handled = true;
+        }
+    }
+
+    if (!handled) {
+        if (delta >= threshold && weight >= threshold) {
+            auto_actions_.cup_present = true;
+        } else if ((-delta) >= threshold && weight <= threshold * kRemovalFloorFactor) {
+            auto_actions_.cup_present = false;
+        }
+    }
+
+    auto_actions_.baseline_weight = weight;
+    auto_actions_.baseline_timestamp_ms = now;
+    auto_actions_.change_active = false;
+    auto_actions_.change_start_ms = 0;
+    auto_actions_.change_start_weight = weight;
+
+#if DEBUG_UI_SYSTEM
+    if ((now - auto_actions_.last_debug_log_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
+        LOG_BLE("[AUTO ACTION DEBUG] enabled=%d stable=%c change=%d baseline=%.1fg current=%.1fg delta=%.1fg cup=%d samples=%lu",
+                auto_actions_.enabled ? 1 : 0,
+                is_stable ? 'Y' : 'N',
+                auto_actions_.change_active ? 1 : 0,
+                static_cast<double>(auto_actions_.baseline_weight),
+                static_cast<double>(weight),
+                static_cast<double>(debug_delta_pre_update),
+                auto_actions_.cup_present ? 1 : 0,
+                static_cast<unsigned long>(sample_count));
+        auto_actions_.last_debug_log_ms = now;
+    }
 #endif
 }

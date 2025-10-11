@@ -50,3 +50,10 @@
 #define USER_SCREEN_BRIGHTNESS_NORMAL 1.0f                                     // Normal screen brightness
 #define USER_SCREEN_BRIGHTNESS_DIMMED 0.35f                                    // Dimmed screen brightness
 #define USER_WEIGHT_ACTIVITY_THRESHOLD_G 1.0f                                  // Weight change threshold for screen timeout reset (grams)
+
+//------------------------------------------------------------------------------
+// AUTO ACTIONS
+//------------------------------------------------------------------------------
+#define USER_AUTO_GRIND_TRIGGER_DELTA_G 50.0f                                   // Weight change threshold used for auto actions (grams)
+#define USER_AUTO_GRIND_TRIGGER_WINDOW_MS 2000                                  // Time window for delta detection (milliseconds)
+#define USER_AUTO_GRIND_REARM_DELAY_MS 1500                                     // Minimum delay between auto actions (milliseconds)

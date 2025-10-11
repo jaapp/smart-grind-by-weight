@@ -44,6 +44,8 @@ void SettingsUIController::register_events() {
 
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
+    EventBridgeLVGL::register_handler(ET::GRIND_MODE_AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
+    EventBridgeLVGL::register_handler(ET::GRIND_MODE_AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
 
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER, [this](lv_event_t*) { handle_brightness_normal_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
@@ -70,6 +72,8 @@ void SettingsUIController::register_events() {
     register_lvgl_event(ui_manager_->settings_screen.get_ble_startup_toggle(), LV_EVENT_VALUE_CHANGED, ET::BLE_STARTUP_TOGGLE);
     register_lvgl_event(ui_manager_->settings_screen.get_logging_toggle(), LV_EVENT_VALUE_CHANGED, ET::LOGGING_TOGGLE);
     register_lvgl_event(ui_manager_->settings_screen.get_grind_mode_swipe_toggle(), LV_EVENT_VALUE_CHANGED, ET::GRIND_MODE_SWIPE_TOGGLE);
+    register_lvgl_event(ui_manager_->settings_screen.get_auto_start_toggle(), LV_EVENT_VALUE_CHANGED, ET::GRIND_MODE_AUTO_START_TOGGLE);
+    register_lvgl_event(ui_manager_->settings_screen.get_auto_return_toggle(), LV_EVENT_VALUE_CHANGED, ET::GRIND_MODE_AUTO_RETURN_TOGGLE);
     register_lvgl_event(ui_manager_->settings_screen.get_brightness_normal_slider(), LV_EVENT_VALUE_CHANGED, ET::BRIGHTNESS_NORMAL_SLIDER);
     register_lvgl_event(ui_manager_->settings_screen.get_brightness_normal_slider(), LV_EVENT_RELEASED, ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED);
     register_lvgl_event(ui_manager_->settings_screen.get_brightness_screensaver_slider(), LV_EVENT_VALUE_CHANGED, ET::BRIGHTNESS_SCREENSAVER_SLIDER);
@@ -150,7 +154,11 @@ void SettingsUIController::handle_motor_test() {
 
 void SettingsUIController::handle_tare() {
     if (!ui_manager_) return;
-    UIOperations::execute_tare(ui_manager_->get_hardware_manager());
+    UIOperations::execute_tare(ui_manager_->get_hardware_manager(), [this]() {
+        if (ui_manager_) {
+            ui_manager_->refresh_auto_action_settings();
+        }
+    });
 }
 
 void SettingsUIController::handle_autotune() {
@@ -316,6 +324,46 @@ void SettingsUIController::handle_grind_mode_radio_button() {
     }
 
     LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT via radio button" : "Grind mode set to TIME via radio button");
+}
+
+void SettingsUIController::handle_auto_start_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->settings_screen.get_auto_start_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin("autogrind", false);
+    prefs.putBool("auto_start", enabled);
+    prefs.end();
+
+    if (ui_manager_) {
+        ui_manager_->refresh_auto_action_settings();
+    }
+
+    LOG_DEBUG_PRINTLN(enabled ? "Auto-start on cup enabled" : "Auto-start on cup disabled");
+}
+
+void SettingsUIController::handle_auto_return_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->settings_screen.get_auto_return_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin("autogrind", false);
+    prefs.putBool("auto_return", enabled);
+    prefs.end();
+
+    if (ui_manager_) {
+        ui_manager_->refresh_auto_action_settings();
+    }
+
+    LOG_DEBUG_PRINTLN(enabled ? "Auto return on cup removal enabled" : "Auto return on cup removal disabled");
 }
 
 void SettingsUIController::handle_brightness_normal_slider() {

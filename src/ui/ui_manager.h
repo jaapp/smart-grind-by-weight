@@ -1,6 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include <functional>
+#include <cstdint>
 #include <memory>
 #include "components/blocking_overlay.h"
 #include "components/ui_operations.h"
@@ -130,15 +131,31 @@ public:
     void set_current_tab(int tab) { current_tab = tab; }
     
     void set_background_active(bool active);
+    void refresh_auto_action_settings();
     
 
 private:
     void create_ui();
+    void update_auto_actions();
     
     // State-specific update methods
 
     // Controller wiring helpers
     void init_controllers();
     void register_controller_events();
-    
+    struct AutoActionState {
+        bool auto_start_enabled = false;
+        bool auto_return_enabled = false;
+        bool cup_present = false;
+        uint32_t last_auto_start_ms = 0;
+        uint32_t last_auto_return_ms = 0;
+        float baseline_weight = 0.0f;
+        uint32_t baseline_timestamp_ms = 0;
+        uint32_t last_debug_log_ms = 0;
+        bool enabled = false;
+        uint32_t last_sample_count = 0;
+        bool change_active = false;
+        uint32_t change_start_ms = 0;
+        float change_start_weight = 0.0f;
+    } auto_actions_;
 };
