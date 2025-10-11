@@ -51,6 +51,8 @@ python3 tools/grinder.py analyze
 **Grind Settings:** Configurable through Settings → Grind Settings page
 - **Swipe Gestures Toggle**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
 - **Time Mode Toggle**: Direct grind mode selection between Weight/Time modes
+- **Start on Cup Toggle**: Automatically tare and kick off the active grind profile when the cup/portafilter weight delta hits the configured threshold
+- **Return on Removal Toggle**: Leave the completion screen and reset to Ready once the cup is lifted after grinding
 - **Preferences**: `swipe.enabled` (boolean) and existing `grind_mode` (0=Weight, 1=Time)
 - **Behavior**: Swipe gestures only work when enabled; direct mode selection always works
 
