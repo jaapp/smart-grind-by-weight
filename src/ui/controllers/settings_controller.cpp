@@ -44,40 +44,17 @@ void SettingsUIController::register_events() {
 
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
-    EventBridgeLVGL::register_handler(ET::GRIND_MODE_AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
-    EventBridgeLVGL::register_handler(ET::GRIND_MODE_AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
+    EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
+    EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
 
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER, [this](lv_event_t*) { handle_brightness_normal_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER, [this](lv_event_t*) { handle_brightness_screensaver_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
 
-    auto register_lvgl_event = [](lv_obj_t* obj, lv_event_code_t code, ET type) {
-        if (!obj) {
-            return;
-        }
-        lv_obj_add_event_cb(obj, EventBridgeLVGL::dispatch_event, code,
-                            reinterpret_cast<void*>(static_cast<intptr_t>(type)));
-    };
-
-    register_lvgl_event(ui_manager_->settings_screen.get_cal_button(), LV_EVENT_CLICKED, ET::SETTINGS_CALIBRATE);
-    register_lvgl_event(ui_manager_->settings_screen.get_purge_button(), LV_EVENT_CLICKED, ET::SETTINGS_PURGE);
-    register_lvgl_event(ui_manager_->settings_screen.get_reset_button(), LV_EVENT_CLICKED, ET::SETTINGS_RESET);
-    register_lvgl_event(ui_manager_->settings_screen.get_diag_reset_button(), LV_EVENT_CLICKED, ET::SETTINGS_DIAGNOSTIC_RESET);
-    register_lvgl_event(ui_manager_->settings_screen.get_motor_test_button(), LV_EVENT_CLICKED, ET::SETTINGS_MOTOR_TEST);
-    register_lvgl_event(ui_manager_->settings_screen.get_tare_button(), LV_EVENT_CLICKED, ET::SETTINGS_TARE);
-    register_lvgl_event(ui_manager_->settings_screen.get_autotune_button(), LV_EVENT_CLICKED, ET::SETTINGS_AUTOTUNE);
-    register_lvgl_event(ui_manager_->settings_screen.get_refresh_stats_button(), LV_EVENT_CLICKED, ET::SETTINGS_REFRESH_STATS);
-    register_lvgl_event(ui_manager_->settings_screen.get_ble_toggle(), LV_EVENT_VALUE_CHANGED, ET::BLE_TOGGLE);
-    register_lvgl_event(ui_manager_->settings_screen.get_ble_startup_toggle(), LV_EVENT_VALUE_CHANGED, ET::BLE_STARTUP_TOGGLE);
-    register_lvgl_event(ui_manager_->settings_screen.get_logging_toggle(), LV_EVENT_VALUE_CHANGED, ET::LOGGING_TOGGLE);
-    register_lvgl_event(ui_manager_->settings_screen.get_grind_mode_swipe_toggle(), LV_EVENT_VALUE_CHANGED, ET::GRIND_MODE_SWIPE_TOGGLE);
-    register_lvgl_event(ui_manager_->settings_screen.get_auto_start_toggle(), LV_EVENT_VALUE_CHANGED, ET::GRIND_MODE_AUTO_START_TOGGLE);
-    register_lvgl_event(ui_manager_->settings_screen.get_auto_return_toggle(), LV_EVENT_VALUE_CHANGED, ET::GRIND_MODE_AUTO_RETURN_TOGGLE);
-    register_lvgl_event(ui_manager_->settings_screen.get_brightness_normal_slider(), LV_EVENT_VALUE_CHANGED, ET::BRIGHTNESS_NORMAL_SLIDER);
-    register_lvgl_event(ui_manager_->settings_screen.get_brightness_normal_slider(), LV_EVENT_RELEASED, ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED);
-    register_lvgl_event(ui_manager_->settings_screen.get_brightness_screensaver_slider(), LV_EVENT_VALUE_CHANGED, ET::BRIGHTNESS_SCREENSAVER_SLIDER);
-    register_lvgl_event(ui_manager_->settings_screen.get_brightness_screensaver_slider(), LV_EVENT_RELEASED, ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED);
+    // Note: Event registration for settings widgets is done in the page creation functions
+    // (settings_screen.cpp) because the menu is created lazily and destroyed on hide.
+    // Attempting to register events here would fail silently since widgets don't exist yet.
 }
 
 void SettingsUIController::update() {
@@ -299,6 +276,38 @@ void SettingsUIController::handle_grind_mode_swipe_toggle() {
     prefs.end();
 
     LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
+}
+
+void SettingsUIController::handle_auto_start_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->settings_screen.get_auto_start_toggle();
+    if (!toggle) return;
+
+    bool auto_start_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin("autogrind", false);
+    prefs.putBool("auto_start", auto_start_enabled);
+    prefs.end();
+
+    LOG_DEBUG_PRINTLN(auto_start_enabled ? "Auto-start enabled" : "Auto-start disabled");
+}
+
+void SettingsUIController::handle_auto_return_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->settings_screen.get_auto_return_toggle();
+    if (!toggle) return;
+
+    bool auto_return_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin("autogrind", false);
+    prefs.putBool("auto_return", auto_return_enabled);
+    prefs.end();
+
+    LOG_DEBUG_PRINTLN(auto_return_enabled ? "Auto-return enabled" : "Auto-return disabled");
 }
 
 void SettingsUIController::handle_grind_mode_radio_button() {

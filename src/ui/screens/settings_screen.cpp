@@ -217,6 +217,17 @@ void SettingsScreen::create_bluetooth_page(lv_obj_t* parent) {
     lv_obj_set_style_text_font(ble_timer_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(ble_timer_label, lv_color_hex(THEME_COLOR_WARNING), 0);
     lv_obj_clear_flag(ble_timer_label, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Register events for the toggles (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (ble_toggle) {
+        lv_obj_add_event_cb(ble_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BLE_TOGGLE)));
+    }
+    if (ble_startup_toggle) {
+        lv_obj_add_event_cb(ble_startup_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BLE_STARTUP_TOGGLE)));
+    }
 }
 
 void SettingsScreen::create_display_page(lv_obj_t* parent) {
@@ -229,6 +240,21 @@ void SettingsScreen::create_display_page(lv_obj_t* parent) {
 
     create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
     create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
+
+    // Register events for the sliders (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (brightness_normal_slider) {
+        lv_obj_add_event_cb(brightness_normal_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_NORMAL_SLIDER)));
+        lv_obj_add_event_cb(brightness_normal_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED)));
+    }
+    if (brightness_screensaver_slider) {
+        lv_obj_add_event_cb(brightness_screensaver_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_SCREENSAVER_SLIDER)));
+        lv_obj_add_event_cb(brightness_screensaver_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED)));
+    }
 }
 
 
@@ -281,6 +307,21 @@ void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_toggle_row(parent, "Start", &auto_start_toggle);
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
     create_toggle_row(parent, "Return", &auto_return_toggle);
+
+    // Register events for the toggles (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (grind_mode_swipe_toggle) {
+        lv_obj_add_event_cb(grind_mode_swipe_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_MODE_SWIPE_TOGGLE)));
+    }
+    if (auto_start_toggle) {
+        lv_obj_add_event_cb(auto_start_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_START_TOGGLE)));
+    }
+    if (auto_return_toggle) {
+        lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
+    }
 }
 
 void SettingsScreen::create_tools_page(lv_obj_t* parent) {
@@ -297,6 +338,25 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     cal_button = create_button(parent, "Calibrate");
     autotune_button = create_button(parent, "Tune Pulses");
     motor_test_button = create_button(parent, "Motor Test");
+
+    // Register events for the buttons (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (tare_button) {
+        lv_obj_add_event_cb(tare_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_TARE)));
+    }
+    if (cal_button) {
+        lv_obj_add_event_cb(cal_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_CALIBRATE)));
+    }
+    if (autotune_button) {
+        lv_obj_add_event_cb(autotune_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_AUTOTUNE)));
+    }
+    if (motor_test_button) {
+        lv_obj_add_event_cb(motor_test_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_MOTOR_TEST)));
+    }
 }
 
 void SettingsScreen::create_data_page(lv_obj_t* parent) {
@@ -324,6 +384,21 @@ void SettingsScreen::create_data_page(lv_obj_t* parent) {
     purge_button = create_button(parent, "Purge Logs", lv_color_hex(THEME_COLOR_WARNING));
     lv_obj_set_style_margin_bottom(purge_button, 10, 0);
     reset_button = create_button(parent, "Factory Reset", lv_color_hex(THEME_COLOR_ERROR));
+
+    // Register events for the toggle and buttons (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (logging_toggle) {
+        lv_obj_add_event_cb(logging_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::LOGGING_TOGGLE)));
+    }
+    if (purge_button) {
+        lv_obj_add_event_cb(purge_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_PURGE)));
+    }
+    if (reset_button) {
+        lv_obj_add_event_cb(reset_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_RESET)));
+    }
 }
 
 void SettingsScreen::create_stats_page(lv_obj_t* parent) {
@@ -348,6 +423,13 @@ void SettingsScreen::create_stats_page(lv_obj_t* parent) {
 
     refresh_stats_button = create_button(parent, "Refresh Stats");
     lv_obj_set_style_margin_top(refresh_stats_button, 10, 0);
+
+    // Register event for the button (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (refresh_stats_button) {
+        lv_obj_add_event_cb(refresh_stats_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_REFRESH_STATS)));
+    }
 }
 
 void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
@@ -405,6 +487,13 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
 
     // Motor latency
     create_data_label(parent, "Motor Latency:", &diag_motor_latency_label, true);
+
+    // Register event for the button (done here because widgets are created lazily)
+    using ET = EventBridgeLVGL::EventType;
+    if (diag_reset_button) {
+        lv_obj_add_event_cb(diag_reset_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_DIAGNOSTIC_RESET)));
+    }
 }
 
 void SettingsScreen::show() {

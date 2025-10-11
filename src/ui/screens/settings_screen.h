@@ -122,7 +122,7 @@ public:
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
-    
+
 private:
     void create_menu_ui();
     void create_info_page(lv_obj_t* parent);
