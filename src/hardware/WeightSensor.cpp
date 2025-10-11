@@ -45,10 +45,6 @@ WeightSensor::WeightSensor() {
     tareTimeoutFlag = false;
     tareTimeOut = 0;
     
-    // Initialize weight activity tracking
-    last_significant_weight = 0.0f;
-    last_weight_activity_time = millis();
-    
     // Initialize stable reading diagnostic tracking
     not_settled_start_time = 0;
     currently_not_settled = false;
@@ -468,6 +464,31 @@ bool WeightSensor::get_weight_delta(uint32_t window_ms, float* delta_out,
     return true;
 }
 
+float WeightSensor::get_weight_range(uint32_t window_ms) const {
+    if (window_ms == 0 || fabsf(cal_factor) < 1e-6f || raw_filter.get_sample_count() == 0) {
+        return 0.0f;
+    }
+
+    int32_t min_raw = raw_filter.get_min_raw(window_ms);
+    int32_t max_raw = raw_filter.get_max_raw(window_ms);
+
+    if (max_raw == min_raw) {
+        return 0.0f;
+    }
+
+    float min_weight = raw_to_weight(min_raw);
+    float max_weight = raw_to_weight(max_raw);
+    return fabsf(max_weight - min_weight);
+}
+
+bool WeightSensor::weight_range_exceeds(uint32_t window_ms, float threshold_g) const {
+    float effective_threshold = fabsf(threshold_g);
+    if (effective_threshold <= 0.0f) {
+        effective_threshold = 0.0f;
+    }
+    return get_weight_range(window_ms) >= effective_threshold;
+}
+
 // Flow rate analysis using CircularBufferMath - convert raw flow to weight flow
 float WeightSensor::get_flow_rate(uint32_t window_ms) const {
     float raw_flow = raw_filter.get_raw_flow_rate(window_ms);
@@ -716,13 +737,6 @@ bool WeightSensor::sample_and_feed_filter() {
             current_raw_adc = raw_adc;
             current_weight = raw_to_weight(raw_adc);  // Convert using WeightSensor calibration
             
-            // Check for significant weight changes (for screen timeout reset)
-            float weight_change = fabs(current_weight - last_significant_weight);
-            if (weight_change >= USER_WEIGHT_ACTIVITY_THRESHOLD_G) {
-                last_significant_weight = current_weight;
-                last_weight_activity_time = timestamp;
-            }
-            
             // Update temperature if available
             update_temperature_if_available();
             
@@ -795,17 +809,6 @@ float WeightSensor::get_current_sps() const {
 //==============================================================================
 // WEIGHT ACTIVITY TRACKING
 //==============================================================================
-
-uint32_t WeightSensor::get_ms_since_last_weight_activity() const {
-    uint32_t now = millis();
-    // Handle millis() overflow (happens approximately every 50 days)
-    if (now >= last_weight_activity_time) {
-        return now - last_weight_activity_time;
-    } else {
-        // millis() has overflowed
-        return (UINT32_MAX - last_weight_activity_time) + now + 1;
-    }
-}
 
 //==============================================================================
 // DIAGNOSTIC METHODS
