@@ -103,20 +103,22 @@ jobs:
           # Create simple release notes with installation instructions
           cat > release-notes.md << EOF
           ## Installation
-        
+
           ### Web Installer (Recommended)
           Visit [Web Installer](https://jaapp.github.io/smart-grind-by-weight/) and select firmware version ${{ github.ref_name }}
-        
+
+          **Note:** Requires Chrome/Edge (desktop or Android). iOS/Safari not supported.
+
           ### Command Line (Alternative)
           1. Download \`smart-grind-by-weight-${{ github.ref_name }}.bin\` below
           2. Use the grinder tool to upload: \`python3 tools/grinder.py upload smart-grind-by-weight-${{ github.ref_name }}.bin\`
-        
+
           ## Build Information
           - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           - Commit: ${{ github.sha }}
           - Tag: ${{ github.ref_name }}
           EOF
-        
+
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           cat release-notes.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

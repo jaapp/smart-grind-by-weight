@@ -156,18 +156,24 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 ### 🌐 Web Flasher (Recommended)
 **[🔗 Open Web Flasher Tool](https://jaapp.github.io/smart-grind-by-weight)**
 
+**Browser Compatibility:**
+- ✅ **Chrome** (Desktop & Android) - Full support
+- ✅ **Microsoft Edge** (Desktop) - Full support
+- ❌ **Safari/iOS** - Not supported (use command line method below)
+- ❌ **Firefox** - Not supported (use command line method below)
+
 **Two-Step Installation Process:**
 
 1. **Initial Setup (USB - One Time Only)**
    - Connect ESP32 via USB cable
-   - Use Chrome/Edge browser
+   - Use Chrome/Edge browser (desktop or Android)
    - Select firmware version from dropdown
    - Click "Flash via USB" - opens ESP Web Tools
    - After installation, device is ready for wireless updates
 
 2. **Future Updates (BLE - After Installation)**
    - Power on the grinder and enable Bluetooth in device settings
-   - Select firmware version from OTA dropdown  
+   - Select firmware version from OTA dropdown
    - Click "Connect to Device" → "Flash Firmware"
    - Update happens wirelessly - **no USB cable needed**
 
