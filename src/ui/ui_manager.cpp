@@ -411,13 +411,14 @@ void UIManager::update_auto_actions() {
     bool within_window = elapsed <= USER_AUTO_GRIND_TRIGGER_WINDOW_MS;
     bool handled = false;
 
+    const bool is_ready_tab = (state_machine->is_state(UIState::READY) && current_tab < 3);
+
     if (!auto_actions_.cup_present &&
         within_window &&
         delta >= threshold &&
         weight >= threshold &&
         auto_actions_.auto_start_enabled &&
-        state_machine->is_state(UIState::READY) &&
-        current_tab < 3 &&
+        is_ready_tab &&
         grind_controller && !grind_controller->is_active() &&
         grinding_controller_ &&
         (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
@@ -455,14 +456,18 @@ void UIManager::update_auto_actions() {
 
 #if DEBUG_UI_SYSTEM
     if ((now - auto_actions_.last_debug_log_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS) {
-        LOG_BLE("[AUTO ACTION DEBUG] enabled=%d stable=%c baseline=%.1fg current=%.1fg delta=%.1fg cup=%d samples=%lu\n",
+        LOG_BLE("[AUTO ACTION DEBUG] enabled=%d stable=%c baseline=%.1fg current=%.1fg delta=%.1fg cup=%d samples=%lu ready_tab=%d grind_active=%d auto_start=%d within_window=%d\n",
                 auto_actions_.enabled ? 1 : 0,
                 is_stable ? 'Y' : 'N',
                 static_cast<double>(auto_actions_.baseline_weight),
                 static_cast<double>(weight),
                 static_cast<double>(delta),
                 auto_actions_.cup_present ? 1 : 0,
-                static_cast<unsigned long>(sample_count));
+                static_cast<unsigned long>(sample_count),
+                is_ready_tab ? 1 : 0,
+                (grind_controller && grind_controller->is_active()) ? 1 : 0,
+                auto_actions_.auto_start_enabled ? 1 : 0,
+                within_window ? 1 : 0);
         auto_actions_.last_debug_log_ms = now;
     }
 #endif
