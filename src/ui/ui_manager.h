@@ -154,8 +154,5 @@ private:
         uint32_t last_debug_log_ms = 0;
         bool enabled = false;
         uint32_t last_sample_count = 0;
-        bool change_active = false;
-        uint32_t change_start_ms = 0;
-        float change_start_weight = 0.0f;
     } auto_actions_;
 };
