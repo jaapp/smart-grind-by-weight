@@ -108,6 +108,10 @@ private:
     // Queue to marshal UI status messages to UI task context
     QueueHandle_t ui_status_queue;
 
+    // Diagnostics report control flags
+    bool diagnostic_report_pending;
+    bool diagnostic_report_in_progress;
+
     // Private methods
     void update_ui_status(const char* status);
     void enqueue_ui_status(const char* status);

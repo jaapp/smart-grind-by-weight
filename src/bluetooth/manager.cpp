@@ -44,7 +44,9 @@ BluetoothManager::BluetoothManager()
     , data_status(BLE_DATA_IDLE)
     , current_chunk(0)
     , next_chunk_time(0)
-    , ui_status_queue(nullptr) {
+    , ui_status_queue(nullptr)
+    , diagnostic_report_pending(false)
+    , diagnostic_report_in_progress(false) {
 }
 
 BluetoothManager::~BluetoothManager() {
@@ -344,6 +346,14 @@ void BluetoothManager::handle() {
     
     // Handle data export updates
     update_data_export();
+
+    // Run deferred diagnostic report generation on BLE task (not on NimBLE callback thread)
+    if (device_connected && debug_tx_characteristic && diagnostic_report_pending && !diagnostic_report_in_progress) {
+        diagnostic_report_in_progress = true;
+        diagnostic_report_pending = false;
+        generate_diagnostic_report();
+        diagnostic_report_in_progress = false;
+    }
     
     // Update system info periodically if connected (every 10 seconds)
     static unsigned long last_sysinfo_update = 0;
@@ -864,8 +874,8 @@ void BluetoothManager::onWrite(BLECharacteristic* characteristic) {
         LOG_BLE("  -> Handling data control\n");
         handle_data_control_command(characteristic);
     } else if (characteristic == sysinfo_diagnostics_characteristic) {
-        LOG_BLE("  -> TRIGGERING DIAGNOSTIC REPORT\n");
-        generate_diagnostic_report();
+        LOG_BLE("  -> QUEUING DIAGNOSTIC REPORT REQUEST\n");
+        diagnostic_report_pending = true; // Defer heavy work to bluetooth task context
     } else {
         LOG_BLE("  -> UNKNOWN characteristic!\n");
     }
@@ -1024,7 +1034,8 @@ void BluetoothManager::generate_diagnostic_report() {
         LOG_BLE("TX: %zu bytes\n", len);
         debug_tx_characteristic->setValue((uint8_t*)chunk, len);
         debug_tx_characteristic->notify();
-        delay(250); // Increased to prevent queue overflow
+        // Explicitly yield to BLE task to process notification queue
+        vTaskDelay(pdMS_TO_TICKS(500)); // Give BLE stack time to drain queue
     };
 
     // Section 1: Header & Firmware Info
