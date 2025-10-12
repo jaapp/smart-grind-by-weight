@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <LittleFS.h>
+#include <nvs_flash.h>
+#include <nvs.h>
 #include "../system/performance_monitor.h"
 #include "../system/statistics_manager.h"
 #include "../system/diagnostics_controller.h"
@@ -1035,7 +1037,7 @@ void BluetoothManager::generate_diagnostic_report() {
         debug_tx_characteristic->setValue((uint8_t*)chunk, len);
         debug_tx_characteristic->notify();
         // Explicitly yield to BLE task to process notification queue
-        vTaskDelay(pdMS_TO_TICKS(500)); // Give BLE stack time to drain queue
+        vTaskDelay(pdMS_TO_TICKS(50)); // Give BLE stack time to drain queue
     };
 
     // Section 1: Header & Firmware Info
@@ -1131,10 +1133,14 @@ void BluetoothManager::generate_diagnostic_report() {
     // Section 4: Profiles (requires access to hardware manager's preferences)
     // This will be populated at runtime - for now show defaults
     snprintf(buf, sizeof(buf),
-        "[PROFILES - COMPILE DEFAULTS]\n"
-        "  Profile Count: %d\n"
-        "  Weight Defaults: %.1fg / %.1fg / %.1fg\n"
-        "  Time Defaults: %.1fs / %.1fs / %.1fs\n"
+        "[COMPILE-TIME PARAMETERS - PROFILES]\n"
+        "  USER_PROFILE_COUNT: %d\n"
+        "  USER_SINGLE_ESPRESSO_WEIGHT_G: %.1f\n"
+        "  USER_DOUBLE_ESPRESSO_WEIGHT_G: %.1f\n"
+        "  USER_CUSTOM_PROFILE_WEIGHT_G: %.1f\n"
+        "  USER_SINGLE_ESPRESSO_TIME_S: %.1f\n"
+        "  USER_DOUBLE_ESPRESSO_TIME_S: %.1f\n"
+        "  USER_CUSTOM_PROFILE_TIME_S: %.1f\n"
         "\n",
         USER_PROFILE_COUNT,
         USER_SINGLE_ESPRESSO_WEIGHT_G,
@@ -1148,12 +1154,15 @@ void BluetoothManager::generate_diagnostic_report() {
 
     // Section 5: User.h Compile Constants (Part 1)
     snprintf(buf, sizeof(buf),
-        "[USER.H COMPILE CONSTANTS]\n"
-        "  Weight Limits: %.1f - %.1f g\n"
-        "  Time Limits: %.1f - %.1f s\n"
-        "  Fine Adjust: %.1fg / %.1fs\n"
-        "  Cal Ref Weight: %.1f g\n"
-        "  Default Cal Factor: %.1f\n"
+        "[COMPILE-TIME PARAMETERS - USER.H PART 1]\n"
+        "  USER_MIN_TARGET_WEIGHT_G: %.1f\n"
+        "  USER_MAX_TARGET_WEIGHT_G: %.1f\n"
+        "  USER_MIN_TARGET_TIME_S: %.1f\n"
+        "  USER_MAX_TARGET_TIME_S: %.1f\n"
+        "  USER_FINE_WEIGHT_ADJUSTMENT_G: %.1f\n"
+        "  USER_FINE_TIME_ADJUSTMENT_S: %.1f\n"
+        "  USER_CALIBRATION_REFERENCE_WEIGHT_G: %.1f\n"
+        "  USER_DEFAULT_CALIBRATION_FACTOR: %.1f\n"
         "\n",
         USER_MIN_TARGET_WEIGHT_G,
         USER_MAX_TARGET_WEIGHT_G,
@@ -1168,13 +1177,15 @@ void BluetoothManager::generate_diagnostic_report() {
 
     // Section 6: User.h Compile Constants (Part 2 - Screen & Auto)
     snprintf(buf, sizeof(buf),
-        "  Screen Timeout: %lu ms\n"
-        "  Brightness: %.2f / %.2f\n"
-        "  Weight Activity Threshold: %.1f g\n"
-        "  Auto Trigger Delta: %.1f g\n"
-        "  Auto Trigger Window: %lu ms\n"
-        "  Auto Settling: %lu ms\n"
-        "  Auto Rearm: %lu ms\n"
+        "[COMPILE-TIME PARAMETERS - USER.H PART 2]\n"
+        "  USER_SCREEN_AUTO_DIM_TIMEOUT_MS: %lu\n"
+        "  USER_SCREEN_BRIGHTNESS_NORMAL: %.2f\n"
+        "  USER_SCREEN_BRIGHTNESS_DIMMED: %.2f\n"
+        "  USER_WEIGHT_ACTIVITY_THRESHOLD_G: %.1f\n"
+        "  USER_AUTO_GRIND_TRIGGER_DELTA_G: %.1f\n"
+        "  USER_AUTO_GRIND_TRIGGER_WINDOW_MS: %lu\n"
+        "  USER_AUTO_GRIND_TRIGGER_SETTLING_MS: %lu\n"
+        "  USER_AUTO_GRIND_REARM_DELAY_MS: %lu\n"
         "\n",
         (unsigned long)USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
         USER_SCREEN_BRIGHTNESS_NORMAL,
@@ -1189,15 +1200,15 @@ void BluetoothManager::generate_diagnostic_report() {
 
     // Section 7: Grind Control Constants (Part 1 - Core)
     snprintf(buf, sizeof(buf),
-        "[GRIND_CONTROL.H COMPILE CONSTANTS]\n"
-        "  Accuracy Tolerance: %.3f g\n"
-        "  Timeout: %d sec\n"
-        "  Max Pulse Attempts: %d\n"
-        "  Flow Threshold: %.1f g/s\n"
-        "  Undershoot Target: %.1f g\n"
-        "  Latency to Coast Ratio: %.1f\n"
-        "  Settling Tolerance: %.3f g\n"
-        "  Time Pulse Duration: %d ms\n"
+        "[COMPILE-TIME PARAMETERS - GRIND_CONTROL.H PART 1]\n"
+        "  GRIND_ACCURACY_TOLERANCE_G: %.3f\n"
+        "  GRIND_TIMEOUT_SEC: %d\n"
+        "  GRIND_MAX_PULSE_ATTEMPTS: %d\n"
+        "  GRIND_FLOW_DETECTION_THRESHOLD_GPS: %.1f\n"
+        "  GRIND_UNDERSHOOT_TARGET_G: %.1f\n"
+        "  GRIND_LATENCY_TO_COAST_RATIO: %.1f\n"
+        "  GRIND_SCALE_SETTLING_TOLERANCE_G: %.3f\n"
+        "  GRIND_TIME_PULSE_DURATION_MS: %d\n"
         "\n",
         GRIND_ACCURACY_TOLERANCE_G,
         GRIND_TIMEOUT_SEC,
@@ -1212,14 +1223,16 @@ void BluetoothManager::generate_diagnostic_report() {
 
     // Section 8: Grind Control Constants (Part 2 - Flow & Motor)
     snprintf(buf, sizeof(buf),
-        "  Flow Rate Limits: %.1f - %.1f g/s\n"
-        "  Fallback Flow: %.1f g/s\n"
-        "  Motor Latency Default: %.1f ms\n"
-        "  Motor Max Pulse: %.1f ms\n"
-        "  Motor Settling: %d ms\n"
-        "  Mech Drop Threshold: %.1f g\n"
-        "  Mech Cooldown: %d ms\n"
-        "  Mech Required Count: %d\n"
+        "[COMPILE-TIME PARAMETERS - GRIND_CONTROL.H PART 2]\n"
+        "  GRIND_FLOW_RATE_MIN_SANE_GPS: %.1f\n"
+        "  GRIND_FLOW_RATE_MAX_SANE_GPS: %.1f\n"
+        "  GRIND_PULSE_FLOW_RATE_FALLBACK_GPS: %.1f\n"
+        "  GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS: %.1f\n"
+        "  GRIND_MOTOR_MAX_PULSE_DURATION_MS: %.1f\n"
+        "  GRIND_MOTOR_SETTLING_TIME_MS: %d\n"
+        "  GRIND_MECHANICAL_DROP_THRESHOLD_G: %.1f\n"
+        "  GRIND_MECHANICAL_EVENT_COOLDOWN_MS: %d\n"
+        "  GRIND_MECHANICAL_EVENT_REQUIRED_COUNT: %d\n"
         "\n",
         GRIND_FLOW_RATE_MIN_SANE_GPS,
         GRIND_FLOW_RATE_MAX_SANE_GPS,
@@ -1235,12 +1248,13 @@ void BluetoothManager::generate_diagnostic_report() {
 
     // Section 9: Grind Control Constants (Part 3 - Settling & Calibration)
     snprintf(buf, sizeof(buf),
-        "  Scale Precision Settling: %d ms\n"
-        "  Scale Settling Timeout: %d ms\n"
-        "  Tare Window: %d ms\n"
-        "  Tare Timeout: %d ms\n"
-        "  Cal Window: %d ms\n"
-        "  Cal Timeout: %d ms\n"
+        "[COMPILE-TIME PARAMETERS - GRIND_CONTROL.H PART 3]\n"
+        "  GRIND_SCALE_PRECISION_SETTLING_TIME_MS: %d\n"
+        "  GRIND_SCALE_SETTLING_TIMEOUT_MS: %d\n"
+        "  GRIND_TARE_SAMPLE_WINDOW_MS: %d\n"
+        "  GRIND_TARE_TIMEOUT_MS: %d\n"
+        "  GRIND_CALIBRATION_SAMPLE_WINDOW_MS: %d\n"
+        "  GRIND_CALIBRATION_TIMEOUT_MS: %d\n"
         "\n",
         GRIND_SCALE_PRECISION_SETTLING_TIME_MS,
         GRIND_SCALE_SETTLING_TIMEOUT_MS,
@@ -1253,16 +1267,17 @@ void BluetoothManager::generate_diagnostic_report() {
 
     // Section 10: Autotune Constants
     snprintf(buf, sizeof(buf),
-        "  Autotune Latency Min: %.1f ms\n"
-        "  Autotune Latency Max: %.1f ms\n"
-        "  Autotune Priming: %d ms\n"
-        "  Autotune Target Acc: %.1f ms\n"
-        "  Autotune Success Rate: %.2f\n"
-        "  Autotune Verify Pulses: %d\n"
-        "  Autotune Max Iter: %d\n"
-        "  Autotune Collection: %d ms\n"
-        "  Autotune Settling: %d ms\n"
-        "  Autotune Weight Thr: %.3f g\n"
+        "[COMPILE-TIME PARAMETERS - AUTOTUNE]\n"
+        "  GRIND_AUTOTUNE_LATENCY_MIN_MS: %.1f\n"
+        "  GRIND_AUTOTUNE_LATENCY_MAX_MS: %.1f\n"
+        "  GRIND_AUTOTUNE_PRIMING_PULSE_MS: %d\n"
+        "  GRIND_AUTOTUNE_TARGET_ACCURACY_MS: %.1f\n"
+        "  GRIND_AUTOTUNE_SUCCESS_RATE: %.2f\n"
+        "  GRIND_AUTOTUNE_VERIFICATION_PULSES: %d\n"
+        "  GRIND_AUTOTUNE_MAX_ITERATIONS: %d\n"
+        "  GRIND_AUTOTUNE_COLLECTION_DELAY_MS: %d\n"
+        "  GRIND_AUTOTUNE_SETTLING_TIMEOUT_MS: %d\n"
+        "  GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G: %.3f\n"
         "\n",
         GRIND_AUTOTUNE_LATENCY_MIN_MS,
         GRIND_AUTOTUNE_LATENCY_MAX_MS,
@@ -1324,7 +1339,137 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 12: Session Data
+    // Section 12: NVM Stored Preferences (Auto-Detected)
+    snprintf(buf, sizeof(buf), "[NVM STORED PREFERENCES]\n");
+    send_chunk(buf);
+
+    // Use NVS iterator to enumerate all entries
+    nvs_iterator_t it = nullptr;
+    esp_err_t res = nvs_entry_find(NVS_DEFAULT_PART_NAME, nullptr, NVS_TYPE_ANY, &it);
+
+    if (res != ESP_OK) {
+        snprintf(buf, sizeof(buf), "  [ERROR] Failed to create NVS iterator (code %d)\n\n", res);
+        send_chunk(buf);
+    } else {
+        char current_namespace[16] = "";
+        bool namespace_started = false;
+        int entry_count = 0;
+
+        while (res == ESP_OK && it != nullptr) {
+            nvs_entry_info_t info;
+            nvs_entry_info(it, &info);
+
+            // Check if we've moved to a new namespace
+            if (strcmp(current_namespace, info.namespace_name) != 0) {
+                if (namespace_started) {
+                    // End previous namespace
+                    snprintf(buf, sizeof(buf), "\n");
+                    send_chunk(buf);
+                }
+
+                // Start new namespace
+                strncpy(current_namespace, info.namespace_name, sizeof(current_namespace) - 1);
+                current_namespace[sizeof(current_namespace) - 1] = '\0';
+                snprintf(buf, sizeof(buf), "  Namespace: %s\n", current_namespace);
+                send_chunk(buf);
+                namespace_started = true;
+            }
+
+            // Open preferences for this namespace to read the value
+            Preferences pref;
+            if (pref.begin(info.namespace_name, true)) {
+                // Format based on type
+                switch (info.type) {
+                    case NVS_TYPE_U8: {
+                        // Could be bool or uint8
+                        uint8_t val = pref.getUChar(info.key, 0);
+                        if (val <= 1) {
+                            // Likely a boolean
+                            snprintf(buf, sizeof(buf), "    %s: %s (bool)\n", info.key, val ? "true" : "false");
+                        } else {
+                            snprintf(buf, sizeof(buf), "    %s: %u (uint8)\n", info.key, val);
+                        }
+                        break;
+                    }
+                    case NVS_TYPE_I8: {
+                        int8_t val = pref.getChar(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %d (int8)\n", info.key, val);
+                        break;
+                    }
+                    case NVS_TYPE_U16: {
+                        uint16_t val = pref.getUShort(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %u (uint16)\n", info.key, val);
+                        break;
+                    }
+                    case NVS_TYPE_I16: {
+                        int16_t val = pref.getShort(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %d (int16)\n", info.key, val);
+                        break;
+                    }
+                    case NVS_TYPE_U32: {
+                        uint32_t val = pref.getUInt(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %lu (uint32)\n", info.key, (unsigned long)val);
+                        break;
+                    }
+                    case NVS_TYPE_I32: {
+                        int32_t val = pref.getInt(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %ld (int32)\n", info.key, (long)val);
+                        break;
+                    }
+                    case NVS_TYPE_U64: {
+                        uint64_t val = pref.getULong64(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %llu (uint64)\n", info.key, val);
+                        break;
+                    }
+                    case NVS_TYPE_I64: {
+                        int64_t val = pref.getLong64(info.key, 0);
+                        snprintf(buf, sizeof(buf), "    %s: %lld (int64)\n", info.key, val);
+                        break;
+                    }
+                    case NVS_TYPE_STR: {
+                        String val = pref.getString(info.key, "");
+                        snprintf(buf, sizeof(buf), "    %s: \"%s\" (string)\n", info.key, val.c_str());
+                        break;
+                    }
+                    case NVS_TYPE_BLOB: {
+                        size_t len = pref.getBytesLength(info.key);
+                        // Check if it's a float (4 bytes)
+                        if (len == sizeof(float)) {
+                            float val = pref.getFloat(info.key, 0.0f);
+                            snprintf(buf, sizeof(buf), "    %s: %.2f (float)\n", info.key, val);
+                        } else if (len == sizeof(double)) {
+                            double val = pref.getDouble(info.key, 0.0);
+                            snprintf(buf, sizeof(buf), "    %s: %.2f (double)\n", info.key, val);
+                        } else {
+                            snprintf(buf, sizeof(buf), "    %s: <blob %u bytes>\n", info.key, (unsigned int)len);
+                        }
+                        break;
+                    }
+                    default: {
+                        snprintf(buf, sizeof(buf), "    %s: <unknown type %d>\n", info.key, info.type);
+                        break;
+                    }
+                }
+                send_chunk(buf);
+                pref.end();
+            }
+
+            entry_count++;
+            res = nvs_entry_next(&it);
+        }
+
+        nvs_release_iterator(it);
+
+        if (entry_count == 0) {
+            snprintf(buf, sizeof(buf), "  [EMPTY] No preferences stored\n");
+            send_chunk(buf);
+        }
+
+        snprintf(buf, sizeof(buf), "\n");
+        send_chunk(buf);
+    }
+
+    // Section 13: Session Data
     uint16_t session_count = data_stream.get_total_sessions();
 
     snprintf(buf, sizeof(buf),
@@ -1339,7 +1484,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 13: Last 5 Grind Sessions Detail
+    // Section 14: Last 5 Grind Sessions Detail
     snprintf(buf, sizeof(buf), "[LAST 5 GRIND SESSIONS]\n");
     send_chunk(buf);
 
@@ -1468,7 +1613,7 @@ void BluetoothManager::generate_diagnostic_report() {
     snprintf(buf, sizeof(buf), "\n");
     send_chunk(buf);
 
-    // Section 14: Autotune Results
+    // Section 15: Autotune Results
     snprintf(buf, sizeof(buf), "[AUTOTUNE RESULTS]\n");
     send_chunk(buf);
 
