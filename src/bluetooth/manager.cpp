@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <Arduino.h>
 #include <esp_system.h>
+#include <LittleFS.h>
 #include "../system/performance_monitor.h"
 #include "../system/statistics_manager.h"
 #include "../config/constants.h"
@@ -1260,11 +1261,45 @@ void BluetoothManager::generate_diagnostic_report() {
         "  Sessions: %u\n"
         "  Events: %lu\n"
         "  Measurements: %lu\n"
-        "\n"
-        "=== END OF REPORT ===\n",
+        "\n",
         session_count,
         grind_logger.count_total_events_in_flash(),
         grind_logger.count_total_measurements_in_flash()
     );
+    send_chunk(buf);
+
+    // Section 12: Autotune Results
+    snprintf(buf, sizeof(buf), "[AUTOTUNE RESULTS]\n");
+    send_chunk(buf);
+
+    if (LittleFS.exists("/autotune.log")) {
+        File autotuneFile = LittleFS.open("/autotune.log", "r");
+        if (autotuneFile) {
+            // Stream file contents in chunks
+            while (autotuneFile.available()) {
+                size_t bytesToRead = autotuneFile.available();
+                if (bytesToRead > sizeof(buf) - 1) {
+                    bytesToRead = sizeof(buf) - 1;
+                }
+                size_t bytesRead = autotuneFile.readBytes(buf, bytesToRead);
+                buf[bytesRead] = '\0';
+                send_chunk(buf);
+            }
+            autotuneFile.close();
+
+            // Add newline after file contents
+            snprintf(buf, sizeof(buf), "\n");
+            send_chunk(buf);
+        } else {
+            snprintf(buf, sizeof(buf), "  [ERROR] Failed to open autotune.log\n\n");
+            send_chunk(buf);
+        }
+    } else {
+        snprintf(buf, sizeof(buf), "  [NOT RUN] Autotune has not been executed yet\n\n");
+        send_chunk(buf);
+    }
+
+    // Final marker
+    snprintf(buf, sizeof(buf), "=== END OF REPORT ===\n");
     send_chunk(buf);
 }
