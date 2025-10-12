@@ -176,10 +176,6 @@ void AutoTuneController::update_priming_phase() {
         case AutoTuneSubPhase::MEASURE_COMPLETE: {
             // Priming complete, now tare
             LOG_BLE("AutoTune: Priming complete, taring scale\n");
-            float weight_delta = last_settled_weight - 0.0f;
-            log_message("  %dms -> %.1fg %s",
-                       GRIND_AUTOTUNE_PRIMING_PULSE_MS, weight_delta,
-                       weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G ? "[OK]" : "[X]");
             start_tare();
             break;
         }
