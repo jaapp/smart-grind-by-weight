@@ -150,3 +150,60 @@ Motor response latency mismatch between firmware settings and actual hardware ch
 **Verify calibration**: Check Settings → Diagnostics → Motor Latency to see current value. Re-run auto-tune if you change grinders, modify relay hardware, or continue experiencing unreliable pulse corrections.
 
 **Manual fallback:** If auto-tune fails, system reverts to safe 50ms default. Check grinder power connection, hopper bean level, and scale setup.
+
+---
+
+## Getting Diagnostic Reports
+
+**Applies to:** Reporting issues on GitHub or troubleshooting system behavior.
+
+### What is a Diagnostic Report?
+
+The diagnostic report is a comprehensive text dump of your device's current state, including:
+- Firmware version, build number, and git commit
+- System information (uptime, CPU frequency, RAM, flash storage)
+- All compile-time constants (grind settings, thresholds, timeouts)
+- Runtime statistics (lifetime grinds, total weight)
+- Load cell calibration status and noise diagnostics
+- Motor latency settings
+- Autotune results (if available)
+
+This information helps identify configuration issues, hardware problems, or firmware bugs.
+
+### How to Get a Diagnostic Report
+
+#### Option 1: Web Flasher (Recommended)
+
+1. Visit the **[Web Flasher Diagnostics Tool](https://jaapp.github.io/smart-grind-by-weight)**
+2. Click the **"Diagnostics"** tab
+3. Click **"Connect & Get Diagnostics"**
+4. Select your device from the Bluetooth pairing dialog
+5. Wait for the report to complete (~5-10 seconds)
+6. Click **"Copy to Clipboard"** or **"Download Report"**
+7. Paste the report into your GitHub issue
+
+**Browser Requirements:** Chrome, Edge, or Opera on desktop/Android (Web Bluetooth API required)
+
+#### Option 2: Command Line Tool
+
+If you have the development environment set up:
+
+```bash
+# Get diagnostics and display in terminal
+python3 tools/grinder.py diagnostics
+
+# Save diagnostics to a file
+python3 tools/grinder.py diagnostics --save diagnostics.txt
+```
+
+### When to Include a Diagnostic Report
+
+**Always include a diagnostic report when reporting:**
+- Grinding accuracy issues (overshooting/undershooting)
+- Timeout errors or slow taring
+- Load cell calibration problems
+- Motor response issues
+- Any unexpected behavior or crashes
+- Feature requests that depend on your hardware configuration
+
+**The diagnostic report is anonymous** and contains no personal information. It only includes technical device settings and statistics.

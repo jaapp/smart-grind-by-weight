@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting Guide
+    url: https://github.com/jaapp/smart-grind-by-weight/blob/main/TROUBLESHOOTING.md
+    about: Check common issues and solutions before opening a bug report
+  - name: Documentation
+    url: https://github.com/jaapp/smart-grind-by-weight/blob/main/DOC.md
+    about: Complete build instructions, usage guide, and technical documentation
+  - name: Development Guide
+    url: https://github.com/jaapp/smart-grind-by-weight/blob/main/DEVELOPMENT.md
+    about: Information for developers building from source

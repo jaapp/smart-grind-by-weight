@@ -1,0 +1,114 @@
+name: Bug Report
+description: Report a bug or issue with the Smart Grind-by-Weight system
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this issue! Please fill out the information below to help us diagnose and fix the problem.
+
+  - type: checkboxes
+    id: diagnostic-report
+    attributes:
+      label: Diagnostic Report
+      description: Please generate and attach a diagnostic report from your device. This is **required** for most hardware/firmware issues.
+      options:
+        - label: I have attached a diagnostic report from my device (see instructions below)
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### How to Get a Diagnostic Report
+
+        **Option 1: Web Flasher (Recommended)**
+        1. Visit the [Web Flasher Diagnostics Tool](https://jaapp.github.io/smart-grind-by-weight)
+        2. Click the **"Diagnostics"** tab
+        3. Click **"Connect & Get Diagnostics"**
+        4. Select your device from the Bluetooth pairing dialog
+        5. Wait for the report to complete (~5-10 seconds)
+        6. Click **"Copy to Clipboard"** and paste it in the "Diagnostic Report" section below
+
+        **Option 2: Command Line**
+        ```bash
+        python3 tools/grinder.py diagnostics --save diagnostics.txt
+        ```
+        Then attach the `diagnostics.txt` file to this issue.
+
+  - type: textarea
+    id: diagnostic-output
+    attributes:
+      label: Diagnostic Report Output
+      description: Paste the complete diagnostic report here
+      placeholder: |
+        === DIAGNOSTIC REPORT ===
+        [Paste your full diagnostic report here]
+        === END OF REPORT ===
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened? What did you expect to happen?
+      description: Describe the issue you're experiencing in detail
+      placeholder: |
+        What happened?
+
+        What were you expecting to happen?
+
+        Include any error messages, unexpected behavior, or accuracy issues.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: dropdown
+    id: grinder-model
+    attributes:
+      label: Grinder Model
+      description: What grinder are you using?
+      options:
+        - Eureka Mignon Specialita
+        - Eureka Mignon (other model)
+        - Other (specify in bug description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: hardware-setup
+    attributes:
+      label: Hardware Setup
+      description: Describe your hardware configuration
+      placeholder: |
+        - Display: Waveshare ESP32-S3 1.64" AMOLED
+        - Load cell: 1kg / 300g / other
+        - HX711 board: Generic / Sparkfun / other
+        - Any modifications or custom wiring
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: |
+        - Screenshots or photos
+        - When did this start happening?
+        - Does it happen consistently or intermittently?
+        - Any recent changes to your setup?
+    validations:
+      required: false
