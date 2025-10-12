@@ -361,45 +361,39 @@ void UIManager::update_auto_actions() {
 
     if (auto_actions_.auto_start_enabled && on_ready_tab && !grinder_active && grinding_controller_) {
         auto* filter = sensor->get_raw_filter();
-        if (filter && filter->get_buffer_time_span_ms() >= USER_AUTO_GRIND_TRIGGER_WINDOW_MS) {
+
+        // Extended window = settling period + trigger window
+        constexpr uint32_t kExtendedWindow = USER_AUTO_GRIND_TRIGGER_SETTLING_MS + USER_AUTO_GRIND_TRIGGER_WINDOW_MS;
+
+        if (filter && filter->get_buffer_time_span_ms() >= kExtendedWindow) {
             constexpr int kBaseSampleRequirement =
-                (HW_LOADCELL_SAMPLE_RATE_SPS * USER_AUTO_GRIND_TRIGGER_WINDOW_MS) / 1000;
+                (HW_LOADCELL_SAMPLE_RATE_SPS * kExtendedWindow) / 1000;
             constexpr int kMinSamplesForWindow = (kBaseSampleRequirement > 2) ? kBaseSampleRequirement : 2;
 
             if (sensor->get_sample_count() >= kMinSamplesForWindow) {
-                float delta_g = 0.0f;
-                int samples_used = 0;
-                uint32_t span_ms = 0;
+                // Check settled state first (cheap) to short-circuit expensive delta calculation
+                if (sensor->is_settled()) {
+                    float delta_g = 0.0f;
+                    int samples_used = 0;
+                    uint32_t span_ms = 0;
 
-                if (sensor->get_weight_delta(USER_AUTO_GRIND_TRIGGER_WINDOW_MS, &delta_g, &samples_used, &span_ms) &&
-                    samples_used >= kMinSamplesForWindow &&
-                    span_ms <= USER_AUTO_GRIND_TRIGGER_WINDOW_MS) {
-                    const bool rearm_ready =
-                        (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
+                    // Weight is settled - now check delta over extended window
+                    if (sensor->get_weight_delta(kExtendedWindow, &delta_g, &samples_used, &span_ms) &&
+                        samples_used >= kMinSamplesForWindow &&
+                        span_ms <= kExtendedWindow &&
+                        delta_g >= USER_AUTO_GRIND_TRIGGER_DELTA_G) {
 
-                    if (delta_g >= USER_AUTO_GRIND_TRIGGER_DELTA_G && rearm_ready) {
-                        LOG_BLE("[AUTO ACTION] %.1fg added in last %lums - auto-starting grind\n",
-                                static_cast<double>(delta_g),
-                                static_cast<unsigned long>(span_ms));
-                        auto_actions_.last_auto_start_ms = now;
-                        grinding_controller_->handle_grind_button();
-                    }
-#if DEBUG_UI_SYSTEM
-                    else {
-                        static uint32_t last_debug_ms = 0;
-                        if (now - last_debug_ms >= USER_AUTO_GRIND_REARM_DELAY_MS) {
-                            LOG_BLE("[AUTO ACTION DEBUG] samples=%d delta=%.1fg span=%lums threshold=%.1fg ready=%d active=%d rearm=%d\n",
-                                    samples_used,
+                        const bool rearm_ready =
+                            (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
+
+                        if (rearm_ready) {
+                            LOG_BLE("[AUTO ACTION] Trigger confirmed: %.1fg over %lums with settled weight - auto-starting grind\n",
                                     static_cast<double>(delta_g),
-                                    static_cast<unsigned long>(span_ms),
-                                    static_cast<double>(USER_AUTO_GRIND_TRIGGER_DELTA_G),
-                                    on_ready_tab ? 1 : 0,
-                                    grinder_active ? 1 : 0,
-                                    rearm_ready ? 1 : 0);
-                            last_debug_ms = now;
+                                    static_cast<unsigned long>(span_ms));
+                            auto_actions_.last_auto_start_ms = now;
+                            grinding_controller_->handle_grind_button();
                         }
                     }
-#endif
                 }
             }
         }
