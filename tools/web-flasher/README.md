@@ -62,11 +62,31 @@ The firmware list is pulled straight from GitHub Releases—no files are stored 
 The web flasher is automatically deployed via GitHub Pages when pushed to main branch.
 
 ### Local Testing
+
+**Quick Start (Recommended):**
+```bash
+# From the tools directory
+python3 start-webflasher.py
+
+# If port 8000 is busy, you'll be prompted to kill the process
+# Use a custom port
+python3 start-webflasher.py --port 3000
+```
+
+The script will automatically:
+- Check if the port is available
+- Prompt to kill any conflicting process
+- Start the server and display the URL
+- Handle cleanup on exit
+
+**Manual Start:**
 ```bash
 # Serve locally (required for Web Bluetooth HTTPS requirement)
 python3 -m http.server 8000 --directory tools/web-flasher
-# Open https://localhost:8000 (note: may need self-signed cert for HTTPS)
+# Open http://localhost:8000
 ```
+
+**Note:** While the production site requires HTTPS for Web Bluetooth, `localhost` is an exception and works with plain HTTP.
 
 ## Security
 
