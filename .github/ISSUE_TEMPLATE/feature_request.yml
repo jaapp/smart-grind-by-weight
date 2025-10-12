@@ -1,0 +1,55 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for the Smart Grind-by-Weight system
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please describe what you'd like to see added or improved.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: Describe the feature you'd like to see
+      placeholder: |
+        What feature would you like to see added or improved?
+
+        How would it work from a user's perspective?
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Use Case / Motivation
+      description: Why would this feature be useful? What problem does it solve?
+      placeholder: |
+        Describe the use case or problem this feature would address.
+
+        How would this improve your workflow or experience?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: |
+        Describe any alternative approaches you've thought about or tried.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or examples about the feature request
+      placeholder: |
+        - Screenshots or mockups
+        - Examples from other projects
+        - Related issues or discussions
+    validations:
+      required: false

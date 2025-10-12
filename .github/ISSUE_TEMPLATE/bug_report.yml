@@ -61,26 +61,21 @@ body:
   - type: textarea
     id: description
     attributes:
-      label: What happened? What did you expect to happen?
-      description: Describe the issue you're experiencing in detail
+      label: Issue Description
+      description: Describe what happened, what you expected to happen, and how to reproduce it
       placeholder: |
-        What happened?
+        **What happened?**
+        [Describe the issue you're experiencing]
 
-        What were you expecting to happen?
+        **What did you expect to happen?**
+        [Describe the expected behavior]
 
-        Include any error messages, unexpected behavior, or accuracy issues.
-    validations:
-      required: true
-
-  - type: textarea
-    id: reproduction
-    attributes:
-      label: Steps to Reproduce
-      description: How can we reproduce this issue?
-      placeholder: |
+        **Steps to Reproduce (optional):**
         1. Go to '...'
         2. Click on '...'
         3. See error
+
+        Include any error messages, unexpected behavior, or accuracy issues.
     validations:
       required: true
 
