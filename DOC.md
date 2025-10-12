@@ -14,6 +14,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 - [Usage Guide](#-usage-guide)
 - [User Interface Navigation](#️-user-interface-navigation)
 - [Bluetooth Connectivity](#-bluetooth-connectivity)
+- [Diagnostic Report](#-diagnostic-report)
 - [Analytics & Data Export](#-analytics--data-export)
 - [Algorithm Details](#-algorithm-details)
 - [Frequently Asked Questions](#-frequently-asked-questions)
@@ -373,6 +374,47 @@ Both automation settings rely on the same smoothed weight deltas used for flow d
 ## 🔵 Bluetooth Connectivity
 
 Bluetooth can be configured in **Settings → Bluetooth** with optional auto-startup (5-minute timer) or manual control (30-minute timer when manually enabled). The blue Bluetooth symbol in the top-right corner indicates when active. Bluetooth enables wireless firmware updates via BLE OTA, grind data export and analytics, and device management. Grind session logging is configurable in **Settings → Data → Logging** (disabled by default to prevent flash wear) and must be enabled before grinding to save session data for later analysis.
+
+---
+
+## 🔍 Diagnostic Report
+
+Generate a comprehensive diagnostic report from your device for troubleshooting or attaching to GitHub issues. The report includes firmware version, system health metrics, load cell diagnostics, and all compile-time parameters.
+
+### Report Contents
+
+- **Firmware Information**: Version, build number, git commit, branch, and build timestamp
+- **System Runtime**: Uptime, CPU frequency, heap memory usage, flash size, and driver type
+- **Runtime Diagnostics**:
+  - Load cell calibration status and factor
+  - Noise levels (standard deviation in grams and ADC units)
+  - Noise acceptability assessment
+  - Motor response latency (default or auto-tuned value)
+- **Compile-Time Parameters**: Profile defaults, weight/time ranges, screen settings, auto-grind thresholds, and all user-configurable constants
+
+### Access Methods
+
+**Web Flasher (Recommended):**
+1. Visit the [Web Flasher Tool](https://jaapp.github.io/smart-grind-by-weight)
+2. Navigate to the **Diagnostics** tab
+3. Click "Connect & Get Diagnostics"
+4. Copy to clipboard or download the report as a text file
+
+**Command Line:**
+```bash
+# Display report in terminal
+python3 tools/grinder.py diagnostics
+
+# Save report to file
+python3 tools/grinder.py diagnostics --save diagnostic-report.txt
+```
+
+**When to Use:**
+- Reporting bugs or issues on GitHub (attach the report to your issue)
+- Verifying calibration status and noise levels
+- Checking motor latency settings after auto-tune
+- Confirming firmware version and compile-time parameters
+- General troubleshooting and system health assessment
 
 ---
 
