@@ -1113,58 +1113,58 @@ class GrinderBLETool:
         self.safe_print("="*60 + "\n")
 
     async def get_diagnostic_report(self) -> str:
-        """Get comprehensive diagnostic report from the device."""
-        report_chunks = []
+        """Get comprehensive diagnostic report from the device, streaming in real-time."""
         report_complete = asyncio.Event()
+        full_report_list = []
 
         def notification_handler(sender, data):
-            """Handle notification chunks from debug TX characteristic."""
+            """Handle notification chunks and print them immediately."""
             try:
-                chunk = data.decode('utf-8')
-                report_chunks.append(chunk)
+                chunk = data.decode('utf-8', errors='replace')
+                # Print chunk immediately to provide streaming output
+                sys.stdout.write(chunk)
+                sys.stdout.flush()
+                full_report_list.append(chunk)
+                
                 # Check if this is the last chunk
                 if "=== END OF REPORT ===" in chunk:
                     report_complete.set()
             except Exception as e:
-                self.safe_print(f"[ERROR] Decoding chunk: {e}")
+                self.safe_print(f"\n[ERROR] Decoding chunk: {e}")
 
         try:
-            # Try to stop notifications first (in case they're already active)
-            try:
-                await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
-                await asyncio.sleep(0.2)  # Brief delay to ensure cleanup
-            except:
-                pass  # Ignore if notifications weren't active
+            # Unsubscribe from the general-purpose debug handler to avoid conflicts
+            await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
+            await asyncio.sleep(0.5)
 
-            # Subscribe to debug TX notifications
+            # Subscribe specifically for the diagnostic report
             await self.client.start_notify(BLE_DEBUG_TX_CHAR_UUID, notification_handler)
             self.safe_print("[INFO] Subscribed to diagnostic stream")
 
-            # Trigger report generation by writing to diagnostics characteristic
+            # Trigger report generation
             await self.client.write_gatt_char(BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID, bytes([0x01]))
             self.safe_print("[INFO] Diagnostic report generation triggered")
 
-            # Wait for report to complete (with timeout)
+            # Wait for the report to complete, with a timeout
             try:
-                await asyncio.wait_for(report_complete.wait(), timeout=30.0)
+                await asyncio.wait_for(report_complete.wait(), timeout=15.0)
             except asyncio.TimeoutError:
-                self.safe_print("[WARN] Report generation timeout - returning partial report")
+                self.safe_print("\n[WARN] Report generation timeout - returning partial report")
 
-            # Stop notifications
-            try:
-                await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
-            except:
-                pass  # Ignore errors when stopping
+            # Clean up the specific subscription
+            await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
+            await asyncio.sleep(0.5)
+            
+            # Re-subscribe the default debug handler if it was active
+            await self.client.start_notify(BLE_DEBUG_TX_CHAR_UUID, self.on_debug_message)
 
-            # Combine all chunks
-            full_report = ''.join(report_chunks)
-            return full_report
+            return "".join(full_report_list)
 
         except Exception as e:
-            self.safe_print(f"[ERROR] Error getting diagnostic report: {e}")
-            # Try to clean up notifications
+            self.safe_print(f"\n[ERROR] Error getting diagnostic report: {e}")
+            # Attempt to restore the default debug handler on error
             try:
-                await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
+                await self.client.start_notify(BLE_DEBUG_TX_CHAR_UUID, self.on_debug_message)
             except:
                 pass
             return ""
@@ -1255,8 +1255,10 @@ async def main():
                             f.write(report)
                         tool.safe_print(f"[OK] Diagnostic report saved to: {args.save}")
                     else:
-                        # Print to console
-                        print("\n" + report)
+                        # The report is streamed live by the handler.
+                        # We just print a newline here to make sure the
+                        # shell prompt appears on a fresh line.
+                        print()
                 else:
                     tool.safe_print("[ERROR] Failed to retrieve diagnostic report")
 

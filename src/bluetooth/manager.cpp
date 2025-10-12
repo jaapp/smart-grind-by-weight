@@ -846,17 +846,28 @@ void BluetoothManager::onDisconnect(BLEServer* server) {
 }
 
 void BluetoothManager::onWrite(BLECharacteristic* characteristic) {
+    LOG_BLE("DEBUG: onWrite() called, characteristic=%p\n", characteristic);
+    LOG_BLE("  ota_control=%p, ota_data=%p, debug_rx=%p, data_control=%p, diagnostics=%p\n",
+        ota_control_characteristic, ota_data_characteristic, debug_rx_characteristic,
+        data_control_characteristic, sysinfo_diagnostics_characteristic);
+
     if (characteristic == ota_control_characteristic) {
+        LOG_BLE("  -> Handling OTA control\n");
         handle_ota_control_command(characteristic);
     } else if (characteristic == ota_data_characteristic) {
+        LOG_BLE("  -> Handling OTA data\n");
         handle_ota_data_chunk(characteristic);
     } else if (characteristic == debug_rx_characteristic) {
+        LOG_BLE("  -> Handling debug command\n");
         handle_debug_command(characteristic);
     } else if (characteristic == data_control_characteristic) {
+        LOG_BLE("  -> Handling data control\n");
         handle_data_control_command(characteristic);
     } else if (characteristic == sysinfo_diagnostics_characteristic) {
-        // Trigger comprehensive diagnostic report generation
+        LOG_BLE("  -> TRIGGERING DIAGNOSTIC REPORT\n");
         generate_diagnostic_report();
+    } else {
+        LOG_BLE("  -> UNKNOWN characteristic!\n");
     }
 }
 
@@ -991,7 +1002,14 @@ void BluetoothManager::update_sessions_info() {
 }
 
 void BluetoothManager::generate_diagnostic_report() {
-    if (!debug_tx_characteristic) return;
+    LOG_BLE("=== DIAGNOSTICS: generate_diagnostic_report() CALLED ===\n");
+
+    if (!debug_tx_characteristic) {
+        LOG_BLE("ERROR: debug_tx_characteristic is NULL\n");
+        return;
+    }
+
+    LOG_BLE("DEBUG: debug_tx_characteristic is valid, starting report generation\n");
 
     // Access global instances
     extern HardwareManager hardware_manager;
@@ -1002,9 +1020,11 @@ void BluetoothManager::generate_diagnostic_report() {
     // Helper lambda to send chunk and flush
     auto send_chunk = [this](const char* chunk) {
         if (!debug_tx_characteristic) return;
-        debug_tx_characteristic->setValue((uint8_t*)chunk, strlen(chunk));
+        size_t len = strlen(chunk);
+        LOG_BLE("TX: %zu bytes\n", len);
+        debug_tx_characteristic->setValue((uint8_t*)chunk, len);
         debug_tx_characteristic->notify();
-        delay(50); // Allow BLE stack to send
+        delay(250); // Increased to prevent queue overflow
     };
 
     // Section 1: Header & Firmware Info
@@ -1469,6 +1489,8 @@ void BluetoothManager::generate_diagnostic_report() {
     }
 
     // Final marker
+    LOG_BLE("DEBUG: Sending final marker\n");
     snprintf(buf, sizeof(buf), "=== END OF REPORT ===\n");
     send_chunk(buf);
+    LOG_BLE("=== DIAGNOSTICS: Report generation COMPLETED ===\n");
 }
