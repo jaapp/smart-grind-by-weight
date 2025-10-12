@@ -5,12 +5,15 @@
 #include <LittleFS.h>
 #include "../system/performance_monitor.h"
 #include "../system/statistics_manager.h"
+#include "../system/diagnostics_controller.h"
 #include "../config/constants.h"
 #include "../config/user.h"
 #include "../config/grind_control.h"
 #include "../config/build_info.h"
 #include "../logging/grind_logging.h"
 #include "../hardware/hardware_manager.h"
+#include "../hardware/WeightSensor.h"
+#include "../controllers/grind_controller.h"
 
 BluetoothManager::BluetoothManager()
     : ble_server(nullptr)
@@ -990,6 +993,10 @@ void BluetoothManager::update_sessions_info() {
 void BluetoothManager::generate_diagnostic_report() {
     if (!debug_tx_characteristic) return;
 
+    // Access global instances
+    extern HardwareManager hardware_manager;
+    extern GrindController grind_controller;
+
     char buf[512];
 
     // Helper lambda to send chunk and flush
@@ -1057,7 +1064,40 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 3: Profiles (requires access to hardware manager's preferences)
+    // Section 3: Runtime Diagnostics
+    WeightSensor* weight_sensor = hardware_manager.get_weight_sensor();
+
+    if (weight_sensor) {
+        // Get load cell noise measurements
+        float std_dev_g = weight_sensor->get_standard_deviation_g(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+        int32_t std_dev_adc = weight_sensor->get_standard_deviation_adc(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+        bool noise_acceptable = weight_sensor->noise_level_diagnostic();
+        float cal_factor = weight_sensor->get_calibration_factor();
+        bool is_calibrated = weight_sensor->is_calibrated();
+
+        // Get motor latency
+        float motor_latency = grind_controller.get_motor_response_latency();
+
+        snprintf(buf, sizeof(buf),
+            "[RUNTIME DIAGNOSTICS]\n"
+            "  Load Cell Status: %s\n"
+            "  Calibration Factor: %.2f\n"
+            "  Std Dev (g): %.4f\n"
+            "  Std Dev (ADC): %ld\n"
+            "  Noise Level: %s\n"
+            "  Motor Latency: %.0f ms\n"
+            "\n",
+            is_calibrated ? "Calibrated" : "NOT CALIBRATED",
+            cal_factor,
+            std_dev_g,
+            (long)std_dev_adc,
+            noise_acceptable ? "OK" : "Too High",
+            motor_latency
+        );
+        send_chunk(buf);
+    }
+
+    // Section 4: Profiles (requires access to hardware manager's preferences)
     // This will be populated at runtime - for now show defaults
     snprintf(buf, sizeof(buf),
         "[PROFILES - COMPILE DEFAULTS]\n"
@@ -1075,7 +1115,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 4: User.h Compile Constants (Part 1)
+    // Section 5: User.h Compile Constants (Part 1)
     snprintf(buf, sizeof(buf),
         "[USER.H COMPILE CONSTANTS]\n"
         "  Weight Limits: %.1f - %.1f g\n"
@@ -1095,7 +1135,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 5: User.h Compile Constants (Part 2 - Screen & Auto)
+    // Section 6: User.h Compile Constants (Part 2 - Screen & Auto)
     snprintf(buf, sizeof(buf),
         "  Screen Timeout: %lu ms\n"
         "  Brightness: %.2f / %.2f\n"
@@ -1116,7 +1156,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 6: Grind Control Constants (Part 1 - Core)
+    // Section 7: Grind Control Constants (Part 1 - Core)
     snprintf(buf, sizeof(buf),
         "[GRIND_CONTROL.H COMPILE CONSTANTS]\n"
         "  Accuracy Tolerance: %.3f g\n"
@@ -1139,7 +1179,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 7: Grind Control Constants (Part 2 - Flow & Motor)
+    // Section 8: Grind Control Constants (Part 2 - Flow & Motor)
     snprintf(buf, sizeof(buf),
         "  Flow Rate Limits: %.1f - %.1f g/s\n"
         "  Fallback Flow: %.1f g/s\n"
@@ -1162,7 +1202,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 8: Grind Control Constants (Part 3 - Settling & Calibration)
+    // Section 9: Grind Control Constants (Part 3 - Settling & Calibration)
     snprintf(buf, sizeof(buf),
         "  Scale Precision Settling: %d ms\n"
         "  Scale Settling Timeout: %d ms\n"
@@ -1180,7 +1220,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 9: Autotune Constants
+    // Section 10: Autotune Constants
     snprintf(buf, sizeof(buf),
         "  Autotune Latency Min: %.1f ms\n"
         "  Autotune Latency Max: %.1f ms\n"
@@ -1206,7 +1246,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 10: Statistics
+    // Section 11: Statistics
     uint32_t total_grinds = statistics_manager.get_total_grinds();
     uint32_t single_shots = statistics_manager.get_single_shots();
     uint32_t double_shots = statistics_manager.get_double_shots();
@@ -1253,7 +1293,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 11: Session Data
+    // Section 12: Session Data
     uint16_t session_count = data_stream.get_total_sessions();
 
     snprintf(buf, sizeof(buf),
@@ -1268,7 +1308,7 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 12: Last 5 Grind Sessions Detail
+    // Section 13: Last 5 Grind Sessions Detail
     snprintf(buf, sizeof(buf), "[LAST 5 GRIND SESSIONS]\n");
     send_chunk(buf);
 
@@ -1397,7 +1437,7 @@ void BluetoothManager::generate_diagnostic_report() {
     snprintf(buf, sizeof(buf), "\n");
     send_chunk(buf);
 
-    // Section 13: Autotune Results
+    // Section 14: Autotune Results
     snprintf(buf, sizeof(buf), "[AUTOTUNE RESULTS]\n");
     send_chunk(buf);
 
