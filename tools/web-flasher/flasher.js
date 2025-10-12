@@ -11,6 +11,14 @@ const BLE_OTA_CONTROL_CHAR_UUID = '11111111-2222-3333-4444-555555555555';
 const BLE_OTA_STATUS_CHAR_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const BLE_OTA_BUILD_NUMBER_CHAR_UUID = '66666666-7777-8888-9999-000000000000';
 
+// Debug Service UUIDs
+const BLE_DEBUG_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_DEBUG_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+// System Info Service UUIDs
+const BLE_SYSINFO_SERVICE_UUID = '77889900-aabb-ccdd-eeff-112233445566';
+const BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID = '22334455-ff00-1111-2222-334455667788';
+
 // Commands and status codes (from your Python implementation)
 const BLE_OTA_CMD_START = 0x01;
 const BLE_OTA_CMD_END = 0x03;
@@ -555,6 +563,167 @@ async function loadReleases() {
         usbSelect.innerHTML = '<option value="">Unable to load releases</option>';
         otaSelect.innerHTML = '<option value="">Unable to load releases</option>';
         updateStatus('Failed to load firmware list from GitHub releases. Please check your connection or try again later.', 'error');
+    }
+}
+
+// ========================================================================
+// DIAGNOSTIC REPORT FUNCTIONS
+// ========================================================================
+
+async function getDiagnosticReport() {
+    const btn = document.getElementById('getDiagnosticsBtn');
+    const statusDiv = document.getElementById('diagnosticsStatus');
+    const reportContainer = document.getElementById('diagnosticsReportContainer');
+    const reportTextarea = document.getElementById('diagnosticsReport');
+
+    try {
+        btn.disabled = true;
+        statusDiv.innerHTML = '<div class="status info">Connecting to device...</div>';
+
+        // Request device
+        device = await navigator.bluetooth.requestDevice({
+            filters: [{ name: DEVICE_NAME }],
+            optionalServices: [BLE_OTA_SERVICE_UUID, BLE_DEBUG_SERVICE_UUID, BLE_SYSINFO_SERVICE_UUID]
+        });
+
+        // Connect to GATT server
+        server = await device.gatt.connect();
+        statusDiv.innerHTML = '<div class="status info">Connected. Requesting diagnostic report...</div>';
+
+        // Get required services
+        const debugService = await server.getPrimaryService(BLE_DEBUG_SERVICE_UUID);
+        const sysinfoService = await server.getPrimaryService(BLE_SYSINFO_SERVICE_UUID);
+
+        // Get characteristics
+        const debugTxChar = await debugService.getCharacteristic(BLE_DEBUG_TX_CHAR_UUID);
+        const diagnosticsChar = await sysinfoService.getCharacteristic(BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID);
+
+        // Collect report chunks
+        let reportChunks = [];
+        let reportComplete = false;
+
+        // Try to stop notifications first (in case they're already active)
+        try {
+            await debugTxChar.stopNotifications();
+            await new Promise(resolve => setTimeout(resolve, 200)); // Brief delay
+        } catch (e) {
+            // Ignore if notifications weren't active
+        }
+
+        // Set up notification handler
+        await debugTxChar.startNotifications();
+        debugTxChar.addEventListener('characteristicvaluechanged', (event) => {
+            const chunk = new TextDecoder().decode(event.target.value);
+            reportChunks.push(chunk);
+
+            // Check if report is complete
+            if (chunk.includes('=== END OF REPORT ===')) {
+                reportComplete = true;
+            }
+        });
+
+        // Trigger report generation by writing to diagnostics characteristic
+        await diagnosticsChar.writeValue(new Uint8Array([0x01]));
+        statusDiv.innerHTML = '<div class="status info">Generating report...</div>';
+
+        // Wait for report to complete (with timeout)
+        const timeout = 30000; // 30 seconds
+        const startTime = Date.now();
+        while (!reportComplete && (Date.now() - startTime) < timeout) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // Stop notifications
+        try {
+            await debugTxChar.stopNotifications();
+        } catch (e) {
+            // Ignore errors when stopping
+        }
+
+        // Disconnect
+        if (device && device.gatt.connected) {
+            device.gatt.disconnect();
+        }
+
+        if (reportComplete) {
+            // Display report
+            const fullReport = reportChunks.join('');
+            reportTextarea.value = fullReport;
+            reportContainer.style.display = 'block';
+            statusDiv.innerHTML = '<div class="status success">✓ Diagnostic report generated successfully!</div>';
+        } else {
+            statusDiv.innerHTML = '<div class="status error">Report generation timed out. Partial report received.</div>';
+            const partialReport = reportChunks.join('');
+            if (partialReport) {
+                reportTextarea.value = partialReport;
+                reportContainer.style.display = 'block';
+            }
+        }
+    } catch (error) {
+        console.error('Diagnostic error:', error);
+        statusDiv.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+
+        // Try to clean up notifications on error
+        try {
+            const debugService = await server.getPrimaryService(BLE_DEBUG_SERVICE_UUID);
+            const debugTxChar = await debugService.getCharacteristic(BLE_DEBUG_TX_CHAR_UUID);
+            await debugTxChar.stopNotifications();
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+
+        // Disconnect on error
+        if (device && device.gatt.connected) {
+            device.gatt.disconnect();
+        }
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function copyDiagnosticReport() {
+    const reportTextarea = document.getElementById('diagnosticsReport');
+    const statusDiv = document.getElementById('diagnosticsStatus');
+
+    reportTextarea.select();
+    reportTextarea.setSelectionRange(0, 99999); // For mobile devices
+
+    try {
+        document.execCommand('copy');
+        statusDiv.innerHTML = '<div class="status success">✓ Report copied to clipboard!</div>';
+        setTimeout(() => {
+            statusDiv.innerHTML = '';
+        }, 3000);
+    } catch (error) {
+        statusDiv.innerHTML = '<div class="status error">Failed to copy report.</div>';
+    }
+}
+
+function downloadDiagnosticReport() {
+    const reportTextarea = document.getElementById('diagnosticsReport');
+    const statusDiv = document.getElementById('diagnosticsStatus');
+
+    try {
+        const report = reportTextarea.value;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const filename = `grinder-diagnostics-${timestamp}.txt`;
+
+        const blob = new Blob([report], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        statusDiv.innerHTML = '<div class="status success">✓ Report downloaded!</div>';
+        setTimeout(() => {
+            statusDiv.innerHTML = '';
+        }, 3000);
+    } catch (error) {
+        statusDiv.innerHTML = '<div class="status error">Failed to download report.</div>';
     }
 }
 

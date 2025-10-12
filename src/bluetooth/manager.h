@@ -81,6 +81,7 @@ private:
     BLECharacteristic* sysinfo_performance_characteristic;
     BLECharacteristic* sysinfo_hardware_characteristic;
     BLECharacteristic* sysinfo_sessions_characteristic;
+    BLECharacteristic* sysinfo_diagnostics_characteristic;
     
     // Connection state
     bool device_connected;
@@ -124,8 +125,9 @@ private:
     void send_individual_file(uint32_t session_id);
     void update_system_info();
     void update_performance_info();
-    void update_hardware_info(); 
+    void update_hardware_info();
     void update_sessions_info();
+    void generate_diagnostic_report();
     
 public:
     BluetoothManager();
@@ -217,6 +219,7 @@ public:
     void onConnect(BLEServer* server) override;
     void onDisconnect(BLEServer* server) override;
     void onWrite(BLECharacteristic* characteristic) override;
+    void onRead(BLECharacteristic* characteristic) override;
 
     // Drain a status message queued from BLE task; called by UI task
     bool dequeue_ui_status(char* out, size_t out_len);

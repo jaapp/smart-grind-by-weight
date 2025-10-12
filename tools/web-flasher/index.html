@@ -232,6 +232,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('ota')">OTA Update (BLE)</button>
             <button class="tab" onclick="showTab('initial')">Initial Setup (USB)</button>
+            <button class="tab" onclick="showTab('diagnostics')">Diagnostics</button>
         </div>
         
         <!-- Initial Setup Tab -->
@@ -303,6 +304,36 @@
             
             <div class="progress" id="progressContainer" style="display: none;">
                 <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </div>
+
+        <!-- Diagnostics Tab -->
+        <div id="diagnosticsTab" class="tab-content">
+            <div class="section">
+                <h3>🔍 Diagnostic Report</h3>
+                <p>Generate a comprehensive diagnostic report from your device to attach to GitHub issues for troubleshooting.</p>
+
+                <div class="form-group">
+                    <button class="btn" id="getDiagnosticsBtn" onclick="getDiagnosticReport()">
+                        <span>📋</span> Connect & Get Diagnostics
+                    </button>
+                </div>
+
+                <div id="diagnosticsReportContainer" style="display: none;">
+                    <label for="diagnosticsReport">Diagnostic Report:</label>
+                    <textarea id="diagnosticsReport" readonly style="width: 100%; min-height: 400px; font-family: 'Courier New', monospace; font-size: 12px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #f8fafc;"></textarea>
+
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn" onclick="copyDiagnosticReport()">
+                            <span>📋</span> Copy to Clipboard
+                        </button>
+                        <button class="btn" onclick="downloadDiagnosticReport()">
+                            <span>💾</span> Download Report
+                        </button>
+                    </div>
+                </div>
+
+                <div id="diagnosticsStatus"></div>
             </div>
         </div>
     </div>

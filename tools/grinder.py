@@ -366,17 +366,34 @@ class GrinderTool:
     async def cmd_info(self, args: argparse.Namespace) -> int:
         """Get device system information."""
         self.print_header("Device System Information")
-        
+
         if not self.check_venv():
             return 1
-        
+
         cmd = [str(self.venv_python), str(self.ble_tool), "info"]
-        
+
         if hasattr(args, 'device') and args.device:
             cmd.extend(["--device", args.device])
-        
+
         return await self.run_async_command(cmd)
-    
+
+    async def cmd_diagnostics(self, args: argparse.Namespace) -> int:
+        """Get comprehensive diagnostic report."""
+        self.print_header("Diagnostic Report")
+
+        if not self.check_venv():
+            return 1
+
+        cmd = [str(self.venv_python), str(self.ble_tool), "diagnostics"]
+
+        if hasattr(args, 'device') and args.device:
+            cmd.extend(["--device", args.device])
+
+        if hasattr(args, 'save') and args.save:
+            cmd.extend(["--save", args.save])
+
+        return await self.run_async_command(cmd)
+
     def cmd_install(self, args: argparse.Namespace) -> int:
         """Manually install Python dependencies."""
         self.print_header("Installing Dependencies")
@@ -487,7 +504,11 @@ def create_parser() -> argparse.ArgumentParser:
     
     info_parser = subparsers.add_parser('info', help='Get comprehensive device system information')
     info_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
-    
+
+    diagnostics_parser = subparsers.add_parser('diagnostics', help='Get comprehensive diagnostic report for GitHub issues')
+    diagnostics_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
+    diagnostics_parser.add_argument('--save', metavar='FILE', help='Save report to file (default: print to console)')
+
     # Development Commands
     install_parser = subparsers.add_parser('install', help='Manually install Python dependencies (auto-setup when needed)')
     monitor_parser = subparsers.add_parser('monitor', help='Monitor live debug output via BLE (alias for debug)')
@@ -528,6 +549,8 @@ async def main():
             return await tool.cmd_debug(args)
         elif args.command == 'info':
             return await tool.cmd_info(args)
+        elif args.command == 'diagnostics':
+            return await tool.cmd_diagnostics(args)
         elif args.command == 'install':
             return tool.cmd_install(args)
         elif args.command == 'clean':

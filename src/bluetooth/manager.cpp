@@ -3,8 +3,13 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include "../system/performance_monitor.h"
+#include "../system/statistics_manager.h"
 #include "../config/constants.h"
+#include "../config/user.h"
+#include "../config/grind_control.h"
+#include "../config/build_info.h"
 #include "../logging/grind_logging.h"
+#include "../hardware/hardware_manager.h"
 
 BluetoothManager::BluetoothManager()
     : ble_server(nullptr)
@@ -25,6 +30,7 @@ BluetoothManager::BluetoothManager()
     , sysinfo_performance_characteristic(nullptr)
     , sysinfo_hardware_characteristic(nullptr)
     , sysinfo_sessions_characteristic(nullptr)
+    , sysinfo_diagnostics_characteristic(nullptr)
     , device_connected(false)
     , ble_enabled(false), debug_stream_active(false)
     , enable_time(0)
@@ -209,7 +215,14 @@ void BluetoothManager::enable(unsigned long timeout_ms) {
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
     delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
-    
+
+    sysinfo_diagnostics_characteristic = sysinfo_service->createCharacteristic(
+        BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    sysinfo_diagnostics_characteristic->setCallbacks(this);
+    delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
+
     ota_service->start();
     delay(BLE_INIT_START_DELAY_MS);
     
@@ -837,7 +850,14 @@ void BluetoothManager::onWrite(BLECharacteristic* characteristic) {
         handle_debug_command(characteristic);
     } else if (characteristic == data_control_characteristic) {
         handle_data_control_command(characteristic);
+    } else if (characteristic == sysinfo_diagnostics_characteristic) {
+        // Trigger comprehensive diagnostic report generation
+        generate_diagnostic_report();
     }
+}
+
+void BluetoothManager::onRead(BLECharacteristic* characteristic) {
+    // Reserved for future use
 }
 
 String BluetoothManager::check_ota_failure_after_boot() {
@@ -964,4 +984,287 @@ void BluetoothManager::update_sessions_info() {
     
     sysinfo_sessions_characteristic->setValue(buffer);
     sysinfo_sessions_characteristic->notify();
+}
+
+void BluetoothManager::generate_diagnostic_report() {
+    if (!debug_tx_characteristic) return;
+
+    char buf[512];
+
+    // Helper lambda to send chunk and flush
+    auto send_chunk = [this](const char* chunk) {
+        if (!debug_tx_characteristic) return;
+        debug_tx_characteristic->setValue((uint8_t*)chunk, strlen(chunk));
+        debug_tx_characteristic->notify();
+        delay(50); // Allow BLE stack to send
+    };
+
+    // Section 1: Header & Firmware Info
+    unsigned long uptime_ms = millis();
+    unsigned long uptime_s = uptime_ms / 1000;
+    unsigned long uptime_h = uptime_s / 3600;
+    unsigned long uptime_m = (uptime_s % 3600) / 60;
+    unsigned long uptime_sec = uptime_s % 60;
+
+    snprintf(buf, sizeof(buf),
+        "=== SMART GRIND BY WEIGHT - DIAGNOSTIC REPORT ===\n"
+        "Generated: %s\n"
+        "\n"
+        "[FIRMWARE]\n"
+        "  Version: %s\n"
+        "  Build: #%d\n"
+        "  Git: %s (%s)\n"
+        "  Built: %s\n"
+        "\n",
+        get_build_datetime(),
+        BUILD_FIRMWARE_VERSION,
+        BUILD_NUMBER,
+        get_git_commit_id(),
+        get_git_branch(),
+        BUILD_TIMESTAMP
+    );
+    send_chunk(buf);
+
+    // Section 2: System Runtime
+    size_t heap_free = ESP.getFreeHeap();
+    size_t heap_total = ESP.getHeapSize();
+    float heap_used_pct = (float(heap_total - heap_free) / float(heap_total)) * 100.0f;
+    uint32_t flash_size = ESP.getFlashChipSize();
+
+    const char* driver_type =
+#ifdef MOCK_BUILD
+        "MOCK";
+#else
+        "REAL";
+#endif
+
+    snprintf(buf, sizeof(buf),
+        "[SYSTEM]\n"
+        "  Uptime: %02lu:%02lu:%02lu\n"
+        "  CPU: %lu MHz\n"
+        "  Heap: %u KB / %u KB (%.1f%% used)\n"
+        "  Flash: %u MB\n"
+        "  Driver: %s\n"
+        "\n",
+        uptime_h, uptime_m, uptime_sec,
+        (unsigned long)ESP.getCpuFreqMHz(),
+        (unsigned int)(heap_free / 1024),
+        (unsigned int)(heap_total / 1024),
+        heap_used_pct,
+        (unsigned int)(flash_size / 1024 / 1024),
+        driver_type
+    );
+    send_chunk(buf);
+
+    // Section 3: Profiles (requires access to hardware manager's preferences)
+    // This will be populated at runtime - for now show defaults
+    snprintf(buf, sizeof(buf),
+        "[PROFILES - COMPILE DEFAULTS]\n"
+        "  Profile Count: %d\n"
+        "  Weight Defaults: %.1fg / %.1fg / %.1fg\n"
+        "  Time Defaults: %.1fs / %.1fs / %.1fs\n"
+        "\n",
+        USER_PROFILE_COUNT,
+        USER_SINGLE_ESPRESSO_WEIGHT_G,
+        USER_DOUBLE_ESPRESSO_WEIGHT_G,
+        USER_CUSTOM_PROFILE_WEIGHT_G,
+        USER_SINGLE_ESPRESSO_TIME_S,
+        USER_DOUBLE_ESPRESSO_TIME_S,
+        USER_CUSTOM_PROFILE_TIME_S
+    );
+    send_chunk(buf);
+
+    // Section 4: User.h Compile Constants (Part 1)
+    snprintf(buf, sizeof(buf),
+        "[USER.H COMPILE CONSTANTS]\n"
+        "  Weight Limits: %.1f - %.1f g\n"
+        "  Time Limits: %.1f - %.1f s\n"
+        "  Fine Adjust: %.1fg / %.1fs\n"
+        "  Cal Ref Weight: %.1f g\n"
+        "  Default Cal Factor: %.1f\n"
+        "\n",
+        USER_MIN_TARGET_WEIGHT_G,
+        USER_MAX_TARGET_WEIGHT_G,
+        USER_MIN_TARGET_TIME_S,
+        USER_MAX_TARGET_TIME_S,
+        USER_FINE_WEIGHT_ADJUSTMENT_G,
+        USER_FINE_TIME_ADJUSTMENT_S,
+        USER_CALIBRATION_REFERENCE_WEIGHT_G,
+        USER_DEFAULT_CALIBRATION_FACTOR
+    );
+    send_chunk(buf);
+
+    // Section 5: User.h Compile Constants (Part 2 - Screen & Auto)
+    snprintf(buf, sizeof(buf),
+        "  Screen Timeout: %lu ms\n"
+        "  Brightness: %.2f / %.2f\n"
+        "  Weight Activity Threshold: %.1f g\n"
+        "  Auto Trigger Delta: %.1f g\n"
+        "  Auto Trigger Window: %lu ms\n"
+        "  Auto Settling: %lu ms\n"
+        "  Auto Rearm: %lu ms\n"
+        "\n",
+        (unsigned long)USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
+        USER_SCREEN_BRIGHTNESS_NORMAL,
+        USER_SCREEN_BRIGHTNESS_DIMMED,
+        USER_WEIGHT_ACTIVITY_THRESHOLD_G,
+        USER_AUTO_GRIND_TRIGGER_DELTA_G,
+        (unsigned long)USER_AUTO_GRIND_TRIGGER_WINDOW_MS,
+        (unsigned long)USER_AUTO_GRIND_TRIGGER_SETTLING_MS,
+        (unsigned long)USER_AUTO_GRIND_REARM_DELAY_MS
+    );
+    send_chunk(buf);
+
+    // Section 6: Grind Control Constants (Part 1 - Core)
+    snprintf(buf, sizeof(buf),
+        "[GRIND_CONTROL.H COMPILE CONSTANTS]\n"
+        "  Accuracy Tolerance: %.3f g\n"
+        "  Timeout: %d sec\n"
+        "  Max Pulse Attempts: %d\n"
+        "  Flow Threshold: %.1f g/s\n"
+        "  Undershoot Target: %.1f g\n"
+        "  Latency to Coast Ratio: %.1f\n"
+        "  Settling Tolerance: %.3f g\n"
+        "  Time Pulse Duration: %d ms\n"
+        "\n",
+        GRIND_ACCURACY_TOLERANCE_G,
+        GRIND_TIMEOUT_SEC,
+        GRIND_MAX_PULSE_ATTEMPTS,
+        GRIND_FLOW_DETECTION_THRESHOLD_GPS,
+        GRIND_UNDERSHOOT_TARGET_G,
+        GRIND_LATENCY_TO_COAST_RATIO,
+        GRIND_SCALE_SETTLING_TOLERANCE_G,
+        GRIND_TIME_PULSE_DURATION_MS
+    );
+    send_chunk(buf);
+
+    // Section 7: Grind Control Constants (Part 2 - Flow & Motor)
+    snprintf(buf, sizeof(buf),
+        "  Flow Rate Limits: %.1f - %.1f g/s\n"
+        "  Fallback Flow: %.1f g/s\n"
+        "  Motor Latency Default: %.1f ms\n"
+        "  Motor Max Pulse: %.1f ms\n"
+        "  Motor Settling: %d ms\n"
+        "  Mech Drop Threshold: %.1f g\n"
+        "  Mech Cooldown: %d ms\n"
+        "  Mech Required Count: %d\n"
+        "\n",
+        GRIND_FLOW_RATE_MIN_SANE_GPS,
+        GRIND_FLOW_RATE_MAX_SANE_GPS,
+        GRIND_PULSE_FLOW_RATE_FALLBACK_GPS,
+        GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS,
+        GRIND_MOTOR_MAX_PULSE_DURATION_MS,
+        GRIND_MOTOR_SETTLING_TIME_MS,
+        GRIND_MECHANICAL_DROP_THRESHOLD_G,
+        GRIND_MECHANICAL_EVENT_COOLDOWN_MS,
+        GRIND_MECHANICAL_EVENT_REQUIRED_COUNT
+    );
+    send_chunk(buf);
+
+    // Section 8: Grind Control Constants (Part 3 - Settling & Calibration)
+    snprintf(buf, sizeof(buf),
+        "  Scale Precision Settling: %d ms\n"
+        "  Scale Settling Timeout: %d ms\n"
+        "  Tare Window: %d ms\n"
+        "  Tare Timeout: %d ms\n"
+        "  Cal Window: %d ms\n"
+        "  Cal Timeout: %d ms\n"
+        "\n",
+        GRIND_SCALE_PRECISION_SETTLING_TIME_MS,
+        GRIND_SCALE_SETTLING_TIMEOUT_MS,
+        GRIND_TARE_SAMPLE_WINDOW_MS,
+        GRIND_TARE_TIMEOUT_MS,
+        GRIND_CALIBRATION_SAMPLE_WINDOW_MS,
+        GRIND_CALIBRATION_TIMEOUT_MS
+    );
+    send_chunk(buf);
+
+    // Section 9: Autotune Constants
+    snprintf(buf, sizeof(buf),
+        "  Autotune Latency Min: %.1f ms\n"
+        "  Autotune Latency Max: %.1f ms\n"
+        "  Autotune Priming: %d ms\n"
+        "  Autotune Target Acc: %.1f ms\n"
+        "  Autotune Success Rate: %.2f\n"
+        "  Autotune Verify Pulses: %d\n"
+        "  Autotune Max Iter: %d\n"
+        "  Autotune Collection: %d ms\n"
+        "  Autotune Settling: %d ms\n"
+        "  Autotune Weight Thr: %.3f g\n"
+        "\n",
+        GRIND_AUTOTUNE_LATENCY_MIN_MS,
+        GRIND_AUTOTUNE_LATENCY_MAX_MS,
+        GRIND_AUTOTUNE_PRIMING_PULSE_MS,
+        GRIND_AUTOTUNE_TARGET_ACCURACY_MS,
+        GRIND_AUTOTUNE_SUCCESS_RATE,
+        GRIND_AUTOTUNE_VERIFICATION_PULSES,
+        GRIND_AUTOTUNE_MAX_ITERATIONS,
+        GRIND_AUTOTUNE_COLLECTION_DELAY_MS,
+        GRIND_AUTOTUNE_SETTLING_TIMEOUT_MS,
+        GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G
+    );
+    send_chunk(buf);
+
+    // Section 10: Statistics
+    uint32_t total_grinds = statistics_manager.get_total_grinds();
+    uint32_t single_shots = statistics_manager.get_single_shots();
+    uint32_t double_shots = statistics_manager.get_double_shots();
+    uint32_t custom_shots = statistics_manager.get_custom_shots();
+    uint64_t motor_runtime_ms = statistics_manager.get_motor_runtime_ms();
+    uint32_t motor_hrs = (uint32_t)(motor_runtime_ms / 3600000ULL);
+    uint32_t motor_min = (uint32_t)((motor_runtime_ms % 3600000ULL) / 60000ULL);
+    uint32_t device_uptime_hrs = statistics_manager.get_device_uptime_hrs();
+    uint32_t device_uptime_min = statistics_manager.get_device_uptime_min_remainder();
+    float total_weight_kg = statistics_manager.get_total_weight_kg();
+    uint32_t weight_grinds = statistics_manager.get_weight_mode_grinds();
+    uint32_t time_grinds = statistics_manager.get_time_mode_grinds();
+    float avg_accuracy = statistics_manager.get_avg_accuracy_g();
+    uint32_t total_pulses = statistics_manager.get_total_pulses();
+    float avg_pulses = statistics_manager.get_avg_pulses();
+    uint32_t time_pulses = statistics_manager.get_time_pulses();
+
+    snprintf(buf, sizeof(buf),
+        "[STATISTICS]\n"
+        "  Total Grinds: %lu\n"
+        "  Shots: %lu Single / %lu Double / %lu Custom\n"
+        "  Motor Runtime: %luh %lum\n"
+        "  Device Uptime: %luh %lum\n"
+        "\n",
+        total_grinds,
+        single_shots, double_shots, custom_shots,
+        motor_hrs, motor_min,
+        device_uptime_hrs, device_uptime_min
+    );
+    send_chunk(buf);
+
+    snprintf(buf, sizeof(buf),
+        "  Total Weight: %.2f kg\n"
+        "  Mode Grinds: %lu Weight / %lu Time\n"
+        "  Avg Accuracy: ±%.2f g\n"
+        "  Total Pulses: %lu (avg %.1f)\n"
+        "  Time Pulses: %lu\n"
+        "\n",
+        total_weight_kg,
+        weight_grinds, time_grinds,
+        avg_accuracy,
+        total_pulses, avg_pulses,
+        time_pulses
+    );
+    send_chunk(buf);
+
+    // Section 11: Session Data
+    uint16_t session_count = data_stream.get_total_sessions();
+
+    snprintf(buf, sizeof(buf),
+        "[SESSION DATA]\n"
+        "  Sessions: %u\n"
+        "  Events: %lu\n"
+        "  Measurements: %lu\n"
+        "\n"
+        "=== END OF REPORT ===\n",
+        session_count,
+        grind_logger.count_total_events_in_flash(),
+        grind_logger.count_total_measurements_in_flash()
+    );
+    send_chunk(buf);
 }

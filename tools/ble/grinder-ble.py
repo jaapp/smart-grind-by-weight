@@ -102,6 +102,7 @@ BLE_SYSINFO_SYSTEM_CHAR_UUID = "88990011-bbcc-ddee-ff11-223344556677"
 BLE_SYSINFO_PERFORMANCE_CHAR_UUID = "99001122-ccdd-eeff-1122-334455667788"
 BLE_SYSINFO_HARDWARE_CHAR_UUID = "00112233-ddee-ff11-2233-445566778899"
 BLE_SYSINFO_SESSIONS_CHAR_UUID = "11223344-eeff-1122-3344-556677889900"
+BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID = "22334455-ff00-1111-2222-334455667788"
 
 # Commands and status codes
 BLE_OTA_CMD_START = 0x01
@@ -1111,6 +1112,63 @@ class GrinderBLETool:
         
         self.safe_print("="*60 + "\n")
 
+    async def get_diagnostic_report(self) -> str:
+        """Get comprehensive diagnostic report from the device."""
+        report_chunks = []
+        report_complete = asyncio.Event()
+
+        def notification_handler(sender, data):
+            """Handle notification chunks from debug TX characteristic."""
+            try:
+                chunk = data.decode('utf-8')
+                report_chunks.append(chunk)
+                # Check if this is the last chunk
+                if "=== END OF REPORT ===" in chunk:
+                    report_complete.set()
+            except Exception as e:
+                self.safe_print(f"[ERROR] Decoding chunk: {e}")
+
+        try:
+            # Try to stop notifications first (in case they're already active)
+            try:
+                await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
+                await asyncio.sleep(0.2)  # Brief delay to ensure cleanup
+            except:
+                pass  # Ignore if notifications weren't active
+
+            # Subscribe to debug TX notifications
+            await self.client.start_notify(BLE_DEBUG_TX_CHAR_UUID, notification_handler)
+            self.safe_print("[INFO] Subscribed to diagnostic stream")
+
+            # Trigger report generation by writing to diagnostics characteristic
+            await self.client.write_gatt_char(BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID, bytes([0x01]))
+            self.safe_print("[INFO] Diagnostic report generation triggered")
+
+            # Wait for report to complete (with timeout)
+            try:
+                await asyncio.wait_for(report_complete.wait(), timeout=30.0)
+            except asyncio.TimeoutError:
+                self.safe_print("[WARN] Report generation timeout - returning partial report")
+
+            # Stop notifications
+            try:
+                await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
+            except:
+                pass  # Ignore errors when stopping
+
+            # Combine all chunks
+            full_report = ''.join(report_chunks)
+            return full_report
+
+        except Exception as e:
+            self.safe_print(f"[ERROR] Error getting diagnostic report: {e}")
+            # Try to clean up notifications
+            try:
+                await self.client.stop_notify(BLE_DEBUG_TX_CHAR_UUID)
+            except:
+                pass
+            return ""
+
     # === Interactive Mode (Unchanged) ===
     async def interactive_session(self):
         self.safe_print("\n[INFO] Interactive Session (type 'help' for commands)")
@@ -1153,8 +1211,10 @@ async def main():
     connect_parser = subparsers.add_parser('connect', help='Connect to device')
     debug_parser = subparsers.add_parser('debug', help='Stream live debug logs from the device')
     sysinfo_parser = subparsers.add_parser('info', help='Get comprehensive device system information')
-    
-    for p in [upload_parser, export_parser, analyse_parser, connect_parser, debug_parser, sysinfo_parser]:
+    diagnostics_parser = subparsers.add_parser('diagnostics', help='Get comprehensive diagnostic report for GitHub issues')
+    diagnostics_parser.add_argument('--save', metavar='FILE', help='Save report to file (default: print to console)')
+
+    for p in [upload_parser, export_parser, analyse_parser, connect_parser, debug_parser, sysinfo_parser, diagnostics_parser]:
         p.add_argument('--device', default=DEVICE_NAME, help='Device name to connect to')
 
     args = parser.parse_args()
@@ -1164,9 +1224,9 @@ async def main():
         if args.command == 'scan':
             await tool.scan_devices()
         
-        elif args.command in ['upload', 'export', 'analyse', 'connect', 'debug', 'info']:
+        elif args.command in ['upload', 'export', 'analyse', 'connect', 'debug', 'info', 'diagnostics']:
             if not await tool.connect_to_device(args.device): return 1
-            
+
             if args.command == 'upload':
                 firmware_path = args.firmware or tool.find_firmware_file()
                 if not firmware_path:
@@ -1186,6 +1246,19 @@ async def main():
             elif args.command == 'info':
                 info = await tool.get_system_info()
                 tool.print_system_info(info)
+            elif args.command == 'diagnostics':
+                report = await tool.get_diagnostic_report()
+                if report:
+                    if args.save:
+                        # Save to file
+                        with open(args.save, 'w') as f:
+                            f.write(report)
+                        tool.safe_print(f"[OK] Diagnostic report saved to: {args.save}")
+                    else:
+                        # Print to console
+                        print("\n" + report)
+                else:
+                    tool.safe_print("[ERROR] Failed to retrieve diagnostic report")
 
             await tool.disconnect()
             
