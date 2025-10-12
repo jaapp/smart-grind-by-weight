@@ -278,38 +278,6 @@ void SettingsUIController::handle_grind_mode_swipe_toggle() {
     LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
 }
 
-void SettingsUIController::handle_auto_start_toggle() {
-    if (!ui_manager_) return;
-
-    auto* toggle = ui_manager_->settings_screen.get_auto_start_toggle();
-    if (!toggle) return;
-
-    bool auto_start_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
-
-    Preferences prefs;
-    prefs.begin("autogrind", false);
-    prefs.putBool("auto_start", auto_start_enabled);
-    prefs.end();
-
-    LOG_DEBUG_PRINTLN(auto_start_enabled ? "Auto-start enabled" : "Auto-start disabled");
-}
-
-void SettingsUIController::handle_auto_return_toggle() {
-    if (!ui_manager_) return;
-
-    auto* toggle = ui_manager_->settings_screen.get_auto_return_toggle();
-    if (!toggle) return;
-
-    bool auto_return_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
-
-    Preferences prefs;
-    prefs.begin("autogrind", false);
-    prefs.putBool("auto_return", auto_return_enabled);
-    prefs.end();
-
-    LOG_DEBUG_PRINTLN(auto_return_enabled ? "Auto-return enabled" : "Auto-return disabled");
-}
-
 void SettingsUIController::handle_grind_mode_radio_button() {
     if (!ui_manager_ || !ui_manager_->profile_controller) return;
 
