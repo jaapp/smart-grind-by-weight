@@ -1268,7 +1268,136 @@ void BluetoothManager::generate_diagnostic_report() {
     );
     send_chunk(buf);
 
-    // Section 12: Autotune Results
+    // Section 12: Last 5 Grind Sessions Detail
+    snprintf(buf, sizeof(buf), "[LAST 5 GRIND SESSIONS]\n");
+    send_chunk(buf);
+
+    if (LittleFS.exists(GRIND_SESSIONS_DIR)) {
+        File dir = LittleFS.open(GRIND_SESSIONS_DIR);
+        if (dir && dir.isDirectory()) {
+            // Collect all session IDs
+            const int MAX_SESSIONS = 100;
+            uint32_t* session_ids = (uint32_t*)malloc(MAX_SESSIONS * sizeof(uint32_t));
+            int count = 0;
+
+            if (session_ids) {
+                File file = dir.openNextFile();
+                while (file && count < MAX_SESSIONS) {
+                    String filename = file.name();
+                    if ((filename.startsWith("session_") || filename.indexOf("/session_") != -1) && filename.endsWith(".bin")) {
+                        int start_pos = filename.indexOf('_') + 1;
+                        int end_pos = filename.lastIndexOf('.');
+                        if (start_pos > 0 && end_pos > start_pos) {
+                            session_ids[count++] = filename.substring(start_pos, end_pos).toInt();
+                        }
+                    }
+                    file = dir.openNextFile();
+                }
+                dir.close();
+
+                // Sort session IDs descending (highest/newest first)
+                for (int i = 0; i < count - 1; i++) {
+                    for (int j = i + 1; j < count; j++) {
+                        if (session_ids[i] < session_ids[j]) {
+                            uint32_t temp = session_ids[i];
+                            session_ids[i] = session_ids[j];
+                            session_ids[j] = temp;
+                        }
+                    }
+                }
+
+                // Read and output last 5 sessions
+                int sessions_to_show = (count < 5) ? count : 5;
+                for (int i = 0; i < sessions_to_show; i++) {
+                    char filename[64];
+                    snprintf(filename, sizeof(filename), SESSION_FILE_FORMAT, session_ids[i]);
+
+                    File sessionFile = LittleFS.open(filename, "r");
+                    if (sessionFile) {
+                        TimeSeriesSessionHeader header;
+                        GrindSession session;
+
+                        if (sessionFile.read((uint8_t*)&header, sizeof(header)) == sizeof(header) &&
+                            sessionFile.read((uint8_t*)&session, sizeof(session)) == sizeof(session)) {
+
+                            const char* mode_name = (session.grind_mode == 0) ? "WEIGHT" : "TIME";
+                            const char* term_names[] = {"COMPLETED", "TIMEOUT", "OVERSHOOT", "MAX_PULSES", "UNKNOWN"};
+                            const char* term_name = (session.termination_reason < 4) ? term_names[session.termination_reason] : term_names[4];
+
+                            snprintf(buf, sizeof(buf),
+                                "\n--- Session #%lu ---\n"
+                                "  Mode: %s | Profile: %u | Status: %.16s\n"
+                                "  Target: %.1fg | Final: %.1fg | Error: %+.2fg\n"
+                                "  Total Time: %.1fs | Motor Time: %.1fs | Pulses: %u\n"
+                                "  Termination: %s\n",
+                                session.session_id,
+                                mode_name, session.profile_id, session.result_status,
+                                session.target_weight, session.final_weight, session.error_grams,
+                                session.total_time_ms / 1000.0f, session.total_motor_on_time_ms / 1000.0f, session.pulse_count,
+                                term_name
+                            );
+                            send_chunk(buf);
+
+                            // Read and output events
+                            if (header.event_count > 0) {
+                                snprintf(buf, sizeof(buf), "  Events (%u):\n", header.event_count);
+                                send_chunk(buf);
+
+                                const char* phase_names[] = {
+                                    "IDLE", "INITIALIZING", "SETUP", "TARING", "TARE_CONFIRM",
+                                    "PREDICTIVE", "PULSE_DECISION", "PULSE_EXECUTE", "PULSE_SETTLING",
+                                    "FINAL_SETTLING", "TIME_GRINDING", "TIME_ADDITIONAL_PULSE", "COMPLETED", "TIMEOUT"
+                                };
+
+                                for (uint16_t e = 0; e < header.event_count; e++) {
+                                    GrindEvent event;
+                                    if (sessionFile.read((uint8_t*)&event, sizeof(event)) == sizeof(event)) {
+                                        const char* phase_name = (event.phase_id < 14) ? phase_names[event.phase_id] : "UNKNOWN";
+
+                                        if (event.pulse_attempt_number > 0) {
+                                            snprintf(buf, sizeof(buf),
+                                                "    [%lums] %s (pulse #%u): %.2fg -> %.2fg (%.1fms pulse)\n",
+                                                event.timestamp_ms,
+                                                phase_name,
+                                                event.pulse_attempt_number,
+                                                event.start_weight,
+                                                event.end_weight,
+                                                event.pulse_duration_ms
+                                            );
+                                        } else {
+                                            snprintf(buf, sizeof(buf),
+                                                "    [%lums] %s: %.2fg -> %.2fg (%lums)\n",
+                                                event.timestamp_ms,
+                                                phase_name,
+                                                event.start_weight,
+                                                event.end_weight,
+                                                event.duration_ms
+                                            );
+                                        }
+                                        send_chunk(buf);
+                                    }
+                                }
+                            }
+                        }
+                        sessionFile.close();
+                    }
+                }
+
+                free(session_ids);
+            }
+        } else {
+            snprintf(buf, sizeof(buf), "  [NONE] No session files found\n");
+            send_chunk(buf);
+        }
+    } else {
+        snprintf(buf, sizeof(buf), "  [NONE] Sessions directory does not exist\n");
+        send_chunk(buf);
+    }
+
+    snprintf(buf, sizeof(buf), "\n");
+    send_chunk(buf);
+
+    // Section 13: Autotune Results
     snprintf(buf, sizeof(buf), "[AUTOTUNE RESULTS]\n");
     send_chunk(buf);
 
