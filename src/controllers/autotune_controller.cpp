@@ -87,6 +87,20 @@ bool AutoTuneController::start() {
     // Store previous latency for comparison
     progress.previous_latency_ms = grind_controller->get_motor_response_latency();
 
+    // Initialize autotune log file
+    LittleFS.remove("/autotune.log");
+    autotune_log_file = LittleFS.open("/autotune.log", "w");
+    if (autotune_log_file) {
+        autotune_log_file.println("=== Autotune Started ===");
+        autotune_log_file.printf("Timestamp: %lums\n", millis());
+        autotune_log_file.printf("Previous Latency: %.1fms\n", progress.previous_latency_ms);
+        autotune_log_file.println();
+        autotune_log_file.flush();
+        LOG_BLE("AutoTune: Log file created at /autotune.log\n");
+    } else {
+        LOG_BLE("WARNING: AutoTune could not create log file (filesystem unavailable)\n");
+    }
+
     // Start with priming phase
     switch_phase(AutoTunePhase::PRIMING);
 
@@ -570,6 +584,16 @@ void AutoTuneController::complete_with_success(float final_latency_ms) {
     current_phase = AutoTunePhase::COMPLETE_SUCCESS;
     update_progress();
 
+    // Close log file with completion summary
+    if (autotune_log_file) {
+        autotune_log_file.println();
+        autotune_log_file.println("=== Autotune Complete: SUCCESS ===");
+        autotune_log_file.printf("Final Latency: %.1fms\n", final_latency_ms);
+        autotune_log_file.printf("Previous Latency: %.1fms\n", progress.previous_latency_ms);
+        autotune_log_file.close();
+        LOG_BLE("AutoTune: Log file closed\n");
+    }
+
     is_running = false;
 }
 
@@ -584,6 +608,16 @@ void AutoTuneController::complete_with_failure(const char* error_msg) {
 
     current_phase = AutoTunePhase::COMPLETE_FAILURE;
     update_progress();
+
+    // Close log file with failure summary
+    if (autotune_log_file) {
+        autotune_log_file.println();
+        autotune_log_file.println("=== Autotune Complete: FAILURE ===");
+        autotune_log_file.printf("Error: %s\n", error_msg ? error_msg : "Unknown");
+        autotune_log_file.printf("Using Default Latency: %.1fms\n", GRIND_MOTOR_RESPONSE_LATENCY_DEFAULT_MS);
+        autotune_log_file.close();
+        LOG_BLE("AutoTune: Log file closed\n");
+    }
 
     is_running = false;
 }
@@ -610,6 +644,12 @@ void AutoTuneController::log_message(const char* format, ...) {
     vsnprintf(progress.last_message, sizeof(progress.last_message), format, args);
     va_end(args);
     progress.has_new_message = true;
+
+    // Write to log file
+    if (autotune_log_file) {
+        autotune_log_file.println(progress.last_message);
+        autotune_log_file.flush();
+    }
 
     // Also log to BLE for debugging
     LOG_BLE("AutoTune Console: %s\n", progress.last_message);

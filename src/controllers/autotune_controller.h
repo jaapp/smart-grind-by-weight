@@ -4,6 +4,7 @@
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "grind_controller.h"
+#include <LittleFS.h>
 
 // Auto-tune phases for UI display
 enum class AutoTunePhase {
@@ -90,6 +91,9 @@ private:
     // Result tracking
     AutoTuneResult result;
     AutoTuneProgress progress;
+
+    // File logging
+    File autotune_log_file;
 
 public:
     AutoTuneController();
