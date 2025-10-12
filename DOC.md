@@ -37,7 +37,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
     - [T70 1 kg](https://nl.aliexpress.com/item/1005008658337192.html)
   - **Tested:** Only the 1 kg T70 and 0.3 kg Mavin load cells have been personally verified
 - **6× M3 screws** (≈10 mm) — Mounting hardware
-- **1000 µF capacitor** (10 V) — Power filtering [Example (untested)](https://nl.aliexpress.com/item/1005008995345289.html)
+- **1000 µF capacitor** (10 V) — Power filtering [Example (untested)](https://nl.aliexpress.com/item/1005006037906723.html)
 - **Wires & Dupont connectors** — General wiring  
   Example: [22 AWG silicone wire set](https://www.aliexpress.com/item/2255800441309579.html)
 - **Dupont connector kit** — [Example (untested)](https://nl.aliexpress.com/item/1005008995345289.html)
