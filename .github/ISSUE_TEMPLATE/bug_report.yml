@@ -22,6 +22,15 @@ body:
       value: |
         ### How to Get a Diagnostic Report
 
+        **For grind-related issues (accuracy, timeout, pulse corrections, etc.):**
+        1. **Enable logging:** Settings → Data → Enable Logging
+        2. **Capture the issue:** Perform at least one grind where the issue occurs
+        3. **Generate diagnostics:** Follow one of the methods below
+
+        The diagnostic report will automatically include your recent grind results, which is critical for troubleshooting grind behavior.
+
+        ---
+
         **Option 1: Web Flasher (Recommended)**
         1. Visit the [Web Flasher Diagnostics Tool](https://jaapp.github.io/smart-grind-by-weight)
         2. Click the **"Diagnostics"** tab

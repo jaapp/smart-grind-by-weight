@@ -207,3 +207,13 @@ python3 tools/grinder.py diagnostics --save diagnostics.txt
 - Feature requests that depend on your hardware configuration
 
 **The diagnostic report is anonymous** and contains no personal information. It only includes technical device settings and statistics.
+
+### Including Grind Results in Your Report
+
+**For grind-related issues, follow these steps before generating the diagnostic report:**
+
+1. **Enable logging:** Settings → Data → Enable Logging
+2. **Reproduce the issue:** Perform at least one grind where the issue occurs
+3. **Generate diagnostics:** Use one of the methods above (Web Flasher or Command Line)
+
+The diagnostic report will automatically include your recent grind session data, which is essential for troubleshooting accuracy issues, pulse corrections, timeout problems, and other grind behavior issues. Without recent grind data, it's much harder to diagnose what's going wrong.
