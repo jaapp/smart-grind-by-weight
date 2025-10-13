@@ -803,10 +803,9 @@ class GrinderBLETool:
                 offset += MEASUREMENT_SIZE
                 continue
 
+            # Fail fast on any sequence error - skip entire session
             if sequence_id != expected_measurement_sequence:
-                self.safe_print(
-                    f"[WARNING] Measurement sequence mismatch in session {parsed_session_id}: expected {expected_measurement_sequence}, got {sequence_id}"
-                )
+                raise ValueError(f"Session {parsed_session_id} corrupted: measurement sequence error at index {meas_idx} (expected {expected_measurement_sequence}, got {sequence_id})")
 
             offset += MEASUREMENT_SIZE
             measurement = {
