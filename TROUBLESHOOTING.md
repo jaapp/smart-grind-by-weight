@@ -1,5 +1,66 @@
 # Troubleshooting Guide
 
+## Table of Contents
+
+- [Motor Does Not Start](#motor-does-not-start)
+- [HX711 Not Detected / Wrong Sample Rate](#hx711-not-detected--wrong-sample-rate)
+- [Unknown board ID 'esp32-s3-devkitc-1'](#unknown-board-id-esp32-s3-devkitc-1)
+- [PlatformIO Project Initialization Issues](#platformio-project-initialization-issues)
+- [Grind Timeout Screen](#grind-timeout-screen)
+- [Unreliable Pulse Corrections](#unreliable-pulse-corrections)
+- [Getting Diagnostic Reports](#getting-diagnostic-reports)
+
+---
+
+## Motor Does Not Start
+
+**Applies to:** Eureka Mignon installations where the grinder motor does not activate when commanded.
+
+### Symptoms
+- Motor test function (Settings → Tools → Motor Test) does not start the motor
+- GRIND button does not start the motor
+- All other functionality works normally (screen, weight readings, etc.)
+
+**Note:** If you hear a click and humming sound but no coffee grounds come out, the motor **is** starting correctly - your grinder is clogged, not a wiring issue.
+
+### Root Cause
+The motor control wire (Pin 3) and button signal wire (Pin 2) from the Eureka 4-pin plug may be reversed on the Waveshare board connection. The button signal wire does not control the motor.
+
+### Diagnosis
+
+**Option 1: Use Motor Test Function (Recommended)**
+
+Access **Settings → Tools → Motor Test** to verify motor connectivity. This button activates the motor for a short test pulse. If the motor does not run during the test, the motor wire is incorrectly connected.
+
+**Option 2: Manual Wire Identification (Advanced - Use with Extreme Caution)**
+
+⚠️ **DANGER:** This test involves live wires and can cause the grinder to start unexpectedly, potentially causing injury or damage. Only attempt if comfortable working with electrical systems.
+
+Using the 4-pin Eureka plug pinout (see `media/4-pin_Eureka_plug_pinout.png` in documentation):
+- **Pin 1**: 5V power supply
+- **Pin 2**: Button signal (unused in this project)
+- **Pin 3**: Motor control signal
+- **Pin 4**: Ground
+
+The motor control wire (Pin 3) is the wire that **starts the motor when briefly connected to ground (Pin 4)**. Test carefully:
+1. Ensure grinder is powered and hopper has minimal beans
+2. Disconnect the suspect wire from the Waveshare board
+3. Briefly touch the wire to ground (Pin 4) - motor should start
+4. **Be prepared for the powerful motor to cause the grinder to twist/jump**
+5. **Avoid shorts that could damage the board or cause injury**
+
+### Resolution
+
+**Swap the wire connections:**
+- The motor control wire (Pin 3) should connect to Waveshare **GPIO 18**
+- The button signal wire (Pin 2) can remain disconnected (unused in this project)
+
+If wires were reversed, swap them so Pin 3 connects to GPIO 18. The Waveshare board has reverse polarity protection for power connections, but the motor/button wires should be correctly identified for proper operation.
+
+**Important:** Wire colors vary significantly between Eureka units - always refer to pin positions rather than wire colors when troubleshooting.
+
+---
+
 ## HX711 Not Detected / Wrong Sample Rate
 
 **Applies to:** First-boot issues when the load cell board is missing, miswired, or strapped for 80 SPS.
