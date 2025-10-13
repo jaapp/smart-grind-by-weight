@@ -273,60 +273,72 @@ def create_release():
             print("Release cancelled.")
             return False
 
+    # Check if current version is an RC
+    is_rc = '-rc.' in current_version
+
+    # Calculate what each option would produce (all create RCs)
+    patch_base = increment_version(current_version, 'patch').lstrip('v')
+    minor_base = increment_version(current_version, 'minor').lstrip('v')
+    major_base = increment_version(current_version, 'major').lstrip('v')
+
+    patch_rc = get_next_rc_version(patch_base)
+    minor_rc = get_next_rc_version(minor_base)
+    major_rc = get_next_rc_version(major_base)
+
+    if is_rc:
+        # For RC, calculate the promoted version and next RC
+        promoted_version = current_version.split('-rc.')[0]  # Remove RC suffix
+        base_version = current_version.lstrip('v').split('-rc.')[0]
+        continue_rc = get_next_rc_version(base_version)
+    else:
+        continue_rc = minor_rc  # Default to minor RC
+
     print("\nWhat would you like to do?")
-    print("1. Patch (bug fixes): v1.0.0 -> v1.0.1")
-    print("2. Minor (new features): v1.0.0 -> v1.1.0")
-    print("3. Major (breaking changes): v1.0.0 -> v2.0.0")
-    print("4. Release Candidate (testing): auto-increments RC number")
+
+    # Option 0: Promote RC (only shown for RC versions)
+    if is_rc:
+        print(f"0. Promote RC to release: {current_version} -> {promoted_version}")
+
+    print(f"1. Patch RC (bug fixes): {current_version} -> {patch_rc}")
+    print(f"2. Minor RC (new features): {current_version} -> {minor_rc}")
+    print(f"3. Major RC (breaking changes): {current_version} -> {major_rc}")
+
+    if is_rc:
+        print(f"4. Continue RC testing: {current_version} -> {continue_rc}")
+    else:
+        print(f"4. Start RC cycle: {current_version} -> {continue_rc}")
+
     print("5. Custom version")
     print("6. Clean old RCs (remove RC tags from previous semvers)")
 
-    choice = input("\nEnter choice (1-6): ").strip()
+    valid_choices = ['1', '2', '3', '4', '5', '6']
+    if is_rc:
+        valid_choices.insert(0, '0')
+
+    choice_prompt = f"\nEnter choice ({', '.join(valid_choices)}): "
+    choice = input(choice_prompt).strip()
 
     if choice == '6':
         return clean_old_rc_tags()
-    
-    if choice == '1':
-        new_version = increment_version(current_version, 'patch')
+
+    if choice == '0':
+        # Promote RC to release
+        if not is_rc:
+            print("Error: Option 0 is only available for RC versions.")
+            return False
+        new_version = promoted_version
+    elif choice == '1':
+        # Patch RC
+        new_version = patch_rc
     elif choice == '2':
-        new_version = increment_version(current_version, 'minor')
+        # Minor RC
+        new_version = minor_rc
     elif choice == '3':
-        new_version = increment_version(current_version, 'major')
+        # Major RC
+        new_version = major_rc
     elif choice == '4':
-        # Release candidate - check if current version is already an RC
-        current_clean = current_version.lstrip('v')
-        if '-rc.' in current_clean:
-            # Current version is already an RC, just increment it
-            base_version = current_clean.split('-rc.')[0]
-            new_version = get_next_rc_version(base_version)
-            print(f"Current version is already an RC. Next RC version: {new_version}")
-        else:
-            # Ask for base version
-            print("\nRelease Candidate Options:")
-            print("1. RC for patch version")
-            print("2. RC for minor version") 
-            print("3. RC for major version")
-            print("4. RC for custom version")
-            
-            rc_choice = input("Enter choice (1-4): ").strip()
-            
-            if rc_choice == '1':
-                base_version = increment_version(current_version, 'patch')
-            elif rc_choice == '2':
-                base_version = increment_version(current_version, 'minor')
-            elif rc_choice == '3':
-                base_version = increment_version(current_version, 'major')
-            elif rc_choice == '4':
-                base_version = input("Enter base version for RC (e.g., 1.2.3): ").strip()
-                if base_version.startswith('v'):
-                    base_version = base_version[1:]
-            else:
-                print("Invalid choice.")
-                return False
-            
-            new_version = get_next_rc_version(base_version)
-            print(f"Next RC version: {new_version}")
-        
+        # Continue RC testing (if on RC) or start RC cycle (if on stable)
+        new_version = continue_rc
     elif choice == '5':
         custom_version = input("Enter custom version (e.g., v1.2.3): ").strip()
         if not custom_version.startswith('v'):
