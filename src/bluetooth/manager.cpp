@@ -1570,9 +1570,11 @@ void BluetoothManager::generate_diagnostic_report() {
                                     if (sessionFile.read((uint8_t*)&event, sizeof(event)) == sizeof(event)) {
                                         const char* phase_name = (event.phase_id < 14) ? phase_names[event.phase_id] : "UNKNOWN";
 
+                                        // Build base event string
+                                        char base_str[256];
                                         if (event.pulse_attempt_number > 0) {
-                                            snprintf(buf, sizeof(buf),
-                                                "    [%lums] %s (pulse #%u): %.2fg -> %.2fg (%.1fms pulse)\n",
+                                            snprintf(base_str, sizeof(base_str),
+                                                "    [%lums] %s (pulse #%u): %.2fg -> %.2fg (%.1fms pulse)",
                                                 event.timestamp_ms,
                                                 phase_name,
                                                 event.pulse_attempt_number,
@@ -1581,8 +1583,8 @@ void BluetoothManager::generate_diagnostic_report() {
                                                 event.pulse_duration_ms
                                             );
                                         } else {
-                                            snprintf(buf, sizeof(buf),
-                                                "    [%lums] %s: %.2fg -> %.2fg (%lums)\n",
+                                            snprintf(base_str, sizeof(base_str),
+                                                "    [%lums] %s: %.2fg -> %.2fg (%lums)",
                                                 event.timestamp_ms,
                                                 phase_name,
                                                 event.start_weight,
@@ -1590,6 +1592,66 @@ void BluetoothManager::generate_diagnostic_report() {
                                                 event.duration_ms
                                             );
                                         }
+
+                                        // Build phase-specific metrics suffix
+                                        char metrics_str[256] = "";
+
+                                        switch (event.phase_id) {
+                                            case 5: // PREDICTIVE
+                                                if (event.grind_latency_ms > 0 || event.pulse_flow_rate > 0 || event.motor_stop_target_weight > 0) {
+                                                    snprintf(metrics_str, sizeof(metrics_str), " | Latency: %lums, Flow: %.1fg/s, Target: %.1fg",
+                                                        event.grind_latency_ms,
+                                                        event.pulse_flow_rate,
+                                                        event.motor_stop_target_weight
+                                                    );
+                                                }
+                                                break;
+
+                                            case 7: // PULSE_EXECUTE
+                                                if (event.pulse_flow_rate > 0 || event.motor_stop_target_weight > 0) {
+                                                    snprintf(metrics_str, sizeof(metrics_str), " | Flow: %.1fg/s, Target: %.1fg",
+                                                        event.pulse_flow_rate,
+                                                        event.motor_stop_target_weight
+                                                    );
+                                                }
+                                                break;
+
+                                            case 8: // PULSE_SETTLING
+                                                if (event.settling_duration_ms > 0 || event.motor_stop_target_weight > 0) {
+                                                    snprintf(metrics_str, sizeof(metrics_str), " | Settled: %lums, Target: %.1fg",
+                                                        event.settling_duration_ms,
+                                                        event.motor_stop_target_weight
+                                                    );
+                                                }
+                                                break;
+
+                                            case 9: // FINAL_SETTLING
+                                                if (event.settling_duration_ms > 0) {
+                                                    snprintf(metrics_str, sizeof(metrics_str), " | Settled: %lums",
+                                                        event.settling_duration_ms
+                                                    );
+                                                }
+                                                break;
+
+                                            case 10: // TIME_GRINDING
+                                                if (event.pulse_flow_rate > 0) {
+                                                    snprintf(metrics_str, sizeof(metrics_str), " | Flow: %.1fg/s",
+                                                        event.pulse_flow_rate
+                                                    );
+                                                }
+                                                break;
+
+                                            case 11: // TIME_ADDITIONAL_PULSE
+                                                if (event.pulse_flow_rate > 0) {
+                                                    snprintf(metrics_str, sizeof(metrics_str), " | Flow: %.1fg/s",
+                                                        event.pulse_flow_rate
+                                                    );
+                                                }
+                                                break;
+                                        }
+
+                                        // Combine base and metrics, add newline
+                                        snprintf(buf, sizeof(buf), "%s%s\n", base_str, metrics_str);
                                         send_chunk(buf);
                                     }
                                 }
