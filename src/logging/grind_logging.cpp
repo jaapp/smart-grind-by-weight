@@ -162,12 +162,15 @@ void GrindLogger::end_grind_session(const char* final_result, float final_weight
     GrindTerminationReason termination_reason = classify_termination_reason(final_result);
     current_session->termination_reason = static_cast<uint8_t>(termination_reason);
 
-    // Don't save sessions that were ended abnormally (e.g., cancelled or timed out).
-    bool is_abnormal_termination = (strcmp(final_result, "STOPPED_BY_USER") == 0) ||
-                                   (termination_reason == GrindTerminationReason::TIMEOUT);
+    // Only exclude cancelled sessions from saving (not failed grinds like timeout/overshoot)
+    bool is_cancelled = (strcmp(final_result, "STOPPED_BY_USER") == 0);
 
-    // Update statistics for successful grinds (not abnormal terminations)
-    if (!is_abnormal_termination) {
+    // Only update statistics for successful grinds (completed within tolerance)
+    // Failed grinds (timeout, overshoot) are saved for analysis but excluded from statistics
+    bool is_successful_grind = (termination_reason == GrindTerminationReason::COMPLETED ||
+                                termination_reason == GrindTerminationReason::MAX_PULSES);
+
+    if (is_successful_grind) {
         bool is_weight_mode = (mode == GrindMode::WEIGHT);
         statistics_manager.update_grind_session(
             final_weight,
@@ -186,7 +189,7 @@ void GrindLogger::end_grind_session(const char* final_result, float final_weight
 
     const char* mode_name = (mode == GrindMode::TIME) ? "TIME" : "WEIGHT";
 
-    if (!is_abnormal_termination && logging_enabled) {
+    if (!is_cancelled && logging_enabled) {
         flush_session_to_flash();
         if (mode == GrindMode::TIME) {
             LOG_BLE("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (saved)\n",
@@ -203,7 +206,7 @@ void GrindLogger::end_grind_session(const char* final_result, float final_weight
                     current_session->error_grams,
                     final_result);
         }
-    } else if (!is_abnormal_termination && !logging_enabled) {
+    } else if (!is_cancelled && !logging_enabled) {
         if (mode == GrindMode::TIME) {
             LOG_BLE("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (not saved - logging disabled)\n",
                     current_session->session_id,
@@ -221,14 +224,14 @@ void GrindLogger::end_grind_session(const char* final_result, float final_weight
         }
     } else {
         if (mode == GrindMode::TIME) {
-            LOG_BLE("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (not saved - abnormal termination)\n",
+            LOG_BLE("Ended session %lu: mode=%s, final=%.1fg, time_error=%+ldms, %s (not saved - cancelled)\n",
                     current_session->session_id,
                     mode_name,
                     final_weight,
                     static_cast<long>(current_session->time_error_ms),
                     final_result);
         } else {
-            LOG_BLE("Ended session %lu: mode=%s, final=%.1fg, error=%+.2fg, %s (not saved - abnormal termination)\n",
+            LOG_BLE("Ended session %lu: mode=%s, final=%.1fg, error=%+.2fg, %s (not saved - cancelled)\n",
                     current_session->session_id,
                     mode_name,
                     final_weight,
