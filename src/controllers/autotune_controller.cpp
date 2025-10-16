@@ -261,9 +261,19 @@ void AutoTuneController::update_binary_search_phase() {
             bool pulse_produced_grounds = (weight_delta > GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
             progress.last_pulse_success = pulse_produced_grounds;
 
-            // Log result
+            // Log result message and yield to UI for one cycle before checking termination
             log_message("  -> %.2fg %s", weight_delta,
                        pulse_produced_grounds ? "[OK]" : "[X]");
+
+            switch_sub_phase(AutoTuneSubPhase::RESULT_LOGGED);
+            break;
+        }
+
+        case AutoTuneSubPhase::RESULT_LOGGED: {
+            // UI has had a chance to display the result message
+            // Now check termination conditions and prepare next iteration
+
+            bool pulse_produced_grounds = progress.last_pulse_success;
 
             if (pulse_produced_grounds) {
                 // Pulse successful - grounds were produced

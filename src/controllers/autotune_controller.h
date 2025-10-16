@@ -24,6 +24,7 @@ enum class AutoTuneSubPhase {
     COLLECTION_DELAY,       // Allow grounds to collect in cup
     SCALE_SETTLING,         // Waiting for scale to settle
     MEASURE_COMPLETE,       // Ready to process result
+    RESULT_LOGGED,          // Result message logged, check termination next cycle
     TARING                  // Performing tare operation
 };
 
