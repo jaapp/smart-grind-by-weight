@@ -75,7 +75,7 @@
 // MOTOR RESPONSE AUTO-TUNE ALGORITHM
 //------------------------------------------------------------------------------
 #define GRIND_AUTOTUNE_LATENCY_MIN_MS 30.0f                                       // Lower search bound for latency
-#define GRIND_AUTOTUNE_LATENCY_MAX_MS 200.0f                                      // Upper search bound for latency
+#define GRIND_AUTOTUNE_LATENCY_MAX_MS 300.0f                                      // Upper search bound for latency
 #define GRIND_AUTOTUNE_PRIMING_PULSE_MS 1000                                      // Initial chute priming pulse
 #define GRIND_AUTOTUNE_TARGET_ACCURACY_MS 5.0f                                    // Target resolution
 #define GRIND_AUTOTUNE_SUCCESS_RATE 0.80f                                         // 80% success threshold (4/5 pulses)
