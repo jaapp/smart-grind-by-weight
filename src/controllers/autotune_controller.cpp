@@ -151,8 +151,10 @@ void AutoTuneController::update() {
 void AutoTuneController::update_priming_phase() {
     switch (sub_phase) {
         case AutoTuneSubPhase::IDLE:
-            // Start priming pulse
-            LOG_BLE("AutoTune Phase 0: Priming chute with %dms pulse\n", GRIND_AUTOTUNE_PRIMING_PULSE_MS);
+            // Capture pre-prime weight for verification
+            pre_pulse_weight = weight_sensor->get_weight_high_latency();
+            LOG_BLE("AutoTune Phase 0: Priming chute with %dms pulse (pre-weight: %.3fg)\n",
+                    GRIND_AUTOTUNE_PRIMING_PULSE_MS, pre_pulse_weight);
             log_message("Priming...");
             start_pulse(GRIND_AUTOTUNE_PRIMING_PULSE_MS);
             break;
@@ -174,8 +176,26 @@ void AutoTuneController::update_priming_phase() {
             break;
 
         case AutoTuneSubPhase::MEASURE_COMPLETE: {
-            // Priming complete, now tare
-            LOG_BLE("AutoTune: Priming complete, taring scale\n");
+            // Verify that priming produced grounds
+            float settled_weight = last_settled_weight;
+            float weight_delta = settled_weight - pre_pulse_weight;
+
+            LOG_BLE("AutoTune: Priming weight delta = %.3fg (threshold: %.3fg)\n",
+                    weight_delta, GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G);
+
+            if (weight_delta <= GRIND_AUTOTUNE_WEIGHT_THRESHOLD_G) {
+                LOG_BLE("ERROR: Priming failed - no weight increase detected\n");
+                log_message("\nPrime failed");
+                log_message("Check:");
+                log_message("- Beans loaded");
+                log_message("- Power on");
+                log_message("- Cup placed");
+                complete_with_failure("Priming failed - no grounds detected");
+                return;
+            }
+
+            // Priming successful, now tare
+            LOG_BLE("AutoTune: Priming complete (%.3fg added), taring scale\n", weight_delta);
             start_tare();
             break;
         }
