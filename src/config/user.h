@@ -24,7 +24,7 @@
 
 // Weight limits
 #define USER_MIN_TARGET_WEIGHT_G 5.0f                                          // Minimum allowed target weight
-#define USER_MAX_TARGET_WEIGHT_G 500.0f                                        // Maximum allowed target weight
+#define USER_MAX_TARGET_WEIGHT_G 1000.0f                                        // Maximum allowed target weight
 
 #define USER_MIN_TARGET_TIME_S 0.5f                                            // Minimum allowed target time
 #define USER_MAX_TARGET_TIME_S 25.0f                                           // Maximum allowed target time
