@@ -86,10 +86,47 @@ body:
       description: What grinder are you using?
       options:
         - Eureka Mignon Specialita
-        - Eureka Mignon (other model)
-        - Other (specify in bug description)
+        - Eureka Mignon XL
+        - Eureka Mignon Silenzio
+        - Eureka Mignon Crono
+        - Eureka Mignon Manuale
+        - Eureka Mignon Zero
+        - Eureka Atom series
+        - Baratza (specify model below)
+        - Niche Zero
+        - Mazzer (specify model below)
+        - Other (specify below)
     validations:
       required: true
+
+  - type: dropdown
+    id: modifications
+    attributes:
+      label: Modifications
+      description: Have you made any modifications to the grinder hardware, 3D printed parts, or smart-grind-by-weight firmware/software?
+      options:
+        - No modifications (stock setup)
+        - Yes (details below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: modifications-details
+    attributes:
+      label: Modification Details
+      description: If you selected "Yes" above, please describe your modifications
+      placeholder: |
+        **Hardware modifications:**
+        - [e.g., custom motor control, sensor changes, wiring modifications, etc.]
+
+        **3D design/parts modifications:**
+        - [e.g., custom enclosure, modified mounting, different display holder, etc.]
+
+        **Firmware/software modifications:**
+        - [e.g., code changes, parameter adjustments, algorithm tweaks, custom build, etc.]
+        - Include commit hash or fork URL if applicable
+    validations:
+      required: false
 
   - type: textarea
     id: hardware-setup
