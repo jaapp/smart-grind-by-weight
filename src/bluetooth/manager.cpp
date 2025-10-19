@@ -1570,25 +1570,30 @@ void BluetoothManager::generate_diagnostic_report() {
                                     if (sessionFile.read((uint8_t*)&event, sizeof(event)) == sizeof(event)) {
                                         const char* phase_name = (event.phase_id < 14) ? phase_names[event.phase_id] : "UNKNOWN";
 
+                                        // Calculate event yield (delta)
+                                        float event_yield = event.end_weight - event.start_weight;
+
                                         // Build base event string
                                         char base_str[256];
                                         if (event.pulse_attempt_number > 0) {
                                             snprintf(base_str, sizeof(base_str),
-                                                "    [%lums] %s (pulse #%u): %.2fg -> %.2fg (%.1fms pulse)",
+                                                "    [%lums] %s (pulse #%u): %.2fg -> %.2fg (%+.2fg) (%.1fms pulse)",
                                                 event.timestamp_ms,
                                                 phase_name,
                                                 event.pulse_attempt_number,
                                                 event.start_weight,
                                                 event.end_weight,
+                                                event_yield,
                                                 event.pulse_duration_ms
                                             );
                                         } else {
                                             snprintf(base_str, sizeof(base_str),
-                                                "    [%lums] %s: %.2fg -> %.2fg (%lums)",
+                                                "    [%lums] %s: %.2fg -> %.2fg (%+.2fg) (%lums)",
                                                 event.timestamp_ms,
                                                 phase_name,
                                                 event.start_weight,
                                                 event.end_weight,
+                                                event_yield,
                                                 event.duration_ms
                                             );
                                         }
