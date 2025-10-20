@@ -31,8 +31,8 @@ void ReadyScreen::create() {
     profile_tabs[0] = lv_tabview_add_tab(tabview, "Single");
     profile_tabs[1] = lv_tabview_add_tab(tabview, "Double");
     profile_tabs[2] = lv_tabview_add_tab(tabview, "Custom");
-    settings_tab = lv_tabview_add_tab(tabview, "SETTINGS");
-    profile_tabs[3] = settings_tab;
+    menu_tab = lv_tabview_add_tab(tabview, "MENU");
+    profile_tabs[3] = menu_tab;
 
     // Default weights
     float default_weights[3] = {USER_SINGLE_ESPRESSO_WEIGHT_G, USER_DOUBLE_ESPRESSO_WEIGHT_G, USER_CUSTOM_PROFILE_WEIGHT_G};
@@ -42,8 +42,8 @@ void ReadyScreen::create() {
         create_profile_page(profile_tabs[i], i, names[i], default_weights[i]);
     }
 
-    // Create settings tab page
-    create_settings_page(settings_tab);
+    // Create menu tab page
+    create_menu_page(menu_tab);
 
     update_profile_values(default_weights, GrindMode::WEIGHT);
 
@@ -67,7 +67,7 @@ void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const
     lv_obj_add_flag(weight_labels[profile_index], LV_OBJ_FLAG_CLICKABLE);
 }
 
-void ReadyScreen::create_settings_page(lv_obj_t* parent) {
+void ReadyScreen::create_menu_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -75,7 +75,7 @@ void ReadyScreen::create_settings_page(lv_obj_t* parent) {
 
     // Info label
     lv_obj_t* info_label = lv_label_create(parent);
-    lv_label_set_text(info_label, "SYSTEM\nSETTINGS");
+    lv_label_set_text(info_label, "MAIN\nMENU");
     lv_obj_set_style_text_font(info_label, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);

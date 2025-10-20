@@ -204,7 +204,7 @@ python3 tools/grinder.py upload smart-grind-by-weight-vX.X.X.bin
 
 After flashing firmware, calibrate the load cell for accurate measurements:
 
-1. **Access calibration**: Settings → Tools → Press "Calibrate"
+1. **Access calibration**: Menu → Tools → Press "Calibrate"
 2. **Empty calibration**: Remove all weight from scale platform → Press OK
 3. **Weight calibration**: 
    - Place known weight on scale (e.g., coffee mug with water)
@@ -215,24 +215,24 @@ After flashing firmware, calibrate the load cell for accurate measurements:
 
 ### Auto-Tune Motor Response
 
-The auto-tune feature models your grinder's motor response behavior by measuring the physical lag between relay activation and grounds production. This accounts for hardware variations like voltage differences (110V vs 220V), relay types (solid-state vs mechanical), and burr inertia across different grinder models. The default 50ms value works well for most setups, but if you experience unreliable pulse corrections or want to minimize coffee waste through hardware-specific optimization, run auto-tune via **Settings → Tools → Auto-Tune Motor Response**. The 1-2 minute calibration process finds the minimum reliable pulse duration for your specific hardware and saves it automatically.
+The auto-tune feature models your grinder's motor response behavior by measuring the physical lag between relay activation and grounds production. This accounts for hardware variations like voltage differences (110V vs 220V), relay types (solid-state vs mechanical), and burr inertia across different grinder models. The default 50ms value works well for most setups, but if you experience unreliable pulse corrections or want to minimize coffee waste through hardware-specific optimization, run auto-tune via **Menu → Tools → Auto-Tune Motor Response**. The 1-2 minute calibration process finds the minimum reliable pulse duration for your specific hardware and saves it automatically.
 
 ### Diagnostics System
 
-The system includes comprehensive load cell health monitoring accessible via **Settings → Diagnostics**. A warning icon (⚠) appears in the top-right corner when diagnostics are active - tap it to navigate directly to the diagnostics page.
+The system includes comprehensive load cell health monitoring accessible via **Menu → Diagnostics**. A warning icon (⚠) appears in the top-right corner when diagnostics are active - tap it to navigate directly to the diagnostics page.
 
 **Diagnostic Types:**
-1. **Load Cell Not Calibrated** - Appears until calibration is completed via Settings → Tools → Calibrate
+1. **Load Cell Not Calibrated** - Appears until calibration is completed via Menu → Tools → Calibrate
 2. **Sustained Noise** - Triggers after 60 seconds of excessive noise; clears after 120 seconds of acceptable levels
 3. **Mechanical Instability** - Detects sudden weight drops during grinding (3+ events); auto-resets on next grind or via manual reset
 
 **Displayed Values:**
 - **Motor Latency** - Current motor response latency in milliseconds (default: 50ms, or calibrated value from auto-tune)
-- **Calibration Factor** - Load cell calibration factor from Settings → Tools → Calibrate
+- **Calibration Factor** - Load cell calibration factor from Menu → Tools → Calibrate
 
 **Noise Floor Diagnostics:**
 
-Access via **Settings → Diagnostics → Noise Floor**.
+Access via **Menu → Diagnostics → Noise Floor**.
 
 **Three values displayed:**
 1. **Standard Deviation (grams)** - Noise level in calibrated weight units
@@ -255,14 +255,14 @@ All profiles are fully customizable. Default grind-by-weight targets (fallback t
 
 ### Navigation
 - **Swipe left/right** to navigate between menu tabs
-- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes (when enabled in Settings → Grind Settings)
+- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes (when enabled in Menu → Grind Settings)
 - **Tap** to select profiles or buttons
 - **Long press** on profile targets to edit/customize them
 
 > **Color cues:** The GRIND button background turns **red** in weight mode and **blue** in time mode, so you always know which behaviour is armed.
 
 ### Grind Settings
-Access **Settings → Grind Settings** to configure:
+Access **Menu → Grind Settings** to configure:
 - **Swipe Gestures**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
 - **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
@@ -277,9 +277,9 @@ These steps describe the default grind-by-weight workflow:
 5. The system grinds to the precise target weight using the predictive algorithm
 6. GRIND COMPLETE shows the final settled weight in grams (with statistics)
 
-> Optional automation (Settings → Grind Settings): enable the new auto-start toggle to begin grinding as soon as the scale sees ~50 g arrive (no tare needed); the system waits for the load cell to gather enough quiet samples before arming itself, then auto-return jumps back to Ready whenever that cup is lifted off again.
+> Optional automation (Menu → Grind Settings): enable the new auto-start toggle to begin grinding as soon as the scale sees ~50 g arrive (no tare needed); the system waits for the load cell to gather enough quiet samples before arming itself, then auto-return jumps back to Ready whenever that cup is lifted off again.
 
-Need the stock timed run? Enable swipe gestures in **Settings → Grind Settings**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in settings.
+Need the stock timed run? Enable swipe gestures in **Menu → Grind Settings**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in the menu.
 
 > **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
 
@@ -308,7 +308,7 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
 |   \-- GRIND button (red=weight, blue=time)
 |   \-- Time mode completion: OK + PULSE buttons
 |
-\-- Settings (hierarchical menu navigation)
+\-- Menu (hierarchical navigation)
     |
     +-- System Info
     |   |-- Firmware version & build number
@@ -362,7 +362,7 @@ During Grinding:
 
 ## ⚡ Automated Grind Flow
 
-Want the scale to run itself? Enable the automation toggles in **Settings → Grind Settings**:
+Want the scale to run itself? Enable the automation toggles in **Menu → Grind Settings**:
 
 - **Start on Cup**: As soon as a recognized cup or portafilter lands on the load cell (≈50 g delta inside a 2 s window), the active profile tars and begins grinding automatically. Ideal when dosing cups dock directly under the chute.
 - **Return on Removal**: When the cup weight drops away after completion, the grinder exits the results screen and returns to Ready. Useful for keeping the workflow hands-free between shots.
@@ -373,7 +373,7 @@ Both automation settings rely on the same smoothed weight deltas used for flow d
 
 ## 🔵 Bluetooth Connectivity
 
-Bluetooth can be configured in **Settings → Bluetooth** with optional auto-startup (5-minute timer) or manual control (30-minute timer when manually enabled). The blue Bluetooth symbol in the top-right corner indicates when active. Bluetooth enables wireless firmware updates via BLE OTA, grind data export and analytics, and device management. Grind session logging is configurable in **Settings → Data → Logging** (disabled by default to prevent flash wear) and must be enabled before grinding to save session data for later analysis.
+Bluetooth can be configured in **Menu → Bluetooth** with optional auto-startup (5-minute timer) or manual control (30-minute timer when manually enabled). The blue Bluetooth symbol in the top-right corner indicates when active. Bluetooth enables wireless firmware updates via BLE OTA, grind data export and analytics, and device management. Grind session logging is configurable in **Menu → Data → Logging** (disabled by default to prevent flash wear) and must be enabled before grinding to save session data for later analysis.
 
 ---
 
@@ -422,7 +422,7 @@ python3 tools/grinder.py diagnostics --save diagnostic-report.txt
 
 ⚠️ **Important**: Grind session logging is **disabled by default** to prevent unnecessary flash wear. To analyze grind data:
 
-1. **Enable logging** in **Settings → Data → Logging** before grinding
+1. **Enable logging** in **Menu → Data → Logging** before grinding
 2. Perform your grind sessions (data will be saved to flash storage)
 3. **Export and analyze** the data using the tools below
 4. **Disable logging** again when analysis is complete (recommended for daily use)
@@ -492,7 +492,7 @@ The motor response latency represents the physical system lag between relay acti
 - Motor inertia (110V vs 220V motors)
 - Burr spin-up characteristics (different grinder models/designs)
 
-The latency value is automatically calibrated via **Auto-Tune Motor Response** (Settings → Tools) using binary search with statistical verification, or uses a safe 50ms default. This enables universal grinder compatibility without firmware modifications.
+The latency value is automatically calibrated via **Auto-Tune Motor Response** (Menu → Tools) using binary search with statistical verification, or uses a safe 50ms default. This enables universal grinder compatibility without firmware modifications.
 
 **Key Features:**
 - Noise-resistant through multi-modal load cell measurement (instant, smoothed, filtered)

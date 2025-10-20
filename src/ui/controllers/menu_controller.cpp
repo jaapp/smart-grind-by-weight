@@ -1,4 +1,4 @@
-#include "settings_controller.h"
+#include "menu_controller.h"
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -18,25 +18,25 @@
 #include "../ui_helpers.h"
 #include "../ui_manager.h"
 
-SettingsUIController::SettingsUIController(UIManager* manager)
+MenuUIController::MenuUIController(UIManager* manager)
     : ui_manager_(manager) {}
 
-void SettingsUIController::register_events() {
+void MenuUIController::register_events() {
     if (!ui_manager_) {
         return;
     }
 
     using ET = EventBridgeLVGL::EventType;
 
-    EventBridgeLVGL::register_handler(ET::SETTINGS_CALIBRATE, [this](lv_event_t*) { handle_calibrate(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_RESET, [this](lv_event_t*) { handle_reset(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_PURGE, [this](lv_event_t*) { handle_purge(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_MOTOR_TEST, [this](lv_event_t*) { handle_motor_test(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_TARE, [this](lv_event_t*) { handle_tare(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_AUTOTUNE, [this](lv_event_t*) { handle_autotune(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_DIAGNOSTIC_RESET, [this](lv_event_t*) { handle_diagnostics_reset(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_BACK, [this](lv_event_t*) { handle_back(); });
-    EventBridgeLVGL::register_handler(ET::SETTINGS_REFRESH_STATS, [this](lv_event_t*) { handle_refresh_stats(); });
+    EventBridgeLVGL::register_handler(ET::MENU_CALIBRATE, [this](lv_event_t*) { handle_calibrate(); });
+    EventBridgeLVGL::register_handler(ET::MENU_RESET, [this](lv_event_t*) { handle_reset(); });
+    EventBridgeLVGL::register_handler(ET::MENU_PURGE, [this](lv_event_t*) { handle_purge(); });
+    EventBridgeLVGL::register_handler(ET::MENU_MOTOR_TEST, [this](lv_event_t*) { handle_motor_test(); });
+    EventBridgeLVGL::register_handler(ET::MENU_TARE, [this](lv_event_t*) { handle_tare(); });
+    EventBridgeLVGL::register_handler(ET::MENU_AUTOTUNE, [this](lv_event_t*) { handle_autotune(); });
+    EventBridgeLVGL::register_handler(ET::MENU_DIAGNOSTIC_RESET, [this](lv_event_t*) { handle_diagnostics_reset(); });
+    EventBridgeLVGL::register_handler(ET::MENU_BACK, [this](lv_event_t*) { handle_back(); });
+    EventBridgeLVGL::register_handler(ET::MENU_REFRESH_STATS, [this](lv_event_t*) { handle_refresh_stats(); });
 
     EventBridgeLVGL::register_handler(ET::BLE_TOGGLE, [this](lv_event_t*) { handle_ble_toggle(); });
     EventBridgeLVGL::register_handler(ET::BLE_STARTUP_TOGGLE, [this](lv_event_t*) { handle_ble_startup_toggle(); });
@@ -52,12 +52,12 @@ void SettingsUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER, [this](lv_event_t*) { handle_brightness_screensaver_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
 
-    // Note: Event registration for settings widgets is done in the page creation functions
-    // (settings_screen.cpp) because the menu is created lazily and destroyed on hide.
+    // Note: Event registration for menu widgets is done in the page creation functions
+    // (menu_screen.cpp) because the menu is created lazily and destroyed on hide.
     // Attempting to register events here would fail silently since widgets don't exist yet.
 }
 
-void SettingsUIController::update() {
+void MenuUIController::update() {
     if (!ui_manager_) {
         return;
     }
@@ -66,18 +66,18 @@ void SettingsUIController::update() {
     unsigned long uptime_ms = millis();
     size_t free_heap = ESP.getFreeHeap();
 
-    ui_manager_->settings_screen.update_info(sensor, uptime_ms, free_heap);
-    ui_manager_->settings_screen.update_diagnostics(sensor);
-    ui_manager_->settings_screen.update_ble_status();
+    ui_manager_->menu_screen.update_info(sensor, uptime_ms, free_heap);
+    ui_manager_->menu_screen.update_diagnostics(sensor);
+    ui_manager_->menu_screen.update_ble_status();
 }
 
-void SettingsUIController::handle_calibrate() {
+void MenuUIController::handle_calibrate() {
     if (ui_manager_) {
         ui_manager_->switch_to_state(UIState::CALIBRATION);
     }
 }
 
-void SettingsUIController::handle_reset() {
+void MenuUIController::handle_reset() {
     if (!ui_manager_) return;
 
     ui_manager_->show_confirmation(
@@ -92,11 +92,11 @@ void SettingsUIController::handle_reset() {
         lv_color_hex(THEME_COLOR_ERROR),
         [this]() { perform_factory_reset(); },
         "CANCEL",
-        [this]() { return_to_settings(); }
+        [this]() { return_to_menu(); }
     );
 }
 
-void SettingsUIController::handle_purge() {
+void MenuUIController::handle_purge() {
     if (!ui_manager_) return;
 
     ui_manager_->show_confirmation(
@@ -109,11 +109,11 @@ void SettingsUIController::handle_purge() {
         lv_color_hex(THEME_COLOR_ERROR),
         [this]() { execute_purge_operation(); },
         "CANCEL",
-        [this]() { return_to_settings(); }
+        [this]() { return_to_menu(); }
     );
 }
 
-void SettingsUIController::handle_motor_test() {
+void MenuUIController::handle_motor_test() {
     if (!ui_manager_) return;
 
     ui_manager_->show_confirmation(
@@ -125,11 +125,11 @@ void SettingsUIController::handle_motor_test() {
         lv_color_hex(THEME_COLOR_SUCCESS),
         [this]() { run_motor_test(); },
         "CANCEL",
-        [this]() { return_to_settings(); }
+        [this]() { return_to_menu(); }
     );
 }
 
-void SettingsUIController::handle_tare() {
+void MenuUIController::handle_tare() {
     if (!ui_manager_) return;
     UIOperations::execute_tare(ui_manager_->get_hardware_manager(), [this]() {
         if (ui_manager_) {
@@ -138,7 +138,7 @@ void SettingsUIController::handle_tare() {
     });
 }
 
-void SettingsUIController::handle_autotune() {
+void MenuUIController::handle_autotune() {
     if (!ui_manager_) return;
 
     // Show confirmation screen with setup instructions
@@ -154,23 +154,23 @@ void SettingsUIController::handle_autotune() {
             lv_color_hex(THEME_COLOR_ACCENT),
             [autotune_controller]() { autotune_controller->confirm_and_begin(); },
             "CANCEL",
-            [this]() { return_to_settings(); }
+            [this]() { return_to_menu(); }
         );
     }
 }
 
-void SettingsUIController::handle_back() {
+void MenuUIController::handle_back() {
     if (!ui_manager_) return;
     ui_manager_->set_current_tab(3);
     ui_manager_->switch_to_state(UIState::READY);
 }
 
-void SettingsUIController::handle_refresh_stats() {
+void MenuUIController::handle_refresh_stats() {
     if (!ui_manager_) return;
-    ui_manager_->settings_screen.refresh_statistics();
+    ui_manager_->menu_screen.refresh_statistics();
 }
 
-void SettingsUIController::handle_diagnostics_reset() {
+void MenuUIController::handle_diagnostics_reset() {
     if (!ui_manager_) return;
 
     ui_manager_->show_confirmation(
@@ -180,11 +180,11 @@ void SettingsUIController::handle_diagnostics_reset() {
         lv_color_hex(THEME_COLOR_WARNING),
         [this]() { perform_diagnostics_reset(); },
         "CANCEL",
-        [this]() { return_to_settings(); }
+        [this]() { return_to_menu(); }
     );
 }
 
-void SettingsUIController::perform_diagnostics_reset() {
+void MenuUIController::perform_diagnostics_reset() {
     if (!ui_manager_) return;
 
     auto* diagnostics = ui_manager_->diagnostics_controller_.get();
@@ -202,23 +202,23 @@ void SettingsUIController::perform_diagnostics_reset() {
     auto* hardware = ui_manager_->get_hardware_manager();
     auto* sensor = hardware ? hardware->get_weight_sensor() : nullptr;
     if (sensor) {
-        ui_manager_->settings_screen.update_diagnostics(sensor);
+        ui_manager_->menu_screen.update_diagnostics(sensor);
     }
 }
 
-void SettingsUIController::handle_ble_toggle() {
+void MenuUIController::handle_ble_toggle() {
     if (!ui_manager_ || !ui_manager_->bluetooth_manager) return;
 
     auto* ble = ui_manager_->bluetooth_manager;
     if (ble->is_enabled()) {
         ble->disable();
         LOG_DEBUG_PRINTLN("Bluetooth disabled by user");
-        ui_manager_->settings_screen.update_ble_status();
+        ui_manager_->menu_screen.update_ble_status();
         return;
     }
 
     auto completion = [this]() {
-        ui_manager_->settings_screen.update_ble_status();
+        ui_manager_->menu_screen.update_ble_status();
     };
 
     auto operation = [ble]() {
@@ -230,10 +230,10 @@ void SettingsUIController::handle_ble_toggle() {
     overlay.show_and_execute(BlockingOperation::BLE_ENABLING, operation, completion);
 }
 
-void SettingsUIController::handle_ble_startup_toggle() {
+void MenuUIController::handle_ble_startup_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->settings_screen.get_ble_startup_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_ble_startup_toggle();
     if (!toggle) return;
 
     bool startup_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
@@ -246,10 +246,10 @@ void SettingsUIController::handle_ble_startup_toggle() {
     LOG_DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
 }
 
-void SettingsUIController::handle_logging_toggle() {
+void MenuUIController::handle_logging_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->settings_screen.get_logging_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_logging_toggle();
     if (!toggle) return;
 
     bool logging_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
@@ -262,10 +262,10 @@ void SettingsUIController::handle_logging_toggle() {
     LOG_DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
 }
 
-void SettingsUIController::handle_grind_mode_swipe_toggle() {
+void MenuUIController::handle_grind_mode_swipe_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->settings_screen.get_grind_mode_swipe_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_grind_mode_swipe_toggle();
     if (!toggle) return;
 
     bool swipe_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
@@ -278,10 +278,10 @@ void SettingsUIController::handle_grind_mode_swipe_toggle() {
     LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
 }
 
-void SettingsUIController::handle_grind_mode_radio_button() {
+void MenuUIController::handle_grind_mode_radio_button() {
     if (!ui_manager_ || !ui_manager_->profile_controller) return;
 
-    lv_obj_t* radio_group = ui_manager_->settings_screen.get_grind_mode_radio_group();
+    lv_obj_t* radio_group = ui_manager_->menu_screen.get_grind_mode_radio_group();
     if (!radio_group) return;
 
     int selected_index = radio_button_group_get_selection(radio_group);
@@ -303,10 +303,10 @@ void SettingsUIController::handle_grind_mode_radio_button() {
     LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT via radio button" : "Grind mode set to TIME via radio button");
 }
 
-void SettingsUIController::handle_auto_start_toggle() {
+void MenuUIController::handle_auto_start_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->settings_screen.get_auto_start_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_auto_start_toggle();
     if (!toggle) return;
 
     bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
@@ -323,10 +323,10 @@ void SettingsUIController::handle_auto_start_toggle() {
     LOG_DEBUG_PRINTLN(enabled ? "Auto-start on cup enabled" : "Auto-start on cup disabled");
 }
 
-void SettingsUIController::handle_auto_return_toggle() {
+void MenuUIController::handle_auto_return_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->settings_screen.get_auto_return_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_auto_return_toggle();
     if (!toggle) return;
 
     bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
@@ -343,10 +343,10 @@ void SettingsUIController::handle_auto_return_toggle() {
     LOG_DEBUG_PRINTLN(enabled ? "Auto return on cup removal enabled" : "Auto return on cup removal disabled");
 }
 
-void SettingsUIController::handle_brightness_normal_slider() {
+void MenuUIController::handle_brightness_normal_slider() {
     if (!ui_manager_) return;
 
-    auto* slider = ui_manager_->settings_screen.get_brightness_normal_slider();
+    auto* slider = ui_manager_->menu_screen.get_brightness_normal_slider();
     if (!slider) return;
 
     int brightness_percent = lv_slider_get_value(slider);
@@ -357,12 +357,12 @@ void SettingsUIController::handle_brightness_normal_slider() {
     float brightness = brightness_percent / 100.0f;
 
     ui_manager_->get_hardware_manager()->get_display()->set_brightness(brightness);
-    ui_manager_->settings_screen.update_brightness_labels(brightness_percent, -1);
+    ui_manager_->menu_screen.update_brightness_labels(brightness_percent, -1);
     LOG_DEBUG_PRINTF("Normal brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
 }
 
-void SettingsUIController::handle_brightness_normal_slider_released() {
-    auto* slider = ui_manager_->settings_screen.get_brightness_normal_slider();
+void MenuUIController::handle_brightness_normal_slider_released() {
+    auto* slider = ui_manager_->menu_screen.get_brightness_normal_slider();
     if (!slider) return;
 
     int brightness_percent = lv_slider_get_value(slider);
@@ -378,10 +378,10 @@ void SettingsUIController::handle_brightness_normal_slider_released() {
     prefs.end();
 }
 
-void SettingsUIController::handle_brightness_screensaver_slider() {
+void MenuUIController::handle_brightness_screensaver_slider() {
     if (!ui_manager_) return;
 
-    auto* slider = ui_manager_->settings_screen.get_brightness_screensaver_slider();
+    auto* slider = ui_manager_->menu_screen.get_brightness_screensaver_slider();
     if (!slider) return;
 
     int brightness_percent = lv_slider_get_value(slider);
@@ -392,12 +392,12 @@ void SettingsUIController::handle_brightness_screensaver_slider() {
     float brightness = brightness_percent / 100.0f;
 
     ui_manager_->get_hardware_manager()->get_display()->set_brightness(brightness);
-    ui_manager_->settings_screen.update_brightness_labels(-1, brightness_percent);
+    ui_manager_->menu_screen.update_brightness_labels(-1, brightness_percent);
     LOG_DEBUG_PRINTF("Screensaver brightness set to %d%% (%.2f)\n", brightness_percent, brightness);
 }
 
-void SettingsUIController::handle_brightness_screensaver_slider_released() {
-    auto* slider = ui_manager_->settings_screen.get_brightness_screensaver_slider();
+void MenuUIController::handle_brightness_screensaver_slider_released() {
+    auto* slider = ui_manager_->menu_screen.get_brightness_screensaver_slider();
     if (!slider) return;
 
     int brightness_percent = lv_slider_get_value(slider);
@@ -417,7 +417,7 @@ void SettingsUIController::handle_brightness_screensaver_slider_released() {
     LOG_DEBUG_PRINTF("Touch released - restored normal brightness to %.2f\n", normal);
 }
 
-void SettingsUIController::perform_factory_reset() {
+void MenuUIController::perform_factory_reset() {
     if (!ui_manager_) return;
 
     LOG_DEBUG_PRINTLN("Factory reset: clearing NVS preferences and rebooting...");
@@ -436,12 +436,12 @@ void SettingsUIController::perform_factory_reset() {
     esp_restart();
 }
 
-void SettingsUIController::execute_purge_operation() {
+void MenuUIController::execute_purge_operation() {
     if (!ui_manager_) return;
 
     auto completion = [this]() {
-        return_to_settings();
-        ui_manager_->settings_screen.refresh_statistics(false);
+        return_to_menu();
+        ui_manager_->menu_screen.refresh_statistics(false);
     };
 
     auto purge_task = []() {
@@ -460,7 +460,7 @@ void SettingsUIController::execute_purge_operation() {
                              "PURGING LOGS...\nPlease wait");
 }
 
-void SettingsUIController::run_motor_test() {
+void MenuUIController::run_motor_test() {
     if (!ui_manager_) return;
 
     auto* grinder = ui_manager_->get_hardware_manager()->get_grinder();
@@ -479,13 +479,13 @@ void SettingsUIController::run_motor_test() {
     }
 }
 
-void SettingsUIController::return_to_settings() {
+void MenuUIController::return_to_menu() {
     if (!ui_manager_) return;
     ui_manager_->set_current_tab(3);
-    ui_manager_->switch_to_state(UIState::SETTINGS);
+    ui_manager_->switch_to_state(UIState::MENU);
 }
 
-float SettingsUIController::get_normal_brightness() const {
+float MenuUIController::get_normal_brightness() const {
     if (!ui_manager_ || !ui_manager_->hardware_manager) {
         return USER_SCREEN_BRIGHTNESS_NORMAL;
     }
@@ -501,7 +501,7 @@ float SettingsUIController::get_normal_brightness() const {
     return brightness;
 }
 
-float SettingsUIController::get_screensaver_brightness() const {
+float MenuUIController::get_screensaver_brightness() const {
     if (!ui_manager_ || !ui_manager_->hardware_manager) {
         return USER_SCREEN_BRIGHTNESS_DIMMED;
     }
@@ -517,14 +517,14 @@ float SettingsUIController::get_screensaver_brightness() const {
     return brightness;
 }
 
-void SettingsUIController::stop_motor_timer() {
+void MenuUIController::stop_motor_timer() {
     if (motor_timer_) {
         lv_timer_del(motor_timer_);
         motor_timer_ = nullptr;
     }
 }
 
-void SettingsUIController::motor_timer_cb(lv_timer_t* timer) {
+void MenuUIController::motor_timer_cb(lv_timer_t* timer) {
     if (!ui_manager_) {
         return;
     }
@@ -536,14 +536,14 @@ void SettingsUIController::motor_timer_cb(lv_timer_t* timer) {
 
     stop_motor_timer();
     ui_manager_->set_background_active(false);
-    return_to_settings();
+    return_to_menu();
 }
 
-void SettingsUIController::static_motor_timer_cb(lv_timer_t* timer) {
+void MenuUIController::static_motor_timer_cb(lv_timer_t* timer) {
     if (!timer) {
         return;
     }
-    auto* controller = static_cast<SettingsUIController*>(lv_timer_get_user_data(timer));
+    auto* controller = static_cast<MenuUIController*>(lv_timer_get_user_data(timer));
     if (controller) {
         controller->motor_timer_cb(timer);
     }

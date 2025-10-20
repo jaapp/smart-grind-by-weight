@@ -23,7 +23,7 @@ body:
         ### How to Get a Diagnostic Report
 
         **For grind-related issues (accuracy, timeout, pulse corrections, etc.):**
-        1. **Enable logging:** Settings → Data → Enable Logging
+        1. **Enable logging:** Menu → Data → Enable Logging
         2. **Capture the issue:** Perform at least one grind where the issue occurs
         3. **Generate diagnostics:** Follow one of the methods below
 

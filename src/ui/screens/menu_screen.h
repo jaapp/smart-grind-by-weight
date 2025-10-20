@@ -8,7 +8,7 @@
 
 class GrindingScreen;  // Forward declaration
 
-class SettingsScreen {
+class MenuScreen {
 private:
     lv_obj_t* screen;
     lv_obj_t* menu;
@@ -43,7 +43,7 @@ private:
     lv_obj_t* stat_avg_accuracy_label;
     lv_obj_t* stat_total_pulses_label;
     
-    // Settings tab elements
+    // Menu toggle elements
     lv_obj_t* ble_toggle;
     lv_obj_t* ble_startup_toggle;
     lv_obj_t* ble_status_label;

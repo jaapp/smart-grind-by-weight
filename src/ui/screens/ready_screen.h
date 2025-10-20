@@ -9,7 +9,7 @@ private:
     lv_obj_t* tabview;
     lv_obj_t* profile_tabs[4];
     lv_obj_t* weight_labels[3];
-    lv_obj_t* settings_tab;
+    lv_obj_t* menu_tab;
     bool visible;
 
 public:
@@ -23,9 +23,9 @@ public:
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
     lv_obj_t* get_tabview() const { return tabview; }
-    lv_obj_t* get_settings_tab() const { return settings_tab; }
+    lv_obj_t* get_menu_tab() const { return menu_tab; }
     
 private:
     void create_profile_page(lv_obj_t* parent, int profile_index, const char* profile_name, float weight);
-    void create_settings_page(lv_obj_t* parent);
+    void create_menu_page(lv_obj_t* parent);
 };

@@ -1,4 +1,4 @@
-#include "settings_screen.h"
+#include "menu_screen.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
 #include "../../logging/grind_logging.h"
@@ -15,12 +15,12 @@ static void back_event_handler(lv_event_t * e)
     lv_obj_t * menu = (lv_obj_t *)lv_event_get_user_data(e);
 
     if(lv_menu_back_button_is_root(menu, obj)) {
-        // Call the EventBridge handle_event directly with SETTINGS_BACK event
-        EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SETTINGS_BACK, e);
+        // Call the EventBridge handle_event directly with MENU_BACK event
+        EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::MENU_BACK, e);
     }
 }
 
-void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl) {
+void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl) {
     bluetooth_manager = bluetooth;
     grind_controller = grind_ctrl;
     grinding_screen = grind_screen;
@@ -41,12 +41,12 @@ void SettingsScreen::create(BluetoothManager* bluetooth, GrindController* grind_
     create_menu_ui();
 }
 
-void SettingsScreen::create_menu_ui() {
+void MenuScreen::create_menu_ui() {
     if (menu) {
         return; // Already created
     }
 
-    LOG_BLE("[%lums SETTINGS] Creating menu UI\n", millis());
+    LOG_BLE("[%lums MENU] Creating menu UI\n", millis());
 
     // Create menu instead of tabview
     menu = lv_menu_create(screen);
@@ -89,7 +89,7 @@ void SettingsScreen::create_menu_ui() {
     lv_obj_clear_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
 
     // Create main page last
-    lv_obj_t* main_page = lv_menu_page_create(menu, "Settings");
+    lv_obj_t* main_page = lv_menu_page_create(menu, "Menu");
 
     // Create sub-pages with titles
     info_page = lv_menu_page_create(menu, "Info");
@@ -149,7 +149,7 @@ void SettingsScreen::create_menu_ui() {
 
     // Refresh lifetime/log statistics whenever the Data or Stats page is displayed
     auto changing_page_callback = [](lv_event_t * e) {
-        SettingsScreen * self = static_cast<SettingsScreen*>(lv_event_get_user_data(e));
+        MenuScreen * self = static_cast<MenuScreen*>(lv_event_get_user_data(e));
         lv_obj_t * menu = static_cast<lv_obj_t *>(lv_event_get_target(e));
         lv_obj_t * cur = lv_menu_get_cur_main_page(menu);
         if (cur == self->data_page || cur == self->stats_page) {
@@ -159,10 +159,10 @@ void SettingsScreen::create_menu_ui() {
 
     lv_obj_add_event_cb(menu, changing_page_callback, LV_EVENT_VALUE_CHANGED, this);
 
-    LOG_BLE("[%lums SETTINGS] Menu UI created successfully\n", millis());
+    LOG_BLE("[%lums MENU] Menu UI created successfully\n", millis());
 }
 
-void SettingsScreen::create_info_page(lv_obj_t* parent) {
+void MenuScreen::create_info_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -193,12 +193,12 @@ void SettingsScreen::create_info_page(lv_obj_t* parent) {
 }
 
 
-void SettingsScreen::create_bluetooth_page(lv_obj_t* parent) {
+void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Enable vertical scrolling on the settings page
+    // Enable vertical scrolling on the menu page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
@@ -231,11 +231,11 @@ void SettingsScreen::create_bluetooth_page(lv_obj_t* parent) {
     }
 }
 
-void SettingsScreen::create_display_page(lv_obj_t* parent) {
+void MenuScreen::create_display_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    // Enable vertical scrolling on the settings page
+    // Enable vertical scrolling on the menu page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
@@ -265,7 +265,7 @@ static void grind_mode_callback(int selected_index, void* user_data) {
     EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::GRIND_MODE_RADIO_BUTTON, nullptr);
 }
 
-void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
+void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -325,7 +325,7 @@ void SettingsScreen::create_grind_mode_page(lv_obj_t* parent) {
     }
 }
 
-void SettingsScreen::create_tools_page(lv_obj_t* parent) {
+void MenuScreen::create_tools_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -344,23 +344,23 @@ void SettingsScreen::create_tools_page(lv_obj_t* parent) {
     using ET = EventBridgeLVGL::EventType;
     if (tare_button) {
         lv_obj_add_event_cb(tare_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_TARE)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_TARE)));
     }
     if (cal_button) {
         lv_obj_add_event_cb(cal_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_CALIBRATE)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_CALIBRATE)));
     }
     if (autotune_button) {
         lv_obj_add_event_cb(autotune_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_AUTOTUNE)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_AUTOTUNE)));
     }
     if (motor_test_button) {
         lv_obj_add_event_cb(motor_test_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_MOTOR_TEST)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_MOTOR_TEST)));
     }
 }
 
-void SettingsScreen::create_data_page(lv_obj_t* parent) {
+void MenuScreen::create_data_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -394,15 +394,15 @@ void SettingsScreen::create_data_page(lv_obj_t* parent) {
     }
     if (purge_button) {
         lv_obj_add_event_cb(purge_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_PURGE)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_PURGE)));
     }
     if (reset_button) {
         lv_obj_add_event_cb(reset_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_RESET)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_RESET)));
     }
 }
 
-void SettingsScreen::create_stats_page(lv_obj_t* parent) {
+void MenuScreen::create_stats_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -429,11 +429,11 @@ void SettingsScreen::create_stats_page(lv_obj_t* parent) {
     using ET = EventBridgeLVGL::EventType;
     if (refresh_stats_button) {
         lv_obj_add_event_cb(refresh_stats_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_REFRESH_STATS)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_REFRESH_STATS)));
     }
 }
 
-void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
+void MenuScreen::create_diagnostics_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -493,12 +493,12 @@ void SettingsScreen::create_diagnostics_page(lv_obj_t* parent) {
     using ET = EventBridgeLVGL::EventType;
     if (diag_reset_button) {
         lv_obj_add_event_cb(diag_reset_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SETTINGS_DIAGNOSTIC_RESET)));
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_DIAGNOSTIC_RESET)));
     }
 }
 
-void SettingsScreen::show() {
-    LOG_BLE("[%lums SETTINGS] Showing settings screen\n", millis());
+void MenuScreen::show() {
+    LOG_BLE("[%lums MENU] Showing menu screen\n", millis());
 
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = true;
@@ -508,24 +508,24 @@ void SettingsScreen::show() {
     update_logging_toggle();
     update_grind_mode_toggles();
 
-    LOG_BLE("[%lums SETTINGS] Settings screen shown successfully\n", millis());
+    LOG_BLE("[%lums MENU] Menu screen shown successfully\n", millis());
 }
 
-void SettingsScreen::hide() {
+void MenuScreen::hide() {
     if (!visible) {
         return; // Already hidden, nothing to do
     }
 
-    LOG_BLE("[%lums SETTINGS] Hiding settings screen\n", millis());
+    LOG_BLE("[%lums MENU] Hiding menu screen\n", millis());
 
     // Keep the menu in memory for instant access next time
     // Just hide the screen instead of deleting the menu
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = false;
-    LOG_BLE("[%lums SETTINGS] Settings screen hidden successfully\n", millis());
+    LOG_BLE("[%lums MENU] Menu screen hidden successfully\n", millis());
 }
 
-void SettingsScreen::update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap) {
+void MenuScreen::update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap) {
     if (!visible) return;
 
     set_label_text_float(instant_label, weight_sensor->get_instant_weight(), "g");
@@ -545,7 +545,7 @@ void SettingsScreen::update_info(const WeightSensor* weight_sensor, unsigned lon
     set_label_text_int(memory_label, free_heap / 1024, "kB");
 }
 
-void SettingsScreen::update_diagnostics(WeightSensor* weight_sensor) {
+void MenuScreen::update_diagnostics(WeightSensor* weight_sensor) {
     if (!visible || !diagnostics_controller) return;
 
     // Update standard deviations only every 1 second to reduce noise
@@ -618,7 +618,7 @@ void SettingsScreen::update_diagnostics(WeightSensor* weight_sensor) {
     }
 }
 
-void SettingsScreen::update_ble_status() {
+void MenuScreen::update_ble_status() {
     if (!visible || !bluetooth_manager) return;
     
     // Update toggle state
@@ -651,7 +651,7 @@ void SettingsScreen::update_ble_status() {
     }
 }
 
-void SettingsScreen::refresh_statistics(bool show_overlay) {
+void MenuScreen::refresh_statistics(bool show_overlay) {
     if (!visible) return;
 
     // Define the statistics loading operation
@@ -734,7 +734,7 @@ void SettingsScreen::refresh_statistics(bool show_overlay) {
     overlay.show_and_execute(BlockingOperation::LOADING_STATISTICS, load_statistics_operation);
 }
 
-void SettingsScreen::update_brightness_sliders() {
+void MenuScreen::update_brightness_sliders() {
     if (!hardware_manager || !brightness_normal_slider || !brightness_screensaver_slider) return;
     
     // Read from the dedicated "brightness" namespace using a local Preferences
@@ -762,7 +762,7 @@ void SettingsScreen::update_brightness_sliders() {
     update_brightness_labels(normal_percent, screensaver_percent);
 }
 
-void SettingsScreen::update_brightness_labels(int normal_percent, int screensaver_percent) {
+void MenuScreen::update_brightness_labels(int normal_percent, int screensaver_percent) {
     if (brightness_normal_label && normal_percent >= 0) {
         char normal_text[32];
         snprintf(normal_text, sizeof(normal_text), "Brightness: %d%%", normal_percent);
@@ -776,7 +776,7 @@ void SettingsScreen::update_brightness_labels(int normal_percent, int screensave
     }
 }
 
-lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
+lv_obj_t* MenuScreen::create_separator(lv_obj_t* parent, const char* text) {
     // Create separator container
     lv_obj_t* separator_container = lv_obj_create(parent);
     lv_obj_set_size(separator_container, LV_PCT(100), LV_SIZE_CONTENT);
@@ -817,7 +817,7 @@ lv_obj_t* SettingsScreen::create_separator(lv_obj_t* parent, const char* text) {
     return separator_container;
 }
 
-void SettingsScreen::update_bluetooth_startup_toggle() {
+void MenuScreen::update_bluetooth_startup_toggle() {
     if (!ble_startup_toggle) return;
 
     // Read from the "bluetooth" namespace using a local Preferences instance
@@ -836,7 +836,7 @@ void SettingsScreen::update_bluetooth_startup_toggle() {
     }
 }
 
-void SettingsScreen::update_logging_toggle() {
+void MenuScreen::update_logging_toggle() {
     if (!logging_toggle) return;
 
     // Read from the "logging" namespace using a local Preferences instance
@@ -855,7 +855,7 @@ void SettingsScreen::update_logging_toggle() {
     }
 }
 
-lv_obj_t* SettingsScreen::create_menu_item(lv_obj_t* parent, const char* text) {
+lv_obj_t* MenuScreen::create_menu_item(lv_obj_t* parent, const char* text) {
     lv_obj_t* cont = lv_menu_cont_create(parent);
     style_as_button(cont);
     lv_obj_set_style_margin_bottom(cont, 10, 0);
@@ -875,7 +875,7 @@ lv_obj_t* SettingsScreen::create_menu_item(lv_obj_t* parent, const char* text) {
     return cont;
 }
 
-lv_obj_t* SettingsScreen::create_toggle_row(lv_obj_t* parent, const char* text, lv_obj_t** out_toggle) {
+lv_obj_t* MenuScreen::create_toggle_row(lv_obj_t* parent, const char* text, lv_obj_t** out_toggle) {
     lv_obj_t* row_container = lv_obj_create(parent);
     style_as_button(row_container);
     lv_obj_set_style_margin_bottom(row_container, 10, 0);
@@ -896,7 +896,7 @@ lv_obj_t* SettingsScreen::create_toggle_row(lv_obj_t* parent, const char* text, 
 }
 
 
-lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, lv_obj_t** label, lv_obj_t** slider, lv_color_t slider_color, uint32_t min, uint32_t max) {
+lv_obj_t* MenuScreen::create_slider_row(lv_obj_t* parent, const char* text, lv_obj_t** label, lv_obj_t** slider, lv_color_t slider_color, uint32_t min, uint32_t max) {
     lv_obj_t* row_container = lv_obj_create(parent);
     style_as_button(row_container, 260, LV_SIZE_CONTENT);
     lv_obj_set_style_margin_bottom(row_container, 10, 0);
@@ -921,18 +921,18 @@ lv_obj_t* SettingsScreen::create_slider_row(lv_obj_t* parent, const char* text, 
     return row_container;
 }
 
-lv_obj_t* SettingsScreen::create_static_data_label(lv_obj_t* parent, const char* name, const char* value) {
+lv_obj_t* MenuScreen::create_static_data_label(lv_obj_t* parent, const char* name, const char* value) {
     lv_obj_t* label;
     lv_obj_t* data_label = create_data_label(parent, name, &label);
     lv_label_set_text(label, value);
     return data_label;
 }
 
-lv_obj_t* SettingsScreen::create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** variable, bool stacked) {
+lv_obj_t* MenuScreen::create_data_label(lv_obj_t* parent, const char* name, lv_obj_t** variable, bool stacked) {
     return ::create_data_label(parent, name, variable, stacked);
 }
 
-lv_obj_t* SettingsScreen::create_description_label(lv_obj_t* parent, const char* text) {
+lv_obj_t* MenuScreen::create_description_label(lv_obj_t* parent, const char* text) {
     // Create container with padding (similar to create_data_label)
     lv_obj_t* container = lv_obj_create(parent);
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
@@ -956,7 +956,7 @@ lv_obj_t* SettingsScreen::create_description_label(lv_obj_t* parent, const char*
     return label;
 }
 
-void SettingsScreen::update_grind_mode_toggles() {
+void MenuScreen::update_grind_mode_toggles() {
     // Read swipe enabled from "swipe" namespace
     Preferences swipe_prefs;
     swipe_prefs.begin("swipe", true); // read-only

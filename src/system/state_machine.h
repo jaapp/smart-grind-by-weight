@@ -6,7 +6,7 @@ enum class UIState {
     GRIND_COMPLETE,
     GRIND_TIMEOUT,
     EDIT,
-    SETTINGS,
+    MENU,
     CALIBRATION,
     CONFIRM,
     AUTOTUNING,

@@ -33,8 +33,8 @@ void ScreenTimeoutController::update() {
     if (ui_manager_->state_machine && ui_manager_->state_machine->is_state(UIState::GRINDING)) {
         if (screen_dimmed_) {
             float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
-            if (ui_manager_->settings_controller_) {
-                normal = ui_manager_->settings_controller_->get_normal_brightness();
+            if (ui_manager_->menu_controller_) {
+                normal = ui_manager_->menu_controller_->get_normal_brightness();
             }
             display->set_brightness(normal);
             screen_dimmed_ = false;
@@ -52,15 +52,15 @@ void ScreenTimeoutController::update() {
 
     if (should_dim && !screen_dimmed_) {
         float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;
-        if (ui_manager_->settings_controller_) {
-            dimmed = ui_manager_->settings_controller_->get_screensaver_brightness();
+        if (ui_manager_->menu_controller_) {
+            dimmed = ui_manager_->menu_controller_->get_screensaver_brightness();
         }
         display->set_brightness(dimmed);
         screen_dimmed_ = true;
     } else if (!should_dim && screen_dimmed_) {
         float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
-        if (ui_manager_->settings_controller_) {
-            normal = ui_manager_->settings_controller_->get_normal_brightness();
+        if (ui_manager_->menu_controller_) {
+            normal = ui_manager_->menu_controller_->get_normal_brightness();
         }
         display->set_brightness(normal);
         screen_dimmed_ = false;

@@ -58,7 +58,7 @@ void AutoTuneUIController::update() {
     if (progress.phase == AutoTunePhase::COMPLETE_SUCCESS) {
         const AutoTuneResult& result = autotune_controller->get_result();
         ui_manager_->autotune_screen.show_success_screen(result.latency_ms, progress.previous_latency_ms);
-        ui_manager_->settings_screen.update_diagnostics(hw_manager->get_weight_sensor());
+        ui_manager_->menu_screen.update_diagnostics(hw_manager->get_weight_sensor());
         autotune_started_ = false;
         return;
     }
@@ -86,7 +86,7 @@ void AutoTuneUIController::start_autotune() {
 }
 
 void AutoTuneUIController::confirm_and_begin() {
-    // This is called AFTER user has already confirmed in settings screen
+    // This is called AFTER user has already confirmed in menu screen
     // So we just start the autotune process directly
     if (!ui_manager_) {
         LOG_BLE("ERROR: Cannot start autotune - no UI manager\n");
@@ -117,7 +117,7 @@ void AutoTuneUIController::confirm_and_begin() {
         LOG_BLE("AutoTune UI: Started successfully\n");
     } else {
         LOG_BLE("ERROR: AutoTune failed to start\n");
-        ui_manager_->switch_to_state(UIState::SETTINGS);
+        ui_manager_->switch_to_state(UIState::MENU);
     }
 }
 
@@ -140,12 +140,12 @@ void AutoTuneUIController::handle_cancel() {
 
     autotune_started_ = false;
 
-    // Return to settings screen
-    ui_manager_->switch_to_state(UIState::SETTINGS);
+    // Return to menu screen
+    ui_manager_->switch_to_state(UIState::MENU);
 }
 
 void AutoTuneUIController::handle_ok() {
-    // Completion acknowledged - return to settings
+    // Completion acknowledged - return to menu
     LOG_BLE("AutoTune UI: OK button pressed (completion acknowledged)\n");
     autotune_started_ = false;
 
@@ -153,5 +153,5 @@ void AutoTuneUIController::handle_ok() {
         return;
     }
 
-    ui_manager_->switch_to_state(UIState::SETTINGS);
+    ui_manager_->switch_to_state(UIState::MENU);
 }

@@ -17,7 +17,7 @@
 **Applies to:** Eureka Mignon installations where the grinder motor does not activate when commanded.
 
 ### Symptoms
-- Motor test function (Settings → Tools → Motor Test) does not start the motor
+- Motor test function (Menu → Tools → Motor Test) does not start the motor
 - GRIND button does not start the motor
 - All other functionality works normally (screen, weight readings, etc.)
 
@@ -30,7 +30,7 @@ The motor control wire (Pin 3) and button signal wire (Pin 2) from the Eureka 4-
 
 **Option 1: Use Motor Test Function (Recommended)**
 
-Access **Settings → Tools → Motor Test** to verify motor connectivity. This button activates the motor for a short test pulse. If the motor does not run during the test, the motor wire is incorrectly connected.
+Access **Menu → Tools → Motor Test** to verify motor connectivity. This button activates the motor for a short test pulse. If the motor does not run during the test, the motor wire is incorrectly connected.
 
 **Option 2: Manual Wire Identification (Advanced - Use with Extreme Caution)**
 
@@ -157,7 +157,7 @@ If you want to try a less aggressive approach first:
 Extended taring due to load cell noise prevents grinding from completing within 30-second limit.
 
 ### Diagnosis
-Check Settings → Diagnostics → "Noise Floor" section (see [Diagnostics System](DOC.md#diagnostics-system) for details). If "Noise level: Too High" (red text) appears persistently, your load cell has sustained noise issues that will cause slow taring (>2 seconds). A warning icon (⚠) will appear in the top-right corner when sustained noise is detected.
+Check **Menu → Diagnostics → "Noise Floor"** section (see [Diagnostics System](DOC.md#diagnostics-system) for details). If "Noise level: Too High" (red text) appears persistently, your load cell has sustained noise issues that will cause slow taring (>2 seconds). A warning icon (⚠) will appear in the top-right corner when sustained noise is detected.
 
 ### Resolution
 1. **Check load cell wiring:**
@@ -167,7 +167,7 @@ Check Settings → Diagnostics → "Noise Floor" section (see [Diagnostics Syste
 
 2. **Check calibration factor (reference examples only):**
 
-   Calibration factors vary between individual load cells, but extreme deviations may indicate hardware issues. Check your calibration factor in Settings → Diagnostics → Load Cell Status. Example values from tested units:
+   Calibration factors vary between individual load cells, but extreme deviations may indicate hardware issues. Check your calibration factor in **Menu → Diagnostics → Load Cell Status**. Example values from tested units:
    - **1KG T70 load cell**: ±4400 (example)
    - **0.3KG Mavin Load Cell**: ±6580 (example)
 
@@ -194,7 +194,7 @@ Motor response latency mismatch between firmware settings and actual hardware ch
 
 **Recommended:** Use the Auto-Tune Motor Response feature to automatically calibrate optimal pulse duration for your hardware:
 
-1. **Access auto-tune**: Settings → Tools → Auto-Tune Motor Response
+1. **Access auto-tune**: Menu → Tools → Auto-Tune Motor Response
 2. **Prepare system**:
    - Ensure beans are in hopper
    - Place dosing cup on scale
@@ -206,9 +206,9 @@ Motor response latency mismatch between firmware settings and actual hardware ch
 4. **Check result**: New motor latency value displayed on completion
    - Typical range: 30-200ms depending on hardware
    - Value saved automatically to device preferences
-   - Displayed in Settings → Diagnostics
+   - Displayed in **Menu → Diagnostics**
 
-**Verify calibration**: Check Settings → Diagnostics → Motor Latency to see current value. Re-run auto-tune if you change grinders, modify relay hardware, or continue experiencing unreliable pulse corrections.
+**Verify calibration**: Check **Menu → Diagnostics → Motor Latency** to see current value. Re-run auto-tune if you change grinders, modify relay hardware, or continue experiencing unreliable pulse corrections.
 
 **Manual fallback:** If auto-tune fails, system reverts to safe 50ms default. Check grinder power connection, hopper bean level, and scale setup.
 
@@ -273,7 +273,7 @@ python3 tools/grinder.py diagnostics --save diagnostics.txt
 
 **For grind-related issues, follow these steps before generating the diagnostic report:**
 
-1. **Enable logging:** Settings → Data → Enable Logging
+1. **Enable logging:** Menu → Data → Enable Logging
 2. **Reproduce the issue:** Perform at least one grind where the issue occurs
 3. **Generate diagnostics:** Use one of the methods above (Web Flasher or Command Line)
 

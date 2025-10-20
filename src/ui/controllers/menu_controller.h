@@ -3,11 +3,11 @@
 
 class UIManager;
 
-// Manages BLE/logging toggles, brightness sliders, motor test, factory reset, and statistics
+// Handles the interactive menu: BLE/logging toggles, brightness sliders, maintenance actions, and stats
 
-class SettingsUIController {
+class MenuUIController {
 public:
-    explicit SettingsUIController(UIManager* manager);
+    explicit MenuUIController(UIManager* manager);
 
     void register_events();
     void update();
@@ -45,6 +45,6 @@ private:
     void stop_motor_timer();
     void motor_timer_cb(lv_timer_t* timer);
     static void static_motor_timer_cb(lv_timer_t* timer);
-    void return_to_settings();
+    void return_to_menu();
     void perform_diagnostics_reset();
 };

@@ -8,7 +8,7 @@
 #include "screens/ready_screen.h"
 #include "screens/edit_screen.h"
 #include "screens/grinding_screen.h"
-#include "screens/settings_screen.h"
+#include "screens/menu_screen.h"
 #include "screens/calibration_screen.h"
 #include "screens/confirm_screen.h"
 #include "screens/ota_screen.h"
@@ -24,7 +24,7 @@
 #include "controllers/ota_data_export_controller.h"
 #include "controllers/ready_controller.h"
 #include "controllers/screen_timeout_controller.h"
-#include "controllers/settings_controller.h"
+#include "controllers/menu_controller.h"
 #include "controllers/status_indicator_controller.h"
 #include "../system/state_machine.h"
 #include "../system/diagnostics_controller.h"
@@ -52,7 +52,7 @@
 class UIManager {
     friend class ReadyUIController;
     friend class EditUIController;
-    friend class SettingsUIController;
+    friend class MenuUIController;
     friend class CalibrationUIController;
     friend class GrindingUIController;
     friend class ConfirmUIController;
@@ -87,7 +87,7 @@ private:
     std::unique_ptr<ReadyUIController> ready_controller_;
     std::unique_ptr<EditUIController> edit_controller_;
     std::unique_ptr<GrindingUIController> grinding_controller_;
-    std::unique_ptr<SettingsUIController> settings_controller_;
+    std::unique_ptr<MenuUIController> menu_controller_;
     std::unique_ptr<StatusIndicatorController> status_indicator_controller_;
     std::unique_ptr<CalibrationUIController> calibration_controller_;
     std::unique_ptr<AutoTuneUIController> autotune_controller_;
@@ -101,7 +101,7 @@ public:
     ReadyScreen ready_screen;
     EditScreen edit_screen;
     GrindingScreen grinding_screen;
-    SettingsScreen settings_screen;
+    MenuScreen menu_screen;
     CalibrationScreen calibration_screen;
     ConfirmScreen confirm_screen;
     AutoTuneScreen autotune_screen;

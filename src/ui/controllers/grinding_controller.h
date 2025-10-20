@@ -35,7 +35,7 @@ private:
     void enter_grinding_state();
     void enter_grind_complete_state();
     void enter_grind_timeout_state();
-    void enter_settings_state();
+    void enter_menu_state();
 
     void start_grind_complete_timer();
     void start_grind_timeout_timer();

@@ -131,12 +131,12 @@ void GrindingUIController::on_state_changed(UIState new_state) {
         case UIState::GRIND_TIMEOUT:
             enter_grind_timeout_state();
             break;
-        case UIState::SETTINGS:
+        case UIState::MENU:
         case UIState::CALIBRATION:
         case UIState::CONFIRM:
         case UIState::OTA_UPDATE:
         case UIState::OTA_UPDATE_FAILED:
-            enter_settings_state();
+            enter_menu_state();
             break;
         default:
             break;
@@ -187,7 +187,7 @@ void GrindingUIController::handle_grind_button() {
 
     if (ui_manager_->state_machine->is_state(UIState::READY)) {
         if (ui_manager_->current_tab == 3) {
-            ui_manager_->switch_to_state(UIState::SETTINGS);
+            ui_manager_->switch_to_state(UIState::MENU);
             return;
         }
 
@@ -562,7 +562,7 @@ void GrindingUIController::enter_grind_timeout_state() {
     ui_manager_->grinding_screen.update_progress(error_grind_progress_);
 }
 
-void GrindingUIController::enter_settings_state() {
+void GrindingUIController::enter_menu_state() {
     if (grind_button_) {
         lv_obj_add_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
     }

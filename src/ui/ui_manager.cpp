@@ -50,8 +50,8 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     
     // Set initial brightness from preferences
     float initial_brightness = USER_SCREEN_BRIGHTNESS_NORMAL;
-    if (settings_controller_) {
-        initial_brightness = settings_controller_->get_normal_brightness();
+    if (menu_controller_) {
+        initial_brightness = menu_controller_->get_normal_brightness();
     }
     hardware_manager->get_display()->set_brightness(initial_brightness);
     
@@ -79,7 +79,7 @@ void UIManager::create_ui() {
     grinding_screen.init(hardware_manager->get_preferences());
     grinding_screen.create();
     grinding_screen.set_mode(current_mode);
-    settings_screen.create(bluetooth_manager, grind_controller, &grinding_screen, hardware_manager, diagnostics_controller_.get());
+    menu_screen.create(bluetooth_manager, grind_controller, &grinding_screen, hardware_manager, diagnostics_controller_.get());
     calibration_screen.create();
     confirm_screen.create();
     autotune_screen.create();
@@ -102,7 +102,7 @@ void UIManager::create_ui() {
     ready_screen.hide();
     edit_screen.hide();
     grinding_screen.hide();
-    settings_screen.hide();
+    menu_screen.hide();
     calibration_screen.hide();
     confirm_screen.hide();
     autotune_screen.hide();
@@ -142,9 +142,9 @@ void UIManager::update() {
             // Event-driven updates - no polling needed
             break;
             
-        case UIState::SETTINGS:
-            if (settings_controller_) {
-                settings_controller_->update();
+        case UIState::MENU:
+            if (menu_controller_) {
+                menu_controller_->update();
             }
             break;
             
@@ -186,7 +186,7 @@ void UIManager::switch_to_state(UIState new_state) {
     ready_screen.hide();
     edit_screen.hide();
     grinding_screen.hide();
-    settings_screen.hide();
+    menu_screen.hide();
     calibration_screen.hide();
     confirm_screen.hide();
     autotune_screen.hide();
@@ -223,8 +223,8 @@ void UIManager::switch_to_state(UIState new_state) {
             grinding_screen.show();
             break;
 
-        case UIState::SETTINGS:
-            settings_screen.show();
+        case UIState::MENU:
+            menu_screen.show();
             break;
 
         case UIState::CALIBRATION: {
@@ -276,7 +276,7 @@ void UIManager::init_controllers() {
     ready_controller_ = std::make_unique<ReadyUIController>(this);
     edit_controller_ = std::make_unique<EditUIController>(this);
     grinding_controller_ = std::make_unique<GrindingUIController>(this);
-    settings_controller_ = std::make_unique<SettingsUIController>(this);
+    menu_controller_ = std::make_unique<MenuUIController>(this);
     status_indicator_controller_ = std::make_unique<StatusIndicatorController>(this);
     calibration_controller_ = std::make_unique<CalibrationUIController>(this);
     autotune_controller_ = std::make_unique<AutoTuneUIController>(this);
@@ -297,7 +297,7 @@ void UIManager::register_controller_events() {
     if (ready_controller_) ready_controller_->register_events();
     if (edit_controller_) edit_controller_->register_events();
     if (grinding_controller_) grinding_controller_->register_events();
-    if (settings_controller_) settings_controller_->register_events();
+    if (menu_controller_) menu_controller_->register_events();
     if (calibration_controller_) calibration_controller_->register_events();
     if (autotune_controller_) autotune_controller_->register_events();
     if (confirm_controller_) confirm_controller_->register_events();

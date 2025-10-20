@@ -127,7 +127,7 @@ void CalibrationUIController::handle_ok() {
             break;
         case CAL_STEP_COMPLETE:
             ui_manager_->set_current_tab(3);
-            ui_manager_->switch_to_state(UIState::SETTINGS);
+            ui_manager_->switch_to_state(UIState::MENU);
             break;
     }
 }
@@ -138,7 +138,7 @@ void CalibrationUIController::handle_cancel() {
     reset_noise_check_state();
     baseline_adc_value_ = 0;
     ui_manager_->set_current_tab(3);
-    ui_manager_->switch_to_state(UIState::SETTINGS);
+    ui_manager_->switch_to_state(UIState::MENU);
     ui_manager_->refresh_auto_action_settings();
 }
 
