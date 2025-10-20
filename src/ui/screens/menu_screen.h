@@ -16,7 +16,6 @@ private:
     lv_obj_t* bluetooth_page;
     lv_obj_t* display_page;
     lv_obj_t* grind_mode_page;
-    lv_obj_t* tools_page;
     lv_obj_t* data_page;
     lv_obj_t* stats_page;
     lv_obj_t* diagnostics_page;
@@ -129,7 +128,6 @@ private:
     void create_bluetooth_page(lv_obj_t* parent);
     void create_display_page(lv_obj_t* parent);
     void create_grind_mode_page(lv_obj_t* parent);
-    void create_tools_page(lv_obj_t* parent);
     void create_data_page(lv_obj_t* parent);
     void create_stats_page(lv_obj_t* parent);
     void create_diagnostics_page(lv_obj_t* parent);

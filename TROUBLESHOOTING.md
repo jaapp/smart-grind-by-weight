@@ -17,7 +17,7 @@
 **Applies to:** Eureka Mignon installations where the grinder motor does not activate when commanded.
 
 ### Symptoms
-- Motor test function (Menu → Tools → Motor Test) does not start the motor
+- Motor test function (Menu → Motor Test) does not start the motor
 - GRIND button does not start the motor
 - All other functionality works normally (screen, weight readings, etc.)
 
@@ -30,7 +30,7 @@ The motor control wire (Pin 3) and button signal wire (Pin 2) from the Eureka 4-
 
 **Option 1: Use Motor Test Function (Recommended)**
 
-Access **Menu → Tools → Motor Test** to verify motor connectivity. This button activates the motor for a short test pulse. If the motor does not run during the test, the motor wire is incorrectly connected.
+Access **Menu → Motor Test** (Tools section) to verify motor connectivity. This button activates the motor for a short test pulse. If the motor does not run during the test, the motor wire is incorrectly connected.
 
 **Option 2: Manual Wire Identification (Advanced - Use with Extreme Caution)**
 
@@ -194,7 +194,7 @@ Motor response latency mismatch between firmware settings and actual hardware ch
 
 **Recommended:** Use the Auto-Tune Motor Response feature to automatically calibrate optimal pulse duration for your hardware:
 
-1. **Access auto-tune**: Menu → Tools → Auto-Tune Motor Response
+1. **Access auto-tune**: Menu → Tune Pulses (Tools section)
 2. **Prepare system**:
    - Ensure beans are in hopper
    - Place dosing cup on scale

@@ -101,6 +101,12 @@ void MenuScreen::create_menu_ui() {
 
     // Create main page last
     lv_obj_t* main_page = lv_menu_page_create(menu, "Menu");
+    lv_obj_set_layout(main_page, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(main_page, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(main_page, 0, 0);
+    lv_obj_set_style_pad_gap(main_page, 18, 0);
+    lv_obj_set_scroll_dir(main_page, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(main_page, LV_SCROLLBAR_MODE_AUTO);
 
     // Create sub-pages with titles
     info_page = lv_menu_page_create(menu, "Info");
@@ -115,9 +121,6 @@ void MenuScreen::create_menu_ui() {
     grind_mode_page = lv_menu_page_create(menu, "Grind Settings");
     create_grind_mode_page(grind_mode_page);
     
-    tools_page = lv_menu_page_create(menu, "Tools");
-    create_tools_page(tools_page);
-    
     data_page = lv_menu_page_create(menu, "Logs & Data");
     create_data_page(data_page);
 
@@ -128,6 +131,35 @@ void MenuScreen::create_menu_ui() {
     create_diagnostics_page(diagnostics_page);
 
     // Create menu items grouped with separators
+    create_separator(main_page, "Tools");
+    tare_button = create_menu_item(main_page, "Tare Scale");
+    cal_button = create_menu_item(main_page, "Calibrate");
+    autotune_button = create_menu_item(main_page, "Tune Pulses");
+    motor_test_button = create_menu_item(main_page, "Motor Test");
+
+    lv_obj_add_flag(tare_button, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(cal_button, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(autotune_button, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(motor_test_button, LV_OBJ_FLAG_CLICKABLE);
+
+    using ET = EventBridgeLVGL::EventType;
+    if (tare_button) {
+        lv_obj_add_event_cb(tare_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_TARE)));
+    }
+    if (cal_button) {
+        lv_obj_add_event_cb(cal_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_CALIBRATE)));
+    }
+    if (autotune_button) {
+        lv_obj_add_event_cb(autotune_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_AUTOTUNE)));
+    }
+    if (motor_test_button) {
+        lv_obj_add_event_cb(motor_test_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_MOTOR_TEST)));
+    }
+
     create_separator(main_page, "Settings");
     lv_obj_t* bluetooth_item = create_menu_item(main_page, "Bluetooth");
     lv_menu_set_load_page_event(menu, bluetooth_item, bluetooth_page);
@@ -137,10 +169,6 @@ void MenuScreen::create_menu_ui() {
 
     lv_obj_t* grind_mode_item = create_menu_item(main_page, "Grind Settings");
     lv_menu_set_load_page_event(menu, grind_mode_item, grind_mode_page);
-
-    create_separator(main_page, "Maintenance");
-    lv_obj_t* tools_item = create_menu_item(main_page, "Tools");
-    lv_menu_set_load_page_event(menu, tools_item, tools_page);
 
     create_separator(main_page, "Info");
     lv_obj_t* diagnostics_item = create_menu_item(main_page, "Diagnostics");
@@ -333,41 +361,6 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
-    }
-}
-
-void MenuScreen::create_tools_page(lv_obj_t* parent) {
-    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 20, 0);
-    
-    // Disable scrolling on the page container itself
-    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_OFF);
-
-    tare_button = create_button(parent, "Tare Scale");
-    cal_button = create_button(parent, "Calibrate");
-    autotune_button = create_button(parent, "Tune Pulses");
-    motor_test_button = create_button(parent, "Motor Test");
-
-    // Register events for the buttons (done here because widgets are created lazily)
-    using ET = EventBridgeLVGL::EventType;
-    if (tare_button) {
-        lv_obj_add_event_cb(tare_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_TARE)));
-    }
-    if (cal_button) {
-        lv_obj_add_event_cb(cal_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_CALIBRATE)));
-    }
-    if (autotune_button) {
-        lv_obj_add_event_cb(autotune_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_AUTOTUNE)));
-    }
-    if (motor_test_button) {
-        lv_obj_add_event_cb(motor_test_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_MOTOR_TEST)));
     }
 }
 

@@ -204,7 +204,7 @@ python3 tools/grinder.py upload smart-grind-by-weight-vX.X.X.bin
 
 After flashing firmware, calibrate the load cell for accurate measurements:
 
-1. **Access calibration**: Menu → Tools → Press "Calibrate"
+1. **Access calibration**: Menu → Calibrate (Tools section)
 2. **Empty calibration**: Remove all weight from scale platform → Press OK
 3. **Weight calibration**: 
    - Place known weight on scale (e.g., coffee mug with water)
@@ -215,20 +215,20 @@ After flashing firmware, calibrate the load cell for accurate measurements:
 
 ### Auto-Tune Motor Response
 
-The auto-tune feature models your grinder's motor response behavior by measuring the physical lag between relay activation and grounds production. This accounts for hardware variations like voltage differences (110V vs 220V), relay types (solid-state vs mechanical), and burr inertia across different grinder models. The default 50ms value works well for most setups, but if you experience unreliable pulse corrections or want to minimize coffee waste through hardware-specific optimization, run auto-tune via **Menu → Tools → Auto-Tune Motor Response**. The 1-2 minute calibration process finds the minimum reliable pulse duration for your specific hardware and saves it automatically.
+The auto-tune feature models your grinder's motor response behavior by measuring the physical lag between relay activation and grounds production. This accounts for hardware variations like voltage differences (110V vs 220V), relay types (solid-state vs mechanical), and burr inertia across different grinder models. The default 50ms value works well for most setups, but if you experience unreliable pulse corrections or want to minimize coffee waste through hardware-specific optimization, run auto-tune via **Menu → Tune Pulses** (Tools section). The 1-2 minute calibration process finds the minimum reliable pulse duration for your specific hardware and saves it automatically.
 
 ### Diagnostics System
 
 The system includes comprehensive load cell health monitoring accessible via **Menu → Diagnostics**. A warning icon (⚠) appears in the top-right corner when diagnostics are active - tap it to navigate directly to the diagnostics page.
 
 **Diagnostic Types:**
-1. **Load Cell Not Calibrated** - Appears until calibration is completed via Menu → Tools → Calibrate
+1. **Load Cell Not Calibrated** - Appears until calibration is completed via Menu → Calibrate (Tools section)
 2. **Sustained Noise** - Triggers after 60 seconds of excessive noise; clears after 120 seconds of acceptable levels
 3. **Mechanical Instability** - Detects sudden weight drops during grinding (3+ events); auto-resets on next grind or via manual reset
 
 **Displayed Values:**
 - **Motor Latency** - Current motor response latency in milliseconds (default: 50ms, or calibrated value from auto-tune)
-- **Calibration Factor** - Load cell calibration factor from Menu → Tools → Calibrate
+- **Calibration Factor** - Load cell calibration factor from Menu → Calibrate (Tools section)
 
 **Noise Floor Diagnostics:**
 
@@ -308,49 +308,55 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
 |   \-- GRIND button (red=weight, blue=time)
 |   \-- Time mode completion: OK + PULSE buttons
 |
-\-- Menu (hierarchical navigation)
+\-- Menu (scrollable hub)
     |
-    +-- System Info
-    |   |-- Firmware version & build number
-    |   |-- Real-time weight sensor data (instant, samples, raw)
-    |   |-- Uptime display
-    |   \-- Memory usage
+    +-- Tools (quick actions)
+    |   |-- Tare Scale (instant tare)
+    |   |-- Calibrate (launch calibration workflow)
+    |   |-- Tune Pulses (auto-tune motor latency)
+    |   \-- Motor Test (1s safety pulse)
     |
-    +-- Diagnostics
-    |   |-- Load Cell Status (calibration flag, calibration factor)
-    |   |-- Noise Floor (std dev g/ADC, noise level indicator)
-    |   |-- Active diagnostic warnings
-    |   \-- Reset diagnostics button
+    +-- Settings
+    |   +-- Bluetooth
+    |   |   |-- Bluetooth toggle (30m timer)
+    |   |   |-- Bluetooth startup toggle (configurable auto-enable)
+    |   |   |-- Connection status display
+    |   |   \-- Auto-disable timer display
+    |   |
+    |   +-- Display
+    |   |   |-- Normal brightness slider
+    |   |   \-- Screensaver brightness slider
+    |   |
+    |   \-- Grind Settings
+    |       |-- Swipe Gestures toggle (enable/disable vertical swipes)
+    |       |-- Time Mode toggle (direct weight/time mode selection)
+    |       |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
+    |       \-- Return on Removal toggle (drop back to Ready when that weight leaves)
     |
-    +-- Bluetooth
-    |   |-- Bluetooth toggle (30m timer)
-    |   |-- Bluetooth startup toggle (configurable auto-enable)
-    |   |-- Connection status display
-    |   \-- Auto-disable timer display
-    |
-    +-- Display
-    |   |-- Normal brightness slider
-    |   \-- Screensaver brightness slider
-    |
-    +-- Grind Settings
-    |   |-- Swipe Gestures toggle (enable/disable vertical swipes)
-    |   |-- Time Mode toggle (direct weight/time mode selection)
-    |   |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
-    |   \-- Return on Removal toggle (drop back to Ready when that weight leaves)
-    |
-    +-- Tools
-    |   |-- Tare button
-    |   |-- Calibrate button
-    |   |-- Auto-Tune Motor Response button
-    |   \-- Motor test button
-    |
-    \-- Data
-        |-- Logging toggle (enable/disable session file writing)
-        |-- Sessions count
-        |-- Events count
-        |-- Measurements count
-        |-- Purge data button (clears logged grind sessions)
-        \-- Factory reset button
+    \-- Info
+        +-- Diagnostics
+        |   |-- Load Cell Status (calibration flag, calibration factor)
+        |   |-- Noise Floor (std dev g/ADC, noise level indicator)
+        |   |-- Active diagnostic warnings
+        |   \-- Reset diagnostics button
+        |
+        +-- System Info
+        |   |-- Firmware version & build number
+        |   |-- Real-time weight sensor data (instant, samples, raw)
+        |   |-- Uptime display
+        |   \-- Memory usage
+        |
+        +-- Logs & Data
+        |   |-- Logging toggle (enable/disable session file writing)
+        |   |-- Sessions / Events / Measurements counters
+        |   |-- Purge Logs button
+        |   \-- Factory Reset button
+        |
+        \-- Lifetime Stats
+            |-- Refresh Stats button
+            |-- Total grinds, shots, weight
+            |-- Motor runtime, uptime, accuracy
+            \-- Pulse counts
 
 During Grinding:
 |-- Weight display & progress
@@ -492,7 +498,7 @@ The motor response latency represents the physical system lag between relay acti
 - Motor inertia (110V vs 220V motors)
 - Burr spin-up characteristics (different grinder models/designs)
 
-The latency value is automatically calibrated via **Auto-Tune Motor Response** (Menu → Tools) using binary search with statistical verification, or uses a safe 50ms default. This enables universal grinder compatibility without firmware modifications.
+The latency value is automatically calibrated via **Auto-Tune Motor Response** (Menu → Tune Pulses) using binary search with statistical verification, or uses a safe 50ms default. This enables universal grinder compatibility without firmware modifications.
 
 **Key Features:**
 - Noise-resistant through multi-modal load cell measurement (instant, smoothed, filtered)
