@@ -104,7 +104,7 @@ void MenuScreen::create_menu_ui() {
     lv_obj_set_layout(main_page, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(main_page, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(main_page, 0, 0);
-    lv_obj_set_style_pad_gap(main_page, 18, 0);
+    lv_obj_set_style_pad_gap(main_page, 0, 0);
     lv_obj_set_scroll_dir(main_page, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(main_page, LV_SCROLLBAR_MODE_AUTO);
 
