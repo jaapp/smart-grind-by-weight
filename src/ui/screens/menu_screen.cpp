@@ -62,7 +62,12 @@ void MenuScreen::create_menu_ui() {
     lv_obj_set_layout(header, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_bottom(header, 10, 0);
+    lv_coord_t title_base_height = lv_font_get_line_height(&lv_font_montserrat_36);
+    lv_coord_t title_target_height = (title_base_height * 3) / 2; // ~50% taller
+    lv_coord_t title_padding = (title_target_height - title_base_height) / 2;
+    lv_obj_set_style_min_height(header, title_target_height, 0);
+    lv_obj_set_style_pad_top(header, title_padding, 0);
+    lv_obj_set_style_pad_bottom(header, title_padding, 0);
 
     // Get the header label
     lv_obj_t* header_label = lv_obj_get_child(header, -1);
@@ -70,12 +75,18 @@ void MenuScreen::create_menu_ui() {
         lv_obj_set_style_text_align(header_label, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_style_text_font(header_label, &lv_font_montserrat_36, 0);
         lv_obj_set_style_text_color(header_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        lv_obj_set_style_min_height(header_label, title_target_height, 0);
+        lv_obj_set_style_pad_top(header_label, title_padding, 0);
+        lv_obj_set_style_pad_bottom(header_label, title_padding, 0);
     }
     // Get and style the chevron first
     lv_obj_t* back_chevron = lv_menu_get_main_header_back_button(menu);
     lv_obj_set_style_text_font(back_chevron, &lv_font_montserrat_32, 0);
     lv_obj_set_ext_click_area(back_chevron, 200);
     lv_obj_set_style_text_color(back_chevron, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_set_style_min_height(back_chevron, title_target_height, 0);
+    lv_obj_set_style_pad_top(back_chevron, title_padding, 0);
+    lv_obj_set_style_pad_bottom(back_chevron, title_padding, 0);
 
     // Force layout update to get proper chevron dimensions
     lv_obj_update_layout(header);
