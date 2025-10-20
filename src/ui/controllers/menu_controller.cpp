@@ -8,6 +8,7 @@
 #include <nvs_flash.h>
 #include <cstdint>
 #include "../../config/constants.h"
+#include "../../controllers/grind_controller.h"
 #include "../../controllers/grind_mode_traits.h"
 #include "../../logging/grind_logging.h"
 #include "../../system/diagnostics_controller.h"
@@ -47,6 +48,7 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
+    EventBridgeLVGL::register_handler(ET::GRIND_PRIME_TOGGLE, [this](lv_event_t*) { handle_prime_toggle(); });
 
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER, [this](lv_event_t*) { handle_brightness_normal_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
@@ -374,6 +376,23 @@ void MenuUIController::handle_auto_return_toggle() {
     }
 
     LOG_DEBUG_PRINTLN(enabled ? "Auto return on cup removal enabled" : "Auto return on cup removal disabled");
+}
+
+void MenuUIController::handle_prime_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->menu_screen.get_prime_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    auto* hardware = ui_manager_->get_hardware_manager();
+    Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+    if (prefs) {
+        prefs->putBool(GrindController::PREF_KEY_PRIME_ENABLED, enabled);
+    }
+
+    LOG_DEBUG_PRINTLN(enabled ? "Chute priming enabled" : "Chute priming disabled");
 }
 
 void MenuUIController::handle_brightness_normal_slider() {

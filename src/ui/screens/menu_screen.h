@@ -61,6 +61,7 @@ private:
     lv_obj_t* grind_mode_swipe_toggle;
     lv_obj_t* auto_start_toggle;
     lv_obj_t* auto_return_toggle;
+    lv_obj_t* prime_toggle;
     
     // Tools entries / scale page elements
     lv_obj_t* scale_item;
@@ -127,6 +128,7 @@ public:
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
+    lv_obj_t* get_prime_toggle() const { return prime_toggle; }
 
 private:
     void create_menu_ui();

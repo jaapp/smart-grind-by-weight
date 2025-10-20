@@ -31,6 +31,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     target_time_ms = 0;
     time_grind_start_ms = 0;
     mode = GrindMode::WEIGHT;
+    prime_enabled_for_session = false;
     last_error_message[0] = '\0';
 
     mechanical_anomaly_count_ = 0;
@@ -108,6 +109,10 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     target_weight = target;
     target_time_ms = time_ms;
     mode = grind_mode;
+    prime_enabled_for_session = false;
+    if (mode == GrindMode::WEIGHT && preferences) {
+        prime_enabled_for_session = preferences->getBool(PREF_KEY_PRIME_ENABLED, false);
+    }
     start_time = millis();
     pulse_attempts = 0;
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
@@ -192,6 +197,7 @@ void GrindController::return_to_idle() {
         LOG_BLE("[%lums CONTROLLER] UI acknowledged completion/timeout, returning to IDLE.\n", millis());
         time_grind_start_ms = 0;
         target_time_ms = 0;
+        prime_enabled_for_session = false;
         last_error_message[0] = '\0';
         if (active_strategy) {
             active_strategy->on_exit(session_descriptor, strategy_context);
@@ -214,6 +220,7 @@ void GrindController::stop_grind() {
     
     time_grind_start_ms = 0;
     target_time_ms = 0;
+    prime_enabled_for_session = false;
     last_error_message[0] = '\0';
     if (active_strategy) {
         active_strategy->on_exit(session_descriptor, strategy_context);
@@ -283,16 +290,57 @@ void GrindController::update() {
             if (!weight_sensor->is_tare_in_progress()) {
                 // Double confirm weights are settled
                 if (weight_sensor->is_settled()) {
-                    grinder->start();  // Start motor
+                    if (!grinder->is_grinding()) {
+                        grinder->start();  // Ensure motor is running
+                    }
                     time_grind_start_ms = loop_data.now;
                     if (mode == GrindMode::TIME) {
                         switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+                    } else if (prime_enabled_for_session) {
+                        switch_phase(GrindPhase::PRIME, loop_data);
                     } else {
                         switch_phase(GrindPhase::PREDICTIVE, loop_data);
                     }
                 }
             }
             break;
+
+        case GrindPhase::PRIME: {
+            if (!grinder->is_grinding()) {
+                grinder->start();
+            }
+
+            bool reached_weight = loop_data.current_weight >= GRIND_PRIME_TARGET_WEIGHT_G;
+            bool exceeded_duration = (loop_data.now - phase_start_time) >= GRIND_PRIME_MAX_DURATION_MS;
+            if (reached_weight || exceeded_duration) {
+                grinder->stop();
+                if (exceeded_duration && !reached_weight) {
+                    queue_log_message("[PRIME] Max duration reached (%.2fg delivered)\n", loop_data.current_weight);
+                }
+                switch_phase(GrindPhase::PRIME_SETTLING, loop_data);
+            }
+            break;
+        }
+
+        case GrindPhase::PRIME_SETTLING: {
+            if (!weight_sensor) {
+                break;
+            }
+
+            bool settled = weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+            bool settling_timed_out = (loop_data.now - phase_start_time) >= GRIND_SCALE_SETTLING_TIMEOUT_MS;
+            if (settled || settling_timed_out) {
+                if (settling_timed_out && !settled) {
+                    queue_log_message("[PRIME] Settling timeout, resuming grind\n");
+                }
+                flow_start_confirmed = false;
+                grind_latency_ms = 0;
+                grinder->start();
+                time_grind_start_ms = loop_data.now;
+                switch_phase(GrindPhase::PREDICTIVE, loop_data);
+            }
+            break;
+        }
 
         case GrindPhase::TIME_GRINDING:
             if (mode == GrindMode::TIME && active_strategy) {
@@ -535,7 +583,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
         } else if (phase == GrindPhase::PULSE_DECISION) {
             event_in_progress.pulse_flow_rate = pulse_flow_rate;
             event_in_progress.loop_count = current_phase_loop_count;
-        } else if (phase == GrindPhase::PULSE_SETTLING || phase == GrindPhase::FINAL_SETTLING) {
+        } else if (phase == GrindPhase::PULSE_SETTLING || phase == GrindPhase::FINAL_SETTLING || phase == GrindPhase::PRIME_SETTLING) {
             event_in_progress.settling_duration_ms = event_in_progress.duration_ms;
             event_in_progress.pulse_flow_rate = pulse_flow_rate;
             event_in_progress.loop_count = current_phase_loop_count;
@@ -544,7 +592,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
         // For all other phases, just log the general loop count
         if (phase != GrindPhase::PREDICTIVE && phase != GrindPhase::PULSE_EXECUTE && 
             phase != GrindPhase::PULSE_DECISION && phase != GrindPhase::PULSE_SETTLING && 
-            phase != GrindPhase::FINAL_SETTLING) {
+            phase != GrindPhase::FINAL_SETTLING && phase != GrindPhase::PRIME_SETTLING) {
             event_in_progress.loop_count = current_phase_loop_count;
         }
 
@@ -573,6 +621,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
         }
 
         switch (new_phase) {
+            case GrindPhase::PRIME:
             case GrindPhase::PREDICTIVE:
             case GrindPhase::TIME_GRINDING:
                 event_in_progress.event_flags |= GRIND_EVENT_FLAG_MOTOR_ACTIVE;
@@ -671,6 +720,8 @@ const char* GrindController::get_phase_name(GrindPhase p) const {
         case GrindPhase::SETUP: return "SETUP";
         case GrindPhase::TARING: return "TARING";
         case GrindPhase::TARE_CONFIRM: return "TARE_CONFIRM";
+        case GrindPhase::PRIME: return "PRIME";
+        case GrindPhase::PRIME_SETTLING: return "PRIME_SETTLING";
         case GrindPhase::PREDICTIVE: return "PREDICTIVE";
         case GrindPhase::PULSE_DECISION: return "PULSE_DECISION";
         case GrindPhase::PULSE_EXECUTE: return "PULSE_EXECUTE";

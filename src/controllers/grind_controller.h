@@ -66,7 +66,9 @@ enum class GrindPhase {
     TIME_GRINDING,      // Time-based grinding phase
     TIME_ADDITIONAL_PULSE, // Additional pulse in time mode after completion
     COMPLETED,          // Grind completed (success, overshoot, or max pulses)
-    TIMEOUT             // Grind timed out
+    TIMEOUT,            // Grind timed out
+    PRIME,              // Optional chute priming grind
+    PRIME_SETTLING      // Settling after priming grind
 };
 
 
@@ -96,6 +98,7 @@ private:
     
     float tolerance;
     GrindMode mode;
+    bool prime_enabled_for_session;
     
     // Timeout tracking
     GrindPhase timeout_phase;   // Phase when timeout occurred
@@ -198,6 +201,7 @@ public:
     bool is_active() const;
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
+    static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
     GrindMode get_mode() const { return mode; }
     const GrindSessionDescriptor& get_session_descriptor() const { return session_descriptor; }
     

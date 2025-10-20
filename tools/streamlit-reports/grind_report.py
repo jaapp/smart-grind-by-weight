@@ -86,6 +86,15 @@ def get_phase_specific_hover_data(events_df):
                    "End Weight: %{customdata[3]:.3f}g<extra></extra>")
         custom_data = events_df[base_cols].values.tolist()
 
+    elif phase == 'PRIME':
+        template = ("<b>%{customdata[0]}</b><br>"
+                   "Duration: %{customdata[1]} ms<br>"
+                   "Primed Weight: %{customdata[4]:.3f}g<br>"
+                   "Start: %{customdata[2]:.3f}g → End: %{customdata[3]:.3f}g<extra></extra>")
+        events_df['yield'] = events_df['end_weight'] - events_df['start_weight']
+        custom_cols = base_cols + ['yield']
+        custom_data = events_df[custom_cols].values.tolist()
+
     elif phase == 'PREDICTIVE':
         template = ("<b>%{customdata[0]}</b><br>"
                    "Duration: %{customdata[1]} ms<br>"
@@ -117,6 +126,16 @@ def get_phase_specific_hover_data(events_df):
                    "Settling Duration: %{customdata[5]} ms<br>"
                    "Phase Duration: %{customdata[1]} ms<br>"
                    "Yield: %{customdata[4]:.3f}g<br>"
+                   "Start: %{customdata[2]:.3f}g → End: %{customdata[3]:.3f}g<extra></extra>")
+        events_df['yield'] = events_df['end_weight'] - events_df['start_weight']
+        custom_cols = base_cols + ['yield', 'settling_duration_ms']
+        custom_data = events_df[custom_cols].values.tolist()
+
+    elif phase == 'PRIME_SETTLING':
+        template = ("<b>%{customdata[0]}</b><br>"
+                   "Settling Duration: %{customdata[5]} ms<br>"
+                   "Phase Duration: %{customdata[1]} ms<br>"
+                   "Residual Gain: %{customdata[4]:.3f}g<br>"
                    "Start: %{customdata[2]:.3f}g → End: %{customdata[3]:.3f}g<extra></extra>")
         events_df['yield'] = events_df['end_weight'] - events_df['start_weight']
         custom_cols = base_cols + ['yield', 'settling_duration_ms']
@@ -390,6 +409,8 @@ if analysis_mode == "Single Session":
         phase_descriptions = {
             'TARING': 'Zeroing scale before grind',
             'TARE_CONFIRM': 'Confirming tare completion',
+            'PRIME': 'Priming grind to refill chute',
+            'PRIME_SETTLING': 'Settling after priming grind',
             'PREDICTIVE': 'Main grinding with flow prediction',
             'PULSE_DECISION': 'Deciding if correction needed',
             'PULSE_EXECUTE': 'Executing precision pulse',
@@ -453,7 +474,7 @@ if analysis_mode == "Single Session":
             start_time = predictive_start_event['timestamp_ms'].min()
             
             # Find the end of the last settling phase
-            settling_phases = ['FINAL_SETTLING', 'PULSE_SETTLING']
+            settling_phases = ['FINAL_SETTLING', 'PULSE_SETTLING', 'PRIME_SETTLING']
             last_settle_event = session_events[session_events['phase_name'].isin(settling_phases)]
             if not last_settle_event.empty:
                 end_time = (last_settle_event['timestamp_ms'] + last_settle_event['duration_ms']).max()
@@ -963,7 +984,7 @@ else: # Multi-Session Analysis
                 predictive_start = events[events['phase_name'] == 'PREDICTIVE']
                 if not predictive_start.empty:
                     start_time = predictive_start['timestamp_ms'].min()
-                    settling_phases = ['FINAL_SETTLING', 'PULSE_SETTLING']
+                    settling_phases = ['FINAL_SETTLING', 'PULSE_SETTLING', 'PRIME_SETTLING']
                     last_settle = events[events['phase_name'].isin(settling_phases)]
                     if not last_settle.empty:
                         end_time = (last_settle['timestamp_ms'] + last_settle['duration_ms']).max()
@@ -1056,7 +1077,7 @@ else: # Multi-Session Analysis
                         # Find the first settling phase after predictive end
                         settling_events = multi_session_events[
                             (multi_session_events['session_id'] == session_id) &
-                            (multi_session_events['phase_name'].isin(['PULSE_SETTLING', 'FINAL_SETTLING'])) &
+                            (multi_session_events['phase_name'].isin(['PULSE_SETTLING', 'FINAL_SETTLING', 'PRIME_SETTLING'])) &
                             (multi_session_events['timestamp_ms'] >= pred_end_time)
                         ].sort_values('timestamp_ms')
                         

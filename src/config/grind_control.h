@@ -22,6 +22,10 @@
 #define GRIND_UNDERSHOOT_TARGET_G 1.0f                                    // Default conservative undershoot target
 #define GRIND_LATENCY_TO_COAST_RATIO 1.0f                                 // Ratio of expected coast time to measured latency (e.g., 0.8 = 80%)
 
+// Prime phase behavior
+#define GRIND_PRIME_TARGET_WEIGHT_G 1.0f                                   // Amount of coffee delivered during chute priming
+#define GRIND_PRIME_MAX_DURATION_MS 5000                                   // Safety timeout for chute priming run
+
 //------------------------------------------------------------------------------
 // SCALE CALIBRATION AND SETTLING
 //------------------------------------------------------------------------------

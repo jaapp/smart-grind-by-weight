@@ -40,6 +40,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     scale_weight_label = nullptr;
     scale_tare_button = nullptr;
     scale_item = nullptr;
+    prime_toggle = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 
     // Create menu UI immediately at boot for instant access
@@ -365,6 +366,11 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
     create_toggle_row(parent, "Return", &auto_return_toggle);
 
+    // Advanced priming option
+    create_separator(parent, "Advanced");
+    create_description_label(parent, "The grinder assumes the chute starts primed. Enable priming if you purge or blow out the chute before grinding.");
+    create_toggle_row(parent, "Prime", &prime_toggle);
+
     // Register events for the toggles (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
     if (grind_mode_swipe_toggle) {
@@ -378,6 +384,10 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
+    }
+    if (prime_toggle) {
+        lv_obj_add_event_cb(prime_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_PRIME_TOGGLE)));
     }
 }
 
@@ -1035,10 +1045,14 @@ void MenuScreen::update_grind_mode_toggles() {
 
     // Read current grind mode from main grinder preferences using hardware manager
     int mode_index = 0; // Default to Weight (index 0)
+    bool prime_enabled = false;
     if (hardware_manager) {
         Preferences* main_prefs = hardware_manager->get_preferences();
-        int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
-        mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
+        if (main_prefs) {
+            int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
+            mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
+            prime_enabled = main_prefs->getBool(GrindController::PREF_KEY_PRIME_ENABLED, false);
+        }
     }
 
     if (grind_mode_radio_group) {
@@ -1073,6 +1087,14 @@ void MenuScreen::update_grind_mode_toggles() {
             lv_obj_add_state(auto_return_toggle, LV_STATE_CHECKED);
         } else {
             lv_obj_clear_state(auto_return_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    if (prime_toggle) {
+        if (prime_enabled) {
+            lv_obj_add_state(prime_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(prime_toggle, LV_STATE_CHECKED);
         }
     }
 }

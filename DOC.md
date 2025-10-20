@@ -267,6 +267,8 @@ Access **Menu → Grind Settings** to configure:
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
 - **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
 - **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
+- **Prime** *(Advanced)*: The grinder assumes the chute is primed (filled with grounds). If you have a workflow where you clear the chute, enable this option.  
+  *Explanation:* The time between motor start and grinds hitting the cup (grind latency) is used to predict the coast time (how long grinds will keep coming after the motor is disengaged). If the chute is cleaned this may lead to undershoots because the grind latency now includes time to prime the chute (refilling with grounds that become retention) as well.
 
 ### Basic Operation
 These steps describe the default grind-by-weight workflow:
