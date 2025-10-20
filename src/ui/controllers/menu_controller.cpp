@@ -32,7 +32,8 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::MENU_RESET, [this](lv_event_t*) { handle_reset(); });
     EventBridgeLVGL::register_handler(ET::MENU_PURGE, [this](lv_event_t*) { handle_purge(); });
     EventBridgeLVGL::register_handler(ET::MENU_MOTOR_TEST, [this](lv_event_t*) { handle_motor_test(); });
-    EventBridgeLVGL::register_handler(ET::MENU_TARE, [this](lv_event_t*) { handle_tare(); });
+    EventBridgeLVGL::register_handler(ET::MENU_SCALE_OPEN, [this](lv_event_t*) { handle_scale_open(); });
+    EventBridgeLVGL::register_handler(ET::MENU_SCALE_TARE, [this](lv_event_t*) { handle_scale_tare(); });
     EventBridgeLVGL::register_handler(ET::MENU_AUTOTUNE, [this](lv_event_t*) { handle_autotune(); });
     EventBridgeLVGL::register_handler(ET::MENU_DIAGNOSTIC_RESET, [this](lv_event_t*) { handle_diagnostics_reset(); });
     EventBridgeLVGL::register_handler(ET::MENU_BACK, [this](lv_event_t*) { handle_back(); });
@@ -69,6 +70,11 @@ void MenuUIController::update() {
     ui_manager_->menu_screen.update_info(sensor, uptime_ms, free_heap);
     ui_manager_->menu_screen.update_diagnostics(sensor);
     ui_manager_->menu_screen.update_ble_status();
+
+    if (ui_manager_->menu_screen.is_scale_page_active()) {
+        float display_weight = sensor ? sensor->get_display_weight() : 0.0f;
+        ui_manager_->menu_screen.update_scale_weight(display_weight);
+    }
 }
 
 void MenuUIController::handle_calibrate() {
@@ -129,11 +135,38 @@ void MenuUIController::handle_motor_test() {
     );
 }
 
-void MenuUIController::handle_tare() {
+void MenuUIController::handle_scale_open() {
     if (!ui_manager_) return;
-    UIOperations::execute_tare(ui_manager_->get_hardware_manager(), [this]() {
-        if (ui_manager_) {
-            ui_manager_->refresh_auto_action_settings();
+    auto* hardware = ui_manager_->get_hardware_manager();
+    if (!hardware) return;
+
+    ui_manager_->menu_screen.reset_scale_display();
+
+    UIOperations::execute_tare(hardware, [this]() {
+        if (!ui_manager_) return;
+        ui_manager_->refresh_auto_action_settings();
+
+        auto* sensor = ui_manager_->hardware_manager->get_weight_sensor();
+        float weight = sensor ? sensor->get_display_weight() : 0.0f;
+        if (ui_manager_->menu_screen.is_scale_page_active()) {
+            ui_manager_->menu_screen.update_scale_weight(weight);
+        }
+    });
+}
+
+void MenuUIController::handle_scale_tare() {
+    if (!ui_manager_) return;
+    auto* hardware = ui_manager_->get_hardware_manager();
+    if (!hardware) return;
+
+    UIOperations::execute_tare(hardware, [this]() {
+        if (!ui_manager_) return;
+        ui_manager_->refresh_auto_action_settings();
+
+        auto* sensor = ui_manager_->hardware_manager->get_weight_sensor();
+        float weight = sensor ? sensor->get_display_weight() : 0.0f;
+        if (ui_manager_->menu_screen.is_scale_page_active()) {
+            ui_manager_->menu_screen.update_scale_weight(weight);
         }
     });
 }

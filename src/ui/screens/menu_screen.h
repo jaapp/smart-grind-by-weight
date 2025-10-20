@@ -19,6 +19,7 @@ private:
     lv_obj_t* data_page;
     lv_obj_t* stats_page;
     lv_obj_t* diagnostics_page;
+    lv_obj_t* scale_page;
 
     // Info tab elements
     lv_obj_t* info_label;
@@ -61,11 +62,13 @@ private:
     lv_obj_t* auto_start_toggle;
     lv_obj_t* auto_return_toggle;
     
-    // Tools tab elements
+    // Tools entries / scale page elements
+    lv_obj_t* scale_item;
     lv_obj_t* cal_button;
     lv_obj_t* motor_test_button;
-    lv_obj_t* tare_button;
     lv_obj_t* autotune_button;
+    lv_obj_t* scale_weight_label;
+    lv_obj_t* scale_tare_button;
 
     // Diagnostics tab elements
     lv_obj_t* diag_status_label;
@@ -79,6 +82,7 @@ private:
 
     // Common elements
     bool visible;
+    bool scale_active;
     
     BluetoothManager* bluetooth_manager;
     GrindController* grind_controller;
@@ -99,7 +103,9 @@ public:
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
     void update_grind_mode_toggles();
-    
+    void reset_scale_display();
+    void update_scale_weight(float weight);
+
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
     lv_obj_t* get_tabview() const { return menu; }
@@ -108,8 +114,8 @@ public:
     lv_obj_t* get_purge_button() const { return purge_button; }
     lv_obj_t* get_reset_button() const { return reset_button; }
     lv_obj_t* get_motor_test_button() const { return motor_test_button; }
-    lv_obj_t* get_tare_button() const { return tare_button; }
     lv_obj_t* get_autotune_button() const { return autotune_button; }
+    bool is_scale_page_active() const { return scale_active; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
     lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
     lv_obj_t* get_logging_toggle() const { return logging_toggle; }
@@ -128,6 +134,7 @@ private:
     void create_bluetooth_page(lv_obj_t* parent);
     void create_display_page(lv_obj_t* parent);
     void create_grind_mode_page(lv_obj_t* parent);
+    void create_scale_page(lv_obj_t* parent);
     void create_data_page(lv_obj_t* parent);
     void create_stats_page(lv_obj_t* parent);
     void create_diagnostics_page(lv_obj_t* parent);

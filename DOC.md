@@ -283,6 +283,9 @@ Need the stock timed run? Enable swipe gestures in **Menu → Grind Settings**, 
 
 > **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
 
+### Quick Scale View
+Need a simple live readout? Open **Menu → Scale** to jump into a full-screen weight display. Entering the page automatically tares the scale (using the same blocking overlay as the main workflow), and a large `TARE` button at the bottom lets you re-zero manually whenever you need.
+
 ### Display Modes
 - **Arc Layout**: Clean, minimal arc-based interface
 - **Nerdy Layout**: Detailed charts showing flow rates and real-time grinding analytics
@@ -311,7 +314,7 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
 \-- Menu (scrollable hub)
     |
     +-- Tools (quick actions)
-    |   |-- Tare Scale (instant tare)
+    |   |-- Scale (live weight view with Tare action)
     |   |-- Calibrate (launch calibration workflow)
     |   |-- Tune Pulses (auto-tune motor latency)
     |   \-- Motor Test (1s safety pulse)

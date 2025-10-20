@@ -35,6 +35,11 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     lv_obj_set_style_pad_all(screen, 0, 0);
 
     visible = false;
+    scale_active = false;
+    scale_page = nullptr;
+    scale_weight_label = nullptr;
+    scale_tare_button = nullptr;
+    scale_item = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 
     // Create menu UI immediately at boot for instant access
@@ -121,6 +126,9 @@ void MenuScreen::create_menu_ui() {
     grind_mode_page = lv_menu_page_create(menu, "Grind Settings");
     create_grind_mode_page(grind_mode_page);
     
+    scale_page = lv_menu_page_create(menu, "Scale");
+    create_scale_page(scale_page);
+
     data_page = lv_menu_page_create(menu, "Logs & Data");
     create_data_page(data_page);
 
@@ -132,21 +140,19 @@ void MenuScreen::create_menu_ui() {
 
     // Create menu items grouped with separators
     create_separator(main_page, "Tools");
-    tare_button = create_menu_item(main_page, "Tare Scale");
+    scale_item = create_menu_item(main_page, "Scale");
     cal_button = create_menu_item(main_page, "Calibrate");
     autotune_button = create_menu_item(main_page, "Tune Pulses");
     motor_test_button = create_menu_item(main_page, "Motor Test");
 
-    lv_obj_add_flag(tare_button, LV_OBJ_FLAG_CLICKABLE);
+    lv_menu_set_load_page_event(menu, scale_item, scale_page);
+
+    lv_obj_add_flag(scale_item, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(cal_button, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(autotune_button, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(motor_test_button, LV_OBJ_FLAG_CLICKABLE);
 
     using ET = EventBridgeLVGL::EventType;
-    if (tare_button) {
-        lv_obj_add_event_cb(tare_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_TARE)));
-    }
     if (cal_button) {
         lv_obj_add_event_cb(cal_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_CALIBRATE)));
@@ -193,6 +199,17 @@ void MenuScreen::create_menu_ui() {
         lv_obj_t * cur = lv_menu_get_cur_main_page(menu);
         if (cur == self->data_page || cur == self->stats_page) {
             self->refresh_statistics();
+        }
+
+        bool on_scale = (cur == self->scale_page);
+        if (on_scale) {
+            if (!self->scale_active) {
+                self->scale_active = true;
+                self->reset_scale_display();
+                EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::MENU_SCALE_OPEN, e);
+            }
+        } else if (self->scale_active) {
+            self->scale_active = false;
         }
     };
 
@@ -361,6 +378,40 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
+    }
+}
+
+void MenuScreen::create_scale_page(lv_obj_t* parent) {
+    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(parent, 24, 0);
+    lv_obj_set_style_pad_gap(parent, 28, 0);
+    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_TRANSP, 0);
+
+    lv_obj_t* subtitle = lv_label_create(parent);
+    lv_label_set_text(subtitle, "Live weight");
+    lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(subtitle, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+
+    scale_weight_label = lv_label_create(parent);
+    lv_label_set_text(scale_weight_label, "0.0g");
+    lv_obj_set_style_text_font(scale_weight_label, &lv_font_montserrat_56, 0);
+    lv_obj_set_style_text_color(scale_weight_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_style_text_align(scale_weight_label, LV_TEXT_ALIGN_CENTER, 0);
+
+    lv_obj_t* spacer = lv_obj_create(parent);
+    lv_obj_set_size(spacer, LV_PCT(100), 0);
+    lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(spacer, 0, 0);
+    lv_obj_set_flex_grow(spacer, 1);
+
+    scale_tare_button = create_button(parent, "TARE", lv_color_hex(THEME_COLOR_PRIMARY), 260, 80, &lv_font_montserrat_28);
+    using ET = EventBridgeLVGL::EventType;
+    if (scale_tare_button) {
+        lv_obj_add_event_cb(scale_tare_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::MENU_SCALE_TARE)));
     }
 }
 
@@ -958,6 +1009,21 @@ lv_obj_t* MenuScreen::create_description_label(lv_obj_t* parent, const char* tex
     lv_obj_set_width(label, LV_PCT(100));
 
     return label;
+}
+
+void MenuScreen::reset_scale_display() {
+    if (scale_weight_label) {
+        lv_label_set_text(scale_weight_label, "0.0g");
+    }
+}
+
+void MenuScreen::update_scale_weight(float weight) {
+    if (!scale_weight_label) {
+        return;
+    }
+    char buffer[24];
+    snprintf(buffer, sizeof(buffer), SYS_WEIGHT_DISPLAY_FORMAT, weight);
+    lv_label_set_text(scale_weight_label, buffer);
 }
 
 void MenuScreen::update_grind_mode_toggles() {
