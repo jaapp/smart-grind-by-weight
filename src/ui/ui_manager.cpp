@@ -410,7 +410,13 @@ void UIManager::update_auto_actions() {
         const bool rearm_ready =
             (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
 
-        if (live_weight <= kCompleteExitThresholdG && rearm_ready) {
+        GrindController::GrindSessionResult session_result =
+            grind_controller ? grind_controller->get_last_session_result()
+                             : GrindController::GrindSessionResult::UNKNOWN;
+        const bool successful_result =
+            session_result == GrindController::GrindSessionResult::SUCCESS;
+
+        if (successful_result && live_weight <= kCompleteExitThresholdG && rearm_ready) {
             LOG_BLE("[AUTO ACTION] Detected near-empty scale - returning to ready screen\n");
             auto_actions_.last_auto_return_ms = now;
             if (grind_controller) {

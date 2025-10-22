@@ -172,6 +172,19 @@ private:
     float motor_response_latency_ms;
 
 public:
+    enum class GrindSessionResult {
+        UNKNOWN,
+        SUCCESS,
+        OVERSHOOT,
+        MAX_PULSES,
+        TIMEOUT,
+        ERROR
+    };
+
+private:
+    GrindSessionResult last_session_result_ = GrindSessionResult::UNKNOWN;
+
+public:
     void init(WeightSensor* lc, Grinder* gr, Preferences* prefs);
     void start_grind(float target_weight, uint32_t target_time_ms, GrindMode grind_mode);
     void user_tare_request();
@@ -186,6 +199,7 @@ public:
     
     // UI event system
     void set_ui_event_callback(void (*callback)(const GrindEventData&));
+    GrindSessionResult get_last_session_result() const { return last_session_result_; }
     void ui_acknowledge_phase_transition(); // Called by UI to confirm phase transition
     void process_queued_ui_events(); // Core 1: Process events from Core 0 queue
     QueueHandle_t get_ui_event_queue() const { return ui_event_queue; }

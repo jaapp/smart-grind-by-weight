@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <cstdarg>
 #include <cstring>
+#include <cmath>
 
 #if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
 #include "../hardware/mock_hx711_driver.h"
@@ -33,6 +34,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     mode = GrindMode::WEIGHT;
     prime_enabled_for_session = false;
     last_error_message[0] = '\0';
+    last_session_result_ = GrindSessionResult::UNKNOWN;
 
     mechanical_anomaly_count_ = 0;
     last_mechanical_event_ms_ = 0;
@@ -116,6 +118,7 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     start_time = millis();
     pulse_attempts = 0;
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
+    last_session_result_ = GrindSessionResult::UNKNOWN;
     // Load cell now runs at constant high speed - no mode switching needed
     
     
@@ -396,18 +399,20 @@ void GrindController::update() {
                 if (mode == GrindMode::TIME) {
                     error = 0.0f;
                 }
-    
-                // Determine result for logging and reporting
-                const char* result_string;
-                if (error > tolerance) { 
-                    result_string = "OVERSHOOT";
-                    LOG_BLE("--- RESULT: OVERSHOOT (Error: %+.2fg) ---\n", error);
-                } else if (pulse_attempts >= GRIND_MAX_PULSE_ATTEMPTS && abs(error) > tolerance) { // abs() is correct here
-                    result_string = "COMPLETE - MAX PULSES";
-                    LOG_BLE("--- RESULT: COMPLETE - MAX PULSES (Error: %+.2fg) ---\n", error);
-                } else {
-                    result_string = "COMPLETE";
-                    LOG_BLE("--- RESULT: COMPLETE (Error: %+.2fg) ---\n", error);
+
+                const char* result_string = "COMPLETE";
+                switch (last_session_result_) {
+                    case GrindSessionResult::OVERSHOOT:
+                        result_string = "OVERSHOOT";
+                        LOG_BLE("--- RESULT: OVERSHOOT (Error: %+.2fg) ---\n", error);
+                        break;
+                    case GrindSessionResult::MAX_PULSES:
+                        result_string = "COMPLETE - MAX PULSES";
+                        LOG_BLE("--- RESULT: COMPLETE - MAX PULSES (Error: %+.2fg) ---\n", error);
+                        break;
+                    default:
+                        LOG_BLE("--- RESULT: COMPLETE (Error: %+.2fg) ---\n", error);
+                        break;
                 }
 
                 // Queue flash operation for Core 1 processing - no blocking on Core 0
@@ -474,6 +479,7 @@ void GrindController::update() {
         phase != GrindPhase::TARE_CONFIRM && loop_data.current_weight < -1.0f) {
         timeout_phase = phase;
         grinder->stop();
+        last_session_result_ = GrindSessionResult::ERROR;
         
         queue_log_message("--- NEGATIVE WEIGHT FAILSAFE TRIGGERED: %.2fg in phase %s ---\n", 
                          loop_data.current_weight, get_phase_name(timeout_phase));
@@ -484,6 +490,7 @@ void GrindController::update() {
     else if (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT && check_timeout()) {
         timeout_phase = phase;
         grinder->stop();
+        last_session_result_ = GrindSessionResult::TIMEOUT;
         
         queue_log_message("--- GRIND TIMEOUT in phase %s ---\n", get_phase_name(timeout_phase));
         char timeout_msg[32];
@@ -541,6 +548,7 @@ void GrindController::final_measurement(const GrindLoopData& loop_data) {
     if (mode == GrindMode::WEIGHT && target_weight >= 1.0f && final_weight < NO_WEIGHT_DELIVERED_THRESHOLD_G) {
         timeout_phase = GrindPhase::FINAL_SETTLING;
         set_error_message("Err: no wt");
+        last_session_result_ = GrindSessionResult::ERROR;
         switch_phase(GrindPhase::TIMEOUT, loop_data);
         return;
     }
@@ -654,6 +662,21 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
     
     // Special handling for completion and timeout events
     if (new_phase == GrindPhase::COMPLETED) {
+        float error = final_weight - target_weight;
+        if (mode == GrindMode::TIME) {
+            error = 0.0f;
+        }
+
+        GrindSessionResult session_result = GrindSessionResult::SUCCESS;
+        if (mode == GrindMode::WEIGHT) {
+            if (error > tolerance) {
+                session_result = GrindSessionResult::OVERSHOOT;
+            } else if (pulse_attempts >= GRIND_MAX_PULSE_ATTEMPTS && fabsf(error) > tolerance) {
+                session_result = GrindSessionResult::MAX_PULSES;
+            }
+        }
+        last_session_result_ = session_result;
+
         event_data.event = UIGrindEvent::COMPLETED;
         // Use final_weight if available (from final_measurement), otherwise use high latency weight
         event_data.final_weight = (final_weight > 0) ? final_weight : 
@@ -666,6 +689,9 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
             event_data.pulse_duration_ms = pulse_duration_ms;
         }
     } else if (new_phase == GrindPhase::TIMEOUT) {
+        if (last_session_result_ == GrindSessionResult::UNKNOWN) {
+            last_session_result_ = GrindSessionResult::TIMEOUT;
+        }
         event_data.event = UIGrindEvent::TIMEOUT;
         if (last_error_message[0] == '\0') {
             set_error_message("Error");
