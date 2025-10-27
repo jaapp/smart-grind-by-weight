@@ -11,7 +11,8 @@ void Grinder::init(int pin) {
     pulse_active = false;
     rmt_initialized = false;
     current_encoder = nullptr;
-    
+    motor_start_time = 0;
+
     // Initialize background indicator
     background_active = false;
     ui_event_callback = nullptr;
@@ -43,13 +44,15 @@ void Grinder::start() {
     MockHX711Driver::notify_grinder_start();
     pulse_active = false;
     grinding = true;
+    motor_start_time = millis();
     emit_background_change(true);
     return;
 #endif
     if (!initialized || !rmt_initialized) return;
-    
+
     // Reset any active pulse state when using continuous mode
     pulse_active = false;
+    motor_start_time = millis();
     
     // Clean up any existing encoder
     if (current_encoder) {
@@ -112,11 +115,14 @@ void Grinder::start_pulse_rmt(uint32_t duration_ms) {
     MockHX711Driver::notify_pulse(duration_ms);
     pulse_active = true;
     grinding = true;
+    motor_start_time = millis();
     emit_background_change(true);
     return;
 #endif
     if (!initialized || !rmt_initialized) return;
-    
+
+    motor_start_time = millis();
+
     // Clean up any existing encoder
     if (current_encoder) {
         rmt_del_encoder(current_encoder);
@@ -197,6 +203,14 @@ bool Grinder::is_pulse_complete() {
     }
     
     return false;
+}
+
+bool Grinder::is_motor_settled() const {
+    // Return true if sufficient time has passed since motor start
+    if (motor_start_time == 0) {
+        return false;  // Motor has never started
+    }
+    return (millis() - motor_start_time) >= HW_GRINDER_SETTLING_TIME_MS;
 }
 
 void Grinder::set_ui_event_callback(const std::function<void(const GrindEventData&)>& callback) {

@@ -108,7 +108,9 @@ void WeightGrindStrategy::run_predictive_phase(GrindController& controller,
         }
     }
 
-    if (loop_data.current_weight >= (controller.target_weight - controller.motor_stop_target_weight)) {
+    // Only allow motor stop decision after motor has settled to avoid startup transients
+    if (controller.grinder->is_motor_settled() &&
+        loop_data.current_weight >= (controller.target_weight - controller.motor_stop_target_weight)) {
         controller.grinder->stop();
         controller.predictive_end_weight = loop_data.current_weight;
         controller.pulse_flow_rate = controller.weight_sensor->get_flow_rate_95th_percentile(2500);

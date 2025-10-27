@@ -14,17 +14,20 @@ private:
     int motor_pin;
     bool grinding;
     bool initialized;
-    
+
     // RMT pulse control
     rmt_channel_handle_t rmt_channel;
     rmt_encoder_handle_t current_encoder;
     bool pulse_active;
     bool rmt_initialized;
-    
+
+    // Motor settling tracking
+    unsigned long motor_start_time;
+
     // Background indicator state (always compiled in)
     bool background_active;
     std::function<void(const GrindEventData&)> ui_event_callback;
-    
+
     void emit_background_change(bool active);
 
 public:
@@ -38,7 +41,8 @@ public:
     
     bool is_grinding() const { return grinding; }
     bool is_initialized() const { return initialized; }
-    
+    bool is_motor_settled() const;
+
     // Background indicator setup (always compiled in)
     void set_ui_event_callback(const std::function<void(const GrindEventData&)>& callback);
 };
