@@ -34,7 +34,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
   - **Examples:**
     - [AliExpress T70](https://nl.aliexpress.com/item/1005009409460619.html)
     - [TinyTronics MAVIN](https://www.tinytronics.nl/en/sensors/weight-pressure-force/load-cells/mavin-load-cell-0.3kg)
-    - [Mavin 0.3 / 1 kg](https://www.alibaba.com/product-detail/subject_1601564701384.html)
+    - [NA6 (Mavin) 0.3 / 1 kg](https://www.alibaba.com/product-detail/subject_1601564701384.html) - [NA6 that delivers to Germany](https://de.aliexpress.com/item/1005002600322988.html)
     - [T70 1 kg](https://nl.aliexpress.com/item/1005008658337192.html)
     - [P70 1 kg](https://nl.aliexpress.com/item/1005006257978435.html) (looks compatible with T70, not personally tested)
   - **Tested:** Only the 1 kg T70 and 0.3 kg Mavin load cells have been personally verified
