@@ -129,7 +129,7 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     } else if (expected_build_number.isEmpty()) {
         LOG_OTA_DEBUG("No expected firmware version to store\n");
     }
-    
+
     task_manager.suspend_hardware_tasks();
     LOG_OTA_DEBUG("Calling start_update()...\n");
     if (!start_update()) {
@@ -139,7 +139,7 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
         return false;
     }
     LOG_OTA_DEBUG("start_update() SUCCESS\n");
-    
+
     ota_in_progress = true;
     current_status = BLE_OTA_RECEIVING;
     LOG_OTA_DEBUG("OTA started successfully - status=BLE_OTA_RECEIVING\n");
@@ -150,14 +150,14 @@ bool OTAHandler::process_data_chunk(const uint8_t* data, size_t size) {
     if (!ota_in_progress) {
         return false;
     }
-    
+
     // Write patch data to patch partition
     if (delta_partition_write(&patch_writer, (const char*)data, size) != ESP_OK) {
         LOG_BLE("OTA: Patch write failed at offset %lu\n", (unsigned long)received_size);
         current_status = BLE_OTA_ERROR;
         return false;
     }
-    
+
     received_size += size;
     
     // Progress logging every 16KB for better visibility, plus at start and end

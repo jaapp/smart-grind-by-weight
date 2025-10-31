@@ -223,10 +223,14 @@ int delta_partition_init(delta_partition_writer_t *writer, const char *partition
     size_t patch_page_size = ((patch_size + PARTITION_PAGE_SIZE - 1) / PARTITION_PAGE_SIZE) * PARTITION_PAGE_SIZE;
     size_t erased = 0;
 
+    // Erase in 256KB chunks to minimize context switches while still preventing watchdog timeout
+    // 4KB chunks (SPI_FLASH_SEC_SIZE) caused massive slowdown due to ~384 yields for 1.5MB
+    const size_t ERASE_CHUNK_SIZE = 256 * 1024;  // 256KB chunks
+
     while (erased < patch_page_size) {
         size_t chunk = patch_page_size - erased;
-        if (chunk > SPI_FLASH_SEC_SIZE) {
-            chunk = SPI_FLASH_SEC_SIZE;
+        if (chunk > ERASE_CHUNK_SIZE) {
+            chunk = ERASE_CHUNK_SIZE;
         }
 
         if (esp_partition_erase_range(patch, erased, chunk) != ESP_OK) {
