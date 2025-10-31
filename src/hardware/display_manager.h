@@ -11,7 +11,9 @@ private:
     lv_display_t* lvgl_display;
     lv_indev_t* lvgl_input;
     lv_color_t* draw_buffer;
+    uint16_t* dma_staging_buffer;
     TouchDriver touch_driver;
+    uint16_t dma_staging_rows;
     
     uint32_t screen_width;
     uint32_t screen_height;

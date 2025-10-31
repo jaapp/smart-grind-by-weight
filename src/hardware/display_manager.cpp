@@ -1,7 +1,10 @@
 #include "display_manager.h"
 #include "../config/constants.h"
+#include "../config/logging.h"
 #include <Arduino.h>
-
+#include <esp_heap_caps.h>
+#include <algorithm>
+#include <cstring>
 
 DisplayManager* g_display_manager = nullptr;
 
@@ -33,13 +36,45 @@ void DisplayManager::init() {
 
     // Full screen buffer, but only partial updates used
     // RGB565 format (16bit per pixel)
-    buffer_size = screen_width * screen_height * sizeof(u_int16_t);  
+    draw_buffer = nullptr;
+    dma_staging_buffer = nullptr;
+    dma_staging_rows = 16;
 
-    draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
-        LV_DRAW_BUF_ALIGN, buffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const size_t draw_rows = 40; // 280 * 40 * 2 = 22,400 bytes
+    buffer_size = screen_width * draw_rows * sizeof(uint16_t);
+
+    draw_buffer = static_cast<lv_color_t*>(
+        heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN,
+                                buffer_size,
+                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+
     if (!draw_buffer) {
-        draw_buffer = (lv_color_t*)heap_caps_aligned_alloc(
-        LV_DRAW_BUF_ALIGN, buffer_size, MALLOC_CAP_8BIT);
+        draw_buffer = static_cast<lv_color_t*>(
+            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN,
+                                    buffer_size,
+                                    MALLOC_CAP_8BIT));
+    }
+
+    if (!draw_buffer) {
+        LOG_BLE("[DISPLAY] ERROR: Failed to allocate LVGL draw buffer\n");
+        return;
+    }
+
+    while (dma_staging_rows >= 4 && dma_staging_buffer == nullptr) {
+        dma_staging_buffer = static_cast<uint16_t*>(
+            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN,
+                                    screen_width * dma_staging_rows * sizeof(uint16_t),
+                                    MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
+        if (!dma_staging_buffer) {
+            dma_staging_rows /= 2;
+        }
+    }
+
+    if (!dma_staging_buffer) {
+        LOG_BLE("[DISPLAY] ERROR: Failed to allocate DMA staging buffer\n");
+        heap_caps_free(draw_buffer);
+        draw_buffer = nullptr;
+        return;
     }
 
     lvgl_display = lv_display_create(screen_width, screen_height);
@@ -79,11 +114,38 @@ void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area,
     
     uint32_t w = lv_area_get_width(area);
     uint32_t h = lv_area_get_height(area);
-    
-    if (LV_COLOR_16_SWAP){
-        g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
-    } else {
-        g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+
+    uint32_t remaining_rows = h;
+    uint32_t current_y = area->y1;
+    uint32_t src_row_offset = 0;
+    uint16_t* staging = g_display_manager->dma_staging_buffer;
+    uint32_t staging_rows = g_display_manager->dma_staging_rows ? g_display_manager->dma_staging_rows : h;
+    const uint16_t* src_pixels = reinterpret_cast<const uint16_t*>(px_map);
+
+    while (remaining_rows > 0) {
+        uint32_t rows = std::min<uint32_t>(remaining_rows, staging_rows);
+        size_t copy_pixels = static_cast<size_t>(w) * rows;
+        const uint16_t* chunk_src = src_pixels + (static_cast<size_t>(src_row_offset) * w);
+
+        if (staging) {
+            memcpy(staging, chunk_src, copy_pixels * sizeof(uint16_t));
+
+            if (LV_COLOR_16_SWAP) {
+                g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, current_y, staging, w, rows);
+            } else {
+                g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, current_y, staging, w, rows);
+            }
+        } else {
+            if (LV_COLOR_16_SWAP) {
+                g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, current_y, const_cast<uint16_t*>(chunk_src), w, rows);
+            } else {
+                g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, current_y, const_cast<uint16_t*>(chunk_src), w, rows);
+            }
+        }
+
+        remaining_rows -= rows;
+        src_row_offset += rows;
+        current_y += rows;
     }
     
     lv_display_flush_ready(disp);

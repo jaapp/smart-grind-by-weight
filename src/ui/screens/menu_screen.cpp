@@ -805,7 +805,7 @@ void MenuScreen::update_brightness_sliders() {
     // Read from the dedicated "brightness" namespace using a local Preferences
     // instance so we don't interfere with the global shared handle.
     Preferences prefs;
-    prefs.begin("brightness", true); // read-only
+    prefs.begin("brightness", false); // writable so namespace is created on first use
     
     // Load brightness values from preferences (default to compile-time values)
     float normal_brightness = prefs.getFloat("normal", USER_SCREEN_BRIGHTNESS_NORMAL);
