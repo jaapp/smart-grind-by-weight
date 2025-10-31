@@ -139,6 +139,8 @@ private:
     // UI event system - thread-safe Core 0 → Core 1 communication
     QueueHandle_t ui_event_queue;
     
+    bool control_loop_paused_;      // Indicates control loop is suspended (e.g., purge confirmation)
+    
     // Flash operation queue - thread-safe Core 0 → Core 1 communication
     QueueHandle_t flash_op_queue;
     static const int FLASH_OP_QUEUE_SIZE = 5;
@@ -218,6 +220,7 @@ public:
     void queue_log_message(const char* format, ...); // Core 0: Queue formatted log message
     
     bool is_active() const;
+    bool is_control_loop_paused() const { return control_loop_paused_; }
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
     static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
@@ -263,6 +266,7 @@ private:
     
     // UI event emission - thread-safe for Core 0
     void emit_ui_event(const GrindEventData& data);
+    void emit_progress_update(const GrindLoopData& loop_data);
     
     // Core 0 control methods  
     bool should_log_measurements() const;

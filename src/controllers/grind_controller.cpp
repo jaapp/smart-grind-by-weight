@@ -37,6 +37,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     grinder_purge_amount_g_for_session = GRIND_PURGE_AMOUNT_DEFAULT_G;
     last_error_message[0] = '\0';
     last_session_result_ = GrindSessionResult::UNKNOWN;
+    control_loop_paused_ = false;
 
     mechanical_anomaly_count_ = 0;
     last_mechanical_event_ms_ = 0;
@@ -171,6 +172,7 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     // Initialize pulse tracking
     additional_pulse_count = 0;
     pulse_duration_ms = GRIND_TIME_PULSE_DURATION_MS;
+    control_loop_paused_ = false;
 
     reset_mechanical_anomaly_count();
 
@@ -276,23 +278,30 @@ void GrindController::continue_from_purge() {
 void GrindController::update() {
     if (!is_active()) return;
     
-    // Increment loop counter for current phase performance tracking
-    current_phase_loop_count = current_phase_loop_count + 1;
-    
     unsigned long now = millis();
     
     // Calculate all measurement values once at the start - pass to methods to avoid redundant calculations
     GrindLoopData loop_data = {};
-    
-    // Always calculate these values
-    loop_data.display_weight = weight_sensor ? weight_sensor->get_display_weight() : 0.0f;
-    loop_data.current_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
     loop_data.now = now;
     loop_data.timestamp_ms = now - start_time;  // Relative to session start
+    loop_data.current_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
+    loop_data.display_weight = weight_sensor ? weight_sensor->get_display_weight() : 0.0f;
     loop_data.motor_is_on = grinder ? (grinder->is_grinding() ? 1 : 0) : 0;
     loop_data.phase_id = get_current_phase_id();
-    loop_data.weight_delta = loop_data.current_weight - last_logged_weight;
     loop_data.flow_rate = weight_sensor ? weight_sensor->get_flow_rate() : 0.0f;
+    loop_data.weight_delta = loop_data.current_weight - last_logged_weight;
+
+    if (control_loop_paused_) {
+        emit_progress_update(loop_data);
+
+        // Keep measurement baseline aligned for when logging resumes
+        last_logged_weight = loop_data.current_weight;
+        last_logged_time = loop_data.now;
+        return;
+    }
+    
+    // Increment loop counter for current phase performance tracking
+    current_phase_loop_count = current_phase_loop_count + 1;
 
     monitor_mechanical_instability(loop_data);
     
@@ -516,18 +525,7 @@ void GrindController::update() {
     }
     
     // Emit progress update events every cycle for responsive UI
-    GrindEventData progress_event = {};
-    progress_event.event = UIGrindEvent::PROGRESS_UPDATED;
-    progress_event.phase = phase;
-    progress_event.mode = session_descriptor.mode;
-    progress_event.current_weight = (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) 
-                                    ? final_weight 
-                                    : loop_data.display_weight;
-    progress_event.progress_percent = get_progress_percent();
-    progress_event.phase_display_text = get_phase_name();
-    progress_event.show_taring_text = show_taring_text();
-    progress_event.flow_rate = loop_data.flow_rate;
-    emit_ui_event(progress_event);
+    emit_progress_update(loop_data);
 
     // Check for negative weight failsafe after TARE_CONFIRM phase during active grinding
     // Only check after motor has settled to avoid false positives from startup transients
@@ -669,6 +667,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
     
     // Update phase state
     phase = new_phase;
+    control_loop_paused_ = (phase == GrindPhase::PURGE_CONFIRM);
     phase_start_time = now;
     
     // Reset loop counter for new phase
@@ -882,6 +881,21 @@ void GrindController::emit_ui_event(const GrindEventData& data) {
             }
         }
     }
+}
+
+void GrindController::emit_progress_update(const GrindLoopData& loop_data) {
+    GrindEventData progress_event = {};
+    progress_event.event = UIGrindEvent::PROGRESS_UPDATED;
+    progress_event.phase = phase;
+    progress_event.mode = session_descriptor.mode;
+    progress_event.current_weight = (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT)
+                                    ? final_weight
+                                    : loop_data.display_weight;
+    progress_event.progress_percent = get_progress_percent();
+    progress_event.phase_display_text = get_phase_name();
+    progress_event.show_taring_text = show_taring_text();
+    progress_event.flow_rate = loop_data.flow_rate;
+    emit_ui_event(progress_event);
 }
 
 //==============================================================================
