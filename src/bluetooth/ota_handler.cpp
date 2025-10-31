@@ -130,30 +130,10 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
         LOG_OTA_DEBUG("No expected firmware version to store\n");
     }
     
-    // Reconfigure task watchdog for OTA process with extended timeout
-    // This is a CPU and flash-intensive operation that can starve other tasks
-    LOG_BLE("OTA: Reconfiguring task watchdog timer for OTA process (600s timeout)...\n");
-    LOG_OTA_DEBUG("Configuring watchdog - timeout_ms=600000, cores=0x3\n");
-    esp_task_wdt_config_t wdt_config = {
-        .timeout_ms = 600000,
-        .idle_core_mask = (1 << 0) | (1 << 1), // Watch idle tasks on both cores
-        .trigger_panic = true,
-    };
-    esp_task_wdt_reconfigure(&wdt_config);
-    LOG_OTA_DEBUG("Watchdog reconfigured successfully\n");
-
-    // Suspend hardware tasks to prevent watchdog timeouts during OTA
-    LOG_BLE("OTA: Suspending hardware tasks...\n");
-    task_manager.suspend_hardware_tasks();
-
     LOG_OTA_DEBUG("Calling start_update()...\n");
     if (!start_update()) {
         current_status = BLE_OTA_ERROR;
         LOG_OTA_DEBUG("start_update() FAILED\n");
-        
-        // Resume hardware tasks on failure
-        LOG_BLE("OTA: Resuming hardware tasks after failed start\n");
-        task_manager.resume_hardware_tasks();
         return false;
     }
     LOG_OTA_DEBUG("start_update() SUCCESS\n");
@@ -251,10 +231,6 @@ bool OTAHandler::complete_ota() {
         current_status = BLE_OTA_ERROR;
         LOG_BLE("OTA: Finalization failed\n");
         LOG_OTA_DEBUG("finalize_update() FAILED\n");
-
-        // Resume hardware tasks on failure
-        LOG_BLE("OTA: Resuming hardware tasks after failed finalization\n");
-        task_manager.resume_hardware_tasks();
     }
     
     ota_in_progress = false;
@@ -270,9 +246,6 @@ void OTAHandler::abort_ota() {
         patch_size = 0;
         current_status = BLE_OTA_ERROR;
 
-        // Resume hardware tasks on abort
-        LOG_BLE("OTA: Resuming hardware tasks after abort\n");
-        task_manager.resume_hardware_tasks();
     }
 }
 

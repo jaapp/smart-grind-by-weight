@@ -260,10 +260,18 @@ void TaskManager::suspend_hardware_tasks() {
     LOG_BLE("TaskManager: Suspending hardware tasks for OTA operations\n");
     
     if (task_handles.weight_sampling_task) {
+        esp_err_t err = esp_task_wdt_delete(task_handles.weight_sampling_task);
+        if (err != ESP_OK) {
+            LOG_BLE("TaskManager: Warning - failed to unsubscribe WeightSampling task from WDT (err=%d)\n", err);
+        }
         vTaskSuspend(task_handles.weight_sampling_task);
     }
     
     if (task_handles.grind_control_task) {
+        esp_err_t err = esp_task_wdt_delete(task_handles.grind_control_task);
+        if (err != ESP_OK) {
+            LOG_BLE("TaskManager: Warning - failed to unsubscribe GrindControl task from WDT (err=%d)\n", err);
+        }
         vTaskSuspend(task_handles.grind_control_task);
     }
 
@@ -280,10 +288,18 @@ void TaskManager::resume_hardware_tasks() {
     LOG_BLE("TaskManager: Resuming hardware tasks after OTA operations\n");
     
     if (task_handles.weight_sampling_task) {
+        esp_err_t err = esp_task_wdt_add(task_handles.weight_sampling_task);
+        if (err != ESP_OK) {
+            LOG_BLE("TaskManager: Warning - failed to resubscribe WeightSampling task to WDT (err=%d)\n", err);
+        }
         vTaskResume(task_handles.weight_sampling_task);
     }
     
     if (task_handles.grind_control_task) {
+        esp_err_t err = esp_task_wdt_add(task_handles.grind_control_task);
+        if (err != ESP_OK) {
+            LOG_BLE("TaskManager: Warning - failed to resubscribe GrindControl task to WDT (err=%d)\n", err);
+        }
         vTaskResume(task_handles.grind_control_task);
     }
 

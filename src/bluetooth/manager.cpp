@@ -858,16 +858,16 @@ void BluetoothManager::onDisconnect(BLEServer* server) {
 }
 
 void BluetoothManager::onWrite(BLECharacteristic* characteristic) {
-    LOG_BLE("DEBUG: onWrite() called, characteristic=%p\n", characteristic);
-    LOG_BLE("  ota_control=%p, ota_data=%p, debug_rx=%p, data_control=%p, diagnostics=%p\n",
+    LOG_BLE_DEBUG("DEBUG: onWrite() called, characteristic=%p\n", characteristic);
+    LOG_BLE_DEBUG("  ota_control=%p, ota_data=%p, debug_rx=%p, data_control=%p, diagnostics=%p\n",
         ota_control_characteristic, ota_data_characteristic, debug_rx_characteristic,
         data_control_characteristic, sysinfo_diagnostics_characteristic);
 
     if (characteristic == ota_control_characteristic) {
-        LOG_BLE("  -> Handling OTA control\n");
+        LOG_BLE_DEBUG("  -> Handling OTA control\n");
         handle_ota_control_command(characteristic);
     } else if (characteristic == ota_data_characteristic) {
-        LOG_BLE("  -> Handling OTA data\n");
+        LOG_BLE_DEBUG("  -> Handling OTA data\n");
         handle_ota_data_chunk(characteristic);
     } else if (characteristic == debug_rx_characteristic) {
         LOG_BLE("  -> Handling debug command\n");
