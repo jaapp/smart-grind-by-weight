@@ -34,6 +34,9 @@ TaskManager::TaskManager() {
     
     tasks_initialized = false;
     ota_suspended = false;
+    ota_watchdog_task = nullptr;
+    ota_watchdog_active = false;
+    ota_watchdog_ble_registered = false;
     instance = this;
 }
 
@@ -279,6 +282,7 @@ void TaskManager::suspend_hardware_tasks() {
         vTaskSuspend(task_handles.file_io_task);
     }
     
+    enable_ota_watchdog_keepalive();
     ota_suspended = true;
 }
 
@@ -307,6 +311,7 @@ void TaskManager::resume_hardware_tasks() {
         vTaskResume(task_handles.file_io_task);
     }
     
+    disable_ota_watchdog_keepalive();
     ota_suspended = false;
 }
 
@@ -373,6 +378,48 @@ bool TaskManager::validate_hardware_ready() const {
     
     LOG_BLE("TaskManager validation: All hardware and task dependencies ready\n");
     return true;
+}
+
+void TaskManager::enable_ota_watchdog_keepalive() {
+    if (ota_watchdog_active) return;
+    
+    ota_watchdog_ble_registered = false;
+    ota_watchdog_task = task_handles.bluetooth_task;
+
+    if (ota_watchdog_task) {
+        ota_watchdog_active = true;
+        esp_err_t err = esp_task_wdt_add(ota_watchdog_task);
+        if (err == ESP_OK) {
+            ota_watchdog_ble_registered = true;
+            LOG_BLE("TaskManager: OTA watchdog keepalive registered for Bluetooth task\n");
+        } else if (err == ESP_ERR_INVALID_STATE) {
+            ota_watchdog_ble_registered = true;
+            LOG_BLE("TaskManager: Bluetooth task already registered with watchdog\n");
+        } else if (err != ESP_ERR_INVALID_ARG) {
+            LOG_BLE("TaskManager: Failed to register Bluetooth task with watchdog (err=%d)\n", err);
+        }
+    } else {
+        ota_watchdog_active = false;
+        LOG_BLE("TaskManager: Bluetooth task handle missing, unable to register watchdog keepalive\n");
+    }
+}
+
+void TaskManager::disable_ota_watchdog_keepalive() {
+    if (!ota_watchdog_active) return;
+
+    if (ota_watchdog_ble_registered && ota_watchdog_task) {
+        esp_err_t ble_err = esp_task_wdt_delete(ota_watchdog_task);
+        if (ble_err != ESP_OK) {
+            LOG_BLE("TaskManager: Failed to unregister Bluetooth task watchdog keepalive (err=%d)\n", ble_err);
+        } else {
+            LOG_BLE("TaskManager: Bluetooth task watchdog keepalive unregistered\n");
+        }
+        ota_watchdog_ble_registered = false;
+    }
+
+    ota_watchdog_task = nullptr;
+    ota_watchdog_active = false;
+    ota_watchdog_ble_registered = false;
 }
 
 // Static task wrapper implementations
@@ -486,6 +533,10 @@ void TaskManager::bluetooth_task_impl() {
         // Use existing bluetooth manager handle method
         if (bluetooth_manager) {
             bluetooth_manager->handle();
+        }
+        
+        if (ota_watchdog_active) {
+            esp_task_wdt_reset();
         }
         
         uint32_t end_time = millis();

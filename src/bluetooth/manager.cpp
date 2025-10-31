@@ -346,11 +346,11 @@ void BluetoothManager::handle() {
         timeout_ms = BLE_AUTO_DISABLE_TIMEOUT_MS;
     }
     
-    // Handle data export updates
     update_data_export();
 
     // Run deferred diagnostic report generation on BLE task (not on NimBLE callback thread)
-    if (device_connected && debug_tx_characteristic && diagnostic_report_pending && !diagnostic_report_in_progress) {
+    if (device_connected && debug_tx_characteristic &&
+        diagnostic_report_pending && !diagnostic_report_in_progress) {
         diagnostic_report_in_progress = true;
         diagnostic_report_pending = false;
         generate_diagnostic_report();

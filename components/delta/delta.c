@@ -17,6 +17,8 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_task_wdt.h"
+#include "esp_spi_flash.h"
 
 #include "esp_partition.h"
 #include "esp_ota_ops.h"
@@ -35,10 +37,20 @@ typedef struct flash_mem {
     esp_ota_handle_t ota_handle;
 } flash_mem_t;
 
+static inline void delta_reset_watchdog_if_registered(void)
+{
+    if (esp_task_wdt_status(NULL) == ESP_OK) {
+        esp_task_wdt_reset();
+    }
+}
+
 static int delta_flash_write_dest(void *arg_p, const uint8_t *buf_p, size_t size)
 {
     flash_mem_t *flash;
     flash = (flash_mem_t *)arg_p;
+
+    delta_reset_watchdog_if_registered();
+    taskYIELD();
 
     if (!flash) {
         return -DELTA_CASTING_ERROR;
@@ -58,6 +70,9 @@ static int delta_flash_read_src(void *arg_p, uint8_t *buf_p, size_t size)
 {
     flash_mem_t *flash;
     flash = (flash_mem_t *)arg_p;
+
+    delta_reset_watchdog_if_registered();
+    taskYIELD();
 
     if (!flash) {
         return -DELTA_CASTING_ERROR;
@@ -89,6 +104,9 @@ static int delta_flash_read_patch(void *arg_p, uint8_t *buf_p, size_t size)
 {
     flash_mem_t *flash;
     flash = (flash_mem_t *)arg_p;
+
+    delta_reset_watchdog_if_registered();
+    taskYIELD();
 
     if (!flash) {
         return -DELTA_CASTING_ERROR;
@@ -202,10 +220,23 @@ int delta_partition_init(delta_partition_writer_t *writer, const char *partition
         return ESP_FAIL;
     }
 
-    size_t patch_page_size = (patch_size + PARTITION_PAGE_SIZE) - (patch_size % PARTITION_PAGE_SIZE);
-    if (esp_partition_erase_range(patch, 0, patch_page_size) != ESP_OK) {
-        ESP_LOGE(TAG, "Partition Error: Could not erase '%s' region!", partition);
-        return ESP_FAIL;
+    size_t patch_page_size = ((patch_size + PARTITION_PAGE_SIZE - 1) / PARTITION_PAGE_SIZE) * PARTITION_PAGE_SIZE;
+    size_t erased = 0;
+
+    while (erased < patch_page_size) {
+        size_t chunk = patch_page_size - erased;
+        if (chunk > SPI_FLASH_SEC_SIZE) {
+            chunk = SPI_FLASH_SEC_SIZE;
+        }
+
+        if (esp_partition_erase_range(patch, erased, chunk) != ESP_OK) {
+            ESP_LOGE(TAG, "Partition Error: Could not erase '%s' region!", partition);
+            return ESP_FAIL;
+        }
+
+        delta_reset_watchdog_if_registered();
+        taskYIELD();
+        erased += chunk;
     }
 
     writer->name = partition;

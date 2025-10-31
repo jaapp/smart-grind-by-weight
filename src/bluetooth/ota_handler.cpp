@@ -130,10 +130,12 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
         LOG_OTA_DEBUG("No expected firmware version to store\n");
     }
     
+    task_manager.suspend_hardware_tasks();
     LOG_OTA_DEBUG("Calling start_update()...\n");
     if (!start_update()) {
         current_status = BLE_OTA_ERROR;
         LOG_OTA_DEBUG("start_update() FAILED\n");
+        task_manager.resume_hardware_tasks();
         return false;
     }
     LOG_OTA_DEBUG("start_update() SUCCESS\n");
@@ -164,6 +166,8 @@ bool OTAHandler::process_data_chunk(const uint8_t* data, size_t size) {
                      (unsigned long)received_size / 1024, (unsigned long)patch_size / 1024, 
                      get_progress());
     }
+    
+    taskYIELD();
     
     return true;
 }
@@ -234,6 +238,7 @@ bool OTAHandler::complete_ota() {
     }
     
     ota_in_progress = false;
+    task_manager.resume_hardware_tasks();
     LOG_OTA_DEBUG("complete_ota() returning %s\n", success ? "SUCCESS" : "FAILED");
     return success;
 }
@@ -245,7 +250,7 @@ void OTAHandler::abort_ota() {
         received_size = 0;
         patch_size = 0;
         current_status = BLE_OTA_ERROR;
-
+        task_manager.resume_hardware_tasks();
     }
 }
 
