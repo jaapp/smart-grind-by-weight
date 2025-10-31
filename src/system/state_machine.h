@@ -9,6 +9,7 @@ enum class UIState {
     MENU,
     CALIBRATION,
     CONFIRM,
+    PURGE_CONFIRM,
     AUTOTUNING,
     OTA_UPDATE,
     OTA_UPDATE_FAILED

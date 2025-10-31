@@ -42,18 +42,28 @@ python3 tools/grinder.py analyze
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
 
 **Grind Phases:**
-- Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
-- New: `TIME_ADDITIONAL_PULSE` - Dedicated phase for post-completion additional grinding pulses in time mode
+- Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PRIME, PRIME_SETTLING, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
+- `TIME_ADDITIONAL_PULSE` - Dedicated phase for post-completion additional grinding pulses in time mode
+- `PURGE_CONFIRM` - Pauses after chute operation (in Purge mode) to allow user to discard grinds before continuing to main grind
 - **Timeout**: 30-second maximum from grind start (includes taring), auto-stops and requires user acknowledgment
+
+**Grinder Purge/Prime:**
+- **Always runs** before weight-mode grinding to saturate the grinder for accurate latency detection
+- **Prime mode**: Keeps coffee, continues immediately to PREDICTIVE phase
+- **Purge mode** (default): Shows confirmation popup, waits for user to discard stale grinds, then continues
+- **Configurable amount**: 0.1g-5.0g (default 1.0g), replaces old hardcoded `GRIND_PRIME_TARGET_WEIGHT_G`
+- **Purge popup**: "Keep purge grinds from now on" checkbox switches mode from Purge → Prime in preferences
+- **Logging disabled** during PURGE_CONFIRM phase to avoid capturing data while paused
+- **Preferences**: `chute_mode` (int: 0=Prime, 1=Purge, default=1), `chute_amount_g` (float: 0.1-5.0, default=1.0)
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
+- **Mode Selection**: Radio buttons for Weight/Time mode selection
 - **Swipe Gestures Toggle**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
-- **Time Mode Toggle**: Direct grind mode selection between Weight/Time modes
-- **Start on Cup Toggle**: Automatically tare and kick off the active grind profile when the cup/portafilter weight delta hits the configured threshold
-- **Return on Removal Toggle**: Leave the completion screen and reset to Ready once the cup is lifted after grinding
-- **Preferences**: `swipe.enabled` (boolean) and existing `grind_mode` (0=Weight, 1=Time)
+- **Automation**: Start on Cup and Return on Removal toggles
+- **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
+- **Preferences**: `swipe.enabled` (boolean), `grind_mode` (0=Weight, 1=Time), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 - **Behavior**: Swipe gestures only work when enabled; direct mode selection always works
 
 **Color Scheme (RGB565):**

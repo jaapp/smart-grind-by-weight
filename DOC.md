@@ -268,8 +268,13 @@ Access **Menu → Grind Settings** to configure:
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
 - **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
 - **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
-- **Prime** *(Advanced)*: The grinder assumes the chute is primed (filled with grounds). If you have a workflow where you clear the chute, enable this option.  
-  *Explanation:* The time between motor start and grinds hitting the cup (grind latency) is used to predict the coast time (how long grinds will keep coming after the motor is disengaged). If the chute is cleaned this may lead to undershoots because the grind latency now includes time to prime the chute (refilling with grounds that become retention) as well.
+- **Purging** *(Advanced)*: Control how the grinder saturates itself before weight-mode grinding
+  - **Prime mode**: Keeps the coffee used to saturate the grinder, continues immediately
+  - **Purge mode** (default): Prompts you to discard stale grinds before continuing
+  - **Amount slider**: Configure purge/prime amount (0.1g-5.0g, default 1.0g). Amount is a minimum target; actual output will be slightly higher.
+  - **"Keep purge grinds from now on" checkbox**: Appears during purge confirmation - switches to Prime mode when checked
+
+  *Explanation:* The time between motor start and grinds hitting the cup (grind latency) is used to predict the coast time (how long grinds will keep coming after the motor is disengaged). Purging clears stale coffee and saturates the grinder with fresh grounds, ensuring accurate latency detection. If you prefer to keep all coffee without manual intervention, select Prime mode.
 
 ### Basic Operation
 These steps describe the default grind-by-weight workflow:
@@ -337,7 +342,9 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |       |-- Swipe Gestures toggle (enable/disable vertical swipes)
     |       |-- Time Mode toggle (direct weight/time mode selection)
     |       |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
-    |       \-- Return on Removal toggle (drop back to Ready when that weight leaves)
+    |       |-- Return on Removal toggle (drop back to Ready when that weight leaves)
+    |       |-- Purging (Prime/Purge radio buttons)
+    |       \-- Amount slider (0.1g-5.0g for purge/prime operation)
     |
     \-- Info
         +-- Diagnostics
@@ -367,7 +374,12 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
 During Grinding:
 |-- Weight display & progress
 |-- Tap anywhere: Arc ↔ Nerdy display modes
-\-- STOP button
+|-- STOP button
+\-- Purge Confirmation (appears in Purge mode after grinder saturation)
+    |-- "Grinder Purged" title
+    |-- Instruction message
+    |-- "Keep purge grinds from now on" checkbox
+    \-- CONTINUE button
 ```
 
 ---
@@ -479,20 +491,27 @@ The system uses a **zero-shot learning algorithm** requiring no prior knowledge 
    - 30-second timeout from grind start to completion
    - Noise-adaptive settling detection
 
-2. **Predictive Phase**
+2. **Grinder Saturation Phase** (Weight mode only)
+   - Saturates the grinder before main grind for accurate latency detection
+   - Configurable amount: 0.1g-5.0g (default 1.0g)
+   - **Prime mode**: Keeps coffee, continues immediately after settling
+   - **Purge mode**: Shows confirmation popup, waits for user to discard stale grinds
+   - Logging and chart updates disabled during purge confirmation
+
+3. **Predictive Phase**
    - Learns flow rate and motor-to-cup latency (relay + motor inertia + burr spin-up)
    - Predicts when to stop motor based on measured flow and coast characteristics
    - Target: barely undershoot target weight (overshoot is unrecoverable)
    - Uses runtime-configurable motor response latency (30-200ms, default 50ms)
 
-3. **Pulse Correction Phase**
+4. **Pulse Correction Phase**
    - Conservative pulse duration calculation using 95th percentile flow rate
    - Bounded pulses respect hardware-specific motor response latency
    - Pulses range from motor latency minimum to latency + 225ms maximum
    - Mechanical instability detection (3+ sudden weight drops triggers diagnostic)
    - Repeats until target ± tolerance reached
 
-4. **Time Mode Additional Pulses**
+5. **Time Mode Additional Pulses**
    - Dedicated `TIME_ADDITIONAL_PULSE` phase for post-completion grinding
    - 100ms fixed pulse duration
    - Split-button UI: OK + PULSE buttons on completion screen

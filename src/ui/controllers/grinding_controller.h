@@ -20,6 +20,7 @@ public:
     void handle_grind_button();
     void handle_pulse_button();
     void handle_layout_toggle();
+    void handle_purge_confirm_continue();
 
     void update_grind_button_icon();
     void update_button_layout();

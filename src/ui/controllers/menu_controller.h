@@ -28,7 +28,9 @@ public:
     void handle_grind_mode_radio_button();
     void handle_auto_start_toggle();
     void handle_auto_return_toggle();
-    void handle_prime_toggle();
+    void handle_grinder_purge_mode_radio_button();
+    void handle_grinder_purge_amount_slider();
+    void handle_grinder_purge_amount_slider_released();
     void handle_brightness_normal_slider();
     void handle_brightness_normal_slider_released();
     void handle_brightness_screensaver_slider();

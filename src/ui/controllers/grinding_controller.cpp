@@ -99,6 +99,9 @@ void GrindingUIController::register_events() {
             }
         }, LV_EVENT_CLICKED, this);
     }
+
+    // NOTE: Purge confirm reuses existing grind_button_ (CANCEL) and pulse_button_ (CONTINUE)
+    // No additional event registration needed - handle_pulse_button() checks for PURGE_CONFIRM phase
 }
 
 void GrindingUIController::on_state_changed(UIState new_state) {
@@ -183,9 +186,15 @@ void GrindingUIController::handle_grind_button() {
             millis(), ui_manager_->state_machine->is_state(UIState::READY) ? "READY" :
                        ui_manager_->state_machine->is_state(UIState::GRINDING) ? "GRINDING" :
                        ui_manager_->state_machine->is_state(UIState::GRIND_COMPLETE) ? "GRIND_COMPLETE" :
-                       ui_manager_->state_machine->is_state(UIState::GRIND_TIMEOUT) ? "GRIND_TIMEOUT" : "OTHER");
+                       ui_manager_->state_machine->is_state(UIState::GRIND_TIMEOUT) ? "GRIND_TIMEOUT" :
+                       ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM) ? "PURGE_CONFIRM" : "OTHER");
 
-    if (ui_manager_->state_machine->is_state(UIState::READY)) {
+    if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
+        // Cancel grind during purge confirmation
+        if (ui_manager_->grind_controller) {
+            ui_manager_->grind_controller->stop_grind();
+        }
+    } else if (ui_manager_->state_machine->is_state(UIState::READY)) {
         if (ui_manager_->current_tab == 3) {
             ui_manager_->switch_to_state(UIState::MENU);
             return;
@@ -224,6 +233,13 @@ void GrindingUIController::handle_pulse_button() {
         return;
     }
 
+    // Check if we're in PURGE_CONFIRM phase - pulse button acts as CONTINUE
+    if (ui_manager_->purge_confirm_screen.is_visible()) {
+        handle_purge_confirm_continue();
+        return;
+    }
+
+    // Normal time mode pulse behavior
     if (ui_manager_->grind_controller->can_pulse()) {
         LOG_BLE("[UIManager] Pulse button clicked - requesting additional pulse\n");
         ui_manager_->grind_controller->start_additional_pulse();
@@ -250,12 +266,41 @@ void GrindingUIController::handle_layout_toggle() {
     }
 }
 
+void GrindingUIController::handle_purge_confirm_continue() {
+    if (!ui_manager_ || !ui_manager_->grind_controller) {
+        return;
+    }
+
+    // Check if "Keep purge grinds from now on" checkbox is checked
+    if (ui_manager_->purge_confirm_screen.is_checkbox_checked()) {
+        LOG_BLE("[%lums PURGE] User chose to keep grinds - switching to Prime mode\n", millis());
+
+        // Switch grinder purge mode from Purge to Prime in preferences
+        auto* hardware = ui_manager_->get_hardware_manager();
+        Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+        if (prefs) {
+            prefs->putInt(GrindController::PREF_KEY_GRINDER_MODE, static_cast<int>(GrinderPurgeMode::PRIME));
+        }
+    }
+
+    // Hide the purge confirmation screen and continue grinding
+    ui_manager_->purge_confirm_screen.hide();
+    ui_manager_->switch_to_state(UIState::GRINDING);
+
+    // Tell the grind controller to continue from PURGE_CONFIRM to PREDICTIVE
+    ui_manager_->grind_controller->continue_from_purge();
+}
+
 void GrindingUIController::update_grind_button_icon() {
     if (!ui_manager_ || !grind_button_ || !grind_icon_) {
         return;
     }
 
-    if (ui_manager_->state_machine->is_state(UIState::GRINDING)) {
+    if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
+        // During purge confirm, show STOP icon (user can cancel the grind)
+        lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_ERROR), 0);
+    } else if (ui_manager_->state_machine->is_state(UIState::GRINDING)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
         lv_obj_set_style_bg_color(grind_button_,
                                   ui_manager_->current_mode == GrindMode::TIME
@@ -288,24 +333,41 @@ void GrindingUIController::update_button_layout() {
         return;
     }
 
+    // Check if we're in PURGE_CONFIRM phase (show dual buttons for CANCEL + CONTINUE)
+    bool in_purge_confirm = ui_manager_->purge_confirm_screen.is_visible();
+
     bool should_show_pulse = (ui_manager_->state_machine->is_state(UIState::GRIND_COMPLETE) &&
                               ui_manager_->current_mode == GrindMode::TIME);
 
-    if (should_show_pulse) {
+    if (in_purge_confirm || should_show_pulse) {
+        // Dual button layout: left button at -60, right button at +60
         lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, -10);
         if (pulse_button_) {
             lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, -10);
             lv_obj_clear_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
 
-            if (ui_manager_->grind_controller && ui_manager_->grind_controller->can_pulse()) {
+            if (in_purge_confirm) {
+                // Purge confirm: pulse button acts as CONTINUE (always enabled)
+                lv_img_set_src(pulse_icon_, LV_SYMBOL_OK);
+                lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
+                lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
+                lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
+            } else if (ui_manager_->grind_controller && ui_manager_->grind_controller->can_pulse()) {
+                // Time mode pulse: enable/disable based on can_pulse()
+                lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
+                lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
             } else {
+                // Time mode pulse: disabled
+                lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
+                lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_add_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_50, LV_STATE_DISABLED);
             }
         }
     } else {
+        // Single button layout: centered at 0
         lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, 0, -10);
         if (pulse_button_) {
             lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
@@ -347,9 +409,15 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
     switch (event_data.event) {
         case UIGrindEvent::PHASE_CHANGED: {
             ui_manager_->current_mode = event_data.mode;
-            if (event_data.phase != GrindPhase::IDLE &&
-                event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE &&
-                !ui_manager_->state_machine->is_state(UIState::GRINDING)) {
+
+            // Handle PURGE_CONFIRM phase specially - show purge confirmation popup
+            if (event_data.phase == GrindPhase::PURGE_CONFIRM) {
+                LOG_UI_DEBUG("[%lums UI_TRANSITION] Switching to PURGE_CONFIRM state\n", millis());
+                ui_manager_->switch_to_state(UIState::PURGE_CONFIRM);
+                update_grind_button_icon();  // Update button icon to STOP and reposition for dual-button layout
+            } else if (event_data.phase != GrindPhase::IDLE &&
+                       event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE &&
+                       !ui_manager_->state_machine->is_state(UIState::GRINDING)) {
                 LOG_UI_DEBUG("[%lums UI_TRANSITION] Switching to GRINDING state due to phase: %s\n",
                              millis(), event_data.phase_display_text);
                 WeightSensor* weight_sensor = ui_manager_->hardware_manager->get_weight_sensor();
@@ -383,7 +451,8 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
                     event_data.phase != GrindPhase::IDLE && event_data.phase != GrindPhase::TARING &&
                     event_data.phase != GrindPhase::TARE_CONFIRM && event_data.phase != GrindPhase::INITIALIZING &&
                     event_data.phase != GrindPhase::SETUP && event_data.phase != GrindPhase::COMPLETED &&
-                    event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE) {
+                    event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE &&
+                    event_data.phase != GrindPhase::PURGE_CONFIRM) {
                     ui_manager_->grinding_screen.add_chart_data_point(event_data.current_weight, event_data.flow_rate, millis());
                 }
             }
@@ -402,7 +471,8 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
                     event_data.phase != GrindPhase::IDLE && event_data.phase != GrindPhase::TARING &&
                     event_data.phase != GrindPhase::TARE_CONFIRM && event_data.phase != GrindPhase::INITIALIZING &&
                     event_data.phase != GrindPhase::SETUP && event_data.phase != GrindPhase::COMPLETED &&
-                    event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE) {
+                    event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE &&
+                    event_data.phase != GrindPhase::PURGE_CONFIRM) {
                     ui_manager_->grinding_screen.add_chart_data_point(event_data.current_weight, event_data.flow_rate, millis());
                 }
             }

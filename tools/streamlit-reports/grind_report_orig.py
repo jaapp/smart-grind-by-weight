@@ -141,6 +141,13 @@ def get_phase_specific_hover_data(events_df):
         custom_cols = base_cols + ['yield', 'settling_duration_ms']
         custom_data = events_df[custom_cols].values.tolist()
 
+    elif phase == 'PURGE_CONFIRM':
+        template = ("<b>%{customdata[0]}</b><br>"
+                   "Duration: %{customdata[1]} ms<br>"
+                   "Awaiting purge confirmation<br>"
+                   "Start: %{customdata[2]:.3f}g → End: %{customdata[3]:.3f}g<extra></extra>")
+        custom_data = events_df[base_cols].values.tolist()
+
     elif phase == 'FINAL_SETTLING':
         template = ("<b>%{customdata[0]}</b><br>"
                    "Duration: %{customdata[1]} ms<br>"
@@ -405,12 +412,13 @@ if analysis_mode == "Single Session":
     
     selected_phases = []
     for phase in all_phases:
-        default_val = phase not in ['PULSE_DECISION', 'PULSE_SETTLING']
+        default_val = phase not in ['PULSE_DECISION', 'PULSE_SETTLING', 'PURGE_CONFIRM']
         phase_descriptions = {
             'TARING': 'Zeroing scale before grind',
             'TARE_CONFIRM': 'Confirming tare completion',
             'PRIME': 'Priming grind to refill chute',
             'PRIME_SETTLING': 'Settling after priming grind',
+            'PURGE_CONFIRM': 'Waiting for purge confirmation',
             'PREDICTIVE': 'Main grinding with flow prediction',
             'PULSE_DECISION': 'Deciding if correction needed',
             'PULSE_EXECUTE': 'Executing precision pulse',

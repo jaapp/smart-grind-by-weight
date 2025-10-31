@@ -18,6 +18,7 @@
 #include "../event_bridge_lvgl.h"
 #include "../ui_helpers.h"
 #include "../ui_manager.h"
+#include "../screens/menu_screen.h"
 
 MenuUIController::MenuUIController(UIManager* manager)
     : ui_manager_(manager) {}
@@ -48,7 +49,9 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
-    EventBridgeLVGL::register_handler(ET::GRIND_PRIME_TOGGLE, [this](lv_event_t*) { handle_prime_toggle(); });
+    EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grinder_purge_mode_radio_button(); });
+    EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_AMOUNT_SLIDER, [this](lv_event_t*) { handle_grinder_purge_amount_slider(); });
+    EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_AMOUNT_SLIDER_RELEASED, [this](lv_event_t*) { handle_grinder_purge_amount_slider_released(); });
 
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER, [this](lv_event_t*) { handle_brightness_normal_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
@@ -378,21 +381,65 @@ void MenuUIController::handle_auto_return_toggle() {
     LOG_DEBUG_PRINTLN(enabled ? "Auto return on cup removal enabled" : "Auto return on cup removal disabled");
 }
 
-void MenuUIController::handle_prime_toggle() {
+void MenuUIController::handle_grinder_purge_mode_radio_button() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->menu_screen.get_prime_toggle();
-    if (!toggle) return;
+    auto* radio_group = ui_manager_->menu_screen.get_grinder_purge_mode_radio_group();
+    if (!radio_group) return;
 
-    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    int selected_index = radio_button_group_get_selection(radio_group);
 
     auto* hardware = ui_manager_->get_hardware_manager();
     Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
     if (prefs) {
-        prefs->putBool(GrindController::PREF_KEY_PRIME_ENABLED, enabled);
+        prefs->putInt(GrindController::PREF_KEY_GRINDER_MODE, selected_index);
     }
 
-    LOG_DEBUG_PRINTLN(enabled ? "Chute priming enabled" : "Chute priming disabled");
+    LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grinder purge mode: Prime (keep coffee)" : "Grinder purge mode: Purge (discard grinds)");
+}
+
+void MenuUIController::handle_grinder_purge_amount_slider() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_grinder_purge_amount_slider();
+    if (!slider) return;
+
+    int slider_value = lv_slider_get_value(slider);
+    float amount_g = slider_value / MenuScreen::kPurgeSliderScale;
+    if (amount_g < GRIND_PURGE_AMOUNT_MIN_G) amount_g = GRIND_PURGE_AMOUNT_MIN_G;
+    if (amount_g > GRIND_PURGE_AMOUNT_MAX_G) amount_g = GRIND_PURGE_AMOUNT_MAX_G;
+
+    // Update the label via MenuScreen method
+    ui_manager_->menu_screen.update_grinder_purge_amount_label(amount_g);
+}
+
+void MenuUIController::handle_grinder_purge_amount_slider_released() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_grinder_purge_amount_slider();
+    if (!slider) return;
+
+    int slider_value = lv_slider_get_value(slider);
+    float amount_g = slider_value / MenuScreen::kPurgeSliderScale;
+    if (amount_g < GRIND_PURGE_AMOUNT_MIN_G) {
+        amount_g = GRIND_PURGE_AMOUNT_MIN_G;
+        lv_slider_set_value(slider, static_cast<int>(GRIND_PURGE_AMOUNT_MIN_G * MenuScreen::kPurgeSliderScale + 0.5f), LV_ANIM_OFF);
+    } else if (amount_g > GRIND_PURGE_AMOUNT_MAX_G) {
+        amount_g = GRIND_PURGE_AMOUNT_MAX_G;
+        lv_slider_set_value(slider, static_cast<int>(GRIND_PURGE_AMOUNT_MAX_G * MenuScreen::kPurgeSliderScale + 0.5f), LV_ANIM_OFF);
+    }
+
+    auto* hardware = ui_manager_->get_hardware_manager();
+    Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+    if (prefs) {
+        prefs->putFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, amount_g);
+    }
+
+    LOG_DEBUG_PRINT("Grinder purge amount set to: ");
+    LOG_DEBUG_PRINT(amount_g);
+    LOG_DEBUG_PRINTLN("g");
+
+    ui_manager_->menu_screen.update_grinder_purge_amount_label(amount_g);
 }
 
 void MenuUIController::handle_brightness_normal_slider() {

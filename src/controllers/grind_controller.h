@@ -67,8 +67,9 @@ enum class GrindPhase {
     TIME_ADDITIONAL_PULSE, // Additional pulse in time mode after completion
     COMPLETED,          // Grind completed (success, overshoot, or max pulses)
     TIMEOUT,            // Grind timed out
-    PRIME,              // Optional chute priming grind
-    PRIME_SETTLING      // Settling after priming grind
+    PRIME,              // Optional chute priming/purging grind
+    PRIME_SETTLING,     // Settling after priming grind
+    PURGE_CONFIRM       // Waiting for user to confirm purge completion
 };
 
 
@@ -98,10 +99,13 @@ private:
     
     float tolerance;
     GrindMode mode;
-    bool prime_enabled_for_session;
-    
+    GrinderPurgeMode grinder_purge_mode_for_session;
+    float grinder_purge_amount_g_for_session;
+
     // Timeout tracking
     GrindPhase timeout_phase;   // Phase when timeout occurred
+    unsigned long timeout_pause_start;  // When we entered a paused state (PURGE_CONFIRM)
+    unsigned long timeout_offset_ms;    // Accumulated time in paused states to exclude from timeout
     
     int pulse_attempts;
     unsigned long pulse_start_time;
@@ -190,6 +194,7 @@ public:
     void user_tare_request();
     void return_to_idle(); // Called by UI to acknowledge completion/timeout
     void stop_grind();
+    void continue_from_purge(); // Called by UI to continue from PURGE_CONFIRM to PREDICTIVE
     void update(); // Core 0 main control method - runs at fixed RTOS interval
     
     // Time mode pulse functionality
@@ -216,6 +221,8 @@ public:
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
     static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
+    static constexpr const char* PREF_KEY_GRINDER_MODE = "grinder_mode";
+    static constexpr const char* PREF_KEY_GRINDER_AMOUNT_G = "grinder_amount_g";
     GrindMode get_mode() const { return mode; }
     const GrindSessionDescriptor& get_session_descriptor() const { return session_descriptor; }
     

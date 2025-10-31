@@ -8,6 +8,21 @@
 // pulse control algorithms.
 
 //------------------------------------------------------------------------------
+// GRINDER PURGE/PRIME
+//------------------------------------------------------------------------------
+// Grinder saturation modes
+enum class GrinderPurgeMode {
+    PRIME = 0,  // Saturate grinder, keep coffee, continue immediately
+    PURGE = 1   // Saturate grinder, prompt user to discard stale grinds
+};
+
+// Grinder saturation defaults and ranges
+#define GRIND_PURGE_MODE_DEFAULT static_cast<int>(GrinderPurgeMode::PURGE)
+#define GRIND_PURGE_AMOUNT_DEFAULT_G 1.0f
+#define GRIND_PURGE_AMOUNT_MIN_G 0.1f
+#define GRIND_PURGE_AMOUNT_MAX_G 2.5f
+
+//------------------------------------------------------------------------------
 // GRIND CONTROL TUNING
 //------------------------------------------------------------------------------
 // Main accuracy and timeout settings
