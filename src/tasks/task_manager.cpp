@@ -379,6 +379,7 @@ bool TaskManager::validate_hardware_ready() const {
 void TaskManager::weight_sampling_task_wrapper(void* parameter) {
     if (instance) {
         instance->weight_sampling_task_impl();
+        instance->task_handles.weight_sampling_task = nullptr;
     }
     vTaskDelete(nullptr);
 }
@@ -386,6 +387,7 @@ void TaskManager::weight_sampling_task_wrapper(void* parameter) {
 void TaskManager::grind_control_task_wrapper(void* parameter) {
     if (instance) {
         instance->grind_control_task_impl();
+        instance->task_handles.grind_control_task = nullptr;
     }
     vTaskDelete(nullptr);
 }
@@ -393,6 +395,7 @@ void TaskManager::grind_control_task_wrapper(void* parameter) {
 void TaskManager::ui_render_task_wrapper(void* parameter) {
     if (instance) {
         instance->ui_render_task_impl();
+        instance->task_handles.ui_render_task = nullptr;
     }
     vTaskDelete(nullptr);
 }
@@ -401,6 +404,7 @@ void TaskManager::ui_render_task_wrapper(void* parameter) {
 void TaskManager::bluetooth_task_wrapper(void* parameter) {
     if (instance) {
         instance->bluetooth_task_impl();
+        instance->task_handles.bluetooth_task = nullptr;
     }
     vTaskDelete(nullptr);
 }
@@ -408,6 +412,7 @@ void TaskManager::bluetooth_task_wrapper(void* parameter) {
 void TaskManager::file_io_task_wrapper(void* parameter) {
     if (instance) {
         instance->file_io_task_impl();
+        instance->task_handles.file_io_task = nullptr;
     }
     vTaskDelete(nullptr);
 }
