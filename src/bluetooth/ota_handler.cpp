@@ -6,6 +6,7 @@
 #include "../tasks/task_manager.h"
 #include <Arduino.h>
 #include <BLEDevice.h>
+#include <esp_task_wdt.h>
 
 OTAHandler::OTAHandler() 
     : ota_in_progress(false)
@@ -129,6 +130,17 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     } else if (expected_build_number.isEmpty()) {
         LOG_OTA_DEBUG("No expected firmware version to store\n");
     }
+
+    // Extend watchdog timeout during OTA to prevent spurious resets
+    LOG_BLE("OTA: Reconfiguring task watchdog timer for OTA process (600s timeout)...\n");
+    LOG_OTA_DEBUG("Configuring watchdog - timeout_ms=600000, cores=0x3\n");
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = 600000,
+        .idle_core_mask = (1 << 0) | (1 << 1),
+        .trigger_panic = true,
+    };
+    esp_task_wdt_reconfigure(&wdt_config);
+    LOG_OTA_DEBUG("Watchdog reconfigured successfully\n");
 
     task_manager.suspend_hardware_tasks();
     LOG_OTA_DEBUG("Calling start_update()...\n");
