@@ -44,6 +44,8 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grinder_purge_mode_radio_group = nullptr;
     grinder_purge_amount_slider = nullptr;
     grinder_purge_amount_label = nullptr;
+    grind_freshness_hours_slider = nullptr;
+    grind_freshness_hours_label = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 
     // Create menu UI immediately at boot for instant access
@@ -400,6 +402,12 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_slider_row(parent, "Amount", &grinder_purge_amount_label, &grinder_purge_amount_slider,
                      lv_color_hex(THEME_COLOR_ACCENT), slider_min_units, slider_max_units);
 
+    create_description_label(parent, "Set how long grounds stay fresh before showing purge prompt.");
+
+    // Slider for grind freshness hours (discrete steps: 0.5, 1, 2, 3, 4, 8, 12, 24, 48)
+    create_slider_row(parent, "Freshness", &grind_freshness_hours_label, &grind_freshness_hours_slider,
+                     lv_color_hex(THEME_COLOR_ACCENT), 0, 8);  // 9 positions (0-8)
+
     // Register events for the toggles (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
     if (grind_mode_swipe_toggle) {
@@ -419,6 +427,12 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRINDER_PURGE_AMOUNT_SLIDER)));
         lv_obj_add_event_cb(grinder_purge_amount_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRINDER_PURGE_AMOUNT_SLIDER_RELEASED)));
+    }
+    if (grind_freshness_hours_slider) {
+        lv_obj_add_event_cb(grind_freshness_hours_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_FRESHNESS_HOURS_SLIDER)));
+        lv_obj_add_event_cb(grind_freshness_hours_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_FRESHNESS_HOURS_SLIDER_RELEASED)));
     }
 }
 
@@ -883,6 +897,18 @@ void MenuScreen::update_grinder_purge_amount_label(float amount_g) {
     }
 }
 
+void MenuScreen::update_grind_freshness_hours_label(float hours) {
+    if (grind_freshness_hours_label) {
+        char buffer[24];
+        if (hours < 1.0f) {
+            snprintf(buffer, sizeof(buffer), "Freshness: %.1fh", hours);
+        } else {
+            snprintf(buffer, sizeof(buffer), "Freshness: %.0fh", hours);
+        }
+        lv_label_set_text(grind_freshness_hours_label, buffer);
+    }
+}
+
 lv_obj_t* MenuScreen::create_separator(lv_obj_t* parent, const char* text) {
     // Create separator container
     lv_obj_t* separator_container = lv_obj_create(parent);
@@ -1152,4 +1178,29 @@ void MenuScreen::update_grind_mode_toggles() {
 
     // Update grinder purge amount label
     update_grinder_purge_amount_label(grinder_purge_amount_g);
+
+    // Load and set grind freshness hours
+    float freshness_hours = GRIND_FRESHNESS_DEFAULT_HOURS;
+    if (hardware_manager) {
+        Preferences* main_prefs = hardware_manager->get_preferences();
+        if (main_prefs) {
+            freshness_hours = main_prefs->getFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, GRIND_FRESHNESS_DEFAULT_HOURS);
+        }
+    }
+
+    // Map hours to slider index (discrete steps: 0.5, 1, 2, 3, 4, 8, 12, 24, 48)
+    static const float freshness_steps[] = {0.5f, 1.0f, 2.0f, 3.0f, 4.0f, 8.0f, 12.0f, 24.0f, 48.0f};
+    int slider_index = 5; // Default to 8h
+    for (int i = 0; i < 9; i++) {
+        if (fabsf(freshness_hours - freshness_steps[i]) < 0.1f) {
+            slider_index = i;
+            break;
+        }
+    }
+
+    if (grind_freshness_hours_slider) {
+        lv_slider_set_value(grind_freshness_hours_slider, slider_index, LV_ANIM_OFF);
+    }
+
+    update_grind_freshness_hours_label(freshness_hours);
 }

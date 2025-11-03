@@ -177,6 +177,10 @@ private:
     // Motor response latency - runtime configurable
     float motor_response_latency_ms;
 
+    // Grind freshness tracking
+    bool grinder_purged_since_boot;      // Tracks if grinder has been used since boot (RAM only)
+    uint64_t last_purge_runtime_ms;      // Runtime when last grind completed (persisted)
+
 public:
     enum class GrindSessionResult {
         UNKNOWN,
@@ -226,6 +230,8 @@ public:
     static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
     static constexpr const char* PREF_KEY_GRINDER_MODE = "grinder_mode";
     static constexpr const char* PREF_KEY_GRINDER_AMOUNT_G = "grinder_amount_g";
+    static constexpr const char* PREF_KEY_GRIND_FRESHNESS_HOURS = "freshness_hrs";
+    static constexpr const char* PREF_KEY_LAST_GRIND_RUNTIME = "last_grind_ms";
     GrindMode get_mode() const { return mode; }
     const GrindSessionDescriptor& get_session_descriptor() const { return session_descriptor; }
     
@@ -252,6 +258,10 @@ public:
     float get_max_pulse_duration() const { return motor_response_latency_ms + GRIND_MOTOR_MAX_PULSE_DURATION_MS; }
     void load_motor_latency();
     void save_motor_latency(float value);
+
+    // Grind freshness accessors
+    bool get_grinder_purged_since_boot() const { return grinder_purged_since_boot; }
+    uint64_t get_last_purge_runtime_ms() const { return last_purge_runtime_ms; }
     
     // Removed - predictive logic now inline in update_realtime()
     

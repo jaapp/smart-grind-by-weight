@@ -43,7 +43,14 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     last_mechanical_event_ms_ = 0;
     last_mechanical_weight_ = 0.0f;
     mechanical_monitor_initialized_ = false;
-    
+
+    // Initialize grind freshness tracking
+    grinder_purged_since_boot = false;
+    last_purge_runtime_ms = 0;
+    if (preferences) {
+        last_purge_runtime_ms = preferences->getULong64(PREF_KEY_LAST_GRIND_RUNTIME, 0);
+    }
+
     // Set up grinder background indicator callback (if enabled)
     if (grinder) {
 #if DEBUG_ENABLE_GRINDER_BACKGROUND_INDICATOR
@@ -389,13 +396,27 @@ void GrindController::update() {
                 flow_start_confirmed = false;
                 grind_latency_ms = 0;
 
-                // Check grinder saturation mode to determine next phase
-                if (grinder_purge_mode_for_session == GrinderPurgeMode::PURGE) {
-                    // Purge mode: wait for user confirmation before continuing
+                // Check if grounds are stale and purge confirmation should be shown
+                bool should_show_purge_popup = false;
+                if (!grinder_purged_since_boot) {
+                    // First grind since boot - grounds are stale
+                    should_show_purge_popup = true;
+                } else {
+                    // Check if enough time has elapsed since last grind
+                    uint64_t current_ms = esp_timer_get_time() / 1000;
+                    uint64_t elapsed_ms = current_ms - last_purge_runtime_ms;
+                    float freshness_hours = preferences ? preferences->getFloat(PREF_KEY_GRIND_FRESHNESS_HOURS, GRIND_FRESHNESS_DEFAULT_HOURS) : GRIND_FRESHNESS_DEFAULT_HOURS;
+                    uint64_t threshold_ms = (uint64_t)(freshness_hours * 3600000.0f);
+                    should_show_purge_popup = (elapsed_ms > threshold_ms);
+                }
+
+                // Determine next phase based on mode AND staleness
+                if (grinder_purge_mode_for_session == GrinderPurgeMode::PURGE && should_show_purge_popup) {
+                    // Purge mode with stale grounds: wait for user confirmation before continuing
                     timeout_pause_start = loop_data.now;  // Track when pause started for timeout offset
                     switch_phase(GrindPhase::PURGE_CONFIRM, loop_data);
                 } else {
-                    // Prime mode: continue immediately to grinding
+                    // Prime mode OR fresh grounds: continue immediately to grinding
                     grinder->start();
                     time_grind_start_ms = loop_data.now;
                     switch_phase(GrindPhase::PREDICTIVE, loop_data);
@@ -735,6 +756,13 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
             }
         }
         last_session_result_ = session_result;
+
+        // Update grind freshness tracking
+        grinder_purged_since_boot = true;
+        last_purge_runtime_ms = esp_timer_get_time() / 1000;
+        if (preferences) {
+            preferences->putULong64(PREF_KEY_LAST_GRIND_RUNTIME, last_purge_runtime_ms);
+        }
 
         event_data.event = UIGrindEvent::COMPLETED;
         // Use final_weight if available (from final_measurement), otherwise use high latency weight

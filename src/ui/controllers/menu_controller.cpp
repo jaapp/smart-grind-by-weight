@@ -52,6 +52,8 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grinder_purge_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_AMOUNT_SLIDER, [this](lv_event_t*) { handle_grinder_purge_amount_slider(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_AMOUNT_SLIDER_RELEASED, [this](lv_event_t*) { handle_grinder_purge_amount_slider_released(); });
+    EventBridgeLVGL::register_handler(ET::GRIND_FRESHNESS_HOURS_SLIDER, [this](lv_event_t*) { handle_grind_freshness_hours_slider(); });
+    EventBridgeLVGL::register_handler(ET::GRIND_FRESHNESS_HOURS_SLIDER_RELEASED, [this](lv_event_t*) { handle_grind_freshness_hours_slider_released(); });
 
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER, [this](lv_event_t*) { handle_brightness_normal_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
@@ -440,6 +442,49 @@ void MenuUIController::handle_grinder_purge_amount_slider_released() {
     LOG_DEBUG_PRINTLN("g");
 
     ui_manager_->menu_screen.update_grinder_purge_amount_label(amount_g);
+}
+
+void MenuUIController::handle_grind_freshness_hours_slider() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_grind_freshness_hours_slider();
+    if (!slider) return;
+
+    // Map slider value to hours (discrete steps: 0.5, 1, 2, 3, 4, 8, 12, 24, 48)
+    static const float freshness_steps[] = {0.5f, 1.0f, 2.0f, 3.0f, 4.0f, 8.0f, 12.0f, 24.0f, 48.0f};
+    int slider_index = lv_slider_get_value(slider);
+    if (slider_index < 0) slider_index = 0;
+    if (slider_index > 8) slider_index = 8;
+    float hours = freshness_steps[slider_index];
+
+    // Update the label via MenuScreen method
+    ui_manager_->menu_screen.update_grind_freshness_hours_label(hours);
+}
+
+void MenuUIController::handle_grind_freshness_hours_slider_released() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_grind_freshness_hours_slider();
+    if (!slider) return;
+
+    // Map slider value to hours (discrete steps: 0.5, 1, 2, 3, 4, 8, 12, 24, 48)
+    static const float freshness_steps[] = {0.5f, 1.0f, 2.0f, 3.0f, 4.0f, 8.0f, 12.0f, 24.0f, 48.0f};
+    int slider_index = lv_slider_get_value(slider);
+    if (slider_index < 0) slider_index = 0;
+    if (slider_index > 8) slider_index = 8;
+    float hours = freshness_steps[slider_index];
+
+    auto* hardware = ui_manager_->get_hardware_manager();
+    Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+    if (prefs) {
+        prefs->putFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, hours);
+    }
+
+    LOG_DEBUG_PRINT("Grind freshness hours set to: ");
+    LOG_DEBUG_PRINT(hours);
+    LOG_DEBUG_PRINTLN("h");
+
+    ui_manager_->menu_screen.update_grind_freshness_hours_label(hours);
 }
 
 void MenuUIController::handle_brightness_normal_slider() {

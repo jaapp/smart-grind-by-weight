@@ -22,6 +22,9 @@ enum class GrinderPurgeMode {
 #define GRIND_PURGE_AMOUNT_MIN_G 0.1f
 #define GRIND_PURGE_AMOUNT_MAX_G 2.5f
 
+// Grind freshness tracking
+#define GRIND_FRESHNESS_DEFAULT_HOURS 8.0f
+
 //------------------------------------------------------------------------------
 // GRIND CONTROL TUNING
 //------------------------------------------------------------------------------

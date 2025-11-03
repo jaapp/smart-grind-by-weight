@@ -31,6 +31,8 @@ public:
     void handle_grinder_purge_mode_radio_button();
     void handle_grinder_purge_amount_slider();
     void handle_grinder_purge_amount_slider_released();
+    void handle_grind_freshness_hours_slider();
+    void handle_grind_freshness_hours_slider_released();
     void handle_brightness_normal_slider();
     void handle_brightness_normal_slider_released();
     void handle_brightness_screensaver_slider();

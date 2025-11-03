@@ -91,3 +91,9 @@ bool PurgeConfirmScreen::is_checkbox_checked() const {
     if (!checkbox) return false;
     return lv_obj_has_state(checkbox, LV_STATE_CHECKED);
 }
+
+void PurgeConfirmScreen::set_message(const char* message) {
+    if (message_label && message) {
+        lv_label_set_text(message_label, message);
+    }
+}

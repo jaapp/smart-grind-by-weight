@@ -64,7 +64,9 @@ private:
     lv_obj_t* grinder_purge_mode_radio_group;
     lv_obj_t* grinder_purge_amount_slider;
     lv_obj_t* grinder_purge_amount_label;
-    
+    lv_obj_t* grind_freshness_hours_slider;
+    lv_obj_t* grind_freshness_hours_label;
+
     // Tools entries / scale page elements
     lv_obj_t* scale_item;
     lv_obj_t* cal_button;
@@ -109,6 +111,7 @@ public:
     void update_logging_toggle();
     void update_grind_mode_toggles();
     void update_grinder_purge_amount_label(float amount_g);
+    void update_grind_freshness_hours_label(float hours);
     void reset_scale_display();
     void update_scale_weight(float weight);
 
@@ -135,6 +138,7 @@ public:
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
     lv_obj_t* get_grinder_purge_mode_radio_group() const { return grinder_purge_mode_radio_group; }
     lv_obj_t* get_grinder_purge_amount_slider() const { return grinder_purge_amount_slider; }
+    lv_obj_t* get_grind_freshness_hours_slider() const { return grind_freshness_hours_slider; }
 
 private:
     void create_menu_ui();
