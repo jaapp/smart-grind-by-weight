@@ -22,3 +22,6 @@ grinder_database.db
 tools/database/
 tools/database/grinder_data.db
 failed_session_*.bin
+
+# Git worktrees
+.worktrees/
