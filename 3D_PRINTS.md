@@ -4,9 +4,9 @@ Alternative and complementary 3D printable designs created by the community for 
 
 | Design | Image | Description | Creator | Link |
 |--------|-------|-------------|---------|------|
-| **58mm Cup Holder** | ![58mm Cup Holder](https://www.printables.com/model/1469021-58mm-cup-holder-for-jaapps-smart-grind-by-weight-m) | Alternative cup holder for 58mm dosing cups, compatible with the default back plate and load cell mount | Community | [Printables](https://www.printables.com/model/1469021-58mm-cup-holder-for-jaapps-smart-grind-by-weight-m) |
-| **54mm Designs & Screen Mount** | - | Screen mount for non-Specialita grinders, 54mm cup holder, and 54mm portafilter holder (WIP) | Community | [GitHub Issue #5](https://github.com/jaapp/smart-grind-by-weight/issues/5#issuecomment-3437532421) |
-| **Portafilter Holder Variants** | - | Various portafilter holder designs focusing on vibration reduction and structural rigidity (WIP) | Community | [GitHub Issue #5](https://github.com/jaapp/smart-grind-by-weight/issues/5) |
+| **58mm Cup Holder** | <img width="225" height="300" alt="afbeelding" src="https://github.com/user-attachments/assets/ebc97b64-1bee-49e6-9d3e-f222dafdd204" /> | Alternative cup holder for 58mm dosing cups, compatible with the default back plate and load cell mount | Oskait | [Printables](https://www.printables.com/model/1469021-58mm-cup-holder-for-jaapps-smart-grind-by-weight-m) |
+| **54mm Designs & Screen Mount** | <img width="360" height="430" alt="afbeelding" src="https://github.com/user-attachments/assets/c090703e-ad8d-4e10-82e8-bff937870aec" /> | Screen mount for non-Specialita grinders, 54mm cup holder, and 54mm portafilter holder (WIP) | jaapp | [GitHub Issue #5](https://github.com/jaapp/smart-grind-by-weight/issues/5#issuecomment-3437532421) |
+| **Portafilter Holder Variants** | - | Various portafilter holder designs | Community | [GitHub Issue #5](https://github.com/jaapp/smart-grind-by-weight/issues/5) |
 
 ---
 
