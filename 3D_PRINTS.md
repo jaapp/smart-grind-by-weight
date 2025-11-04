@@ -15,7 +15,7 @@ Alternative and complementary 3D printable designs created by the community for 
 Created a custom mount, holder, or adapter? Share it with the community:
 
 1. Upload to Printables/Thingiverse with proper attribution
-2. Share in [GitHub Issue #5](https://github.com/jaapp/smart-grind-by-weight/issues/5) or create a new issue
-3. Include: grinder compatibility, print settings, assembly notes, and photos
+2. Share it by creating a new issue
+3. Tips to include: grinder compatibility, print settings, assembly notes, and photos
 
 **Design Reference:** Use the Fusion 360 source files at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for mounting dimensions.
