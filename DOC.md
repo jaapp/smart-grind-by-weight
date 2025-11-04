@@ -57,16 +57,21 @@ All parts designed to print **without supports**. Keep the orientation of the ST
 - **Layer Height**: 0.2mm
 - **Alternative**: PLA might work but will offer a reduced experience due to brittleness
 
+**Default Eureka Parts:**
 - **[Screen adapter](3d_files/Waveshare%20AMOLED%201_64%20adapter.stl)** - Mounts Waveshare screen to Eureka location
-- **[Back plate](3d_files/Back%20plate.stl)** - Mounts to Eureka and holds HX711/load cell  
+- **[Back plate](3d_files/Back%20plate.stl)** - Mounts to Eureka and holds HX711/load cell
 - **[Cover plate](3d_files/Cover.stl)** - Clean finishing cover
 - **[Dosing cup holder](3d_files/Cup%20holder.stl)** - Connects to load cell for dosing cup
 - **[Screw hole covers](3d_files/Cup%20holder%20hole%20cover.stl)** - Hides screws and protects against coffee grounds
 
+**Community Designs:**
+
+Looking for alternative sizes or grinder-specific mounts? See **[Community 3D Designs](3D_PRINTS.md)** for 58mm cup holders, portafilter holders, and adaptations for other grinder models.
+
 ### Fusion 360 Source Files
 - **[All components](https://a360.co/3HYgubb)** - Customizable source files
 
-Use these to adjust mounts for your specific grinder. Tuned for 54mm dosing cups. 
+Use these to adjust mounts for your specific grinder. Tuned for 54mm dosing cups.
 Compatible dosing cup: [AliExpress 54mm Cup](https://nl.aliexpress.com/item/1005006526852408.html)
 
 ---

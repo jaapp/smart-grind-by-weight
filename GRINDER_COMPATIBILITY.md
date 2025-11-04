@@ -29,6 +29,8 @@ Compatibility guide for Smart Grind-by-Weight modification across grinder models
 - **🛠️ Needs design**: [Abandoned chute cover](3d_files/chute%20cover/) available as starting point - **PRs welcome!**
 - **❌ None**: No existing design files
 
+**Community Contributions**: See **[Community 3D Designs](3D_PRINTS.md)** for alternative cup holders, portafilter mounts, and grinder-specific adaptations.
+
 ![Pin soldering example](https://besson.co/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrinder-pins.ad081f28.jpg&w=3840&q=75)  
 *Pin connections for non-screen models. Credit: [Besson Coffee Grinder Smart Scale](https://besson.co/projects/coffee-grinder-smart-scale)*
 
