@@ -99,23 +99,23 @@ void OTAHandler::restore_normal_power() {
 }
 
 bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, bool is_full_update, const String& expected_firmware_version) {
-    LOG_OTA_DEBUG("start_ota() called - size=%lu, build=%s, full=%d\n", 
+    LOG_OTA_DEBUG("start_ota() called - size=%lu, build=%s, full=%d\n",
                   (unsigned long)size, expected_build_number.c_str(), is_full_update);
-    
+
     if (ota_in_progress) {
         LOG_BLE("OTA: Update already in progress\n");
         LOG_OTA_DEBUG("start_ota() FAILED - already in progress\n");
         return false;
     }
-    
+
     patch_size = size;
     received_size = 0;
     this->is_full_update = is_full_update;
-    
+
     LOG_BLE("OTA: Starting %s update (%lu KB)\n", is_full_update ? "full" : "delta", (unsigned long)patch_size / 1024);
-    LOG_OTA_DEBUG("patch_size=%lu, received_size=%lu, is_full_update=%d\n", 
+    LOG_OTA_DEBUG("patch_size=%lu, received_size=%lu, is_full_update=%d\n",
                   (unsigned long)patch_size, (unsigned long)received_size, this->is_full_update);
-    
+
     // Store expected build number and firmware version for post-reboot verification
     if (!expected_build_number.isEmpty() && preferences) {
         preferences->putString("new_build_nr", expected_build_number);
@@ -123,7 +123,7 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     } else {
         LOG_OTA_DEBUG("No expected build number to store\n");
     }
-    
+
     if (!expected_firmware_version.isEmpty() && preferences) {
         preferences->putString("new_fw_ver", expected_firmware_version);
         LOG_OTA_DEBUG("Stored expected firmware version: %s\n", expected_firmware_version.c_str());
@@ -142,19 +142,24 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     esp_task_wdt_reconfigure(&wdt_config);
     LOG_OTA_DEBUG("Watchdog reconfigured successfully\n");
 
+    // Set OTA active BEFORE partition erase so UI can show screen immediately
+    ota_in_progress = true;
+    current_status = BLE_OTA_RECEIVING;
+    LOG_OTA_DEBUG("OTA marked as active - status=BLE_OTA_RECEIVING\n");
+
     task_manager.suspend_hardware_tasks();
-    LOG_OTA_DEBUG("Calling start_update()...\n");
+    LOG_OTA_DEBUG("Calling start_update() - this will erase partition...\n");
     if (!start_update()) {
+        // Partition erase/init failed - reset state
         current_status = BLE_OTA_ERROR;
-        LOG_OTA_DEBUG("start_update() FAILED\n");
+        ota_in_progress = false;
+        LOG_OTA_DEBUG("start_update() FAILED - OTA aborted\n");
         task_manager.resume_hardware_tasks();
         return false;
     }
-    LOG_OTA_DEBUG("start_update() SUCCESS\n");
+    LOG_OTA_DEBUG("start_update() SUCCESS - partition ready\n");
 
-    ota_in_progress = true;
-    current_status = BLE_OTA_RECEIVING;
-    LOG_OTA_DEBUG("OTA started successfully - status=BLE_OTA_RECEIVING\n");
+    LOG_OTA_DEBUG("OTA started successfully - ready to receive data\n");
     return true;
 }
 
