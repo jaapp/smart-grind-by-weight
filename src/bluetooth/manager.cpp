@@ -994,6 +994,11 @@ void BluetoothManager::update_hardware_info() {
 
 void BluetoothManager::update_sessions_info() {
     if (!sysinfo_sessions_characteristic) return;
+
+    if (ota_handler.is_ota_active()) {
+        LOG_BLE_DEBUG("System info: skipping session count while OTA is active\n");
+        return;
+    }
     
     char buffer[BLE_SYSINFO_MAX_PAYLOAD_BYTES];
     uint16_t session_count = data_stream.get_total_sessions();
