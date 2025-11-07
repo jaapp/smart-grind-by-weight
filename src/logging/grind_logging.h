@@ -198,6 +198,7 @@ public:
     // Data access
     uint32_t get_total_flash_sessions() const;
     bool is_logging_active() const { return logging_active; }
+    uint32_t get_session_storage_version() const { return session_storage_version; }
     
     // Debug output helpers - conditionally compiled based on debug flags (moved to public for BLE access)
 #if ENABLE_GRIND_DEBUG
@@ -228,6 +229,9 @@ private:
     bool validate_session_file(uint32_t session_id); // Check if session file is valid/readable
     bool remove_session_file(uint32_t session_id);   // Delete specific session file
     void cleanup_old_session_files(); // Remove old session files to maintain MAX_STORED_SESSIONS_FLASH limit
+    void mark_session_storage_dirty(); // Bump version when session files change
+    
+    uint32_t session_storage_version;
     
 };
 

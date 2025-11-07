@@ -101,6 +101,9 @@ private:
     uint16_t current_chunk;
     unsigned long next_chunk_time;
     uint32_t current_file_session_id;  // For per-file streaming
+    bool sessions_info_dirty;
+    uint32_t last_session_storage_version;
+    bool last_reported_export_state;
     
     // UI status callback
     UIStatusCallback ui_status_callback;
@@ -130,7 +133,9 @@ private:
     void update_system_info();
     void update_performance_info();
     void update_hardware_info();
-    void update_sessions_info();
+    bool update_sessions_info();
+    void process_sessions_info_updates();
+    void mark_sessions_info_dirty();
     void generate_diagnostic_report();
     
 public:

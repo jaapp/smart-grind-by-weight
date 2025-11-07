@@ -46,6 +46,10 @@ BluetoothManager::BluetoothManager()
     , data_status(BLE_DATA_IDLE)
     , current_chunk(0)
     , next_chunk_time(0)
+    , current_file_session_id(0)
+    , sessions_info_dirty(true)
+    , last_session_storage_version(0)
+    , last_reported_export_state(false)
     , ui_status_queue(nullptr)
     , diagnostic_report_pending(false)
     , diagnostic_report_in_progress(false) {
@@ -268,6 +272,7 @@ void BluetoothManager::enable(unsigned long timeout_ms) {
     
     // Initialize system information
     refresh_system_info();
+    sessions_info_dirty = true;
     
     start_advertising();
     log("Bluetooth: Ready - device is advertising (%lum timeout)\n", timeout_minutes);
@@ -347,6 +352,7 @@ void BluetoothManager::handle() {
     }
     
     update_data_export();
+    process_sessions_info_updates();
 
     // Run deferred diagnostic report generation on BLE task (not on NimBLE callback thread)
     if (device_connected && debug_tx_characteristic &&
@@ -428,6 +434,7 @@ void BluetoothManager::stop_data_export() {
     current_chunk = 0;
     next_chunk_time = 0;
     current_file_session_id = 0;
+    mark_sessions_info_dirty();
     
     // Clean shutdown of stream
     data_stream.close_stream();
@@ -495,6 +502,7 @@ void BluetoothManager::send_next_data_chunk() {
         data_export_in_progress = false;
         current_chunk = 0;
         current_file_session_id = 0;
+        mark_sessions_info_dirty();
         
         data_stream.close_stream();
         
@@ -624,6 +632,7 @@ void BluetoothManager::send_individual_file(uint32_t session_id) {
     current_file_session_id = session_id;
     current_chunk = 0;
     next_chunk_time = millis(); // Start immediately
+    mark_sessions_info_dirty();
     set_data_status(BLE_DATA_EXPORTING);
 }
 
@@ -835,6 +844,7 @@ void BluetoothManager::handle_data_control_command(BLECharacteristic* characteri
 void BluetoothManager::onConnect(BLEServer* server) {
     device_connected = true;
     log("BLE: Client connected - timeout paused while connected\n");
+    mark_sessions_info_dirty();
 }
 
 void BluetoothManager::onDisconnect(BLEServer* server) {
@@ -898,7 +908,6 @@ void BluetoothManager::refresh_system_info() {
     update_system_info();
     update_performance_info();
     update_hardware_info();
-    update_sessions_info();
 }
 
 void BluetoothManager::update_system_info() {
@@ -992,12 +1001,12 @@ void BluetoothManager::update_hardware_info() {
     sysinfo_hardware_characteristic->notify();
 }
 
-void BluetoothManager::update_sessions_info() {
-    if (!sysinfo_sessions_characteristic) return;
+bool BluetoothManager::update_sessions_info() {
+    if (!sysinfo_sessions_characteristic) return false;
 
     if (ota_handler.is_ota_active()) {
         LOG_BLE_DEBUG("System info: skipping session count while OTA is active\n");
-        return;
+        return false;
     }
     
     char buffer[BLE_SYSINFO_MAX_PAYLOAD_BYTES];
@@ -1016,7 +1025,39 @@ void BluetoothManager::update_sessions_info() {
     );
     
     sysinfo_sessions_characteristic->setValue(buffer);
-    sysinfo_sessions_characteristic->notify();
+    if (device_connected) {
+        sysinfo_sessions_characteristic->notify();
+    }
+
+    return true;
+}
+
+void BluetoothManager::process_sessions_info_updates() {
+    if (!ble_enabled || !device_connected || !sysinfo_sessions_characteristic) {
+        return;
+    }
+
+    uint32_t storage_version = grind_logger.get_session_storage_version();
+    bool version_changed = (storage_version != last_session_storage_version);
+    bool export_changed = (data_export_in_progress != last_reported_export_state);
+
+    if (!sessions_info_dirty && !version_changed && !export_changed) {
+        return;
+    }
+
+    if (!update_sessions_info()) {
+        // Keep dirty so we'll retry once OTA finishes or characteristic is ready
+        sessions_info_dirty = true;
+        return;
+    }
+
+    last_session_storage_version = storage_version;
+    last_reported_export_state = data_export_in_progress;
+    sessions_info_dirty = false;
+}
+
+void BluetoothManager::mark_sessions_info_dirty() {
+    sessions_info_dirty = true;
 }
 
 void BluetoothManager::generate_diagnostic_report() {

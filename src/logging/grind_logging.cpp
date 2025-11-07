@@ -36,6 +36,7 @@ GrindLogger grind_logger;
 
 bool GrindLogger::init(Preferences* prefs) {
     _preferences = prefs;
+    session_storage_version = 0;
     current_session = (GrindSession*)heap_caps_malloc(sizeof(GrindSession), MALLOC_CAP_SPIRAM);
     if (!current_session) {
         LOG_BLE("ERROR: Failed to allocate PSRAM for grind session\n");
@@ -322,6 +323,7 @@ bool GrindLogger::flush_session_to_flash() {
     if (success) {
         // Clean up old session files to maintain the limit
         cleanup_old_session_files();
+        mark_session_storage_dirty();
         
         LOG_BLE("Session %lu flushed to individual file\n", current_session->session_id);
     } else {
@@ -828,6 +830,10 @@ bool GrindLogger::clear_all_sessions_from_flash() {
     dir.close();
  
     LOG_DEBUG_PRINTF("Purge complete. Removed: %d, Failed: %d.\n", files_removed, files_failed);
+
+    if (files_removed > 0) {
+        mark_session_storage_dirty();
+    }
  
     if (overall_result) {
         LOG_DEBUG_PRINTLN("Grind history purge completed successfully.");
@@ -1318,4 +1324,11 @@ void GrindLogger::cleanup_old_session_files() {
 
     free(session_ids);
     LOG_BLE("Cleanup complete. Removed %lu old session(s).\n", files_to_remove);
+    if (files_to_remove > 0) {
+        mark_session_storage_dirty();
+    }
+}
+
+void GrindLogger::mark_session_storage_dirty() {
+    session_storage_version++;
 }
