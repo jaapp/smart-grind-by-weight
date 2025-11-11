@@ -128,7 +128,7 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 **4-Pin Eureka Plug Reference (Left to Right):**
 - **Pin 1**: 5V power supply
 - **Pin 2**: Button signal (unused in this project)  
-- **Pin 3**: Motor control signal
+- **Pin 3**: Motor control signal *(active-high — the motor runs when GPIO 18 drives this pin to ~3.3V)*
 - **Pin 4**: Ground
 
 ⚠️ **VERIFY 5V:** Use a multimeter to confirm 5V pin - wire colors vary between units! The Waveshare board has reverse polarity protection, and button/motor wires can be swapped without risk of damage.

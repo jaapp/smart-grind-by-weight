@@ -39,13 +39,13 @@ Access **Menu → Motor Test** (Tools section) to verify motor connectivity. Thi
 Using the 4-pin Eureka plug pinout (see `media/4-pin_Eureka_plug_pinout.png` in documentation):
 - **Pin 1**: 5V power supply
 - **Pin 2**: Button signal (unused in this project)
-- **Pin 3**: Motor control signal
+- **Pin 3**: Motor control signal *(active-high — motor engages when driven to 3.3-5V)*
 - **Pin 4**: Ground
 
-The motor control wire (Pin 3) is the wire that **starts the motor when briefly connected to ground (Pin 4)**. Test carefully:
+The motor control wire (Pin 3) is the wire that **starts the motor when briefly driven HIGH (touch it to Pin 1 / 5V)**. Test carefully:
 1. Ensure grinder is powered and hopper has minimal beans
 2. Disconnect the suspect wire from the Waveshare board
-3. Briefly touch the wire to ground (Pin 4) - motor should start
+3. Briefly touch the wire to 5V (Pin 1) - motor should start
 4. **Be prepared for the powerful motor to cause the grinder to twist/jump**
 5. **Avoid shorts that could damage the board or cause injury**
 
