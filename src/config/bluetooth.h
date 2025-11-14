@@ -35,6 +35,8 @@
 #define BLE_DEBUG_SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"         // Nordic UART Service UUID
 #define BLE_DEBUG_RX_CHAR_UUID "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"         // ESP32 RX (Client -> Device)
 #define BLE_DEBUG_TX_CHAR_UUID "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"         // ESP32 TX (Device -> Client)
+#define BLE_DEBUG_MAX_CHUNK_BYTES 180                                          // Cap debug payloads to reduce BLE heap pressure
+#define BLE_DEBUG_CHUNK_DELAY_MS 25                                            // Delay between debug notifications for flow control
 
 //------------------------------------------------------------------------------
 // BLE SYSTEM INFO SERVICE

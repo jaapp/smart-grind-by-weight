@@ -1,4 +1,5 @@
 #include "manager.h"
+#include <algorithm>
 #include <cstdarg>
 #include <Arduino.h>
 #include <esp_system.h>
@@ -1075,15 +1076,23 @@ void BluetoothManager::generate_diagnostic_report() {
 
     char buf[512];
 
-    // Helper lambda to send chunk and flush
+    // Helper lambda to send chunk and flush in flow-controlled slices
     auto send_chunk = [this](const char* chunk) {
-        if (!debug_tx_characteristic) return;
+        if (!debug_tx_characteristic || !chunk) return;
         size_t len = strlen(chunk);
-        LOG_BLE("TX: %zu bytes\n", len);
-        debug_tx_characteristic->setValue((uint8_t*)chunk, len);
-        debug_tx_characteristic->notify();
-        // Explicitly yield to BLE task to process notification queue
-        vTaskDelay(pdMS_TO_TICKS(50)); // Give BLE stack time to drain queue
+        if (len == 0) return;
+
+        const TickType_t chunk_delay = pdMS_TO_TICKS(BLE_DEBUG_CHUNK_DELAY_MS);
+
+        size_t offset = 0;
+        while (offset < len) {
+            size_t part_len = std::min(static_cast<size_t>(BLE_DEBUG_MAX_CHUNK_BYTES), len - offset);
+            LOG_BLE("TX: %zu bytes\n", part_len);
+            debug_tx_characteristic->setValue(reinterpret_cast<const uint8_t*>(chunk + offset), part_len);
+            debug_tx_characteristic->notify();
+            vTaskDelay(chunk_delay); // Give BLE stack time to drain queue
+            offset += part_len;
+        }
     };
 
     // Section 1: Header & Firmware Info
@@ -1539,7 +1548,8 @@ void BluetoothManager::generate_diagnostic_report() {
         if (dir && dir.isDirectory()) {
             // Collect all session IDs
             const int MAX_SESSIONS = 100;
-            uint32_t* session_ids = (uint32_t*)malloc(MAX_SESSIONS * sizeof(uint32_t));
+            const size_t session_buf_bytes = MAX_SESSIONS * sizeof(uint32_t);
+            uint32_t* session_ids = static_cast<uint32_t*>(malloc(session_buf_bytes));
             int count = 0;
 
             if (session_ids) {
@@ -1555,6 +1565,7 @@ void BluetoothManager::generate_diagnostic_report() {
                     }
                     file = dir.openNextFile();
                 }
+                file.close();
                 dir.close();
 
                 // Sort session IDs descending (highest/newest first)
@@ -1713,6 +1724,11 @@ void BluetoothManager::generate_diagnostic_report() {
                 }
 
                 free(session_ids);
+            } else {
+                dir.close();
+                snprintf(buf, sizeof(buf), "  [ERROR] Unable to allocate session buffer (%u bytes)\n",
+                    (unsigned int)session_buf_bytes);
+                send_chunk(buf);
             }
         } else {
             snprintf(buf, sizeof(buf), "  [NONE] No session files found\n");
