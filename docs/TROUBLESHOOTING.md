@@ -36,7 +36,7 @@ Access **Menu → Motor Test** (Tools section) to verify motor connectivity. Thi
 
 ⚠️ **DANGER:** This test involves live wires and can cause the grinder to start unexpectedly, potentially causing injury or damage. Only attempt if comfortable working with electrical systems.
 
-Using the 4-pin Eureka plug pinout (see `media/4-pin_Eureka_plug_pinout.png` in documentation):
+Using the 4-pin Eureka plug pinout (see `../media/4-pin_Eureka_plug_pinout.png` in documentation):
 - **Pin 1**: 5V power supply
 - **Pin 2**: Button signal (unused in this project)
 - **Pin 3**: Motor control signal *(active-high — motor engages when driven to 3.3-5V)*

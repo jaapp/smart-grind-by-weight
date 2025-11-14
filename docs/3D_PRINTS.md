@@ -18,4 +18,4 @@ Created a custom mount, holder, or adapter? Share it with the community:
 2. Share it by creating a new issue
 3. Tips to include: grinder compatibility, print settings, assembly notes, and photos
 
-**Design Reference:** Use the Fusion 360 source files at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for mounting dimensions.
+**Design Reference:** Use the Fusion 360 source files at `../3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for mounting dimensions.

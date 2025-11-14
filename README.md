@@ -67,18 +67,18 @@ flowchart LR
 
 ### For Users - Using Pre-built Firmware
 
-1. **Get the parts** - ESP32-S3 AMOLED display + HX711 + load cell (~€35 total) → See [Parts List](DOC.md#-parts-list)
-2. **3D print the mounting parts** - All STL files included, no supports needed → See [3D Printed Parts](DOC.md#3d-printed-parts) | [Community Designs](3D_PRINTS.md)
+1. **Get the parts** - ESP32-S3 AMOLED display + HX711 + load cell (~€35 total) → See [Parts List](docs/DOC.md#-parts-list)
+2. **3D print the mounting parts** - All STL files included, no supports needed → See [3D Printed Parts](docs/DOC.md#3d-printed-parts) | [Community Designs](docs/3D_PRINTS.md)
 3. **Flash firmware & calibrate** - [Web Flasher](https://jaapp.github.io/smart-grind-by-weight) (Chrome/Edge desktop + Android only) or command line
 4. **Follow the assembly video** - [Complete Eureka build process](https://youtu.be/-kfKjiwJsGM)
 
-**Ready to build?** → See **[DOC.md](DOC.md)** for complete build instructions, parts list, and usage guide.
+**Ready to build?** → See **[DOC.md](docs/DOC.md)** for complete build instructions, parts list, and usage guide.
 
 ---
 
 ### For Developers - Building from Source
 
-If you want to modify the code or contribute to development, see **[DEVELOPMENT.md](DEVELOPMENT.md)** for build instructions.
+If you want to modify the code or contribute to development, see **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** for build instructions.
 
 **Design Files:** The complete Fusion 360 design is available at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for modification and adaptation to other grinder models.
 
@@ -117,10 +117,10 @@ In this project, that's most obvious when at state management - it's a bit clutt
 
 **Project Status**: This project is shared 'as-is' and I have limited availability for support. While I'm happy to share what I've built, please understand that troubleshooting and feature requests may receive limited attention.
 
-**Want to dive deeper?** → Check out **[DOC.md](DOC.md)** for comprehensive documentation.
+**Want to dive deeper?** → Check out **[DOC.md](docs/DOC.md)** for comprehensive documentation.
 
-**Different grinder?** → See **[Grinder Compatibility Matrix](GRINDER_COMPATIBILITY.md)** for adaptation guidance.
+**Different grinder?** → See **[Grinder Compatibility Matrix](docs/GRINDER_COMPATIBILITY.md)** for adaptation guidance.
 
-**Having issues?** → See **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** for common problems and solutions.
+**Having issues?** → See **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** for common problems and solutions.
 
 **Changelog & Updates** → See **[Releases](https://github.com/jaapp/smart-grind-by-weight/releases)** for version history and updates.

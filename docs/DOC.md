@@ -46,7 +46,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 - **Angled pin headers** — [Example (untested)](https://nl.aliexpress.com/item/1005006149080284.html)
 - **[JST-PH 4-pin male connector (optional)](https://nl.aliexpress.com/item/1005009479983500.html)** — Optional solder-free connection to Eureka
 
-[<img src="media/waveshare_board_wired_up_1.jpg" alt="Wired Waveshare Board" width="30%">](media/waveshare_board_wired_up_1.jpg)
+[<img src="../media/waveshare_board_wired_up_1.jpg" alt="Wired Waveshare Board" width="30%">](../media/waveshare_board_wired_up_1.jpg)
 
 ### 3D Printed Parts
 
@@ -58,11 +58,11 @@ All parts designed to print **without supports**. Keep the orientation of the ST
 - **Alternative**: PLA might work but will offer a reduced experience due to brittleness
 
 **Default Eureka Parts:**
-- **[Screen adapter](3d_files/Waveshare%20AMOLED%201_64%20adapter.stl)** - Mounts Waveshare screen to Eureka location
-- **[Back plate](3d_files/Back%20plate.stl)** - Mounts to Eureka and holds HX711/load cell
-- **[Cover plate](3d_files/Cover.stl)** - Clean finishing cover
-- **[Dosing cup holder](3d_files/Cup%20holder.stl)** - Connects to load cell for dosing cup
-- **[Screw hole covers](3d_files/Cup%20holder%20hole%20cover.stl)** - Hides screws and protects against coffee grounds
+- **[Screen adapter](../3d_files/Waveshare%20AMOLED%201_64%20adapter.stl)** - Mounts Waveshare screen to Eureka location
+- **[Back plate](../3d_files/Back%20plate.stl)** - Mounts to Eureka and holds HX711/load cell
+- **[Cover plate](../3d_files/Cover.stl)** - Clean finishing cover
+- **[Dosing cup holder](../3d_files/Cup%20holder.stl)** - Connects to load cell for dosing cup
+- **[Screw hole covers](../3d_files/Cup%20holder%20hole%20cover.stl)** - Hides screws and protects against coffee grounds
 
 **Community Designs:**
 
@@ -84,7 +84,7 @@ Watch the complete Eureka Mignon Specialita assembly process: **[YouTube Assembl
 
 ## 🔌 Installation & Wiring
 
-[<img src="media/wiring_diagram.png" alt="Wiring Diagram" width="50%">](media/wiring_diagram.png)
+[<img src="../media/wiring_diagram.png" alt="Wiring Diagram" width="50%">](../media/wiring_diagram.png)
 
 ### Pin Configuration
 
@@ -114,9 +114,9 @@ Yellow (Shield)  →  GND
 
 ⚠️ **CRITICAL WARNING:** Always verify your specific Eureka's wiring independently! Wire colors vary between units and cannot be trusted. Use the numbered pin positions shown in the reference image.
 
-Using the 4-pin Eureka plug pinout (see `media/4-pin_Eureka_plug_pinout.png`), counting from left to right with the plug oriented with 'ribs' towards you:
+Using the 4-pin Eureka plug pinout (see `../media/4-pin_Eureka_plug_pinout.png`), counting from left to right with the plug oriented with 'ribs' towards you:
 
-[<img src="media/4-pin_Eureka_plug_pinout.png" alt="4-Pin Eureka Plug Pinout" width="50%">](media/4-pin_Eureka_plug_pinout.png)
+[<img src="../media/4-pin_Eureka_plug_pinout.png" alt="4-Pin Eureka Plug Pinout" width="50%">](../media/4-pin_Eureka_plug_pinout.png)
 
 ```
 ESP32-S3 5V        →    Pin 1 (5V power)

@@ -41,7 +41,7 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 
 ## Firmware Sources
 
-The firmware list is pulled straight from GitHub Releases—no files are stored in this repo. If you need the exact asset mapping, see `DOC.md`.
+The firmware list is pulled straight from GitHub Releases—no files are stored in this repo. If you need the exact asset mapping, see [DOC.md](../../docs/DOC.md).
 
 ## Technical Details
 
