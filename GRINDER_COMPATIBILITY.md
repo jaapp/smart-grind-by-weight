@@ -13,9 +13,6 @@ Compatibility guide for Smart Grind-by-Weight modification across grinder models
 | [**Mignon Manuale**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/evolution+range/27.aspx) | 🔧 **Pin soldering** | Custom mount + pins | 🏗️ **WIP design** | Timer pot, no screen |
 | [**Mignon Zero**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/zero+range/74.aspx) | 🔧 **Extra hardware** | Custom mount + relay | 🏗️ **WIP design** | Requires 230V optocoupler relay (3.3V logic) + external USB power |
 | [**Atom series**](https://www.eureka.co.it/en/products/eureka+1920/commercial+grinders/atom+range/8.aspx) | ❓ **Unknown** | Research needed | ❌ **None** | Internals unknown |
-| **Baratza models** | 🔧 **Custom work** | Full adaptation | ❌ **None** | Electronics + mounting |
-| **Niche Zero** | 🔧 **Custom work** | Full adaptation | ❌ **None** | Electronics + mounting |
-| **Mazzer models** | 🔧 **Custom work** | Full adaptation | ❌ **None** | Electronics + mounting |
 
 ## Methods Explained
 
@@ -28,9 +25,11 @@ See: **[3D PRINTS](3D_PRINTS.md)** for a WIP design that adds a Waveshare screen
 ![Pin soldering example](https://besson.co/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrinder-pins.ad081f28.jpg&w=3840&q=75)  
 *Pin connections for non-screen models. Credit: [Besson Coffee Grinder Smart Scale](https://besson.co/projects/coffee-grinder-smart-scale)*
 
-## Requirements
+## How to adapt this mod for a not yet supported grinder
 
-**Universal**: ESP32-S3 AMOLED, HX711, load cell, 5V power, motor control signal
-**Pin soldering**: 2N3904 transistor for 3.3V→5V conversion
-**Relay control**: 230V optocoupler relay (3.3V logic) or SSR-40DA solid-state relay. Provides safety isolation between 230V mains and ESP32. Grinder auto-detects/auto-tunes relay delays.
-**Custom mounting**: 3D printed parts, mechanical adaptation
+Bringing the Smart Grind-by-Weight setup to a new grinder mostly means recreating the mechanical interface and ensuring safe motor control.
+
+- Design and print a new 3D mount that secures the load cell inside the grinder without interfering with the chute or burr carrier.
+- Integrate the SSR-40DA (or equivalent) so the ESP32 can switch the grinder motor safely, tapping into the grinder's existing on/off path while keeping mains fully isolated.
+
+For a concrete wiring example, reference the [Eureka Specialita reverse engineering notes](docs/eureka-specialita-reverse-engineering.md) that document how the mod ties into the stock control board.
