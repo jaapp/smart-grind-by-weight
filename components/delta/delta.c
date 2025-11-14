@@ -17,8 +17,6 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
-#include "esp_task_wdt.h"
-#include "esp_spi_flash.h"
 
 #include "esp_partition.h"
 #include "esp_ota_ops.h"
@@ -37,20 +35,10 @@ typedef struct flash_mem {
     esp_ota_handle_t ota_handle;
 } flash_mem_t;
 
-static inline void delta_reset_watchdog_if_registered(void)
-{
-    if (esp_task_wdt_status(NULL) == ESP_OK) {
-        esp_task_wdt_reset();
-    }
-}
-
 static int delta_flash_write_dest(void *arg_p, const uint8_t *buf_p, size_t size)
 {
     flash_mem_t *flash;
     flash = (flash_mem_t *)arg_p;
-
-    delta_reset_watchdog_if_registered();
-    taskYIELD();
 
     if (!flash) {
         return -DELTA_CASTING_ERROR;
@@ -70,9 +58,6 @@ static int delta_flash_read_src(void *arg_p, uint8_t *buf_p, size_t size)
 {
     flash_mem_t *flash;
     flash = (flash_mem_t *)arg_p;
-
-    delta_reset_watchdog_if_registered();
-    taskYIELD();
 
     if (!flash) {
         return -DELTA_CASTING_ERROR;
@@ -104,9 +89,6 @@ static int delta_flash_read_patch(void *arg_p, uint8_t *buf_p, size_t size)
 {
     flash_mem_t *flash;
     flash = (flash_mem_t *)arg_p;
-
-    delta_reset_watchdog_if_registered();
-    taskYIELD();
 
     if (!flash) {
         return -DELTA_CASTING_ERROR;
@@ -221,11 +203,8 @@ int delta_partition_init(delta_partition_writer_t *writer, const char *partition
     }
 
     size_t patch_page_size = ((patch_size + PARTITION_PAGE_SIZE - 1) / PARTITION_PAGE_SIZE) * PARTITION_PAGE_SIZE;
+    const size_t ERASE_CHUNK_SIZE = 256 * 1024;  // Reduce OTA start delay
     size_t erased = 0;
-
-    // Erase in 256KB chunks to minimize context switches while still preventing watchdog timeout
-    // 4KB chunks (SPI_FLASH_SEC_SIZE) caused massive slowdown due to ~384 yields for 1.5MB
-    const size_t ERASE_CHUNK_SIZE = 256 * 1024;  // 256KB chunks
 
     while (erased < patch_page_size) {
         size_t chunk = patch_page_size - erased;
@@ -238,8 +217,6 @@ int delta_partition_init(delta_partition_writer_t *writer, const char *partition
             return ESP_FAIL;
         }
 
-        delta_reset_watchdog_if_registered();
-        taskYIELD();
         erased += chunk;
     }
 

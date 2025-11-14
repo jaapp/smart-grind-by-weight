@@ -351,12 +351,12 @@ void BluetoothManager::handle() {
         timeout_ms = BLE_AUTO_DISABLE_TIMEOUT_MS;
     }
     
+    // Handle data export updates
     update_data_export();
     process_sessions_info_updates();
 
     // Run deferred diagnostic report generation on BLE task (not on NimBLE callback thread)
-    if (device_connected && debug_tx_characteristic &&
-        diagnostic_report_pending && !diagnostic_report_in_progress) {
+    if (device_connected && debug_tx_characteristic && diagnostic_report_pending && !diagnostic_report_in_progress) {
         diagnostic_report_in_progress = true;
         diagnostic_report_pending = false;
         generate_diagnostic_report();
@@ -681,16 +681,16 @@ void BluetoothManager::handle_ota_control_command(BLECharacteristic* characteris
             if (data.length() >= 6) {  // 1 + 4 + 1 bytes minimum (cmd + patch_size + full_update_flag)
                 uint32_t patch_size = *(uint32_t*)(data.c_str() + 1);
                 bool is_full_update = data[5] != 0;
-
-                log("Bluetooth OTA: Starting %s update (%lu KB)\n",
+                
+                log("Bluetooth OTA: Starting %s update (%lu KB)\n", 
                     is_full_update ? "full" : "delta", (unsigned long)patch_size / 1024);
-                update_ui_status("Initializing update...");
-
+                update_ui_status("Receiving update...");
+                
                 // Parse build number if present
                 String expected_build = "";
                 String expected_firmware_version = "";
                 size_t offset = 7;
-
+                
                 if (data.length() > 6) {
                     uint8_t build_length = data[6];
                     if (build_length > 0 && data.length() >= offset + build_length) {
@@ -698,7 +698,7 @@ void BluetoothManager::handle_ota_control_command(BLECharacteristic* characteris
                         log("Bluetooth OTA: Expected build after update: %s\n", expected_build.c_str());
                         offset += build_length;
                     }
-
+                    
                     // Parse firmware version if present (backwards compatible extension)
                     if (data.length() > offset) {
                         uint8_t version_length = data[offset];
@@ -709,10 +709,9 @@ void BluetoothManager::handle_ota_control_command(BLECharacteristic* characteris
                         }
                     }
                 }
-
+                
                 if (ota_handler.start_ota(patch_size, expected_build, is_full_update, expected_firmware_version)) {
                     set_ota_status(BLE_OTA_RECEIVING);
-                    update_ui_status("Receiving update...");
                 } else {
                     set_ota_status(BLE_OTA_ERROR);
                 }
@@ -869,16 +868,16 @@ void BluetoothManager::onDisconnect(BLEServer* server) {
 }
 
 void BluetoothManager::onWrite(BLECharacteristic* characteristic) {
-    LOG_BLE_DEBUG("DEBUG: onWrite() called, characteristic=%p\n", characteristic);
-    LOG_BLE_DEBUG("  ota_control=%p, ota_data=%p, debug_rx=%p, data_control=%p, diagnostics=%p\n",
+    LOG_BLE("DEBUG: onWrite() called, characteristic=%p\n", characteristic);
+    LOG_BLE("  ota_control=%p, ota_data=%p, debug_rx=%p, data_control=%p, diagnostics=%p\n",
         ota_control_characteristic, ota_data_characteristic, debug_rx_characteristic,
         data_control_characteristic, sysinfo_diagnostics_characteristic);
 
     if (characteristic == ota_control_characteristic) {
-        LOG_BLE_DEBUG("  -> Handling OTA control\n");
+        LOG_BLE("  -> Handling OTA control\n");
         handle_ota_control_command(characteristic);
     } else if (characteristic == ota_data_characteristic) {
-        LOG_BLE_DEBUG("  -> Handling OTA data\n");
+        LOG_BLE("  -> Handling OTA data\n");
         handle_ota_data_chunk(characteristic);
     } else if (characteristic == debug_rx_characteristic) {
         LOG_BLE("  -> Handling debug command\n");

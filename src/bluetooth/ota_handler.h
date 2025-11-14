@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
+#include <esp_task_wdt.h>
 #include <esp_app_format.h>
 #include <soc/rtc.h>
 #include <esp_pm.h>

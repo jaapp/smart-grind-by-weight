@@ -75,9 +75,6 @@ private:
     TaskMetrics task_metrics[5]; // One for each task
     bool tasks_initialized;
     bool ota_suspended;
-    TaskHandle_t ota_watchdog_task;
-    bool ota_watchdog_active;
-    bool ota_watchdog_ble_registered;
     
     // Static instance for task callbacks
     static TaskManager* instance;
@@ -136,10 +133,6 @@ private:
     
     // Task validation
     bool validate_hardware_ready() const;
-    
-    // OTA watchdog management
-    void enable_ota_watchdog_keepalive();
-    void disable_ota_watchdog_keepalive();
 };
 
 // Global task manager instance

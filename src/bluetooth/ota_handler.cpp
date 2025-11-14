@@ -6,7 +6,6 @@
 #include "../tasks/task_manager.h"
 #include <Arduino.h>
 #include <BLEDevice.h>
-#include <esp_task_wdt.h>
 
 OTAHandler::OTAHandler() 
     : ota_in_progress(false)
@@ -99,23 +98,23 @@ void OTAHandler::restore_normal_power() {
 }
 
 bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, bool is_full_update, const String& expected_firmware_version) {
-    LOG_OTA_DEBUG("start_ota() called - size=%lu, build=%s, full=%d\n",
+    LOG_OTA_DEBUG("start_ota() called - size=%lu, build=%s, full=%d\n", 
                   (unsigned long)size, expected_build_number.c_str(), is_full_update);
-
+    
     if (ota_in_progress) {
         LOG_BLE("OTA: Update already in progress\n");
         LOG_OTA_DEBUG("start_ota() FAILED - already in progress\n");
         return false;
     }
-
+    
     patch_size = size;
     received_size = 0;
     this->is_full_update = is_full_update;
-
+    
     LOG_BLE("OTA: Starting %s update (%lu KB)\n", is_full_update ? "full" : "delta", (unsigned long)patch_size / 1024);
-    LOG_OTA_DEBUG("patch_size=%lu, received_size=%lu, is_full_update=%d\n",
+    LOG_OTA_DEBUG("patch_size=%lu, received_size=%lu, is_full_update=%d\n", 
                   (unsigned long)patch_size, (unsigned long)received_size, this->is_full_update);
-
+    
     // Store expected build number and firmware version for post-reboot verification
     if (!expected_build_number.isEmpty() && preferences) {
         preferences->putString("new_build_nr", expected_build_number);
@@ -123,43 +122,45 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     } else {
         LOG_OTA_DEBUG("No expected build number to store\n");
     }
-
+    
     if (!expected_firmware_version.isEmpty() && preferences) {
         preferences->putString("new_fw_ver", expected_firmware_version);
         LOG_OTA_DEBUG("Stored expected firmware version: %s\n", expected_firmware_version.c_str());
     } else if (expected_build_number.isEmpty()) {
         LOG_OTA_DEBUG("No expected firmware version to store\n");
     }
-
-    // Extend watchdog timeout during OTA to prevent spurious resets
-    LOG_BLE("OTA: Reconfiguring task watchdog timer for OTA process (600s timeout)...\n");
-    LOG_OTA_DEBUG("Configuring watchdog - timeout_ms=600000, cores=0x3\n");
+    
+    // Reconfigure task watchdog for OTA process with extended timeout
+    // This is a CPU and flash-intensive operation that can starve other tasks
+    LOG_BLE("OTA: Reconfiguring task watchdog timer for OTA process (900s timeout)...\n");
+    LOG_OTA_DEBUG("Configuring watchdog - timeout_ms=900000, cores=0x3\n");
     esp_task_wdt_config_t wdt_config = {
-        .timeout_ms = 600000,
-        .idle_core_mask = (1 << 0) | (1 << 1),
+        .timeout_ms = 900000,
+        .idle_core_mask = (1 << 0) | (1 << 1), // Watch idle tasks on both cores
         .trigger_panic = true,
     };
     esp_task_wdt_reconfigure(&wdt_config);
     LOG_OTA_DEBUG("Watchdog reconfigured successfully\n");
 
-    // Set OTA active BEFORE partition erase so UI can show screen immediately
-    ota_in_progress = true;
-    current_status = BLE_OTA_RECEIVING;
-    LOG_OTA_DEBUG("OTA marked as active - status=BLE_OTA_RECEIVING\n");
-
+    // Suspend hardware tasks to prevent watchdog timeouts during OTA
+    LOG_BLE("OTA: Suspending hardware tasks...\n");
     task_manager.suspend_hardware_tasks();
-    LOG_OTA_DEBUG("Calling start_update() - this will erase partition...\n");
+
+    LOG_OTA_DEBUG("Calling start_update()...\n");
     if (!start_update()) {
-        // Partition erase/init failed - reset state
         current_status = BLE_OTA_ERROR;
-        ota_in_progress = false;
-        LOG_OTA_DEBUG("start_update() FAILED - OTA aborted\n");
+        LOG_OTA_DEBUG("start_update() FAILED\n");
+        
+        // Resume hardware tasks on failure
+        LOG_BLE("OTA: Resuming hardware tasks after failed start\n");
         task_manager.resume_hardware_tasks();
         return false;
     }
-    LOG_OTA_DEBUG("start_update() SUCCESS - partition ready\n");
-
-    LOG_OTA_DEBUG("OTA started successfully - ready to receive data\n");
+    LOG_OTA_DEBUG("start_update() SUCCESS\n");
+    
+    ota_in_progress = true;
+    current_status = BLE_OTA_RECEIVING;
+    LOG_OTA_DEBUG("OTA started successfully - status=BLE_OTA_RECEIVING\n");
     return true;
 }
 
@@ -167,14 +168,14 @@ bool OTAHandler::process_data_chunk(const uint8_t* data, size_t size) {
     if (!ota_in_progress) {
         return false;
     }
-
+    
     // Write patch data to patch partition
     if (delta_partition_write(&patch_writer, (const char*)data, size) != ESP_OK) {
         LOG_BLE("OTA: Patch write failed at offset %lu\n", (unsigned long)received_size);
         current_status = BLE_OTA_ERROR;
         return false;
     }
-
+    
     received_size += size;
     
     // Progress logging every 16KB for better visibility, plus at start and end
@@ -183,8 +184,6 @@ bool OTAHandler::process_data_chunk(const uint8_t* data, size_t size) {
                      (unsigned long)received_size / 1024, (unsigned long)patch_size / 1024, 
                      get_progress());
     }
-    
-    taskYIELD();
     
     return true;
 }
@@ -252,10 +251,13 @@ bool OTAHandler::complete_ota() {
         current_status = BLE_OTA_ERROR;
         LOG_BLE("OTA: Finalization failed\n");
         LOG_OTA_DEBUG("finalize_update() FAILED\n");
+
+        // Resume hardware tasks on failure
+        LOG_BLE("OTA: Resuming hardware tasks after failed finalization\n");
+        task_manager.resume_hardware_tasks();
     }
     
     ota_in_progress = false;
-    task_manager.resume_hardware_tasks();
     LOG_OTA_DEBUG("complete_ota() returning %s\n", success ? "SUCCESS" : "FAILED");
     return success;
 }
@@ -267,6 +269,9 @@ void OTAHandler::abort_ota() {
         received_size = 0;
         patch_size = 0;
         current_status = BLE_OTA_ERROR;
+
+        // Resume hardware tasks on abort
+        LOG_BLE("OTA: Resuming hardware tasks after abort\n");
         task_manager.resume_hardware_tasks();
     }
 }
