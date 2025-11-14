@@ -1616,16 +1616,18 @@ void BluetoothManager::generate_diagnostic_report() {
                                 snprintf(buf, sizeof(buf), "  Events (%u):\n", header.event_count);
                                 send_chunk(buf);
 
-                                const char* phase_names[] = {
+                                static const char* const phase_names[] = {
                                     "IDLE", "INITIALIZING", "SETUP", "TARING", "TARE_CONFIRM",
                                     "PREDICTIVE", "PULSE_DECISION", "PULSE_EXECUTE", "PULSE_SETTLING",
-                                    "FINAL_SETTLING", "TIME_GRINDING", "TIME_ADDITIONAL_PULSE", "COMPLETED", "TIMEOUT"
+                                    "FINAL_SETTLING", "TIME_GRINDING", "TIME_ADDITIONAL_PULSE", "COMPLETED", "TIMEOUT",
+                                    "PRIME", "PRIME_SETTLING", "PURGE_CONFIRM"
                                 };
+                                const size_t phase_name_count = sizeof(phase_names) / sizeof(phase_names[0]);
 
                                 for (uint16_t e = 0; e < header.event_count; e++) {
                                     GrindEvent event;
                                     if (sessionFile.read((uint8_t*)&event, sizeof(event)) == sizeof(event)) {
-                                        const char* phase_name = (event.phase_id < 14) ? phase_names[event.phase_id] : "UNKNOWN";
+                                        const char* phase_name = (event.phase_id < phase_name_count) ? phase_names[event.phase_id] : "UNKNOWN";
 
                                         // Calculate event yield (delta)
                                         float event_yield = event.end_weight - event.start_weight;

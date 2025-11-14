@@ -645,7 +645,7 @@ class GrinderBLETool:
         PHASE_NAMES = {
             0: "IDLE", 1: "INITIALIZING", 2: "SETUP", 3: "TARING", 4: "TARE_CONFIRM",
             5: "PREDICTIVE", 6: "PULSE_DECISION", 7: "PULSE_EXECUTE", 8: "PULSE_SETTLING",
-            9: "FINAL_SETTLING", 10: "TIME", 11: "PULSE", 12: "COMPLETED", 13: "TIMEOUT",
+            9: "FINAL_SETTLING", 10: "TIME_GRINDING", 11: "TIME_ADDITIONAL_PULSE", 12: "COMPLETED", 13: "TIMEOUT",
             14: "PRIME", 15: "PRIME_SETTLING", 16: "PURGE_CONFIRM",
         }
         
