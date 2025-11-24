@@ -20,7 +20,7 @@ Compatibility guide for Smart Grind-by-Weight modification across grinder models
 - **Pin soldering**: Direct board connections ([Besson method](https://besson.co/projects/coffee-grinder-smart-scale)) + custom mount using [abandoned chute cover](../3d_files/chute%20cover/) as starting point
 - **Custom work**: Full electronics research + mechanical adaptation needed
 
-See: **[3D PRINTS](3D_PRINTS.md)** for a WIP design that adds a Waveshare screenmount for Eureka grinders that don't come with one.
+See: **[3D PRINTS](3D_PRINTS.md)** for a couple designs that adds a Waveshare screenmount for Eureka grinders that don't come with one.
 
 ![Pin soldering example](https://besson.co/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrinder-pins.ad081f28.jpg&w=3840&q=75)  
 *Pin connections for non-screen models. Credit: [Besson Coffee Grinder Smart Scale](https://besson.co/projects/coffee-grinder-smart-scale)*
