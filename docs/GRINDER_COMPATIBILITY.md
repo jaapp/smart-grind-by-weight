@@ -14,6 +14,7 @@ Compatibility guide for Smart Grind-by-Weight modification across grinder models
 | [**Mignon Crono**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/filter+range/26.aspx) | 🔧 **Pin soldering** | Custom mount + pins | 🏗️ **WIP design** | No screen, no relay needed (2N3904 for 3.3V→5V). [Discussion #70](https://github.com/jaapp/smart-grind-by-weight/discussions/70) |
 | [**Mignon Manuale**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/evolution+range/27.aspx) | 🔧 **Step-down required (WIP)** | Custom mount + pins + 5V buck | ✅ **MakerWorld T70 mount** ([link](https://makerworld.com/en/models/2157431-eureka-mignon-manuale-smart-grinder-case#profileId-2338828)) | Manuale board feeds ~18V on header; add a 5V buck to protect ESP/display. Progress tracked in [issue #86](https://github.com/jaapp/smart-grind-by-weight/issues/86) |
 | [**Mignon Zero**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/zero+range/74.aspx) | 🔧 **Extra hardware** | Custom mount + relay | 🏗️ **WIP design** | Requires 230V optocoupler relay (3.3V logic) + external USB power |
+| [**Gaggia MDF55**](https://www.gaggia.com/product/g-grinder/) | 🔄 **Likely compatible** | Screen replacement | ✅ **Ready** | Untested. Rebranded Specialita with same screen |
 | [**Atom series**](https://www.eureka.co.it/en/products/eureka+1920/commercial+grinders/atom+range/8.aspx) | ❓ **Unknown** | Research needed | ❌ **None** | Internals unknown |
 
 ## Methods Explained
