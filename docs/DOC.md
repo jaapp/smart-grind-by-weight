@@ -27,8 +27,10 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 
 - **[Waveshare ESP32-S3 1.64" AMOLED Touch Display](https://www.waveshare.com/esp32-s3-touch-amoled-1.64.htm)** — Main controller
 - **[HX711 ADC module](https://nl.aliexpress.com/item/1005006851380544.html)** — Load cell amplifier
-- **MAVIN or T70 load cell** (0.3 – 1 kg range) — Weight sensor  
+- **MAVIN or T70 load cell** (0.3 – 1 kg range) — Weight sensor
   ⚠️ Avoid cheap unshielded small load cells — accuracy will suffer
+  - **Required dimensions:** 70 × 22 × 15 mm (L × H × D)
+  - **Screw pattern:** 4 holes in rectangular layout (`: :` pattern), NOT linear (`. . . .`)
   - **1 kg:** Recommended. Suits portafilter use cases.
   - **0.3 kg:** Only suitable for dosing cups.
   - **Examples:**
@@ -39,7 +41,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
     - [P70 1 kg](https://nl.aliexpress.com/item/1005006257978435.html) (looks compatible with T70, not personally tested)
   - **Tested:** Only the 1 kg T70 and 0.3 kg Mavin load cells have been personally verified
 - **6× M3 screws** (≈10 mm) — Mounting hardware
-- **1000 µF capacitor** (10 V) — Power filtering [Example (untested)](https://nl.aliexpress.com/item/1005006037906723.html)
+- **1000 µF capacitor** (≥10 V) — Brownout protection. Smaller values may work; larger voltage ratings (e.g. 25V) are fine but physically bigger, so check fitment. [Example (untested)](https://nl.aliexpress.com/item/1005006037906723.html)
 - **Wires & Dupont connectors** — General wiring  
   Example: [22 AWG silicone wire set](https://www.aliexpress.com/item/2255800441309579.html)
 - **Dupont connector kit** — [Example (untested)](https://nl.aliexpress.com/item/1005008995345289.html)
@@ -143,7 +145,7 @@ ESP32-S3 GND       →    Pin 4 (Ground)
    - Load cell can be directly soldered to HX711 (Make the wires as short as possible. Connect shield wire as well to GND)
 4. **For Eureka Mignon assembly:**
    - Disassemble top plate and front plate
-   - Remove the button and store it (not needed)
+   - Remove the button: unscrew from front plate, open grinder from below, unplug connector from powerboard, store plug+cable to revert mod later
    - Use JST-PH plug to connect to Waveshare board
    - **WARNING:** Wire colors vary significantly between Eureka units - always verify pin functions with a multimeter before connecting!
    - Mount Waveshare screen using 3D printed adapter where original screen was (the Waveshare screen with adapter replaces the original screen and reuses the original mounting screws)
