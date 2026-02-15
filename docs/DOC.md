@@ -117,6 +117,15 @@ Yellow (Shield)  →  GND
 - The HX711 only has 1 GND pin - solder the shield wire to the backside of the pin header
 - **Tip**: Keep the load cell wire as short as possible to reduce noise
 
+### Recommended Wire Lengths
+
+Advised lengths:
+- **Load cell → HX711:** ~10 cm
+- **HX711 → Waveshare board:** ~15 cm (image shows a slightly shorter lead; 15 cm gives comfortable slack)
+- **Grinder harness → HX711:** ~30 cm to route from the housing feed-through to the amplifier without strain
+
+[<img src="../media/wiring%20length.jpg" alt="Wire Length Example" width="25%">](../media/wiring%20length.jpg)
+
 **Eureka Mignon Connections:**
 
 ⚠️ **CRITICAL WARNING:** Always verify your specific Eureka's wiring independently! Wire colors vary between units and cannot be trusted. Use the numbered pin positions shown in the reference image.
