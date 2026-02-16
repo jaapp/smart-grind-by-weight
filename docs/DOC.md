@@ -6,19 +6,43 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 
 ## 📋 Table of Contents
 
-- [Parts List](#️-parts-list)
-- [Assembly Video](#-assembly-video)
-- [Installation & Wiring](#-installation--wiring)
-- [Firmware Installation](#-firmware-installation)
-- [Initial Calibration](#️-initial-calibration)
-- [Usage Guide](#-usage-guide)
-- [User Interface Navigation](#️-user-interface-navigation)
-- [Bluetooth Connectivity](#-bluetooth-connectivity)
-- [Diagnostic Report](#-diagnostic-report)
-- [Analytics & Data Export](#-analytics--data-export)
-- [Algorithm Details](#-algorithm-details)
-- [Frequently Asked Questions](#-frequently-asked-questions)
-- [Troubleshooting](#-troubleshooting)
+- [Smart Grind-by-Weight Documentation](#smart-grind-by-weight-documentation)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [🛠️ Parts List](#️-parts-list)
+    - [3D Printed Parts](#3d-printed-parts)
+    - [Fusion 360 Source Files](#fusion-360-source-files)
+  - [📹 Assembly Video](#-assembly-video)
+  - [🔌 Installation \& Wiring](#-installation--wiring)
+    - [Pin Configuration](#pin-configuration)
+    - [Recommended Wire Lengths](#recommended-wire-lengths)
+    - [Installation Steps](#installation-steps)
+  - [🚀 Firmware Installation](#-firmware-installation)
+    - [🌐 Web Flasher (Recommended)](#-web-flasher-recommended)
+    - [Command Line (Fallback)](#command-line-fallback)
+  - [⚖️ Initial Calibration](#️-initial-calibration)
+    - [Auto-Tune Motor Response](#auto-tune-motor-response)
+    - [Diagnostics System](#diagnostics-system)
+  - [📱 Usage Guide](#-usage-guide)
+    - [Grinding Profiles](#grinding-profiles)
+    - [Navigation](#navigation)
+    - [Grind Settings](#grind-settings)
+    - [Basic Operation](#basic-operation)
+    - [Quick Scale View](#quick-scale-view)
+    - [Display Modes](#display-modes)
+  - [🗺️ User Interface Navigation](#️-user-interface-navigation)
+  - [⚡ Automated Grind Flow](#-automated-grind-flow)
+  - [🔵 Bluetooth Connectivity](#-bluetooth-connectivity)
+  - [🔍 Diagnostic Report](#-diagnostic-report)
+    - [Report Contents](#report-contents)
+    - [Access Methods](#access-methods)
+  - [📊 Analytics \& Data Export](#-analytics--data-export)
+    - [Launch Interactive Dashboard](#launch-interactive-dashboard)
+    - [Available Tools](#available-tools)
+    - [Tools Directory Structure](#tools-directory-structure)
+  - [🧠 Algorithm Details](#-algorithm-details)
+    - [Grinding Algorithm](#grinding-algorithm)
+  - [❓ Frequently Asked Questions](#-frequently-asked-questions)
+  - [🔧 Troubleshooting](#-troubleshooting)
 
 ---
 ## 🛠️ Parts List
@@ -123,6 +147,8 @@ Advised lengths:
 - **Load cell → HX711:** ~10 cm
 - **HX711 → Waveshare board:** ~15 cm (image shows a slightly shorter lead; 15 cm gives comfortable slack)
 - **Grinder harness → HX711:** ~30 cm to route from the housing feed-through to the amplifier without strain
+
+These lengths fit the Eureka Mignon layout shown here; other grinders may require different cable lengths.
 
 [<img src="../media/wiring%20length.jpg" alt="Wire Length Example" width="25%">](../media/wiring%20length.jpg)
 
