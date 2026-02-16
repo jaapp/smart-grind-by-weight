@@ -35,4 +35,4 @@ Bringing the Smart Grind-by-Weight setup to a new grinder mostly means recreatin
 - Design and print a new 3D mount that secures the load cell inside the grinder without interfering with the chute or burr carrier.
 - Integrate the SSR-40DA (or equivalent) so the ESP32 can switch the grinder motor safely, tapping into the grinder's existing on/off path while keeping mains fully isolated.
 
-For a concrete wiring example, reference the [Eureka Specialita reverse engineering notes](docs/eureka-specialita-reverse-engineering.md) that document how the mod ties into the stock control board.
+For a concrete wiring example, reference the [Eureka Specialita reverse engineering notes](eureka-specialita-reverse-engineering.md) that document how the mod ties into the stock control board.
