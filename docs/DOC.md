@@ -145,7 +145,7 @@ Yellow (Shield)  →  GND
 
 Advised lengths:
 - **Load cell → HX711:** ~10 cm
-- **HX711 → Waveshare board:** ~15 cm (image shows a slightly shorter lead; 15 cm gives comfortable slack)
+- **Eureka → Waveshare board:** ~15 cm (image shows a slightly shorter lead; 15 cm gives comfortable slack)
 - **Grinder harness → HX711:** ~30 cm to route from the housing feed-through to the amplifier without strain
 
 These lengths fit the Eureka Mignon layout shown here; other grinders may require different cable lengths.
