@@ -114,8 +114,8 @@ const char* BlockingOperationOverlay::get_operation_message(BlockingOperation op
             return "CALIBRATING";
         case BlockingOperation::SETTLING:
             return "SETTLING";
-        case BlockingOperation::BLE_ENABLING:
-            return "ENABLING BLUETOOTH";
+        case BlockingOperation::CONNECTIVITY_ENABLING:
+            return "ENABLING WIFI";
         case BlockingOperation::LOADING_STATISTICS:
             return "LOADING STATISTICS";
         default:

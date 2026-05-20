@@ -12,13 +12,13 @@ UIManager* UIManager::instance = nullptr;
 
 UIManager::~UIManager() = default;
 
-void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm, 
-                     ProfileController* pc, GrindController* gc, BluetoothManager* bluetooth) {
+void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
+                     ProfileController* pc, GrindController* gc, ConnectivityManager* connectivity) {
     hardware_manager = hw_mgr;
     state_machine = sm;
     profile_controller = pc;
     grind_controller = gc;
-    bluetooth_manager = bluetooth;
+    connectivity_manager = connectivity;
     
     // Set static instance for event callbacks
     instance = this;
@@ -79,7 +79,7 @@ void UIManager::create_ui() {
     grinding_screen.init(hardware_manager->get_preferences());
     grinding_screen.create();
     grinding_screen.set_mode(current_mode);
-    menu_screen.create(bluetooth_manager, grind_controller, &grinding_screen, hardware_manager, diagnostics_controller_.get());
+    menu_screen.create(connectivity_manager, grind_controller, &grinding_screen, hardware_manager, diagnostics_controller_.get());
     calibration_screen.create();
     confirm_screen.create();
     purge_confirm_screen.create();

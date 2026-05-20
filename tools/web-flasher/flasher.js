@@ -1,5 +1,5 @@
-// Smart Grind By Weight - Web Bluetooth Flasher
-// Based on your existing Python BLE implementation
+// Smart Grind By Weight - Web Flasher
+// WiFi OTA is the default; BLE is retained for legacy firmware.
 
 // Firmware index metadata
 const FIRMWARE_INDEX_URL = 'firmware/index.json';
@@ -60,16 +60,18 @@ function resolveFirmwareUrl(relativePath) {
 window.addEventListener('load', () => {
     if (!('bluetooth' in navigator)) {
         document.getElementById('browserWarning').style.display = 'block';
-        // Disable OTA tab if no Web Bluetooth
-        const otaTab = document.querySelector('[onclick="showTab(\'ota\')"]');
-        if (otaTab) {
-            otaTab.disabled = true;
-            otaTab.style.opacity = '0.5';
+        const transportSelect = document.getElementById('transportSelect');
+        if (transportSelect) {
+            const bleOption = Array.from(transportSelect.options).find(option => option.value === 'ble');
+            if (bleOption) {
+                bleOption.disabled = true;
+            }
         }
     }
     
     // Load available releases
     loadReleases();
+    updateTransportUi();
 });
 
 // Tab switching
@@ -171,17 +173,59 @@ async function downloadFirmware(url) {
 // Combined connect and flash function
 async function connectAndFlash() {
     const connectFlashBtn = document.getElementById('connectFlashBtn');
+    const transport = document.getElementById('transportSelect')?.value || 'wifi';
 
     // Disable button during operation
     connectFlashBtn.disabled = true;
 
-    const connected = await connectDevice();
-    if (connected) {
-        await flashFirmware();
+    if (transport === 'wifi') {
+        await flashFirmwareWifi();
+    } else {
+        const connected = await connectDevice();
+        if (connected) {
+            await flashFirmware();
+        }
     }
 
     // Re-enable button after operation
     connectFlashBtn.disabled = false;
+}
+
+function updateTransportUi() {
+    const transport = document.getElementById('transportSelect')?.value || 'wifi';
+    const wifiGroup = document.getElementById('wifiHostGroup');
+    const bleGroup = document.getElementById('bleDeviceGroup');
+    const button = document.getElementById('connectFlashBtn');
+
+    if (wifiGroup) wifiGroup.style.display = transport === 'wifi' ? 'block' : 'none';
+    if (bleGroup) bleGroup.style.display = transport === 'ble' ? 'block' : 'none';
+    if (button) button.textContent = transport === 'wifi' ? 'Flash Firmware over WiFi' : 'Connect & Flash Firmware';
+}
+
+function normalizeWifiBaseUrl() {
+    const input = document.getElementById('wifiDeviceHost');
+    let value = (input?.value || 'http://grindbyweight.local').trim();
+    if (!value.startsWith('http://') && !value.startsWith('https://')) {
+        value = `http://${value}`;
+    }
+    return value.replace(/\/+$/, '');
+}
+
+async function checkWifiDevice() {
+    try {
+        const baseUrl = normalizeWifiBaseUrl();
+        updateStatus(`Checking ${baseUrl}...`, 'info');
+        const response = await fetch(`${baseUrl}/status`, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const status = await response.json();
+        updateStatus(`Connected to ${status.device || 'device'} v${status.version || '?'} at ${status.ip || baseUrl}`, 'success');
+        return true;
+    } catch (error) {
+        updateStatus(`WiFi check failed: ${error.message}`, 'error');
+        return false;
+    }
 }
 
 // BLE Connection
@@ -449,6 +493,81 @@ async function flashFirmware() {
         } catch (abortError) {
             console.error('Could not send abort command:', abortError);
         }
+    }
+}
+
+async function uploadFirmwareOverWifi(baseUrl, firmwareData, filename, version) {
+    const formData = new FormData();
+    if (version) {
+        formData.append('version', version);
+    }
+    formData.append('firmware', new Blob([firmwareData], { type: 'application/octet-stream' }), filename);
+
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${baseUrl}/ota`);
+        xhr.responseType = 'text';
+
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                updateProgress(progress);
+                updateStatus(`Uploading over WiFi: ${progress}%`, 'info');
+            } else {
+                updateStatus('Uploading over WiFi...', 'info');
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.responseText);
+            } else {
+                reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText || xhr.statusText}`));
+            }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out'));
+        xhr.timeout = 240000;
+        xhr.send(formData);
+    });
+}
+
+async function flashFirmwareWifi() {
+    const firmwareSelect = document.getElementById('firmwareSelect');
+    const selectedOption = firmwareSelect?.selectedOptions[0];
+    const firmwareUrl = selectedOption ? (selectedOption.dataset?.ota || firmwareSelect.value) : firmwareSelect?.value;
+
+    if (!firmwareUrl) {
+        updateStatus('Please select a firmware version', 'error');
+        return;
+    }
+
+    try {
+        const baseUrl = normalizeWifiBaseUrl();
+        if (!await checkWifiDevice()) {
+            return;
+        }
+
+        const firmwareData = await downloadFirmware(firmwareUrl);
+        const expectedVersion = selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl);
+        const filename = firmwareUrl.split('/').pop() || 'firmware.bin';
+
+        if (expectedVersion) {
+            updateStatus(`Installing version: ${expectedVersion}`, 'info');
+        }
+
+        const responseText = await uploadFirmwareOverWifi(baseUrl, firmwareData, filename, expectedVersion);
+        updateProgress(100);
+        updateStatus('Firmware update completed - device rebooting', 'success');
+        console.log('WiFi OTA response:', responseText);
+
+        setTimeout(() => {
+            updateProgress(0);
+        }, 3000);
+    } catch (error) {
+        updateStatus(`WiFi flash failed: ${error.message}`, 'error');
+        console.error('WiFi flash error:', error);
     }
 }
 

@@ -221,7 +221,7 @@
         
         <div id="browserWarning" class="browser-support">
             <h3>⚠️ Browser Not Supported</h3>
-            <p>This tool requires <strong>Google Chrome</strong> for both Web Bluetooth (OTA) and Web Serial (USB) support.</p>
+            <p>This tool requires <strong>Google Chrome</strong> for Web Serial (USB) and BLE fallback support. WiFi OTA works from a local HTTP flasher page.</p>
             <ul>
                 <li><strong>Chrome</strong> (Desktop & Android) - Required</li>
                 <li><strong>Microsoft Edge</strong> (Desktop) - Limited support</li>
@@ -230,7 +230,7 @@
         </div>
         
         <div class="tabs">
-            <button class="tab active" onclick="showTab('ota')">OTA Update (BLE)</button>
+            <button class="tab active" onclick="showTab('ota')">OTA Update</button>
             <button class="tab" onclick="showTab('initial')">Initial Setup (USB)</button>
             <button class="tab" onclick="showTab('diagnostics')">Diagnostics</button>
         </div>
@@ -270,8 +270,16 @@
         <!-- OTA Update Tab -->
         <div id="otaTab" class="tab-content active">
             <div class="section">
-                <h3>📶 OTA Update - Bluetooth Connection</h3>
-                <p>For updates after installation when USB access is limited. Requires firmware to be installed via USB first.</p>
+                <h3>📶 OTA Update</h3>
+                <p>For updates after installation when USB access is limited. WiFi is the default; BLE remains available for legacy firmware.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="transportSelect">Connectivity</label>
+                <select id="transportSelect" onchange="updateTransportUi()">
+                    <option value="wifi" selected>WiFi</option>
+                    <option value="ble">Bluetooth LE (legacy)</option>
+                </select>
             </div>
             
             <div class="form-group">
@@ -287,7 +295,13 @@
                 </select>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" id="wifiHostGroup">
+                <label for="wifiDeviceHost">WiFi Device Address</label>
+                <input type="text" id="wifiDeviceHost" value="http://grindbyweight.local" placeholder="http://grindbyweight.local or http://192.168.4.1">
+                <button class="btn" id="checkWifiBtn" onclick="checkWifiDevice()" style="margin-top: 10px;">Check WiFi Connection</button>
+            </div>
+
+            <div class="form-group" id="bleDeviceGroup" style="display: none;">
                 <label for="deviceName">Device Name</label>
                 <input type="text" id="deviceName" value="GrindByWeight" readonly>
             </div>

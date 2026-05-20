@@ -7,7 +7,7 @@ enum class BlockingOperation {
     TARING,
     CALIBRATING,
     SETTLING,
-    BLE_ENABLING,
+    CONNECTIVITY_ENABLING,
     LOADING_STATISTICS,
     CUSTOM
 };

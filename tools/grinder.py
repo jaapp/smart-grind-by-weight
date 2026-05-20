@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import shutil
 import stat
+import json
+import re
+import time
+import urllib.error
+import urllib.request
 
 # Color support for cross-platform output
 try:
@@ -55,6 +60,7 @@ class GrinderTool:
         self.streamlit_dir = self.script_dir / "streamlit-reports"
         self.db_path = self.script_dir / "database" / "grinder_data.db"
         self.requirements_txt = self.script_dir / "requirements.txt"
+        self.default_wifi_host = "grindbyweight.local"
     
     def safe_print(self, text: str):
         """Print text with proper encoding handling for all platforms."""
@@ -197,7 +203,7 @@ class GrinderTool:
         return result.returncode
     
     async def cmd_upload(self, args: argparse.Namespace) -> int:
-        """Upload firmware via BLE OTA."""
+        """Upload firmware via WiFi or BLE OTA."""
         firmware_path = args.firmware
         
         if not firmware_path:
@@ -218,11 +224,16 @@ class GrinderTool:
             # Get the most recently modified firmware
             firmware_path = max(firmware_files, key=lambda f: f.stat().st_mtime)
         
-        self.print_header("BLE OTA Upload")
+        transport = getattr(args, 'transport', 'wifi')
+        self.print_header("WiFi OTA Upload" if transport == 'wifi' else "BLE OTA Upload")
         self.print_info(f"Using firmware: {firmware_path}")
         
         if not self.check_venv():
             return 1
+
+        if transport == 'wifi':
+            host = getattr(args, 'host', self.default_wifi_host)
+            return self.upload_via_wifi(Path(firmware_path), host)
         
         cmd = [str(self.venv_python), str(self.ble_tool), "upload", str(firmware_path)]
         
@@ -233,9 +244,102 @@ class GrinderTool:
             cmd.append("--force-full")
         
         return await self.run_async_command(cmd)
+
+    def normalize_wifi_base_url(self, host: str) -> str:
+        """Normalize a host/IP/user URL into a base HTTP URL."""
+        value = (host or self.default_wifi_host).strip()
+        if not value.startswith(("http://", "https://")):
+            value = "http://" + value
+        return value.rstrip("/")
+
+    def get_firmware_version(self) -> str:
+        """Read the firmware version from build_info.h for post-OTA validation."""
+        build_info = self.project_dir / "src" / "config" / "build_info.h"
+        try:
+            content = build_info.read_text()
+            match = re.search(r'#define\s+BUILD_FIRMWARE_VERSION\s+"([^"]+)"', content)
+            if match:
+                return match.group(1)
+        except OSError:
+            pass
+        return ""
+
+    def upload_via_wifi(self, firmware_path: Path, host: str) -> int:
+        """Upload a firmware binary to the device's WiFi OTA endpoint."""
+        if not firmware_path.exists():
+            self.print_error(f"Firmware file not found: {firmware_path}")
+            return 1
+
+        base_url = self.normalize_wifi_base_url(host)
+        status_url = base_url + "/status"
+        ota_url = base_url + "/ota"
+        version = self.get_firmware_version()
+
+        try:
+            self.print_info(f"Checking device at {status_url}")
+            with urllib.request.urlopen(status_url, timeout=8) as response:
+                status = json.loads(response.read().decode("utf-8"))
+            self.print_info(
+                f"Device: {status.get('device', 'unknown')} "
+                f"v{status.get('version', '?')} at {status.get('ip', host)}"
+            )
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            self.print_error(f"Could not reach WiFi device: {exc}")
+            self.print_info("Make sure the grinder is on the same network or use --host <device-ip>.")
+            return 1
+
+        boundary = f"----GrindByWeight{int(time.time())}"
+        firmware = firmware_path.read_bytes()
+        fields = []
+        if version:
+            fields.append(
+                (
+                    f"--{boundary}\r\n"
+                    'Content-Disposition: form-data; name="version"\r\n\r\n'
+                    f"{version}\r\n"
+                ).encode("utf-8")
+            )
+        fields.append(
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="firmware"; filename="{firmware_path.name}"\r\n'
+                "Content-Type: application/octet-stream\r\n\r\n"
+            ).encode("utf-8")
+        )
+        fields.append(firmware)
+        fields.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+        body = b"".join(fields)
+
+        request = urllib.request.Request(
+            ota_url,
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(len(body)),
+            },
+        )
+
+        try:
+            self.print_info(f"Uploading {firmware_path.stat().st_size / 1024:.1f} KB to {ota_url}")
+            with urllib.request.urlopen(request, timeout=240) as response:
+                response_text = response.read().decode("utf-8", errors="replace")
+            self.print_success("WiFi OTA upload complete; device is rebooting")
+            if response_text:
+                self.print_info(response_text)
+            return 0
+        except urllib.error.HTTPError as exc:
+            self.print_error(f"WiFi OTA failed: HTTP {exc.code} {exc.reason}")
+            details = exc.read().decode("utf-8", errors="replace")
+            if details:
+                self.print_info(details)
+            return 1
+        except (urllib.error.URLError, TimeoutError) as exc:
+            self.print_error(f"WiFi OTA failed: {exc}")
+            return 1
     
     async def cmd_build_upload(self, args: argparse.Namespace) -> int:
-        """Build firmware and upload via BLE."""
+        """Build firmware and upload via selected transport."""
         build_result = self.cmd_build(args)
         if build_result != 0:
             return build_result
@@ -469,12 +573,16 @@ def create_parser() -> argparse.ArgumentParser:
     # Build & Upload Commands
     build_parser = subparsers.add_parser('build', help='Build firmware using PlatformIO')
     
-    upload_parser = subparsers.add_parser('upload', help='Upload firmware via BLE OTA')
+    upload_parser = subparsers.add_parser('upload', help='Upload firmware via WiFi or BLE OTA')
     upload_parser.add_argument('firmware', nargs='?', help='Path to firmware .bin file (finds latest if not specified)')
+    upload_parser.add_argument('--transport', choices=['wifi', 'ble'], default='wifi', help='OTA transport (default: wifi)')
+    upload_parser.add_argument('--host', default='grindbyweight.local', help='WiFi device host/IP for --transport wifi')
     upload_parser.add_argument('--force-full', action='store_true', help='Force full firmware update (skip delta patching)')
     upload_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     
-    build_upload_parser = subparsers.add_parser('build-upload', help='Build firmware and upload via BLE')
+    build_upload_parser = subparsers.add_parser('build-upload', help='Build firmware and upload via WiFi or BLE')
+    build_upload_parser.add_argument('--transport', choices=['wifi', 'ble'], default='wifi', help='OTA transport (default: wifi)')
+    build_upload_parser.add_argument('--host', default='grindbyweight.local', help='WiFi device host/IP for --transport wifi')
     build_upload_parser.add_argument('--force-full', action='store_true', help='Force full firmware update (skip delta patching)')
     build_upload_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     
@@ -511,7 +619,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     # Development Commands
     install_parser = subparsers.add_parser('install', help='Manually install Python dependencies (auto-setup when needed)')
-    monitor_parser = subparsers.add_parser('monitor', help='Monitor live debug output via BLE (alias for debug)')
+    monitor_parser = subparsers.add_parser('monitor', help='Monitor live debug output via BLE on legacy firmware (alias for debug)')
     monitor_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     clean_parser = subparsers.add_parser('clean', help='Clean build artifacts')
     release_parser = subparsers.add_parser('release', help='Create tagged release (triggers automated GitHub release)')

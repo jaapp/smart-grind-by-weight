@@ -39,8 +39,8 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 - **High accuracy**: ±0.03g error tolerance  
 - **Zero-shot learning**: Algorithm adapts instantly to any grind size, bean setting, humidity etc. without manual tuning
 - **Original timed run preserved** – there is a setting to enable the original Grind-By-Time mode
-- **BLE OTA updates** for firmware
-- **Advanced analytics** using BLE data transfer and Python Streamlit reports
+- **WiFi OTA updates** for firmware, with first-boot setup AP for credentials
+- **Advanced analytics** using Python Streamlit reports
 - **For Eureka**: No permanent modifications needed - just swap the screen and add 3D printed parts
 
 ---

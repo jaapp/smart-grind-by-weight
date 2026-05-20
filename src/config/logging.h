@@ -1,8 +1,8 @@
 #pragma once
 
 // Forward declaration to avoid circular dependency
-class BluetoothManager;
-extern BluetoothManager g_bluetooth_manager;
+class ConnectivityManager;
+extern ConnectivityManager g_connectivity_manager;
 
 // Temporary fallback logging - use Serial instead of BLE to avoid circular dependencies
 #include <Arduino.h>
