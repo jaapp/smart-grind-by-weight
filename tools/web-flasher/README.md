@@ -43,7 +43,9 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 
 ## Firmware Sources
 
-The firmware list is pulled straight from GitHub Releases—no files are stored in this repo. If you need the exact asset mapping, see [DOC.md](../../docs/DOC.md).
+On GitHub Pages, the firmware list is pulled from the generated release index. When started locally with `python3 tools/start-webflasher.py`, the server generates a local firmware entry from `.pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin` and the matching USB flashing artifacts.
+
+For WiFi OTA, you can also select a local `.bin` file directly in the browser.
 
 ## Technical Details
 
@@ -75,6 +77,7 @@ python3 start-webflasher.py --port 3000
 
 The script will automatically:
 - Check if the port is available
+- Serve the current local PlatformIO build as `Local Build #...`
 - Prompt to kill any conflicting process
 - Start the server and display the URL
 - Handle cleanup on exit

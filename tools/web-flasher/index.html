@@ -294,6 +294,11 @@
                     <option value="">Loading releases...</option>
                 </select>
             </div>
+
+            <div class="form-group">
+                <label for="localFirmwareFile">Local Firmware .bin</label>
+                <input type="file" id="localFirmwareFile" accept=".bin,application/octet-stream" onchange="updateOtaSelectedFirmware()">
+            </div>
             
             <div class="form-group" id="wifiHostGroup">
                 <label for="wifiDeviceHost">WiFi Device Address</label>

@@ -170,6 +170,36 @@ async function downloadFirmware(url) {
     return firmware;
 }
 
+async function readLocalFirmwareFile(file) {
+    if (!file) {
+        throw new Error('No local firmware file selected');
+    }
+
+    updateStatus(`Reading local firmware ${file.name}`, 'info');
+    updateProgress(0);
+
+    const buffer = await file.arrayBuffer();
+    const firmware = new Uint8Array(buffer);
+    updateStatus(`Loaded ${Math.round(firmware.length / 1024)}KB firmware`, 'success');
+    return firmware;
+}
+
+function getLocalFirmwareFile() {
+    const input = document.getElementById('localFirmwareFile');
+    return input?.files?.[0] || null;
+}
+
+function getSelectedFirmwareOption(select) {
+    if (!select || select.selectedIndex < 0) {
+        return null;
+    }
+    return select.selectedOptions[0] || null;
+}
+
+function getSelectedFirmwareUrl(select, option) {
+    return option ? (option.dataset?.ota || option.value) : select?.value;
+}
+
 // Combined connect and flash function
 async function connectAndFlash() {
     const connectFlashBtn = document.getElementById('connectFlashBtn');
@@ -339,15 +369,16 @@ function prepareFirmwareData(firmwareData) {
 // Main firmware flash function
 async function flashFirmware() {
     const firmwareSelect = document.getElementById('firmwareSelect');
+    const localFile = getLocalFirmwareFile();
 
-    if (!firmwareSelect) {
+    if (!firmwareSelect && !localFile) {
         updateStatus('Firmware selection element not found', 'error');
         return;
     }
 
-    const selectedOption = firmwareSelect.selectedOptions[0];
-    const firmwareUrl = selectedOption ? (selectedOption.dataset?.ota || firmwareSelect.value) : firmwareSelect.value;
-    if (!firmwareUrl) {
+    const selectedOption = getSelectedFirmwareOption(firmwareSelect);
+    const firmwareUrl = getSelectedFirmwareUrl(firmwareSelect, selectedOption);
+    if (!localFile && !firmwareUrl) {
         updateStatus('Please select a firmware version', 'error');
         return;
     }
@@ -358,8 +389,7 @@ async function flashFirmware() {
     }
     
     try {
-        // Download firmware
-        const firmwareData = await downloadFirmware(firmwareUrl);
+        const firmwareData = localFile ? await readLocalFirmwareFile(localFile) : await downloadFirmware(firmwareUrl);
         const patchData = prepareFirmwareData(firmwareData);
         
         updateStatus('Starting firmware update...', 'info');
@@ -379,7 +409,7 @@ async function flashFirmware() {
         }
         
         // Extract expected version from URL
-        const expectedVersion = selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl);
+        const expectedVersion = localFile ? null : (selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl));
         if (expectedVersion) {
             updateStatus(`Installing version: ${expectedVersion}`, 'info');
         }
@@ -535,10 +565,11 @@ async function uploadFirmwareOverWifi(baseUrl, firmwareData, filename, version) 
 
 async function flashFirmwareWifi() {
     const firmwareSelect = document.getElementById('firmwareSelect');
-    const selectedOption = firmwareSelect?.selectedOptions[0];
-    const firmwareUrl = selectedOption ? (selectedOption.dataset?.ota || firmwareSelect.value) : firmwareSelect?.value;
+    const localFile = getLocalFirmwareFile();
+    const selectedOption = getSelectedFirmwareOption(firmwareSelect);
+    const firmwareUrl = getSelectedFirmwareUrl(firmwareSelect, selectedOption);
 
-    if (!firmwareUrl) {
+    if (!localFile && !firmwareUrl) {
         updateStatus('Please select a firmware version', 'error');
         return;
     }
@@ -549,9 +580,9 @@ async function flashFirmwareWifi() {
             return;
         }
 
-        const firmwareData = await downloadFirmware(firmwareUrl);
-        const expectedVersion = selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl);
-        const filename = firmwareUrl.split('/').pop() || 'firmware.bin';
+        const firmwareData = localFile ? await readLocalFirmwareFile(localFile) : await downloadFirmware(firmwareUrl);
+        const expectedVersion = localFile ? null : (selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl));
+        const filename = localFile ? localFile.name : (firmwareUrl.split('/').pop() || 'firmware.bin');
 
         if (expectedVersion) {
             updateStatus(`Installing version: ${expectedVersion}`, 'info');
@@ -575,11 +606,12 @@ async function flashFirmwareWifi() {
 function updateOtaSelectedFirmware() {
     const select = document.getElementById('firmwareSelect');
     const selectedDisplay = document.getElementById('otaSelectedFile');
-    const selectedOption = select.selectedOptions[0];
-    const displayLabel = selectedOption?.dataset?.display || select.value;
+    const localFile = getLocalFirmwareFile();
+    const selectedOption = getSelectedFirmwareOption(select);
+    const displayLabel = localFile ? localFile.name : (selectedOption?.dataset?.display || select.value);
 
-    if (selectedOption && selectedOption.value) {
-        selectedDisplay.textContent = `Selected: ${displayLabel}`;
+    if (localFile || (selectedOption && selectedOption.value)) {
+        selectedDisplay.textContent = localFile ? `Selected local file: ${displayLabel}` : `Selected: ${displayLabel}`;
         selectedDisplay.className = 'status info';
         selectedDisplay.style.display = 'block';
     } else {
@@ -678,10 +710,11 @@ async function loadReleases() {
             updateOtaSelectedFirmware();
         }
     } catch (error) {
-        console.error('Failed to load releases from GitHub:', error);
-        usbSelect.innerHTML = '<option value="">Unable to load releases</option>';
-        otaSelect.innerHTML = '<option value="">Unable to load releases</option>';
-        updateStatus('Failed to load firmware list from GitHub releases. Please check your connection or try again later.', 'error');
+        console.warn('Firmware index unavailable:', error);
+        usbSelect.innerHTML = '<option value="">No hosted firmware index available</option>';
+        otaSelect.innerHTML = '<option value="">Select a local firmware .bin below</option>';
+        updateOtaSelectedFirmware();
+        updateStatus('No hosted firmware index available. Select a local firmware .bin or restart the local flasher after building firmware.', 'warning');
     }
 }
 
