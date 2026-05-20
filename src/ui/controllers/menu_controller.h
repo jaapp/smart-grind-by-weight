@@ -28,6 +28,11 @@ public:
     void handle_grind_mode_radio_button();
     void handle_auto_start_toggle();
     void handle_auto_return_toggle();
+    void handle_basket_detect_toggle();
+    void handle_basket_capture_single();
+    void handle_basket_capture_double();
+    void handle_basket_tolerance_slider();
+    void handle_basket_tolerance_slider_released();
     void handle_grinder_purge_mode_radio_button();
     void handle_grinder_purge_amount_slider();
     void handle_grinder_purge_amount_slider_released();
@@ -57,4 +62,5 @@ private:
     static void static_motor_timer_cb(lv_timer_t* timer);
     void return_to_menu();
     void perform_diagnostics_reset();
+    void handle_basket_capture(bool capture_single);
 };

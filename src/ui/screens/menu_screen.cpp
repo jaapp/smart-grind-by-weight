@@ -6,6 +6,7 @@
 #include "../../config/constants.h"
 #include "../../logging/grind_logging.h"
 #include "../../system/statistics_manager.h"
+#include "../../controllers/basket_detector.h"
 #include "../../hardware/hardware_manager.h"
 #include "grinding_screen.h"
 #include "../event_bridge_lvgl.h"
@@ -23,9 +24,10 @@ static void back_event_handler(lv_event_t * e)
     }
 }
 
-void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl) {
+void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl, BasketDetector* detector, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl) {
     bluetooth_manager = bluetooth;
     grind_controller = grind_ctrl;
+    basket_detector = detector;
     grinding_screen = grind_screen;
     hardware_manager = hw_mgr;
     diagnostics_controller = diag_ctrl;
@@ -43,6 +45,13 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     scale_weight_label = nullptr;
     scale_tare_button = nullptr;
     scale_item = nullptr;
+    basket_detect_toggle = nullptr;
+    basket_single_label = nullptr;
+    basket_double_label = nullptr;
+    basket_single_capture_button = nullptr;
+    basket_double_capture_button = nullptr;
+    basket_tolerance_slider = nullptr;
+    basket_tolerance_label = nullptr;
     grinder_purge_mode_radio_group = nullptr;
     grinder_purge_amount_slider = nullptr;
     grinder_purge_amount_label = nullptr;
@@ -397,6 +406,19 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
     create_toggle_row(parent, "Return", &auto_return_toggle);
 
+    create_separator(parent, "Basket Detection");
+    create_description_label(parent, "Detect the portafilter basket weight before Auto Start chooses Single or Double.");
+    create_toggle_row(parent, "Detect Basket", &basket_detect_toggle);
+    create_data_label(parent, "Single:", &basket_single_label);
+    basket_single_capture_button = create_button(parent, "Capture Single", lv_color_hex(THEME_COLOR_NEUTRAL), 260, 64, &lv_font_montserrat_24);
+    create_data_label(parent, "Double:", &basket_double_label);
+    basket_double_capture_button = create_button(parent, "Capture Double", lv_color_hex(THEME_COLOR_NEUTRAL), 260, 64, &lv_font_montserrat_24);
+
+    const uint32_t basket_tolerance_min = static_cast<uint32_t>(USER_BASKET_DETECTION_TOLERANCE_MIN_G * kBasketToleranceSliderScale + 0.5f);
+    const uint32_t basket_tolerance_max = static_cast<uint32_t>(USER_BASKET_DETECTION_TOLERANCE_MAX_G * kBasketToleranceSliderScale + 0.5f);
+    create_slider_row(parent, "Tolerance", &basket_tolerance_label, &basket_tolerance_slider,
+                     lv_color_hex(THEME_COLOR_ACCENT), basket_tolerance_min, basket_tolerance_max);
+
     // Grinder Purging section
     create_separator(parent, "Purging");
     create_description_label(parent, "Decide what do do with the grinded coffee after the grinder is primed.");
@@ -451,6 +473,24 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
+    }
+    if (basket_detect_toggle) {
+        lv_obj_add_event_cb(basket_detect_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BASKET_DETECT_TOGGLE)));
+    }
+    if (basket_single_capture_button) {
+        lv_obj_add_event_cb(basket_single_capture_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BASKET_CAPTURE_SINGLE)));
+    }
+    if (basket_double_capture_button) {
+        lv_obj_add_event_cb(basket_double_capture_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BASKET_CAPTURE_DOUBLE)));
+    }
+    if (basket_tolerance_slider) {
+        lv_obj_add_event_cb(basket_tolerance_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BASKET_TOLERANCE_SLIDER)));
+        lv_obj_add_event_cb(basket_tolerance_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BASKET_TOLERANCE_SLIDER_RELEASED)));
     }
     if (grinder_purge_amount_slider) {
         lv_obj_add_event_cb(grinder_purge_amount_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
@@ -955,6 +995,67 @@ void MenuScreen::update_coast_ratio_label(float ratio) {
     }
 }
 
+void MenuScreen::update_basket_tolerance_label(float tolerance_g) {
+    if (!basket_tolerance_label) {
+        return;
+    }
+
+    if (tolerance_g < USER_BASKET_DETECTION_TOLERANCE_MIN_G) {
+        tolerance_g = USER_BASKET_DETECTION_TOLERANCE_MIN_G;
+    } else if (tolerance_g > USER_BASKET_DETECTION_TOLERANCE_MAX_G) {
+        tolerance_g = USER_BASKET_DETECTION_TOLERANCE_MAX_G;
+    }
+
+    char buffer[24];
+    snprintf(buffer, sizeof(buffer), "Tolerance: ±%.0fg", tolerance_g);
+    lv_label_set_text(basket_tolerance_label, buffer);
+}
+
+void MenuScreen::update_basket_detection_controls() {
+    if (!basket_detector) {
+        return;
+    }
+
+    if (basket_detect_toggle) {
+        if (basket_detector->is_enabled()) {
+            lv_obj_add_state(basket_detect_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(basket_detect_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    if (basket_single_label) {
+        char buffer[24];
+        if (basket_detector->has_single_weight()) {
+            snprintf(buffer, sizeof(buffer), "%.1fg", basket_detector->get_single_weight());
+        } else {
+            snprintf(buffer, sizeof(buffer), "--");
+        }
+        lv_label_set_text(basket_single_label, buffer);
+    }
+
+    if (basket_double_label) {
+        char buffer[24];
+        if (basket_detector->has_double_weight()) {
+            snprintf(buffer, sizeof(buffer), "%.1fg", basket_detector->get_double_weight());
+        } else {
+            snprintf(buffer, sizeof(buffer), "--");
+        }
+        lv_label_set_text(basket_double_label, buffer);
+    }
+
+    const float tolerance_g = basket_detector->get_tolerance();
+    if (basket_tolerance_slider) {
+        const int slider_min = static_cast<int>(USER_BASKET_DETECTION_TOLERANCE_MIN_G * kBasketToleranceSliderScale + 0.5f);
+        const int slider_max = static_cast<int>(USER_BASKET_DETECTION_TOLERANCE_MAX_G * kBasketToleranceSliderScale + 0.5f);
+        int slider_value = static_cast<int>(tolerance_g * kBasketToleranceSliderScale + 0.5f);
+        slider_value = std::clamp(slider_value, slider_min, slider_max);
+        lv_slider_set_value(basket_tolerance_slider, slider_value, LV_ANIM_OFF);
+    }
+
+    update_basket_tolerance_label(tolerance_g);
+}
+
 void MenuScreen::update_screensaver_toggles() {
     bool image_exists = LittleFS.exists(BLE_IMAGE_FILENAME);
 
@@ -1302,4 +1403,5 @@ void MenuScreen::update_grind_mode_toggles() {
     }
 
     update_coast_ratio_label(coast_ratio);
+    update_basket_detection_controls();
 }

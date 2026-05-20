@@ -12,6 +12,7 @@ void ReadyScreen::create() {
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
     lv_obj_add_flag(screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    status_timer = nullptr;
 
     // Create tabview
     tabview = lv_tabview_create(screen);
@@ -44,6 +45,17 @@ void ReadyScreen::create() {
 
     // Create menu tab page
     create_menu_page(menu_tab);
+
+    status_label = lv_label_create(screen);
+    lv_label_set_text(status_label, "");
+    lv_label_set_long_mode(status_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(status_label, 260);
+    lv_obj_set_style_text_font(status_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(status_label, lv_color_hex(THEME_COLOR_ACCENT), 0);
+    lv_obj_set_style_text_align(status_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(status_label, LV_ALIGN_BOTTOM_MID, 0, -52);
+    lv_obj_add_flag(status_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(status_label);
 
     update_profile_values(default_weights, GrindMode::WEIGHT);
 
@@ -88,6 +100,7 @@ void ReadyScreen::show() {
 
 void ReadyScreen::hide() {
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
+    clear_status();
     visible = false;
 }
 
@@ -112,5 +125,50 @@ void ReadyScreen::set_profile_long_press_handler(lv_event_cb_t handler) {
         if (weight_labels[i]) {
             lv_obj_add_event_cb(weight_labels[i], handler, LV_EVENT_LONG_PRESSED, NULL);
         }
+    }
+}
+
+void ReadyScreen::show_transient_status(const char* text, uint32_t duration_ms) {
+    if (!status_label) {
+        return;
+    }
+
+    if (status_timer) {
+        lv_timer_del(status_timer);
+        status_timer = nullptr;
+    }
+
+    lv_label_set_text(status_label, text ? text : "");
+    lv_obj_clear_flag(status_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(status_label);
+
+    status_timer = lv_timer_create(status_timer_cb, duration_ms, this);
+    if (status_timer) {
+        lv_timer_set_repeat_count(status_timer, 1);
+    }
+}
+
+void ReadyScreen::clear_status() {
+    if (status_timer) {
+        lv_timer_del(status_timer);
+        status_timer = nullptr;
+    }
+
+    if (status_label) {
+        lv_obj_add_flag(status_label, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void ReadyScreen::status_timer_cb(lv_timer_t* timer) {
+    auto* self = static_cast<ReadyScreen*>(lv_timer_get_user_data(timer));
+    if (!self) {
+        return;
+    }
+
+    if (self->status_label) {
+        lv_obj_add_flag(self->status_label, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (self->status_timer == timer) {
+        self->status_timer = nullptr;
     }
 }

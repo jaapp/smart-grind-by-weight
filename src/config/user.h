@@ -58,3 +58,11 @@
 #define USER_AUTO_GRIND_TRIGGER_WINDOW_MS 5000                                  // Time window for delta detection (milliseconds)
 #define USER_AUTO_GRIND_TRIGGER_SETTLING_MS 1000                                // Settling period after trigger detection before confirmation (milliseconds)
 #define USER_AUTO_GRIND_REARM_DELAY_MS 1500                                     // Minimum delay between auto actions (milliseconds)
+
+// Basket-based profile detection (optional Auto Start extension)
+#define USER_BASKET_DETECTION_TOLERANCE_DEFAULT_G 5.0f                          // Default allowed basket weight variance (grams)
+#define USER_BASKET_DETECTION_TOLERANCE_MIN_G 1.0f                              // Minimum basket detection tolerance (grams)
+#define USER_BASKET_DETECTION_TOLERANCE_MAX_G 30.0f                             // Maximum basket detection tolerance (grams)
+#define USER_BASKET_DETECTION_CONFIRM_MS 1200                                   // Confirmation duration before detected grind starts (milliseconds)
+#define USER_BASKET_DETECTION_STATUS_MS 2500                                    // Error/status message duration (milliseconds)
+#define USER_BASKET_DETECTION_REMOVAL_THRESHOLD_G 2.0f                          // Weight threshold used to re-arm failed basket detection (grams)

@@ -30,6 +30,7 @@
 #include "controllers/status_indicator_controller.h"
 #include "../system/state_machine.h"
 #include "../system/diagnostics_controller.h"
+#include "../controllers/basket_detector.h"
 #include "../controllers/profile_controller.h"
 #include "../controllers/grind_controller.h"
 #include "../controllers/grind_events.h"
@@ -69,6 +70,7 @@ private:
     ProfileController* profile_controller;
     GrindController* grind_controller;
     BluetoothManager* bluetooth_manager;
+    BasketDetector basket_detector_;
     
     lv_timer_t* jog_timer;
 
@@ -129,6 +131,7 @@ public:
     
     // Public accessors for static callbacks
     ProfileController* get_profile_controller() { return profile_controller; }
+    BasketDetector* get_basket_detector() { return &basket_detector_; }
     HardwareManager* get_hardware_manager() { return hardware_manager; }
     GrindController* get_grind_controller() { return grind_controller; }
     OtaDataExportController* get_ota_data_export_controller() { return ota_data_export_controller_.get(); }
@@ -141,6 +144,10 @@ public:
 private:
     void create_ui();
     void update_auto_actions();
+    void schedule_basket_auto_start(int profile_index, const char* status_text);
+    void complete_pending_basket_auto_start();
+    void cancel_pending_basket_auto_start();
+    static void basket_auto_start_timer_cb(lv_timer_t* timer);
     
     // State-specific update methods
 
@@ -152,5 +159,9 @@ private:
         bool auto_return_enabled = false;
         uint32_t last_auto_start_ms = 0;
         uint32_t last_auto_return_ms = 0;
+        bool basket_placement_latched = false;
+        bool basket_start_pending = false;
+        int pending_basket_profile = -1;
+        lv_timer_t* basket_start_timer = nullptr;
     } auto_actions_;
 };

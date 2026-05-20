@@ -7,7 +7,9 @@
 #include <esp_system.h>
 #include <nvs_flash.h>
 #include <cstdint>
+#include <cmath>
 #include "../../config/constants.h"
+#include "../../controllers/basket_detector.h"
 #include "../../controllers/grind_controller.h"
 #include "../../controllers/grind_mode_traits.h"
 #include "../../logging/grind_logging.h"
@@ -49,6 +51,11 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
+    EventBridgeLVGL::register_handler(ET::BASKET_DETECT_TOGGLE, [this](lv_event_t*) { handle_basket_detect_toggle(); });
+    EventBridgeLVGL::register_handler(ET::BASKET_CAPTURE_SINGLE, [this](lv_event_t*) { handle_basket_capture_single(); });
+    EventBridgeLVGL::register_handler(ET::BASKET_CAPTURE_DOUBLE, [this](lv_event_t*) { handle_basket_capture_double(); });
+    EventBridgeLVGL::register_handler(ET::BASKET_TOLERANCE_SLIDER, [this](lv_event_t*) { handle_basket_tolerance_slider(); });
+    EventBridgeLVGL::register_handler(ET::BASKET_TOLERANCE_SLIDER_RELEASED, [this](lv_event_t*) { handle_basket_tolerance_slider_released(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grinder_purge_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_AMOUNT_SLIDER, [this](lv_event_t*) { handle_grinder_purge_amount_slider(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_AMOUNT_SLIDER_RELEASED, [this](lv_event_t*) { handle_grinder_purge_amount_slider_released(); });
@@ -386,6 +393,108 @@ void MenuUIController::handle_auto_return_toggle() {
     }
 
     LOG_DEBUG_PRINTLN(enabled ? "Auto return on cup removal enabled" : "Auto return on cup removal disabled");
+}
+
+void MenuUIController::handle_basket_detect_toggle() {
+    if (!ui_manager_) return;
+
+    auto* detector = ui_manager_->get_basket_detector();
+    auto* toggle = ui_manager_->menu_screen.get_basket_detect_toggle();
+    if (!detector || !toggle) return;
+
+    const bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    detector->save_enabled(enabled);
+    ui_manager_->menu_screen.update_basket_detection_controls();
+
+    LOG_DEBUG_PRINTLN(enabled ? "Basket detection enabled" : "Basket detection disabled");
+}
+
+void MenuUIController::handle_basket_capture_single() {
+    handle_basket_capture(true);
+}
+
+void MenuUIController::handle_basket_capture_double() {
+    handle_basket_capture(false);
+}
+
+void MenuUIController::handle_basket_capture(bool capture_single) {
+    if (!ui_manager_) return;
+
+    auto* hardware = ui_manager_->get_hardware_manager();
+    auto* detector = ui_manager_->get_basket_detector();
+    if (!hardware || !detector) return;
+
+    auto capture_task = [this, capture_single]() {
+        if (!ui_manager_) return;
+
+        auto* hardware = ui_manager_->get_hardware_manager();
+        auto* detector = ui_manager_->get_basket_detector();
+        auto* sensor = hardware ? hardware->get_weight_sensor() : nullptr;
+        if (!sensor || !detector) return;
+
+        const float captured_weight_g = sensor->get_precision_settled_weight();
+        if (capture_single) {
+            detector->save_single_weight(captured_weight_g);
+        } else {
+            detector->save_double_weight(captured_weight_g);
+        }
+
+        LOG_DEBUG_PRINTF("Captured %s basket weight: %.2fg\n",
+                         capture_single ? "single" : "double",
+                         std::fabs(captured_weight_g));
+    };
+
+    auto completion = [this]() {
+        if (!ui_manager_) return;
+        ui_manager_->menu_screen.update_basket_detection_controls();
+    };
+
+    UIOperations::execute_custom_operation("SETTLING", capture_task, completion);
+}
+
+void MenuUIController::handle_basket_tolerance_slider() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_basket_tolerance_slider();
+    if (!slider) return;
+
+    int slider_value = lv_slider_get_value(slider);
+    const int slider_min = static_cast<int>(USER_BASKET_DETECTION_TOLERANCE_MIN_G * MenuScreen::kBasketToleranceSliderScale + 0.5f);
+    const int slider_max = static_cast<int>(USER_BASKET_DETECTION_TOLERANCE_MAX_G * MenuScreen::kBasketToleranceSliderScale + 0.5f);
+    if (slider_value < slider_min) {
+        slider_value = slider_min;
+    } else if (slider_value > slider_max) {
+        slider_value = slider_max;
+    }
+
+    const float tolerance_g = slider_value / MenuScreen::kBasketToleranceSliderScale;
+    ui_manager_->menu_screen.update_basket_tolerance_label(tolerance_g);
+}
+
+void MenuUIController::handle_basket_tolerance_slider_released() {
+    if (!ui_manager_) return;
+
+    auto* detector = ui_manager_->get_basket_detector();
+    auto* slider = ui_manager_->menu_screen.get_basket_tolerance_slider();
+    if (!detector || !slider) return;
+
+    int slider_value = lv_slider_get_value(slider);
+    const int slider_min = static_cast<int>(USER_BASKET_DETECTION_TOLERANCE_MIN_G * MenuScreen::kBasketToleranceSliderScale + 0.5f);
+    const int slider_max = static_cast<int>(USER_BASKET_DETECTION_TOLERANCE_MAX_G * MenuScreen::kBasketToleranceSliderScale + 0.5f);
+
+    if (slider_value < slider_min) {
+        slider_value = slider_min;
+        lv_slider_set_value(slider, slider_value, LV_ANIM_OFF);
+    } else if (slider_value > slider_max) {
+        slider_value = slider_max;
+        lv_slider_set_value(slider, slider_value, LV_ANIM_OFF);
+    }
+
+    const float tolerance_g = slider_value / MenuScreen::kBasketToleranceSliderScale;
+    detector->save_tolerance(tolerance_g);
+    ui_manager_->menu_screen.update_basket_detection_controls();
+
+    LOG_DEBUG_PRINTF("Basket detection tolerance set to: %.0fg\n", tolerance_g);
 }
 
 void MenuUIController::handle_grinder_purge_mode_radio_button() {

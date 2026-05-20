@@ -7,6 +7,7 @@
 #include "../ui_helpers.h"
 
 class GrindingScreen;  // Forward declaration
+class BasketDetector;
 
 class MenuScreen {
 private:
@@ -63,6 +64,13 @@ private:
     lv_obj_t* grind_mode_swipe_toggle;
     lv_obj_t* auto_start_toggle;
     lv_obj_t* auto_return_toggle;
+    lv_obj_t* basket_detect_toggle;
+    lv_obj_t* basket_single_label;
+    lv_obj_t* basket_double_label;
+    lv_obj_t* basket_single_capture_button;
+    lv_obj_t* basket_double_capture_button;
+    lv_obj_t* basket_tolerance_slider;
+    lv_obj_t* basket_tolerance_label;
     lv_obj_t* grinder_purge_mode_radio_group;
     lv_obj_t* grinder_purge_amount_slider;
     lv_obj_t* grinder_purge_amount_label;
@@ -95,6 +103,7 @@ private:
     
     BluetoothManager* bluetooth_manager;
     GrindController* grind_controller;
+    BasketDetector* basket_detector;
     GrindingScreen* grinding_screen;
     class HardwareManager* hardware_manager; // Forward declaration to access preferences
     DiagnosticsController* diagnostics_controller;
@@ -102,8 +111,9 @@ private:
 public:
     static constexpr float kPurgeSliderScale = 10.0f; // Slider uses 0.1g increments
     static constexpr float kCoastRatioSliderScale = 20.0f; // Slider uses 0.05 increments
+    static constexpr float kBasketToleranceSliderScale = 1.0f; // Slider uses 1g increments
 
-    void create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl);
+    void create(BluetoothManager* bluetooth, GrindController* grind_ctrl, BasketDetector* detector, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl);
     void show();
     void hide();
     void update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap);
@@ -118,6 +128,8 @@ public:
     void update_grinder_purge_amount_label(float amount_g);
     void update_grind_freshness_hours_label(float hours);
     void update_coast_ratio_label(float ratio);
+    void update_basket_detection_controls();
+    void update_basket_tolerance_label(float tolerance_g);
     void reset_scale_display();
     void update_scale_weight(float weight);
 
@@ -142,6 +154,10 @@ public:
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
+    lv_obj_t* get_basket_detect_toggle() const { return basket_detect_toggle; }
+    lv_obj_t* get_basket_single_capture_button() const { return basket_single_capture_button; }
+    lv_obj_t* get_basket_double_capture_button() const { return basket_double_capture_button; }
+    lv_obj_t* get_basket_tolerance_slider() const { return basket_tolerance_slider; }
     lv_obj_t* get_grinder_purge_mode_radio_group() const { return grinder_purge_mode_radio_group; }
     lv_obj_t* get_grinder_purge_amount_slider() const { return grinder_purge_amount_slider; }
     lv_obj_t* get_grind_freshness_hours_slider() const { return grind_freshness_hours_slider; }

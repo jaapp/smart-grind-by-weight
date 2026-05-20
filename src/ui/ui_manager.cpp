@@ -22,6 +22,7 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     
     // Set static instance for event callbacks
     instance = this;
+    basket_detector_.init(hardware_manager ? hardware_manager->get_preferences() : nullptr);
     
     edit_target = 0.0f;
     original_target = 0.0f;
@@ -93,7 +94,7 @@ void UIManager::create_ui() {
     grinding_screen.init(hardware_manager->get_preferences());
     grinding_screen.create();
     grinding_screen.set_mode(current_mode);
-    menu_screen.create(bluetooth_manager, grind_controller, &grinding_screen, hardware_manager, diagnostics_controller_.get());
+    menu_screen.create(bluetooth_manager, grind_controller, &basket_detector_, &grinding_screen, hardware_manager, diagnostics_controller_.get());
     calibration_screen.create();
     confirm_screen.create();
     purge_confirm_screen.create();
@@ -380,6 +381,9 @@ void UIManager::set_background_active(bool active) {
 }
 
 void UIManager::refresh_auto_action_settings() {
+    cancel_pending_basket_auto_start();
+    auto_actions_.basket_placement_latched = false;
+
     Preferences prefs;
     prefs.begin("autogrind", true);
     auto_actions_.auto_start_enabled = prefs.getBool("auto_start", false);
@@ -389,6 +393,73 @@ void UIManager::refresh_auto_action_settings() {
     uint32_t now = millis();
     auto_actions_.last_auto_start_ms = now;
     auto_actions_.last_auto_return_ms = now;
+}
+
+void UIManager::schedule_basket_auto_start(int profile_index, const char* status_text) {
+    cancel_pending_basket_auto_start();
+
+    if (!profile_controller || !ready_controller_ || !grinding_controller_) {
+        return;
+    }
+
+    profile_controller->set_current_profile(profile_index);
+    current_tab = profile_index;
+    edit_target = get_current_profile_target(*profile_controller, current_mode);
+    ready_screen.set_active_tab(profile_index);
+    ready_controller_->refresh_profiles();
+    grinding_controller_->update_grind_button_icon();
+    ready_screen.show_transient_status(status_text, USER_BASKET_DETECTION_CONFIRM_MS);
+
+    auto_actions_.basket_start_pending = true;
+    auto_actions_.pending_basket_profile = profile_index;
+    auto_actions_.basket_start_timer = lv_timer_create(basket_auto_start_timer_cb,
+                                                       USER_BASKET_DETECTION_CONFIRM_MS,
+                                                       this);
+    if (auto_actions_.basket_start_timer) {
+        lv_timer_set_repeat_count(auto_actions_.basket_start_timer, 1);
+    }
+}
+
+void UIManager::complete_pending_basket_auto_start() {
+    auto_actions_.basket_start_timer = nullptr;
+
+    const int profile_index = auto_actions_.pending_basket_profile;
+    auto_actions_.basket_start_pending = false;
+    auto_actions_.pending_basket_profile = -1;
+
+    if (!state_machine || !grinding_controller_ || !hardware_manager || profile_index < 0) {
+        return;
+    }
+
+    auto* sensor = hardware_manager->get_weight_sensor();
+    const bool grinder_active = (grind_controller && grind_controller->is_active());
+    if (!sensor || !state_machine->is_state(UIState::READY) || grinder_active || current_tab != profile_index) {
+        return;
+    }
+
+    const float live_weight = sensor->get_weight_low_latency();
+    if (std::fabs(live_weight) <= USER_BASKET_DETECTION_REMOVAL_THRESHOLD_G) {
+        ready_screen.clear_status();
+        return;
+    }
+
+    grinding_controller_->handle_grind_button();
+}
+
+void UIManager::cancel_pending_basket_auto_start() {
+    if (auto_actions_.basket_start_timer) {
+        lv_timer_del(auto_actions_.basket_start_timer);
+        auto_actions_.basket_start_timer = nullptr;
+    }
+    auto_actions_.basket_start_pending = false;
+    auto_actions_.pending_basket_profile = -1;
+}
+
+void UIManager::basket_auto_start_timer_cb(lv_timer_t* timer) {
+    auto* ui = static_cast<UIManager*>(lv_timer_get_user_data(timer));
+    if (ui) {
+        ui->complete_pending_basket_auto_start();
+    }
 }
 
 void UIManager::update_auto_actions() {
@@ -410,6 +481,15 @@ void UIManager::update_auto_actions() {
     const uint32_t now = millis();
     const bool grinder_active = (grind_controller && grind_controller->is_active());
     const bool on_ready_tab = state_machine->is_state(UIState::READY) && current_tab < 3;
+    const float live_weight = sensor->get_weight_low_latency();
+
+    if (std::fabs(live_weight) <= USER_BASKET_DETECTION_REMOVAL_THRESHOLD_G) {
+        if (auto_actions_.basket_placement_latched || auto_actions_.basket_start_pending) {
+            cancel_pending_basket_auto_start();
+            ready_screen.clear_status();
+        }
+        auto_actions_.basket_placement_latched = false;
+    }
 
     if (auto_actions_.auto_start_enabled && on_ready_tab && !grinder_active && grinding_controller_) {
         auto* filter = sensor->get_raw_filter();
@@ -439,11 +519,54 @@ void UIManager::update_auto_actions() {
                             (now - auto_actions_.last_auto_start_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
 
                         if (rearm_ready) {
-                            LOG_BLE("[AUTO ACTION] Trigger confirmed: %.1fg over %lums with settled weight - auto-starting grind\n",
+                            LOG_BLE("[AUTO ACTION] Trigger confirmed: %.1fg over %lums with settled weight\n",
                                     static_cast<double>(delta_g),
                                     static_cast<unsigned long>(span_ms));
-                            auto_actions_.last_auto_start_ms = now;
-                            grinding_controller_->handle_grind_button();
+
+                            bool basket_detection_handled = false;
+                            if (basket_detector_.is_enabled() && basket_detector_.is_configured()) {
+                                basket_detection_handled = true;
+                                if (!auto_actions_.basket_placement_latched && !auto_actions_.basket_start_pending) {
+                                    const float settled_weight = sensor->get_weight_high_latency();
+                                    const BasketDetectionResult result = basket_detector_.classify(settled_weight);
+                                    auto_actions_.last_auto_start_ms = now;
+                                    auto_actions_.basket_placement_latched = true;
+
+                                    switch (result) {
+                                        case BasketDetectionResult::SINGLE:
+                                            LOG_BLE("[AUTO ACTION] Detected SINGLE basket at %.1fg\n",
+                                                    static_cast<double>(settled_weight));
+                                            schedule_basket_auto_start(0, "Detected SINGLE basket");
+                                            break;
+                                        case BasketDetectionResult::DOUBLE:
+                                            LOG_BLE("[AUTO ACTION] Detected DOUBLE basket at %.1fg\n",
+                                                    static_cast<double>(settled_weight));
+                                            schedule_basket_auto_start(1, "Detected DOUBLE basket");
+                                            break;
+                                        case BasketDetectionResult::AMBIGUOUS:
+                                            LOG_BLE("[AUTO ACTION] Basket detection ambiguous at %.1fg\n",
+                                                    static_cast<double>(settled_weight));
+                                            ready_screen.show_transient_status("Basket weights too close",
+                                                                               USER_BASKET_DETECTION_STATUS_MS);
+                                            break;
+                                        case BasketDetectionResult::NO_MATCH:
+                                            LOG_BLE("[AUTO ACTION] No basket match at %.1fg\n",
+                                                    static_cast<double>(settled_weight));
+                                            ready_screen.show_transient_status("No basket match",
+                                                                               USER_BASKET_DETECTION_STATUS_MS);
+                                            break;
+                                        case BasketDetectionResult::UNCONFIGURED:
+                                            basket_detection_handled = false;
+                                            auto_actions_.basket_placement_latched = false;
+                                            break;
+                                    }
+                                }
+                            }
+
+                            if (!basket_detection_handled) {
+                                auto_actions_.last_auto_start_ms = now;
+                                grinding_controller_->handle_grind_button();
+                            }
                         }
                     }
                 }
@@ -458,7 +581,6 @@ void UIManager::update_auto_actions() {
     if (state_machine->is_state(UIState::GRIND_COMPLETE) ||
         state_machine->is_state(UIState::GRIND_TIMEOUT)) {
         constexpr float kCompleteExitThresholdG = 2.0f;  // Treat scale as empty once weight drops below this point
-        const float live_weight = sensor->get_weight_low_latency();
         const bool rearm_ready =
             (now - auto_actions_.last_auto_return_ms) >= USER_AUTO_GRIND_REARM_DELAY_MS;
 
