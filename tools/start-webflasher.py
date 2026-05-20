@@ -5,7 +5,9 @@ Automatically handles port conflicts and starts the server
 """
 
 import argparse
+import json
 import os
+import re
 import sys
 import signal
 import subprocess
@@ -13,8 +15,11 @@ import socket
 from pathlib import Path
 import http.server
 import socketserver
+from urllib.parse import unquote, urlparse
 
 DEFAULT_PORT = 8000
+ENV_NAME = "waveshare-esp32s3-touch-amoled-164"
+FIRMWARE_OFFSET = 0x320000
 
 def is_port_in_use(port):
     """Check if a port is already in use."""
@@ -75,6 +80,10 @@ def kill_process_on_port(port):
 class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP request handler with reduced logging."""
 
+    project_dir = Path(__file__).resolve().parent.parent
+    webflasher_dir = Path(__file__).resolve().parent / "web-flasher"
+    build_dir = project_dir / ".pio" / "build" / ENV_NAME
+
     def log_message(self, format, *args):
         """Override to show cleaner logs."""
         # Only log actual requests, not every resource
@@ -82,6 +91,156 @@ class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             client = self.address_string()
             sys.stdout.write(f"[{self.log_date_time_string()}] {client} - {format % args}\n")
             sys.stdout.flush()
+
+    def do_GET(self):
+        """Serve static flasher files plus generated local firmware metadata."""
+        path = unquote(urlparse(self.path).path)
+
+        if path == "/firmware/index.json":
+            self.serve_firmware_index()
+            return
+        if path == "/firmware/local.manifest.json":
+            self.serve_local_manifest()
+            return
+        if path == "/firmware/local/firmware.bin":
+            self.serve_file(self.get_local_firmware_path())
+            return
+        if path == "/firmware/local/bootloader.bin":
+            self.serve_file(self.build_dir / "bootloader.bin")
+            return
+        if path == "/firmware/local/partitions.bin":
+            self.serve_file(self.build_dir / "partitions.bin")
+            return
+
+        super().do_GET()
+
+    def read_define(self, path, name):
+        """Read a simple C preprocessor define value from a file."""
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+
+        quoted_match = re.search(rf"#define\s+{re.escape(name)}\s+\"([^\"]*)\"", content)
+        if quoted_match:
+            return quoted_match.group(1)
+
+        match = re.search(rf"#define\s+{re.escape(name)}\s+(.+)", content)
+        if not match:
+            return None
+
+        value = match.group(1).split("//", 1)[0].strip()
+        if value.startswith('"') and value.endswith('"'):
+            return value[1:-1]
+        return value
+
+    def get_build_number(self):
+        value = self.read_define(self.project_dir / "include" / "git_info.h", "BUILD_NUMBER")
+        return value or "local"
+
+    def get_firmware_version(self):
+        value = self.read_define(self.project_dir / "src" / "config" / "build_info.h", "BUILD_FIRMWARE_VERSION")
+        return value or "local"
+
+    def get_local_firmware_path(self):
+        firmware_path = self.build_dir / "firmware.bin"
+        if firmware_path.exists():
+            return firmware_path
+
+        cached = sorted((self.project_dir / "firmware_cache").glob("build_*.bin"))
+        return cached[-1] if cached else firmware_path
+
+    def get_local_index_entry(self):
+        firmware_path = self.get_local_firmware_path()
+        if not firmware_path.exists():
+            return None
+
+        build_number = self.get_build_number()
+        version = self.get_firmware_version()
+        display = f"Local Build #{build_number}"
+        manifest_path = self.build_dir / "bootloader.bin"
+        partitions_path = self.build_dir / "partitions.bin"
+        has_usb_parts = manifest_path.exists() and partitions_path.exists()
+
+        return {
+            "tag": f"local-build-{build_number}",
+            "version": version,
+            "display": display,
+            "prerelease": False,
+            "local": True,
+            "manifest": "firmware/local.manifest.json" if has_usb_parts else None,
+            "ota": "firmware/local/firmware.bin",
+        }
+
+    def serve_json(self, status, payload):
+        body = json.dumps(payload, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def serve_firmware_index(self):
+        entries = []
+        local_entry = self.get_local_index_entry()
+        if local_entry:
+            entries.append(local_entry)
+
+        static_index = self.webflasher_dir / "firmware" / "index.json"
+        if static_index.exists():
+            try:
+                static_entries = json.loads(static_index.read_text(encoding="utf-8"))
+                entries.extend(static_entries)
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        self.serve_json(200, entries)
+
+    def serve_local_manifest(self):
+        local_entry = self.get_local_index_entry()
+        if not local_entry or not local_entry.get("manifest"):
+            self.send_error(404, "Local firmware build artifacts not found. Run python3 tools/grinder.py build first.")
+            return
+
+        version = local_entry["version"]
+        manifest = {
+            "name": "Smart Grind By Weight",
+            "version": version,
+            "home_assistant_domain": "grinder",
+            "new_install_skip_erase": True,
+            "builds": [
+                {
+                    "chipFamily": "ESP32-S3",
+                    "parts": [
+                        {"path": "local/bootloader.bin", "offset": 0},
+                        {"path": "local/partitions.bin", "offset": 0x8000},
+                        {"path": "blank_8KB.bin", "offset": 0xE000},
+                        {"path": "local/firmware.bin", "offset": FIRMWARE_OFFSET},
+                    ],
+                }
+            ],
+        }
+        self.serve_json(200, manifest)
+
+    def serve_file(self, path):
+        if not path or not path.exists() or not path.is_file():
+            self.send_error(404, "File not found")
+            return
+
+        try:
+            with path.open("rb") as file:
+                data = file.read()
+        except OSError:
+            self.send_error(500, "Could not read file")
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
 
 def start_server(port, directory):
     """Start the HTTP server."""

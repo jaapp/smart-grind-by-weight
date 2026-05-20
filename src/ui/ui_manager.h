@@ -36,7 +36,7 @@
 #include "../controllers/grind_events.h"
 #include "../controllers/grind_mode.h"
 #include "../hardware/hardware_manager.h"
-#include "../bluetooth/manager.h"
+#include "../connectivity/manager.h"
 
 /*
  * AVAILABLE FONTS AND THEIR USAGE:
@@ -69,7 +69,7 @@ private:
     StateMachine* state_machine;
     ProfileController* profile_controller;
     GrindController* grind_controller;
-    BluetoothManager* bluetooth_manager;
+    ConnectivityManager* connectivity_manager;
     BasketDetector basket_detector_;
     
     lv_timer_t* jog_timer;
@@ -116,7 +116,7 @@ public:
 
     ~UIManager();
     void init(HardwareManager* hw_mgr, StateMachine* sm, 
-              ProfileController* pc, GrindController* gc, BluetoothManager* bluetooth);
+              ProfileController* pc, GrindController* gc, ConnectivityManager* connectivity);
     void update();
     void switch_to_state(UIState new_state);
     // Helper method to show confirmation dialog
@@ -144,6 +144,7 @@ public:
 private:
     void create_ui();
     void update_auto_actions();
+    void apply_connectivity_settings_changes();
     void schedule_basket_auto_start(int profile_index, const char* status_text);
     void complete_pending_basket_auto_start();
     void cancel_pending_basket_auto_start();

@@ -24,8 +24,8 @@ static void back_event_handler(lv_event_t * e)
     }
 }
 
-void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl, BasketDetector* detector, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl) {
-    bluetooth_manager = bluetooth;
+void MenuScreen::create(ConnectivityManager* connectivity, GrindController* grind_ctrl, BasketDetector* detector, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl) {
+    connectivity_manager = connectivity;
     grind_controller = grind_ctrl;
     basket_detector = detector;
     grinding_screen = grind_screen;
@@ -136,8 +136,8 @@ void MenuScreen::create_menu_ui() {
     info_page = lv_menu_page_create(menu, "Info");
     create_info_page(info_page);
 
-    bluetooth_page = lv_menu_page_create(menu, "Bluetooth");
-    create_bluetooth_page(bluetooth_page);
+    connectivity_page = lv_menu_page_create(menu, "WiFi");
+    create_connectivity_page(connectivity_page);
 
     display_page = lv_menu_page_create(menu, "Display");
     create_display_page(display_page);
@@ -186,8 +186,8 @@ void MenuScreen::create_menu_ui() {
     }
 
     create_separator(main_page, "Settings");
-    lv_obj_t* bluetooth_item = create_menu_item(main_page, "Bluetooth");
-    lv_menu_set_load_page_event(menu, bluetooth_item, bluetooth_page);
+    lv_obj_t* connectivity_item = create_menu_item(main_page, "WiFi");
+    lv_menu_set_load_page_event(menu, connectivity_item, connectivity_page);
 
     lv_obj_t* display_item = create_menu_item(main_page, "Display");
     lv_menu_set_load_page_event(menu, display_item, display_page);
@@ -268,7 +268,7 @@ void MenuScreen::create_info_page(lv_obj_t* parent) {
 }
 
 
-void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
+void MenuScreen::create_connectivity_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -277,32 +277,36 @@ void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    create_toggle_row(parent, "Enabled", &ble_toggle);
-    create_toggle_row(parent, "Startup", &ble_startup_toggle);
+    create_toggle_row(parent, "Enabled", &connectivity_toggle);
+    create_toggle_row(parent, "Startup", &connectivity_startup_toggle);
 
-    // BLE Status label
-    ble_status_label = lv_label_create(parent);
-    lv_label_set_text(ble_status_label, "Bluetooth: Disabled");
-    lv_obj_set_style_text_font(ble_status_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(ble_status_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_clear_flag(ble_status_label, LV_OBJ_FLAG_SCROLLABLE);
+    create_separator(parent, "Status");
+    create_data_label(parent, "State:", &connectivity_status_label);
+    create_data_label(parent, "Mode:", &connectivity_mode_label);
+    create_data_label(parent, "SSID:", &connectivity_ssid_label, true);
+    create_data_label(parent, "IP:", &connectivity_ip_label, true);
+    create_data_label(parent, "Host:", &connectivity_host_label, true);
+    create_data_label(parent, "MAC:", &connectivity_mac_label, true);
+    create_data_label(parent, "RSSI:", &connectivity_rssi_label);
+    create_data_label(parent, "OTA:", &connectivity_ota_label, true);
 
-    // BLE Timer label
-    ble_timer_label = lv_label_create(parent);
-    lv_label_set_text(ble_timer_label, "");
-    lv_obj_set_style_text_font(ble_timer_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(ble_timer_label, lv_color_hex(THEME_COLOR_WARNING), 0);
-    lv_obj_clear_flag(ble_timer_label, LV_OBJ_FLAG_SCROLLABLE);
+    connectivity_detail_label = lv_label_create(parent);
+    lv_label_set_text(connectivity_detail_label, "");
+    lv_obj_set_style_text_font(connectivity_detail_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(connectivity_detail_label, lv_color_hex(THEME_COLOR_WARNING), 0);
+    lv_label_set_long_mode(connectivity_detail_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(connectivity_detail_label, 260);
+    lv_obj_clear_flag(connectivity_detail_label, LV_OBJ_FLAG_SCROLLABLE);
 
     // Register events for the toggles (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
-    if (ble_toggle) {
-        lv_obj_add_event_cb(ble_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BLE_TOGGLE)));
+    if (connectivity_toggle) {
+        lv_obj_add_event_cb(connectivity_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::CONNECTIVITY_TOGGLE)));
     }
-    if (ble_startup_toggle) {
-        lv_obj_add_event_cb(ble_startup_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BLE_STARTUP_TOGGLE)));
+    if (connectivity_startup_toggle) {
+        lv_obj_add_event_cb(connectivity_startup_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::CONNECTIVITY_STARTUP_TOGGLE)));
     }
 }
 
@@ -688,9 +692,9 @@ void MenuScreen::show() {
 
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = true;
-    update_ble_status();
+    update_connectivity_status();
     update_brightness_sliders();
-    update_bluetooth_startup_toggle();
+    update_connectivity_startup_toggle();
     update_logging_toggle();
     update_grind_mode_toggles();
     update_screensaver_toggles();
@@ -805,36 +809,70 @@ void MenuScreen::update_diagnostics(WeightSensor* weight_sensor) {
     }
 }
 
-void MenuScreen::update_ble_status() {
-    if (!visible || !bluetooth_manager) return;
+void MenuScreen::update_connectivity_status() {
+    if (!visible || !connectivity_manager) return;
     
     // Update toggle state
-    if (bluetooth_manager->is_enabled()) {
-        lv_obj_add_state(ble_toggle, LV_STATE_CHECKED);
+    if (connectivity_manager->is_enabled()) {
+        lv_obj_add_state(connectivity_toggle, LV_STATE_CHECKED);
     } else {
-        lv_obj_clear_state(ble_toggle, LV_STATE_CHECKED);
+        lv_obj_clear_state(connectivity_toggle, LV_STATE_CHECKED);
     }
     
-    // Update status text
-    if (bluetooth_manager->is_enabled()) {
-        if (bluetooth_manager->is_connected()) {
-            lv_label_set_text(ble_status_label, "Connected");
+    if (connectivity_status_label) {
+        lv_label_set_text(connectivity_status_label, connectivity_manager->get_status_label());
+    }
+    if (connectivity_mode_label) {
+        lv_label_set_text(connectivity_mode_label, connectivity_manager->get_mode_label());
+    }
+
+    String ip = connectivity_manager->get_ip_address();
+    String ssid = connectivity_manager->get_active_ssid();
+    String host = connectivity_manager->is_setup_mode()
+                      ? String("http://") + ip
+                      : String("http://") + WIFI_HOSTNAME + ".local";
+    String ota = connectivity_manager->get_ota_url();
+
+    if (connectivity_ssid_label) {
+        lv_label_set_text(connectivity_ssid_label, ssid.isEmpty() ? "--" : ssid.c_str());
+    }
+    if (connectivity_ip_label) {
+        lv_label_set_text(connectivity_ip_label, ip.isEmpty() ? "--" : ip.c_str());
+    }
+    if (connectivity_host_label) {
+        lv_label_set_text(connectivity_host_label, connectivity_manager->is_enabled() && !ip.isEmpty() ? host.c_str() : "--");
+    }
+    if (connectivity_mac_label) {
+        String mac = connectivity_manager->get_mac_address();
+        lv_label_set_text(connectivity_mac_label, mac.isEmpty() ? "--" : mac.c_str());
+    }
+    if (connectivity_rssi_label) {
+        char rssi_text[24];
+        if (connectivity_manager->is_connected()) {
+            snprintf(rssi_text, sizeof(rssi_text), "%ld dBm", static_cast<long>(connectivity_manager->get_rssi_dbm()));
         } else {
-            lv_label_set_text(ble_status_label, "Advertising");
+            snprintf(rssi_text, sizeof(rssi_text), "--");
         }
-        lv_obj_clear_flag(ble_status_label, LV_OBJ_FLAG_HIDDEN);
-        
-        // Show remaining time
-        unsigned long remaining_ms = bluetooth_manager->get_bluetooth_timeout_remaining_ms();
-        unsigned long remaining_min = remaining_ms / (60 * 1000);
-        char timer_text[64];
-        snprintf(timer_text, sizeof(timer_text), "Auto-disable in: %lu min", remaining_min);
-        lv_label_set_text(ble_timer_label, timer_text);
-        lv_obj_clear_flag(ble_timer_label, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(connectivity_rssi_label, rssi_text);
+    }
+    if (connectivity_ota_label) {
+        lv_label_set_text(connectivity_ota_label, ota.isEmpty() ? "--" : ota.c_str());
+    }
+
+    if (connectivity_manager->is_enabled()) {
+        char detail_text[120];
+        if (connectivity_manager->is_setup_mode()) {
+            snprintf(detail_text, sizeof(detail_text), "Join %s, then open the Host URL above.",
+                     WIFI_SETUP_AP_SSID);
+        } else if (!ip.isEmpty()) {
+            snprintf(detail_text, sizeof(detail_text), "Use Host for settings and OTA updates.");
+        } else {
+            snprintf(detail_text, sizeof(detail_text), "Waiting for network");
+        }
+        lv_label_set_text(connectivity_detail_label, detail_text);
+        lv_obj_clear_flag(connectivity_detail_label, LV_OBJ_FLAG_HIDDEN);
     } else {
-        // When nothing to display hide the status labels
-        lv_obj_add_flag(ble_status_label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ble_timer_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(connectivity_detail_label, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -1057,7 +1095,7 @@ void MenuScreen::update_basket_detection_controls() {
 }
 
 void MenuScreen::update_screensaver_toggles() {
-    bool image_exists = LittleFS.exists(BLE_IMAGE_FILENAME);
+    bool image_exists = LittleFS.exists(WIFI_SCREENSAVER_PATH);
 
     Preferences prefs;
     prefs.begin("screensaver", true);
@@ -1134,22 +1172,22 @@ lv_obj_t* MenuScreen::create_separator(lv_obj_t* parent, const char* text) {
     return separator_container;
 }
 
-void MenuScreen::update_bluetooth_startup_toggle() {
-    if (!ble_startup_toggle) return;
+void MenuScreen::update_connectivity_startup_toggle() {
+    if (!connectivity_startup_toggle) return;
 
-    // Read from the "bluetooth" namespace using a local Preferences instance
+    // Read from the "wifi" namespace using a local Preferences instance
     Preferences prefs;
-    prefs.begin("bluetooth", true); // read-only
+    prefs.begin(WIFI_PREF_NAMESPACE, true); // read-only
 
     // Load startup value from preferences (default to false)
-    bool startup_enabled = prefs.getBool("startup", true);
+    bool startup_enabled = prefs.getBool(WIFI_PREF_KEY_STARTUP, true);
     prefs.end();
 
     // Update toggle state
     if (startup_enabled) {
-        lv_obj_add_state(ble_startup_toggle, LV_STATE_CHECKED);
+        lv_obj_add_state(connectivity_startup_toggle, LV_STATE_CHECKED);
     } else {
-        lv_obj_clear_state(ble_startup_toggle, LV_STATE_CHECKED);
+        lv_obj_clear_state(connectivity_startup_toggle, LV_STATE_CHECKED);
     }
 }
 

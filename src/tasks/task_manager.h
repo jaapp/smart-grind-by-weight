@@ -10,7 +10,7 @@ class HardwareManager;
 class StateMachine; 
 class ProfileController;
 class GrindController;
-class BluetoothManager;
+class ConnectivityManager;
 class UIManager;
 
 // Task handle storage for all FreeRTOS tasks
@@ -18,7 +18,7 @@ struct TaskHandles {
     TaskHandle_t weight_sampling_task;
     TaskHandle_t grind_control_task;
     TaskHandle_t ui_render_task;
-    TaskHandle_t bluetooth_task;
+    TaskHandle_t connectivity_task;
     TaskHandle_t file_io_task;
 };
 
@@ -68,7 +68,7 @@ private:
     StateMachine* state_machine;
     ProfileController* profile_controller; 
     GrindController* grind_controller;
-    BluetoothManager* bluetooth_manager;
+    ConnectivityManager* connectivity_manager;
     UIManager* ui_manager;
     
     // Task monitoring
@@ -85,7 +85,7 @@ public:
     
     // Initialization
     bool init(HardwareManager* hw_mgr, StateMachine* sm, ProfileController* pc,
-              GrindController* gc, BluetoothManager* bluetooth, UIManager* ui);
+              GrindController* gc, ConnectivityManager* connectivity, UIManager* ui);
     
     // Task lifecycle management
     bool create_all_tasks();
@@ -105,7 +105,7 @@ public:
     static void weight_sampling_task_wrapper(void* parameter);
     static void grind_control_task_wrapper(void* parameter);
     static void ui_render_task_wrapper(void* parameter);
-    static void bluetooth_task_wrapper(void* parameter);
+    static void connectivity_task_wrapper(void* parameter);
     static void file_io_task_wrapper(void* parameter);
     
 private:
@@ -113,7 +113,7 @@ private:
     bool create_weight_sampling_task();
     bool create_grind_control_task();
     bool create_ui_render_task();
-    bool create_bluetooth_task();
+    bool create_connectivity_task();
     bool create_file_io_task();
     
     // Queue creation
@@ -124,7 +124,7 @@ private:
     void weight_sampling_task_impl();
     void grind_control_task_impl();
     void ui_render_task_impl();
-    void bluetooth_task_impl();
+    void connectivity_task_impl();
     void file_io_task_impl();
     
     // Performance monitoring

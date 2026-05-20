@@ -12,13 +12,13 @@ UIManager* UIManager::instance = nullptr;
 
 UIManager::~UIManager() = default;
 
-void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm, 
-                     ProfileController* pc, GrindController* gc, BluetoothManager* bluetooth) {
+void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
+                     ProfileController* pc, GrindController* gc, ConnectivityManager* connectivity) {
     hardware_manager = hw_mgr;
     state_machine = sm;
     profile_controller = pc;
     grind_controller = gc;
-    bluetooth_manager = bluetooth;
+    connectivity_manager = connectivity;
     
     // Set static instance for event callbacks
     instance = this;
@@ -94,7 +94,7 @@ void UIManager::create_ui() {
     grinding_screen.init(hardware_manager->get_preferences());
     grinding_screen.create();
     grinding_screen.set_mode(current_mode);
-    menu_screen.create(bluetooth_manager, grind_controller, &basket_detector_, &grinding_screen, hardware_manager, diagnostics_controller_.get());
+    menu_screen.create(connectivity_manager, grind_controller, &basket_detector_, &grinding_screen, hardware_manager, diagnostics_controller_.get());
     calibration_screen.create();
     confirm_screen.create();
     purge_confirm_screen.create();
@@ -140,6 +140,8 @@ void UIManager::update() {
     if (screen_timeout_controller_) {
         screen_timeout_controller_->update();
     }
+
+    apply_connectivity_settings_changes();
 
     bool ota_cycle_consumed = false;
     if (ota_data_export_controller_) {
@@ -195,8 +197,39 @@ void UIManager::update() {
     }
 }
 
+void UIManager::apply_connectivity_settings_changes() {
+    if (!connectivity_manager || !connectivity_manager->consume_settings_changed()) {
+        return;
+    }
+
+    if (profile_controller) {
+        profile_controller->load_profiles();
+        current_tab = profile_controller->get_current_profile();
+        current_mode = profile_controller->get_grind_mode();
+        edit_target = get_current_profile_target(*profile_controller, current_mode);
+    }
+
+    if (ready_controller_) {
+        ready_controller_->refresh_profiles();
+    }
+    grinding_screen.set_mode(current_mode);
+    menu_screen.update_brightness_sliders();
+    menu_screen.update_connectivity_startup_toggle();
+    menu_screen.update_logging_toggle();
+    menu_screen.update_grind_mode_toggles();
+    menu_screen.update_screensaver_toggles();
+    refresh_auto_action_settings();
+
+    if (hardware_manager && menu_controller_) {
+        hardware_manager->get_display()->set_brightness(menu_controller_->get_normal_brightness());
+    }
+}
+
 void UIManager::switch_to_state(UIState new_state) {
     state_machine->transition_to(new_state);
+    if (screensaver_controller_ && screensaver_controller_->is_visible()) {
+        screensaver_controller_->hide();
+    }
 
     // Hide all screens before showing the requested one
     ready_screen.hide();

@@ -7,20 +7,24 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #101010;
             margin: 0;
             padding: 20px;
             min-height: 100vh;
-            color: #333;
+            color: #20242a;
         }
-        
+
+        * {
+            box-sizing: border-box;
+        }
+
         .container {
-            max-width: 800px;
+            max-width: 760px;
             margin: 0 auto;
-            background: white;
-            border-radius: 16px;
+            background: #ffffff;
+            border-radius: 8px;
             padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 18px 50px rgba(0,0,0,0.38);
         }
         
         .header {
@@ -61,7 +65,7 @@
         
         .tab.active {
             background: white;
-            color: #667eea;
+            color: #d71920;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         
@@ -78,7 +82,7 @@
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #00aaff;
         }
         
         .form-group {
@@ -103,24 +107,25 @@
         
         input:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #00aaff;
+            box-shadow: 0 0 0 3px rgba(0, 170, 255, 0.12);
         }
         
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #d71920;
             color: white;
             padding: 12px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 16px;
             font-weight: 600;
-            transition: transform 0.2s ease;
+            transition: background 0.2s ease, transform 0.2s ease;
             width: 100%;
         }
         
         .btn:hover {
+            background: #b81319;
             transform: translateY(-1px);
         }
         
@@ -168,7 +173,7 @@
         
         .progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: #00aaff;
             width: 0%;
             transition: width 0.3s ease;
         }
@@ -220,8 +225,8 @@
         </div>
         
         <div id="browserWarning" class="browser-support">
-            <h3>⚠️ Browser Not Supported</h3>
-            <p>This tool requires <strong>Google Chrome</strong> for both Web Bluetooth (OTA) and Web Serial (USB) support.</p>
+            <h3>Browser Not Supported</h3>
+            <p>This tool requires <strong>Google Chrome</strong> for Web Serial (USB) and BLE fallback support. WiFi OTA works from a local HTTP flasher page.</p>
             <ul>
                 <li><strong>Chrome</strong> (Desktop & Android) - Required</li>
                 <li><strong>Microsoft Edge</strong> (Desktop) - Limited support</li>
@@ -230,16 +235,15 @@
         </div>
         
         <div class="tabs">
-            <button class="tab active" onclick="showTab('ota')">OTA Update (BLE)</button>
+            <button class="tab active" onclick="showTab('ota')">OTA Update</button>
             <button class="tab" onclick="showTab('initial')">Initial Setup (USB)</button>
-            <button class="tab" onclick="showTab('screensaver')">Screensaver</button>
-            <button class="tab" onclick="showTab('diagnostics')">Diagnostics</button>
+            <button class="tab" onclick="showTab('diagnostics')">Legacy Diagnostics</button>
         </div>
         
         <!-- Initial Setup Tab -->
         <div id="initialTab" class="tab-content">
             <div class="section">
-                <h3>🔌 Initial Setup - USB Connection</h3>
+                <h3>Initial Setup - USB Connection</h3>
                 <p>For first-time installation or when the grinder is easily accessible, use ESP Web Tools to flash firmware via USB.</p>
                 
             </div>
@@ -271,8 +275,16 @@
         <!-- OTA Update Tab -->
         <div id="otaTab" class="tab-content active">
             <div class="section">
-                <h3>📶 OTA Update - Bluetooth Connection</h3>
-                <p>For updates after installation when USB access is limited. Requires firmware to be installed via USB first.</p>
+                <h3>OTA Update</h3>
+                <p>For updates after installation when USB access is limited. WiFi is the default; BLE remains available for legacy firmware.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="transportSelect">Connectivity</label>
+                <select id="transportSelect" onchange="updateTransportUi()">
+                    <option value="wifi" selected>WiFi</option>
+                    <option value="ble">Bluetooth LE (legacy)</option>
+                </select>
             </div>
             
             <div class="form-group">
@@ -287,8 +299,19 @@
                     <option value="">Loading releases...</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
+                <label for="localFirmwareFile">Local Firmware .bin</label>
+                <input type="file" id="localFirmwareFile" accept=".bin,application/octet-stream" onchange="updateOtaSelectedFirmware()">
+            </div>
+
+            <div class="form-group" id="wifiHostGroup">
+                <label for="wifiDeviceHost">WiFi Device Address</label>
+                <input type="text" id="wifiDeviceHost" value="http://grindbyweight.local" placeholder="http://grindbyweight.local or http://192.168.4.1">
+                <button class="btn" id="checkWifiBtn" onclick="checkWifiDevice()" style="margin-top: 10px;">Check WiFi Connection</button>
+            </div>
+
+            <div class="form-group" id="bleDeviceGroup" style="display: none;">
                 <label for="deviceName">Device Name</label>
                 <input type="text" id="deviceName" value="GrindByWeight" readonly>
             </div>
@@ -308,46 +331,15 @@
             </div>
         </div>
 
-        <!-- Screensaver Tab -->
-        <div id="screensaverTab" class="tab-content">
-            <div class="section">
-                <h3>🖼️ Custom Screensaver Image</h3>
-                <p>Upload a custom image to display on startup or when the grinder enters power-saving mode. The image must be exactly <strong>280 x 456 pixels</strong>.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="screensaverFile">Select Image File</label>
-                <input type="file" id="screensaverFile" accept=".png,.jpg,.jpeg,.bmp,.webp" onchange="handleScreensaverFileSelect(event)">
-            </div>
-
-            <div id="screensaverPreviewContainer" style="display: none; text-align: center; margin-bottom: 20px;">
-                <canvas id="screensaverPreview" style="border: 2px solid #e2e8f0; border-radius: 8px; max-width: 100%; height: auto;"></canvas>
-            </div>
-
-            <div id="screensaverValidation" class="status" style="display: none;"></div>
-
-            <button class="btn" id="uploadScreensaverBtn" onclick="uploadScreensaver()" disabled>Upload to Device</button>
-
-            <div class="progress" id="screensaverProgressContainer" style="display: none;">
-                <div class="progress-bar" id="screensaverProgressBar"></div>
-            </div>
-
-            <div id="screensaverStatus" class="status info" style="display: none;"></div>
-
-            <div style="margin-top: 20px;">
-                <button class="btn" id="deleteScreensaverBtn" onclick="deleteScreensaver()" style="background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);">Delete Image from Device</button>
-            </div>
-        </div>
-
         <!-- Diagnostics Tab -->
         <div id="diagnosticsTab" class="tab-content">
             <div class="section">
-                <h3>🔍 Diagnostic Report</h3>
-                <p>Generate a comprehensive diagnostic report from your device to attach to GitHub issues for troubleshooting.</p>
+                <h3>Legacy BLE Diagnostic Report</h3>
+                <p>Generate a diagnostic report from older BLE firmware. Current WiFi firmware uses on-device diagnostics and serial logs.</p>
 
                 <div class="form-group">
                     <button class="btn" id="getDiagnosticsBtn" onclick="getDiagnosticReport()">
-                        <span>📋</span> Connect & Get Diagnostics
+                        <span>Connect via BLE & Get Diagnostics</span>
                     </button>
                 </div>
 
@@ -357,10 +349,10 @@
 
                     <div style="display: flex; gap: 10px; margin-top: 15px;">
                         <button class="btn" onclick="copyDiagnosticReport()">
-                            <span>📋</span> Copy to Clipboard
+                            <span>Copy to Clipboard</span>
                         </button>
                         <button class="btn" onclick="downloadDiagnosticReport()">
-                            <span>💾</span> Download Report
+                            <span>Download Report</span>
                         </button>
                     </div>
                 </div>

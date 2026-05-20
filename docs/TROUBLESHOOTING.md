@@ -233,7 +233,15 @@ This information helps identify configuration issues, hardware problems, or firm
 
 ### How to Get a Diagnostic Report
 
-#### Option 1: Web Flasher (Recommended)
+#### Option 1: On-Device Diagnostics (Current WiFi Firmware)
+
+1. Open **Menu → Diagnostics** on the grinder.
+2. Note the visible firmware/build, load-cell, noise, and motor-latency values.
+3. Include those values in your GitHub issue along with the behavior you observed.
+
+WiFi firmware no longer includes the BLE diagnostics export path. Use serial logs during development if you need a full boot/runtime trace.
+
+#### Option 2: Web Flasher (Legacy BLE Firmware)
 
 1. Visit the **[Web Flasher Diagnostics Tool](https://jaapp.github.io/smart-grind-by-weight)**
 2. Click the **"Diagnostics"** tab
@@ -245,9 +253,9 @@ This information helps identify configuration issues, hardware problems, or firm
 
 **Browser Requirements:** Chrome, Edge, or Opera on desktop/Android (Web Bluetooth API required)
 
-#### Option 2: Command Line Tool
+#### Option 3: Command Line Tool
 
-If you have the development environment set up:
+If you have the development environment set up and are running legacy BLE firmware:
 
 ```bash
 # Get diagnostics and display in terminal

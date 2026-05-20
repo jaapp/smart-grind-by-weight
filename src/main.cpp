@@ -8,7 +8,7 @@
 #include "controllers/grind_controller.h"
 #include "ui/ui_manager.h"
 #include "config/constants.h"
-#include "bluetooth/manager.h"
+#include "connectivity/manager.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -19,8 +19,8 @@ StateMachine state_machine;
 ProfileController profile_controller;
 GrindController grind_controller;
 UIManager ui_manager;
-BluetoothManager g_bluetooth_manager;
-BluetoothManager& bluetooth_manager = g_bluetooth_manager;
+ConnectivityManager g_connectivity_manager;
+ConnectivityManager& connectivity_manager = g_connectivity_manager;
 
 #if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
@@ -74,10 +74,10 @@ void setup() {
     // Set up the reference so HardwareManager can query GrindController state
     hardware_manager.set_grind_controller(&grind_controller);
     
-    bluetooth_manager.init(hardware_manager.get_preferences());
+    connectivity_manager.init(hardware_manager.get_preferences());
     
     // Check for OTA failure to determine initial state
-    String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
+    String failed_ota_build = connectivity_manager.check_ota_failure_after_boot();
     bool ota_failed = !failed_ota_build.isEmpty();
 
     // Check calibration status to determine initial screen
@@ -93,7 +93,7 @@ void setup() {
         state_machine.init(UIState::READY);
     }
     
-    ui_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &bluetooth_manager);
+    ui_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &connectivity_manager);
     
     // Store OTA failure info in ui_manager if needed
     if (ota_failed) {
@@ -103,15 +103,15 @@ void setup() {
     }
     
     // Set up UI status callback to avoid circular dependency
-    bluetooth_manager.set_ui_status_callback([](const char* status) {
+    connectivity_manager.set_ui_status_callback([](const char* status) {
         if (auto* ota = ui_manager.get_ota_data_export_controller()) {
             ota->update_status(status);
         }
     });
     
-    // Enable BLE by default during bootup with 2-minute timeout
-    // (Previously disabled by default for security, now enabled for user convenience)
-    bluetooth_manager.enable_during_bootup();
+    // Enable WiFi by default during bootup. If credentials are missing,
+    // the device starts a setup AP for initial configuration.
+    connectivity_manager.enable_during_bootup();
     
     // Initialize individual task modules BEFORE TaskManager creates FreeRTOS tasks
     // This ensures all task dependencies are ready before tasks start running
@@ -125,7 +125,7 @@ void setup() {
     // Initialize TaskManager with hardware and system interfaces
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller, 
-                                              &grind_controller, &bluetooth_manager, &ui_manager);
+                                              &grind_controller, &connectivity_manager, &ui_manager);
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
@@ -175,7 +175,7 @@ void loop() {
     
     // Check OTA state and suspend hardware tasks if needed
     static bool hardware_suspended = false;
-    bool ota_active = bluetooth_manager.is_updating();
+    bool ota_active = connectivity_manager.is_updating();
     
     if (ota_active && !hardware_suspended) {
         task_manager.suspend_hardware_tasks();
@@ -204,15 +204,15 @@ void loop() {
         
         // Get system states
         bool is_grinding = grind_controller.is_active();
-        const char* ble_state = bluetooth_manager.is_enabled() ? 
-                               (bluetooth_manager.is_connected() ? "CONN" : "ADV") : "OFF";
+        const char* connectivity_state = connectivity_manager.is_enabled() ?
+                               connectivity_manager.get_status_label() : "OFF";
         const char* grinder_state = is_grinding ? "ACTIVE" : "IDLE";
         const char* tasks_status = task_manager.are_tasks_healthy() ? "HEALTHY" : "ERROR";
         size_t free_heap_kb = ESP.getFreeHeap() / 1024;
         
-        LOG_BLE("[%lums MAIN_LOOP_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Tasks: %s | BLE: %s | Grinder: %s | Mem: %zuKB | Build: #%d\n",
+        LOG_BLE("[%lums MAIN_LOOP_HEARTBEAT] Cycles: %lu/10s | Avg: %lums (%lu-%lums) | Tasks: %s | WiFi: %s | Grinder: %s | Mem: %zuKB | Build: #%d\n",
                millis(), core1_cycle_count_10s, avg_cycle_time, core1_cycle_time_min_ms, core1_cycle_time_max_ms,
-               tasks_status, ble_state, grinder_state, free_heap_kb, BUILD_NUMBER);
+               tasks_status, connectivity_state, grinder_state, free_heap_kb, BUILD_NUMBER);
         
         // Reset Core 1 metrics for next interval
         core1_cycle_count_10s = 0;

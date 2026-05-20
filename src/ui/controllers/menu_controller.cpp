@@ -43,8 +43,8 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::MENU_BACK, [this](lv_event_t*) { handle_back(); });
     EventBridgeLVGL::register_handler(ET::MENU_REFRESH_STATS, [this](lv_event_t*) { handle_refresh_stats(); });
 
-    EventBridgeLVGL::register_handler(ET::BLE_TOGGLE, [this](lv_event_t*) { handle_ble_toggle(); });
-    EventBridgeLVGL::register_handler(ET::BLE_STARTUP_TOGGLE, [this](lv_event_t*) { handle_ble_startup_toggle(); });
+    EventBridgeLVGL::register_handler(ET::CONNECTIVITY_TOGGLE, [this](lv_event_t*) { handle_connectivity_toggle(); });
+    EventBridgeLVGL::register_handler(ET::CONNECTIVITY_STARTUP_TOGGLE, [this](lv_event_t*) { handle_connectivity_startup_toggle(); });
     EventBridgeLVGL::register_handler(ET::LOGGING_TOGGLE, [this](lv_event_t*) { handle_logging_toggle(); });
 
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
@@ -88,7 +88,7 @@ void MenuUIController::update() {
 
     ui_manager_->menu_screen.update_info(sensor, uptime_ms, free_heap);
     ui_manager_->menu_screen.update_diagnostics(sensor);
-    ui_manager_->menu_screen.update_ble_status();
+    ui_manager_->menu_screen.update_connectivity_status();
 
     if (ui_manager_->menu_screen.is_scale_page_active()) {
         float display_weight = sensor ? sensor->get_display_weight() : 0.0f;
@@ -258,44 +258,44 @@ void MenuUIController::perform_diagnostics_reset() {
     }
 }
 
-void MenuUIController::handle_ble_toggle() {
-    if (!ui_manager_ || !ui_manager_->bluetooth_manager) return;
+void MenuUIController::handle_connectivity_toggle() {
+    if (!ui_manager_ || !ui_manager_->connectivity_manager) return;
 
-    auto* ble = ui_manager_->bluetooth_manager;
-    if (ble->is_enabled()) {
-        ble->disable();
-        LOG_DEBUG_PRINTLN("Bluetooth disabled by user");
-        ui_manager_->menu_screen.update_ble_status();
+    auto* connectivity = ui_manager_->connectivity_manager;
+    if (connectivity->is_enabled()) {
+        connectivity->disable();
+        LOG_DEBUG_PRINTLN("WiFi disabled by user");
+        ui_manager_->menu_screen.update_connectivity_status();
         return;
     }
 
     auto completion = [this]() {
-        ui_manager_->menu_screen.update_ble_status();
+        ui_manager_->menu_screen.update_connectivity_status();
     };
 
-    auto operation = [ble]() {
-        ble->enable();
-        LOG_DEBUG_PRINTLN("Bluetooth enabled by user (30 minute timeout)");
+    auto operation = [connectivity]() {
+        connectivity->enable();
+        LOG_DEBUG_PRINTLN("WiFi enabled by user");
     };
 
     auto& overlay = BlockingOperationOverlay::getInstance();
-    overlay.show_and_execute(BlockingOperation::BLE_ENABLING, operation, completion);
+    overlay.show_and_execute(BlockingOperation::CONNECTIVITY_ENABLING, operation, completion);
 }
 
-void MenuUIController::handle_ble_startup_toggle() {
+void MenuUIController::handle_connectivity_startup_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->menu_screen.get_ble_startup_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_connectivity_startup_toggle();
     if (!toggle) return;
 
     bool startup_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
 
     Preferences prefs;
-    prefs.begin("bluetooth", false);
-    prefs.putBool("startup", startup_enabled);
+    prefs.begin(WIFI_PREF_NAMESPACE, false);
+    prefs.putBool(WIFI_PREF_KEY_STARTUP, startup_enabled);
     prefs.end();
 
-    LOG_DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
+    LOG_DEBUG_PRINTLN(startup_enabled ? "WiFi startup enabled" : "WiFi startup disabled");
 }
 
 void MenuUIController::handle_logging_toggle() {

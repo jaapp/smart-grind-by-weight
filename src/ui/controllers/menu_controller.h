@@ -3,7 +3,7 @@
 
 class UIManager;
 
-// Handles the interactive menu: BLE/logging toggles, brightness sliders, maintenance actions, and stats
+// Handles the interactive menu: connectivity/logging toggles, brightness sliders, maintenance actions, and stats
 
 class MenuUIController {
 public:
@@ -21,8 +21,8 @@ public:
     void handle_back();
     void handle_refresh_stats();
     void handle_diagnostics_reset();
-    void handle_ble_toggle();
-    void handle_ble_startup_toggle();
+    void handle_connectivity_toggle();
+    void handle_connectivity_startup_toggle();
     void handle_logging_toggle();
     void handle_grind_mode_swipe_toggle();
     void handle_grind_mode_radio_button();

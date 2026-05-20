@@ -3,11 +3,11 @@
 Import("env")
 import os
 
-def upload_ble_action(source, target, env):
+def upload_wifi_action(source, target, env):
     """
-    Build firmware and upload over BLE using the Python uploader.
+    Build firmware and upload over WiFi using the Python uploader.
     """
-    print("--- Executing custom target: Upload over BLE ---")
+    print("--- Executing custom target: Upload over WiFi ---")
     
     # Get the name of the current build environment
     environment = env["PIOENV"]
@@ -17,7 +17,7 @@ def upload_ble_action(source, target, env):
     print("--- Building firmware ---")
     result = env.Execute(f"pio run -e {environment}")
     if result != 0:
-        print("❌ Build failed, aborting BLE upload")
+        print("❌ Build failed, aborting WiFi upload")
         return
 
     # Get the firmware path
@@ -29,15 +29,15 @@ def upload_ble_action(source, target, env):
         return
 
     # Run the unified grinder tool for upload
-    print("--- Starting BLE upload ---")
+    print("--- Starting WiFi upload ---")
     grinder_script = os.path.join(project_dir, "tools", "grinder.py")
-    env.Execute(f"python3 {grinder_script} upload {firmware_path}")
+    env.Execute(f"python3 {grinder_script} upload --transport wifi {firmware_path}")
 
 # Register custom targets
 env.AddCustomTarget(
-    name="upload_ble",
+    name="upload_wifi",
     dependencies=None,
-    actions=upload_ble_action,
-    title="Upload over BLE",
-    description="Builds firmware and uploads over BLE"
+    actions=upload_wifi_action,
+    title="Upload over WiFi",
+    description="Builds firmware and uploads over WiFi"
 )

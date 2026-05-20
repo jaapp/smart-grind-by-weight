@@ -28,22 +28,22 @@
 #define SYS_TASK_WEIGHT_SAMPLING_INTERVAL_MS 20                                // Weight sampling poll interval (50Hz poll; HX711 @10SPS) - Core 0
 #define SYS_TASK_GRIND_CONTROL_INTERVAL_MS 20                                  // Grind controller update interval (50Hz) - Core 0
 #define SYS_TASK_UI_INTERVAL_MS 16                                             // UI rendering frequency (60Hz) - Core 1  
-#define SYS_TASK_BLUETOOTH_INTERVAL_MS 20                                      // Bluetooth handling frequency (50Hz) - Core 1
+#define SYS_TASK_CONNECTIVITY_INTERVAL_MS 20                                   // Connectivity handling frequency (50Hz) - Core 1
 #define SYS_TASK_FILE_IO_INTERVAL_MS 100                                       // File I/O operations frequency (10Hz) - Core 1
 
 // Task Stack Sizes (bytes) - Increased for BLE_LOG overhead and complex operations
 #define SYS_TASK_WEIGHT_SAMPLING_STACK_SIZE 4096                               // 4KB stack for weight sampling (was 2KB, increased for BLE_LOG)
 #define SYS_TASK_GRIND_CONTROL_STACK_SIZE 6144                                 // 6KB stack for grind control logic (was 4KB, increased for complex algorithms)
 #define SYS_TASK_UI_STACK_SIZE 8192                                            // 8KB stack for LVGL rendering (unchanged)
-#define SYS_TASK_BLUETOOTH_STACK_SIZE 4096                                     // 4KB stack for BLE operations (unchanged)
+#define SYS_TASK_CONNECTIVITY_STACK_SIZE 8192                                  // 8KB stack for Wi-Fi HTTP/OTA operations
 #define SYS_TASK_FILE_IO_STACK_SIZE 6144                                       // 6KB stack for LittleFS operations (was 4KB, increased for file operations)
 
 // Task Priorities (higher number = higher priority)
 #define SYS_TASK_PRIORITY_WEIGHT_SAMPLING 4                                    // Highest priority (real-time sampling)
 #define SYS_TASK_PRIORITY_GRIND_CONTROL 3                                      // High priority (grind control)
 #define SYS_TASK_PRIORITY_UI 2                                                 // Medium priority (UI updates)
-// Raise BLE above UI to prevent starvation during transfers
-#define SYS_TASK_PRIORITY_BLUETOOTH 3                                          // Higher priority (BLE operations)
+// Raise connectivity above UI to prevent starvation during transfers
+#define SYS_TASK_PRIORITY_CONNECTIVITY 3                                       // Higher priority (Wi-Fi/OTA operations)
 #define SYS_TASK_PRIORITY_FILE_IO 1                                            // Low priority (file operations)
 
 // Inter-Task Communication Queue Sizes
@@ -101,4 +101,3 @@
 //------------------------------------------------------------------------------
 #define SYS_WEIGHT_DISPLAY_FORMAT "%.1fg"                                      // Weight display format string
 #define SYS_RAW_VALUE_FORMAT "%ld"                                             // Raw load cell value format string
-

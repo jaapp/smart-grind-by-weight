@@ -106,7 +106,7 @@ python3 tools/grinder.py clean
 
 ### Initial USB Flashing
 
-For the first-time setup or when BLE isn't working:
+For first-time setup, recovery, or when WiFi is not configured yet:
 
 ```bash
 # Build and upload via USB (production)
@@ -120,24 +120,27 @@ python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp
 python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164-mock
 ```
 
-### BLE OTA Updates (After Initial Setup)
+### WiFi OTA Updates (After Initial Setup)
 
-Once the device is running and connected to Bluetooth:
+Once the device is running and connected to WiFi:
 
 ```bash
-# Build and upload wirelessly (production)
+# Build and upload wirelessly over WiFi (production)
 python3 tools/grinder.py build-upload
 
 # Upload specific firmware file
 python3 tools/grinder.py upload path/to/smart-grind-by-weight-vX.X.X.bin
 
-# Force full firmware update (skip delta patching)
-python3 tools/grinder.py build-upload --force-full
+# Upload to a specific IP/host
+python3 tools/grinder.py upload --host 192.168.4.1 path/to/firmware.bin
 
-# Scan for BLE devices
+# Legacy BLE upload for older firmware only
+python3 tools/grinder.py upload --transport ble path/to/firmware.bin
+
+# Legacy BLE helpers for older firmware only
 python3 tools/grinder.py scan
 
-# Get device system info
+# Get device system info from older BLE firmware
 python3 tools/grinder.py info
 ```
 
@@ -158,10 +161,10 @@ For maintainers creating releases, see **[RELEASES.md](RELEASES.md)** for detail
 python3 tools/venv/bin/python -m platformio device monitor
 ```
 
-### BLE Debug Monitoring
+### BLE Debug Monitoring (Legacy Firmware)
 
 ```bash
-# Live debug monitoring via BLE
+# Live debug monitoring via BLE on legacy builds
 python3 tools/grinder.py debug
 ```
 

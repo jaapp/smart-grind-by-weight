@@ -1,4 +1,4 @@
-# BLE OTA functionality
+# Legacy BLE functionality
 bleak>=0.21.0
 
 # Grinder Data Analysis Tool Dependencies  

@@ -10,18 +10,19 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 - Perfect for factory setup or recovery
 - Powered by [ESP Web Tools](https://esphome.github.io/esp-web-tools/) for browser-based flashing
 
-### 📶 OTA Updates (Bluetooth)
+### 📶 OTA Updates (WiFi)
 - Over-the-air updates for installed grinders
-- Web Bluetooth API for wireless connection
-- Full firmware updates (no delta compression)
+- HTTP upload to the grinder's built-in WiFi update server
+- Full firmware updates
 - Progress tracking and status updates
+- Legacy BLE OTA remains available from the transport dropdown for older firmware
 
 ## Browser Support
 
 - ✅ **Chrome** (Desktop & Android) - Full support
 - ✅ **Microsoft Edge** (Desktop) - Full support  
-- ❌ **Firefox** - No Web Bluetooth support
-- ❌ **Safari/iOS** - No Web Bluetooth support
+- ⚠️ **Firefox** - WiFi OTA can work locally, but USB flashing and BLE fallback are not supported
+- ❌ **Safari/iOS** - USB flashing and BLE fallback are not supported
 
 ## Usage
 
@@ -31,31 +32,32 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 3. Enter firmware URL from GitHub release
 4. Click "Flash via USB" - opens ESP Web Tools
 5. Connect device via USB and flash
+6. After first boot, join the `GrindByWeight-Setup` WiFi network and open `http://192.168.4.1` to save your home WiFi credentials
 
 ### For OTA Updates
-1. Ensure grinder is powered and BLE enabled
-2. Go to "OTA Update (BLE)" tab  
-3. Enter firmware URL from GitHub release
-4. Click "Connect to Device"
-5. Click "Flash Firmware" when connected
+1. Ensure grinder is powered and connected to WiFi
+2. Go to "OTA Update" tab
+3. Select `WiFi` transport
+4. Use `http://grindbyweight.local` or the device IP address
+5. Click "Flash Firmware over WiFi"
 
 ## Firmware Sources
 
-The firmware list is pulled straight from GitHub Releases—no files are stored in this repo. If you need the exact asset mapping, see [DOC.md](../../docs/DOC.md).
+On GitHub Pages, the firmware list is pulled from the generated release index. When started locally with `python3 tools/start-webflasher.py`, the server generates a local firmware entry from `.pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin` and the matching USB flashing artifacts.
+
+For WiFi OTA, you can also select a local `.bin` file directly in the browser.
 
 ## Technical Details
 
-### BLE Services Used
-- **OTA Service**: `12345678-1234-1234-1234-123456789abc`
-- **Data Transfer**: `87654321-4321-4321-4321-cba987654321`
-- **Control Commands**: `11111111-2222-3333-4444-555555555555`
-- **Status Updates**: `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+### WiFi Endpoints
+- **Status**: `GET /status`
+- **Setup**: `GET /` and `POST /wifi`
+- **OTA**: `POST /ota` with multipart `firmware` file and optional `version`
 
 ### Protocol
-- Based on existing Python BLE implementation
-- 512-byte chunks for firmware transfer
-- Status notifications for progress tracking
-- Command structure: START → DATA_CHUNKS → END
+- Uses the ESP32 Arduino WiFi/WebServer stack
+- Writes firmware directly to the next OTA app partition
+- Reboots automatically after a successful upload
 
 ## Development
 
@@ -75,21 +77,22 @@ python3 start-webflasher.py --port 3000
 
 The script will automatically:
 - Check if the port is available
+- Serve the current local PlatformIO build as `Local Build #...`
 - Prompt to kill any conflicting process
 - Start the server and display the URL
 - Handle cleanup on exit
 
 **Manual Start:**
 ```bash
-# Serve locally (required for Web Bluetooth HTTPS requirement)
+# Serve locally for WiFi OTA
 python3 -m http.server 8000 --directory tools/web-flasher
 # Open http://localhost:8000
 ```
 
-**Note:** While the production site requires HTTPS for Web Bluetooth, `localhost` is an exception and works with plain HTTP.
+**Note:** Run the flasher locally for WiFi OTA. Browsers may block HTTPS pages from posting firmware to a local HTTP device.
 
 ## Security
 
-- All communications use Web Bluetooth's built-in security
+- WiFi OTA runs on the local network
 - Firmware is downloaded directly from GitHub releases
 - No credentials or keys stored locally

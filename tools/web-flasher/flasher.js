@@ -1,5 +1,5 @@
-// Smart Grind By Weight - Web Bluetooth Flasher
-// Based on your existing Python BLE implementation
+// Smart Grind By Weight - Web Flasher
+// WiFi OTA is the default; BLE is retained for legacy firmware.
 
 // Firmware index metadata
 const FIRMWARE_INDEX_URL = 'firmware/index.json';
@@ -18,30 +18,6 @@ const BLE_DEBUG_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 // System Info Service UUIDs
 const BLE_SYSINFO_SERVICE_UUID = '77889900-aabb-ccdd-eeff-112233445566';
 const BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID = '22334455-ff00-1111-2222-334455667788';
-
-// Image upload uses the existing Data Service (no separate service needed)
-// Data Service UUIDs are defined above as BLE_DATA_*
-const BLE_DATA_CONTROL_CHAR_UUID = '33445566-7788-99aa-bbcc-ddeeffaabbcc';
-const BLE_DATA_TRANSFER_CHAR_UUID = '44556677-8899-aabb-ccdd-eeffaabbccdd';
-const BLE_DATA_STATUS_CHAR_UUID = '55667788-99aa-bbcc-ddee-ffaabbccddee';
-const BLE_DATA_SERVICE_UUID = '22334455-6677-8899-aabb-ccddeeffffaa';
-
-// Image upload commands (0x30+ range, sent via data control characteristic)
-const BLE_IMG_CMD_START = 0x30;
-const BLE_IMG_CMD_END = 0x32;
-const BLE_IMG_CMD_ABORT = 0x33;
-const BLE_IMG_CMD_DELETE = 0x34;
-
-const BLE_IMG_STATUS_IDLE = 0x30;
-const BLE_IMG_STATUS_READY = 0x31;
-const BLE_IMG_STATUS_RECEIVING = 0x32;
-const BLE_IMG_STATUS_SUCCESS = 0x33;
-const BLE_IMG_STATUS_ERROR = 0x34;
-const BLE_IMG_STATUS_HAS_IMAGE = 0x35;
-
-const IMAGE_WIDTH = 280;
-const IMAGE_HEIGHT = 456;
-const IMAGE_EXPECTED_SIZE = IMAGE_WIDTH * IMAGE_HEIGHT * 2; // RGB565
 
 // Commands and status codes (from your Python implementation)
 const BLE_OTA_CMD_START = 0x01;
@@ -84,16 +60,18 @@ function resolveFirmwareUrl(relativePath) {
 window.addEventListener('load', () => {
     if (!('bluetooth' in navigator)) {
         document.getElementById('browserWarning').style.display = 'block';
-        // Disable OTA tab if no Web Bluetooth
-        const otaTab = document.querySelector('[onclick="showTab(\'ota\')"]');
-        if (otaTab) {
-            otaTab.disabled = true;
-            otaTab.style.opacity = '0.5';
+        const transportSelect = document.getElementById('transportSelect');
+        if (transportSelect) {
+            const bleOption = Array.from(transportSelect.options).find(option => option.value === 'ble');
+            if (bleOption) {
+                bleOption.disabled = true;
+            }
         }
     }
     
     // Load available releases
     loadReleases();
+    updateTransportUi();
 });
 
 // Tab switching
@@ -192,20 +170,92 @@ async function downloadFirmware(url) {
     return firmware;
 }
 
+async function readLocalFirmwareFile(file) {
+    if (!file) {
+        throw new Error('No local firmware file selected');
+    }
+
+    updateStatus(`Reading local firmware ${file.name}`, 'info');
+    updateProgress(0);
+
+    const buffer = await file.arrayBuffer();
+    const firmware = new Uint8Array(buffer);
+    updateStatus(`Loaded ${Math.round(firmware.length / 1024)}KB firmware`, 'success');
+    return firmware;
+}
+
+function getLocalFirmwareFile() {
+    const input = document.getElementById('localFirmwareFile');
+    return input?.files?.[0] || null;
+}
+
+function getSelectedFirmwareOption(select) {
+    if (!select || select.selectedIndex < 0) {
+        return null;
+    }
+    return select.selectedOptions[0] || null;
+}
+
+function getSelectedFirmwareUrl(select, option) {
+    return option ? (option.dataset?.ota || option.value) : select?.value;
+}
+
 // Combined connect and flash function
 async function connectAndFlash() {
     const connectFlashBtn = document.getElementById('connectFlashBtn');
+    const transport = document.getElementById('transportSelect')?.value || 'wifi';
 
     // Disable button during operation
     connectFlashBtn.disabled = true;
 
-    const connected = await connectDevice();
-    if (connected) {
-        await flashFirmware();
+    if (transport === 'wifi') {
+        await flashFirmwareWifi();
+    } else {
+        const connected = await connectDevice();
+        if (connected) {
+            await flashFirmware();
+        }
     }
 
     // Re-enable button after operation
     connectFlashBtn.disabled = false;
+}
+
+function updateTransportUi() {
+    const transport = document.getElementById('transportSelect')?.value || 'wifi';
+    const wifiGroup = document.getElementById('wifiHostGroup');
+    const bleGroup = document.getElementById('bleDeviceGroup');
+    const button = document.getElementById('connectFlashBtn');
+
+    if (wifiGroup) wifiGroup.style.display = transport === 'wifi' ? 'block' : 'none';
+    if (bleGroup) bleGroup.style.display = transport === 'ble' ? 'block' : 'none';
+    if (button) button.textContent = transport === 'wifi' ? 'Flash Firmware over WiFi' : 'Connect & Flash Firmware';
+}
+
+function normalizeWifiBaseUrl() {
+    const input = document.getElementById('wifiDeviceHost');
+    let value = (input?.value || 'http://grindbyweight.local').trim();
+    if (!value.startsWith('http://') && !value.startsWith('https://')) {
+        value = `http://${value}`;
+    }
+    return value.replace(/\/+$/, '');
+}
+
+async function checkWifiDevice() {
+    try {
+        const baseUrl = normalizeWifiBaseUrl();
+        updateStatus(`Checking ${baseUrl}...`, 'info');
+        const response = await fetch(`${baseUrl}/status`, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const status = await response.json();
+        updateStatus(`Connected to ${status.device || 'device'} v${status.version || '?'} at ${status.ip || baseUrl}`, 'success');
+        return true;
+    } catch (error) {
+        updateStatus(`WiFi check failed: ${error.message}`, 'error');
+        return false;
+    }
 }
 
 // BLE Connection
@@ -319,15 +369,16 @@ function prepareFirmwareData(firmwareData) {
 // Main firmware flash function
 async function flashFirmware() {
     const firmwareSelect = document.getElementById('firmwareSelect');
+    const localFile = getLocalFirmwareFile();
 
-    if (!firmwareSelect) {
+    if (!firmwareSelect && !localFile) {
         updateStatus('Firmware selection element not found', 'error');
         return;
     }
 
-    const selectedOption = firmwareSelect.selectedOptions[0];
-    const firmwareUrl = selectedOption ? (selectedOption.dataset?.ota || firmwareSelect.value) : firmwareSelect.value;
-    if (!firmwareUrl) {
+    const selectedOption = getSelectedFirmwareOption(firmwareSelect);
+    const firmwareUrl = getSelectedFirmwareUrl(firmwareSelect, selectedOption);
+    if (!localFile && !firmwareUrl) {
         updateStatus('Please select a firmware version', 'error');
         return;
     }
@@ -338,8 +389,7 @@ async function flashFirmware() {
     }
     
     try {
-        // Download firmware
-        const firmwareData = await downloadFirmware(firmwareUrl);
+        const firmwareData = localFile ? await readLocalFirmwareFile(localFile) : await downloadFirmware(firmwareUrl);
         const patchData = prepareFirmwareData(firmwareData);
         
         updateStatus('Starting firmware update...', 'info');
@@ -359,7 +409,7 @@ async function flashFirmware() {
         }
         
         // Extract expected version from URL
-        const expectedVersion = selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl);
+        const expectedVersion = localFile ? null : (selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl));
         if (expectedVersion) {
             updateStatus(`Installing version: ${expectedVersion}`, 'info');
         }
@@ -476,15 +526,92 @@ async function flashFirmware() {
     }
 }
 
+async function uploadFirmwareOverWifi(baseUrl, firmwareData, filename, version) {
+    const formData = new FormData();
+    if (version) {
+        formData.append('version', version);
+    }
+    formData.append('firmware', new Blob([firmwareData], { type: 'application/octet-stream' }), filename);
+
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${baseUrl}/ota`);
+        xhr.responseType = 'text';
+
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                updateProgress(progress);
+                updateStatus(`Uploading over WiFi: ${progress}%`, 'info');
+            } else {
+                updateStatus('Uploading over WiFi...', 'info');
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.responseText);
+            } else {
+                reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText || xhr.statusText}`));
+            }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out'));
+        xhr.timeout = 240000;
+        xhr.send(formData);
+    });
+}
+
+async function flashFirmwareWifi() {
+    const firmwareSelect = document.getElementById('firmwareSelect');
+    const localFile = getLocalFirmwareFile();
+    const selectedOption = getSelectedFirmwareOption(firmwareSelect);
+    const firmwareUrl = getSelectedFirmwareUrl(firmwareSelect, selectedOption);
+
+    if (!localFile && !firmwareUrl) {
+        updateStatus('Please select a firmware version', 'error');
+        return;
+    }
+
+    try {
+        const baseUrl = normalizeWifiBaseUrl();
+        if (!await checkWifiDevice()) {
+            return;
+        }
+
+        const firmwareData = localFile ? await readLocalFirmwareFile(localFile) : await downloadFirmware(firmwareUrl);
+        const expectedVersion = localFile ? null : (selectedOption?.dataset?.version || extractVersionFromUrl(firmwareUrl));
+        const filename = localFile ? localFile.name : (firmwareUrl.split('/').pop() || 'firmware.bin');
+
+        if (expectedVersion) {
+            updateStatus(`Installing version: ${expectedVersion}`, 'info');
+        }
+
+        const responseText = await uploadFirmwareOverWifi(baseUrl, firmwareData, filename, expectedVersion);
+        updateProgress(100);
+        updateStatus('Firmware update completed - device rebooting', 'success');
+        console.log('WiFi OTA response:', responseText);
+
+        setTimeout(() => {
+            updateProgress(0);
+        }, 3000);
+    } catch (error) {
+        updateStatus(`WiFi flash failed: ${error.message}`, 'error');
+        console.error('WiFi flash error:', error);
+    }
+}
+
 // Update OTA selected firmware display when dropdown changes
 function updateOtaSelectedFirmware() {
     const select = document.getElementById('firmwareSelect');
     const selectedDisplay = document.getElementById('otaSelectedFile');
-    const selectedOption = select.selectedOptions[0];
-    const displayLabel = selectedOption?.dataset?.display || select.value;
+    const localFile = getLocalFirmwareFile();
+    const selectedOption = getSelectedFirmwareOption(select);
+    const displayLabel = localFile ? localFile.name : (selectedOption?.dataset?.display || select.value);
 
-    if (selectedOption && selectedOption.value) {
-        selectedDisplay.textContent = `Selected: ${displayLabel}`;
+    if (localFile || (selectedOption && selectedOption.value)) {
+        selectedDisplay.textContent = localFile ? `Selected local file: ${displayLabel}` : `Selected: ${displayLabel}`;
         selectedDisplay.className = 'status info';
         selectedDisplay.style.display = 'block';
     } else {
@@ -583,10 +710,11 @@ async function loadReleases() {
             updateOtaSelectedFirmware();
         }
     } catch (error) {
-        console.error('Failed to load releases from GitHub:', error);
-        usbSelect.innerHTML = '<option value="">Unable to load releases</option>';
-        otaSelect.innerHTML = '<option value="">Unable to load releases</option>';
-        updateStatus('Failed to load firmware list from GitHub releases. Please check your connection or try again later.', 'error');
+        console.warn('Firmware index unavailable:', error);
+        usbSelect.innerHTML = '<option value="">No hosted firmware index available</option>';
+        otaSelect.innerHTML = '<option value="">Select a local firmware .bin below</option>';
+        updateOtaSelectedFirmware();
+        updateStatus('No hosted firmware index available. Select a local firmware .bin or restart the local flasher after building firmware.', 'warning');
     }
 }
 
@@ -602,7 +730,7 @@ async function getDiagnosticReport() {
 
     try {
         btn.disabled = true;
-        statusDiv.innerHTML = '<div class="status info">Connecting to device...</div>';
+        statusDiv.innerHTML = '<div class="status info">Connecting to legacy BLE firmware...</div>';
 
         // Request device
         device = await navigator.bluetooth.requestDevice({
@@ -748,227 +876,6 @@ function downloadDiagnosticReport() {
         }, 3000);
     } catch (error) {
         statusDiv.innerHTML = '<div class="status error">Failed to download report.</div>';
-    }
-}
-
-// =============================================================================
-// SCREENSAVER IMAGE UPLOAD
-// =============================================================================
-
-let screensaverRgb565Data = null; // Converted image data ready for upload
-
-function updateScreensaverStatus(message, type = 'info') {
-    const el = document.getElementById('screensaverStatus');
-    el.textContent = message;
-    el.className = `status ${type}`;
-    el.style.display = 'block';
-    console.log(`[SCREENSAVER ${type.toUpperCase()}] ${message}`);
-}
-
-function updateScreensaverProgress(percent) {
-    const container = document.getElementById('screensaverProgressContainer');
-    const bar = document.getElementById('screensaverProgressBar');
-    if (percent > 0) {
-        container.style.display = 'block';
-        bar.style.width = percent + '%';
-    } else {
-        container.style.display = 'none';
-    }
-}
-
-function handleScreensaverFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    screensaverRgb565Data = null;
-    document.getElementById('uploadScreensaverBtn').disabled = true;
-
-    const validationEl = document.getElementById('screensaverValidation');
-    validationEl.style.display = 'block';
-    validationEl.textContent = 'Validating image...';
-    validationEl.className = 'status info';
-
-    const img = new Image();
-    img.onload = () => {
-        URL.revokeObjectURL(img.src);
-
-        if (img.width !== IMAGE_WIDTH || img.height !== IMAGE_HEIGHT) {
-            validationEl.textContent = `Invalid dimensions: ${img.width} x ${img.height}. Required: ${IMAGE_WIDTH} x ${IMAGE_HEIGHT} pixels.`;
-            validationEl.className = 'status error';
-            document.getElementById('screensaverPreviewContainer').style.display = 'none';
-            return;
-        }
-
-        // Draw to canvas for preview and conversion
-        const canvas = document.getElementById('screensaverPreview');
-        canvas.width = IMAGE_WIDTH;
-        canvas.height = IMAGE_HEIGHT;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        document.getElementById('screensaverPreviewContainer').style.display = 'block';
-
-        // Convert to RGB565 (byte-swapped for LV_COLOR_16_SWAP = 1)
-        const imageData = ctx.getImageData(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
-        screensaverRgb565Data = rgbaToRgb565(imageData.data);
-
-        validationEl.textContent = `Image valid: ${IMAGE_WIDTH} x ${IMAGE_HEIGHT} pixels (${(screensaverRgb565Data.length / 1024).toFixed(0)} KB)`;
-        validationEl.className = 'status success';
-        document.getElementById('uploadScreensaverBtn').disabled = false;
-    };
-
-    img.onerror = () => {
-        URL.revokeObjectURL(img.src);
-        validationEl.textContent = 'Failed to load image file.';
-        validationEl.className = 'status error';
-    };
-
-    img.src = URL.createObjectURL(file);
-}
-
-/**
- * Convert RGBA pixel data to native (little-endian) RGB565.
- * LVGL uses LV_COLOR_FORMAT_RGB565 internally and the display driver
- * handles byte swapping (LV_COLOR_16_SWAP) during flush.
- */
-function rgbaToRgb565(rgba) {
-    const rgb565 = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGHT * 2);
-    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 2) {
-        const r = rgba[i];
-        const g = rgba[i + 1];
-        const b = rgba[i + 2];
-        const pixel = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
-        // Little-endian: low byte first
-        rgb565[j] = pixel & 0xFF;
-        rgb565[j + 1] = (pixel >> 8) & 0xFF;
-    }
-    return rgb565;
-}
-
-async function uploadScreensaver() {
-    if (!screensaverRgb565Data) {
-        updateScreensaverStatus('No valid image to upload.', 'error');
-        return;
-    }
-
-    const uploadBtn = document.getElementById('uploadScreensaverBtn');
-    uploadBtn.disabled = true;
-
-    try {
-        updateScreensaverStatus('Connecting to device...', 'info');
-
-        // Connect via BLE (image upload uses the existing data service)
-        const bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: DEVICE_NAME }],
-            optionalServices: [BLE_DATA_SERVICE_UUID]
-        });
-
-        const bleServer = await bleDevice.gatt.connect();
-        updateScreensaverStatus('Getting data service...', 'info');
-
-        const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
-        const dataChar = await dataService.getCharacteristic(BLE_DATA_TRANSFER_CHAR_UUID);
-        const controlChar = await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID);
-        const imgStatusChar = await dataService.getCharacteristic(BLE_DATA_STATUS_CHAR_UUID);
-
-        // Set up status notifications
-        let lastStatus = BLE_IMG_STATUS_IDLE;
-        await imgStatusChar.startNotifications();
-        imgStatusChar.addEventListener('characteristicvaluechanged', (event) => {
-            const val = new Uint8Array(event.target.value.buffer);
-            if (val.length > 0) lastStatus = val[0];
-        });
-
-        // Send START command: [0x10][size:4 LE]
-        updateScreensaverStatus('Starting upload...', 'info');
-        const startCmd = new Uint8Array(5);
-        startCmd[0] = BLE_IMG_CMD_START;
-        startCmd[1] = screensaverRgb565Data.length & 0xFF;
-        startCmd[2] = (screensaverRgb565Data.length >> 8) & 0xFF;
-        startCmd[3] = (screensaverRgb565Data.length >> 16) & 0xFF;
-        startCmd[4] = (screensaverRgb565Data.length >> 24) & 0xFF;
-        await controlChar.writeValue(startCmd);
-
-        await sleep(200); // Wait for device to prepare
-
-        if (lastStatus === BLE_IMG_STATUS_ERROR) {
-            throw new Error('Device rejected the upload (check image size or OTA status)');
-        }
-
-        // Send data in chunks
-        const totalChunks = Math.ceil(screensaverRgb565Data.length / CHUNK_SIZE);
-        updateScreensaverStatus(`Uploading image (${totalChunks} chunks)...`, 'info');
-        updateScreensaverProgress(0);
-
-        for (let offset = 0; offset < screensaverRgb565Data.length; offset += CHUNK_SIZE) {
-            const end = Math.min(offset + CHUNK_SIZE, screensaverRgb565Data.length);
-            const chunk = screensaverRgb565Data.slice(offset, end);
-            await dataChar.writeValue(chunk);
-
-            const percent = Math.round((end / screensaverRgb565Data.length) * 100);
-            updateScreensaverProgress(percent);
-        }
-
-        // Send END command
-        updateScreensaverStatus('Finalizing...', 'info');
-        const endCmd = new Uint8Array([BLE_IMG_CMD_END]);
-        await controlChar.writeValue(endCmd);
-
-        await sleep(500); // Wait for device to finalize
-
-        if (lastStatus === BLE_IMG_STATUS_ERROR) {
-            throw new Error('Device reported error during finalization');
-        }
-
-        updateScreensaverStatus('Screensaver image uploaded successfully!', 'success');
-        updateScreensaverProgress(100);
-
-        // Disconnect
-        await sleep(500);
-        if (bleDevice.gatt.connected) {
-            bleDevice.gatt.disconnect();
-        }
-
-    } catch (error) {
-        updateScreensaverStatus(`Upload failed: ${error.message}`, 'error');
-        console.error('Screensaver upload error:', error);
-    } finally {
-        uploadBtn.disabled = !screensaverRgb565Data;
-        setTimeout(() => updateScreensaverProgress(0), 3000);
-    }
-}
-
-async function deleteScreensaver() {
-    const deleteBtn = document.getElementById('deleteScreensaverBtn');
-    deleteBtn.disabled = true;
-
-    try {
-        updateScreensaverStatus('Connecting to device...', 'info');
-
-        const bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: DEVICE_NAME }],
-            optionalServices: [BLE_DATA_SERVICE_UUID]
-        });
-
-        const bleServer = await bleDevice.gatt.connect();
-        const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
-        const controlChar = await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID);
-
-        // Send DELETE command
-        const deleteCmd = new Uint8Array([BLE_IMG_CMD_DELETE]);
-        await controlChar.writeValue(deleteCmd);
-
-        await sleep(500);
-        updateScreensaverStatus('Screensaver image deleted from device.', 'success');
-
-        if (bleDevice.gatt.connected) {
-            bleDevice.gatt.disconnect();
-        }
-
-    } catch (error) {
-        updateScreensaverStatus(`Delete failed: ${error.message}`, 'error');
-        console.error('Screensaver delete error:', error);
-    } finally {
-        deleteBtn.disabled = false;
     }
 }
 

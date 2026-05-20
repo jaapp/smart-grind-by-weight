@@ -31,7 +31,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
     - [Display Modes](#display-modes)
   - [🗺️ User Interface Navigation](#️-user-interface-navigation)
   - [⚡ Automated Grind Flow](#-automated-grind-flow)
-  - [🔵 Bluetooth Connectivity](#-bluetooth-connectivity)
+  - [📶 WiFi Connectivity](#-wifi-connectivity)
   - [🔍 Diagnostic Report](#-diagnostic-report)
     - [Report Contents](#report-contents)
     - [Access Methods](#access-methods)
@@ -220,10 +220,12 @@ ESP32-S3 GND       →    Pin 4 (Ground)
    - Click "Flash via USB" - opens ESP Web Tools
    - After installation, device is ready for wireless updates
 
-2. **Future Updates (BLE - After Installation)**
-   - Power on the grinder and enable Bluetooth in device settings
+2. **Future Updates (WiFi - After Installation)**
+   - On first boot, join the `GrindByWeight-Setup` WiFi network and open `http://192.168.4.1`
+   - Save your home WiFi credentials
+   - Power on the grinder and confirm it is connected to WiFi
    - Select firmware version from OTA dropdown
-   - Click "Connect to Device" → "Flash Firmware"
+   - Select WiFi transport and click "Flash Firmware over WiFi"
    - Update happens wirelessly - **no USB cable needed**
 
 **Key Benefits:**
@@ -237,10 +239,13 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 ### Command Line (Fallback)
 ```bash
 # First time (USB) - if web flasher unavailable
+python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164
+
+# Updates (WiFi)
 python3 tools/grinder.py upload smart-grind-by-weight-vX.X.X.bin
 
-# Updates (BLE) - Enable device Bluetooth first  
-python3 tools/grinder.py upload smart-grind-by-weight-vX.X.X.bin
+# Updates (WiFi with explicit host/IP)
+python3 tools/grinder.py upload --host 192.168.4.1 smart-grind-by-weight-vX.X.X.bin
 ```
 
 **Manual firmware download:** [Releases page](https://github.com/jaapp/smart-grind-by-weight/releases)  
@@ -267,7 +272,7 @@ The auto-tune feature models your grinder's motor response behavior by measuring
 
 ### Diagnostics System
 
-The system includes comprehensive load cell health monitoring accessible via **Menu → Diagnostics**. A warning icon (⚠) appears in the top-right corner when diagnostics are active - tap it to navigate directly to the diagnostics page.
+The system includes comprehensive load cell health monitoring accessible via **Menu → Diagnostics**. Active warnings are shown on the Diagnostics page and can be cleared there when the underlying condition has been resolved.
 
 **Diagnostic Types:**
 1. **Load Cell Not Calibrated** - Appears until calibration is completed via Menu → Calibrate (Tools section)
@@ -375,11 +380,12 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   \-- Motor Test (1s safety pulse)
     |
     +-- Settings
-    |   +-- Bluetooth
-    |   |   |-- Bluetooth toggle (30m timer)
-    |   |   |-- Bluetooth startup toggle (configurable auto-enable)
-    |   |   |-- Connection status display
-    |   |   \-- Auto-disable timer display
+    |   +-- WiFi
+    |   |   |-- WiFi toggle
+    |   |   |-- WiFi startup toggle (configurable auto-enable)
+    |   |   |-- Connection status, mode, SSID, IP, host URL
+    |   |   |-- MAC address and RSSI
+    |   |   \-- OTA endpoint
     |   |
     |   +-- Display
     |   |   |-- Normal brightness slider
@@ -442,9 +448,24 @@ Both automation settings rely on the same smoothed weight deltas used for flow d
 
 ---
 
-## 🔵 Bluetooth Connectivity
+## 📶 WiFi Connectivity
 
-Bluetooth can be configured in **Menu → Bluetooth** with optional auto-startup (5-minute timer) or manual control (30-minute timer when manually enabled). The blue Bluetooth symbol in the top-right corner indicates when active. Bluetooth enables wireless firmware updates via BLE OTA, grind data export and analytics, and device management. Grind session logging is configurable in **Menu → Data → Logging** (disabled by default to prevent flash wear) and must be enabled before grinding to save session data for later analysis.
+WiFi can be configured in **Menu → WiFi** with optional auto-startup. If no credentials are saved, the grinder starts a `GrindByWeight-Setup` access point; join it and open `http://192.168.4.1` to save your home WiFi credentials. Once connected, the grinder is available at `http://grindbyweight.local` or its displayed IP address. WiFi enables wireless firmware updates through the built-in HTTP OTA endpoint.
+
+The device web page also exposes the same practical settings as the touchscreen menu: grind mode, purge mode and amount, freshness, automation toggles, logging, brightness, WiFi startup, and OTA upload. Settings are stored in the existing NVS preference namespaces, so the web UI does not duplicate settings storage.
+
+Machine-readable endpoints are available for future integrations:
+
+```text
+GET  /api/status
+GET  /api/settings
+POST /api/settings
+GET  /api/screensaver
+POST /api/screensaver
+POST /api/screensaver/clear
+```
+
+Screensaver images are uploaded from the browser page. The browser resizes the selected image to the 280x456 display and converts it to raw RGB565 before upload; the firmware stores that fixed-size file in LittleFS and shows it when the screen dims.
 
 ---
 
@@ -510,7 +531,9 @@ python3 tools/grinder.py report
 ### Available Tools
 ```bash
 python3 tools/grinder.py --help          # Show all available commands
-python3 tools/grinder.py scan            # Scan for BLE devices
+python3 tools/grinder.py upload          # Upload latest firmware over WiFi
+python3 tools/grinder.py upload --host 192.168.4.1 firmware.bin
+python3 tools/grinder.py scan            # Scan for BLE devices on legacy firmware
 python3 tools/grinder.py connect         # Connect to grinder device  
 python3 tools/grinder.py debug           # Stream live debug logs
 python3 tools/grinder.py info            # Get device system information
@@ -519,7 +542,7 @@ python3 tools/grinder.py export          # Export grind data to database
 
 ### Tools Directory Structure
 - **`grinder.py`**: Cross-platform Python tool for all operations (build, upload, analyze)
-- **`ble/`**: BLE communication tools and OTA update system
+- **`ble/`**: Legacy BLE communication tools
 - **`streamlit-reports/`**: Interactive data visualization and analytics
 - **`database/`**: SQLite database management for grind session storage
 

@@ -21,7 +21,7 @@ ScreensaverController::~ScreensaverController() {
 }
 
 bool ScreensaverController::has_image() const {
-    return LittleFS.exists(BLE_IMAGE_FILENAME);
+    return LittleFS.exists(WIFI_SCREENSAVER_PATH);
 }
 
 bool ScreensaverController::is_startup_enabled() const {
@@ -73,9 +73,9 @@ void ScreensaverController::show() {
 
     // Set up image descriptor for raw RGB565 data
     image_dsc_.header.cf = LV_COLOR_FORMAT_RGB565;
-    image_dsc_.header.w = HW_DISPLAY_WIDTH_PX;
-    image_dsc_.header.h = HW_DISPLAY_HEIGHT_PX;
-    image_dsc_.data_size = BLE_IMAGE_EXPECTED_SIZE;
+    image_dsc_.header.w = WIFI_SCREENSAVER_WIDTH_PX;
+    image_dsc_.header.h = WIFI_SCREENSAVER_HEIGHT_PX;
+    image_dsc_.data_size = WIFI_SCREENSAVER_BYTES;
     image_dsc_.data = image_buffer_;
 
     lv_img_set_src(image_widget_, &image_dsc_);
@@ -106,14 +106,14 @@ void ScreensaverController::hide() {
 }
 
 bool ScreensaverController::load_image() {
-    image_buffer_ = (uint8_t*)heap_caps_malloc(BLE_IMAGE_EXPECTED_SIZE,
+    image_buffer_ = (uint8_t*)heap_caps_malloc(WIFI_SCREENSAVER_BYTES,
                                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!image_buffer_) {
-        LOG_BLE("Screensaver: PSRAM allocation failed (%d bytes)\n", BLE_IMAGE_EXPECTED_SIZE);
+        LOG_BLE("Screensaver: PSRAM allocation failed (%d bytes)\n", WIFI_SCREENSAVER_BYTES);
         return false;
     }
 
-    File f = LittleFS.open(BLE_IMAGE_FILENAME, "r");
+    File f = LittleFS.open(WIFI_SCREENSAVER_PATH, "r");
     if (!f) {
         LOG_BLE("Screensaver: Failed to open image file\n");
         free_image();
@@ -122,17 +122,17 @@ bool ScreensaverController::load_image() {
 
     size_t total_read = 0;
     const size_t chunk_size = 4096;
-    while (total_read < BLE_IMAGE_EXPECTED_SIZE) {
-        size_t to_read = std::min(chunk_size, (size_t)(BLE_IMAGE_EXPECTED_SIZE - total_read));
+    while (total_read < WIFI_SCREENSAVER_BYTES) {
+        size_t to_read = std::min(chunk_size, (size_t)(WIFI_SCREENSAVER_BYTES - total_read));
         size_t bytes_read = f.read(image_buffer_ + total_read, to_read);
         if (bytes_read == 0) break;
         total_read += bytes_read;
     }
     f.close();
 
-    if (total_read != BLE_IMAGE_EXPECTED_SIZE) {
+    if (total_read != WIFI_SCREENSAVER_BYTES) {
         LOG_BLE("Screensaver: Image file size mismatch (%u != %d)\n",
-                (unsigned)total_read, BLE_IMAGE_EXPECTED_SIZE);
+                (unsigned)total_read, WIFI_SCREENSAVER_BYTES);
         free_image();
         return false;
     }

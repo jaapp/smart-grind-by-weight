@@ -28,24 +28,24 @@ void OtaDataExportController::register_events() {
 }
 
 bool OtaDataExportController::update() {
-    if (!ui_manager_ || !ui_manager_->bluetooth_manager) {
+    if (!ui_manager_ || !ui_manager_->connectivity_manager) {
         return false;
     }
 
-    auto* bluetooth = ui_manager_->bluetooth_manager;
+    auto* connectivity = ui_manager_->connectivity_manager;
 
-    if (bluetooth->is_updating()) {
+    if (connectivity->is_updating()) {
         if (!ui_manager_->state_machine->is_state(UIState::OTA_UPDATE)) {
             ui_manager_->ota_screen.show_ota_mode();
             ui_manager_->switch_to_state(UIState::OTA_UPDATE);
         } else {
-            int progress = static_cast<int>(bluetooth->get_ota_progress());
+            int progress = static_cast<int>(connectivity->get_ota_progress());
             ui_manager_->ota_screen.update_progress(progress);
         }
         return true;
     }
 
-    if (bluetooth->is_data_export_active()) {
+    if (connectivity->is_data_export_active()) {
         if (!data_export_active_) {
             start_data_export_ui();
         }
@@ -115,11 +115,11 @@ void OtaDataExportController::handle_failure_acknowledged() {
 }
 
 void OtaDataExportController::start_data_export_ui() {
-    if (!ui_manager_ || !ui_manager_->bluetooth_manager) {
+    if (!ui_manager_ || !ui_manager_->connectivity_manager) {
         return;
     }
 
-    if (ui_manager_->bluetooth_manager->is_data_export_active()) {
+    if (ui_manager_->connectivity_manager->is_data_export_active()) {
         data_export_active_ = true;
         ui_manager_->ota_screen.show_data_export_mode();
         ui_manager_->switch_to_state(UIState::OTA_UPDATE);
@@ -127,18 +127,18 @@ void OtaDataExportController::start_data_export_ui() {
 }
 
 void OtaDataExportController::poll_data_export() {
-    if (!ui_manager_ || !ui_manager_->bluetooth_manager) {
+    if (!ui_manager_ || !ui_manager_->connectivity_manager) {
         return;
     }
 
-    auto* bluetooth = ui_manager_->bluetooth_manager;
+    auto* connectivity = ui_manager_->connectivity_manager;
 
-    if (!bluetooth->is_data_export_active()) {
+    if (!connectivity->is_data_export_active()) {
         stop_data_export_ui();
         return;
     }
 
-    float progress = bluetooth->get_data_export_progress();
+    float progress = connectivity->get_data_export_progress();
     int percent = static_cast<int>(progress);
 
     ui_manager_->ota_screen.update_progress(percent);
@@ -156,10 +156,10 @@ void OtaDataExportController::stop_data_export_ui() {
 
     data_export_active_ = false;
 
-    if (auto* bluetooth = ui_manager_->bluetooth_manager) {
+    if (auto* connectivity = ui_manager_->connectivity_manager) {
         Serial.printf("UI: Data export ended - progress was at %d%%\n",
-                      static_cast<int>(bluetooth->get_data_export_progress()));
-        bluetooth->stop_data_export();
+                      static_cast<int>(connectivity->get_data_export_progress()));
+        connectivity->stop_data_export();
     }
 
     ui_manager_->ota_screen.hide();

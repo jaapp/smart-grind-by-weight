@@ -3,8 +3,7 @@
 
 class UIManager;
 
-// Shows Bluetooth connection status icon with color coding
-// Shows diagnostic warning icon when issues detected
+// Shows connectivity status icon with color coding
 
 class StatusIndicatorController {
 public:
@@ -14,10 +13,8 @@ public:
     void update();
 
 private:
-    void update_ble_status_icon();
-    void update_warning_icon();
+    void update_connectivity_status_icon();
 
     UIManager* ui_manager_;
-    lv_obj_t* ble_status_icon_ = nullptr;
-    lv_obj_t* warning_icon_ = nullptr;
+    lv_obj_t* connectivity_status_icon_ = nullptr;
 };

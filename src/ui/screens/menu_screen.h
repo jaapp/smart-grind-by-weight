@@ -1,7 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include "../../config/constants.h"
-#include "../../bluetooth/manager.h"
+#include "../../connectivity/manager.h"
 #include "../../controllers/grind_controller.h"
 #include "../../system/diagnostics_controller.h"
 #include "../ui_helpers.h"
@@ -14,7 +14,7 @@ private:
     lv_obj_t* screen;
     lv_obj_t* menu;
     lv_obj_t* info_page;
-    lv_obj_t* bluetooth_page;
+    lv_obj_t* connectivity_page;
     lv_obj_t* display_page;
     lv_obj_t* grind_mode_page;
     lv_obj_t* data_page;
@@ -45,10 +45,17 @@ private:
     lv_obj_t* stat_total_pulses_label;
     
     // Menu toggle elements
-    lv_obj_t* ble_toggle;
-    lv_obj_t* ble_startup_toggle;
-    lv_obj_t* ble_status_label;
-    lv_obj_t* ble_timer_label;
+    lv_obj_t* connectivity_toggle;
+    lv_obj_t* connectivity_startup_toggle;
+    lv_obj_t* connectivity_status_label;
+    lv_obj_t* connectivity_detail_label;
+    lv_obj_t* connectivity_mode_label = nullptr;
+    lv_obj_t* connectivity_ssid_label = nullptr;
+    lv_obj_t* connectivity_ip_label = nullptr;
+    lv_obj_t* connectivity_host_label = nullptr;
+    lv_obj_t* connectivity_mac_label = nullptr;
+    lv_obj_t* connectivity_rssi_label = nullptr;
+    lv_obj_t* connectivity_ota_label = nullptr;
     lv_obj_t* logging_toggle;
     lv_obj_t* brightness_normal_slider;
     lv_obj_t* brightness_screensaver_slider;
@@ -101,7 +108,7 @@ private:
     bool visible;
     bool scale_active;
     
-    BluetoothManager* bluetooth_manager;
+    ConnectivityManager* connectivity_manager;
     GrindController* grind_controller;
     BasketDetector* basket_detector;
     GrindingScreen* grinding_screen;
@@ -113,16 +120,16 @@ public:
     static constexpr float kCoastRatioSliderScale = 20.0f; // Slider uses 0.05 increments
     static constexpr float kBasketToleranceSliderScale = 1.0f; // Slider uses 1g increments
 
-    void create(BluetoothManager* bluetooth, GrindController* grind_ctrl, BasketDetector* detector, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl);
+    void create(ConnectivityManager* connectivity, GrindController* grind_ctrl, BasketDetector* detector, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl);
     void show();
     void hide();
     void update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap);
     void update_diagnostics(WeightSensor* weight_sensor);
-    void update_ble_status();
+    void update_connectivity_status();
     void refresh_statistics(bool show_overlay = true);
     void update_brightness_labels(int normal_percent = -1, int screensaver_percent = -1); // Use negative value to leave unchanged
     void update_brightness_sliders();
-    void update_bluetooth_startup_toggle();
+    void update_connectivity_startup_toggle();
     void update_logging_toggle();
     void update_grind_mode_toggles();
     void update_grinder_purge_amount_label(float amount_g);
@@ -143,8 +150,8 @@ public:
     lv_obj_t* get_motor_test_button() const { return motor_test_button; }
     lv_obj_t* get_autotune_button() const { return autotune_button; }
     bool is_scale_page_active() const { return scale_active; }
-    lv_obj_t* get_ble_toggle() const { return ble_toggle; }
-    lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
+    lv_obj_t* get_connectivity_toggle() const { return connectivity_toggle; }
+    lv_obj_t* get_connectivity_startup_toggle() const { return connectivity_startup_toggle; }
     lv_obj_t* get_logging_toggle() const { return logging_toggle; }
     lv_obj_t* get_refresh_stats_button() const { return refresh_stats_button; }
     lv_obj_t* get_diag_reset_button() const { return diag_reset_button; }
@@ -169,7 +176,7 @@ public:
 private:
     void create_menu_ui();
     void create_info_page(lv_obj_t* parent);
-    void create_bluetooth_page(lv_obj_t* parent);
+    void create_connectivity_page(lv_obj_t* parent);
     void create_display_page(lv_obj_t* parent);
     void create_grind_mode_page(lv_obj_t* parent);
     void create_scale_page(lv_obj_t* parent);
