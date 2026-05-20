@@ -11,6 +11,8 @@
 
 #include "../config/constants.h"
 
+class HardwareManager;
+
 using UIStatusCallback = std::function<void(const char*)>;
 
 struct ConnectivityUIStatusMessage {
@@ -30,6 +32,7 @@ enum class ConnectivityState : uint8_t {
 class ConnectivityManager {
 private:
     Preferences* preferences_;
+    HardwareManager* hardware_manager_;
     WebServer server_;
     QueueHandle_t ui_status_queue_;
     UIStatusCallback ui_status_callback_;
@@ -83,6 +86,7 @@ private:
     void handle_screensaver_upload();
     void handle_screensaver_complete();
     void handle_screensaver_clear();
+    void handle_basket_capture(bool capture_single);
     void handle_ota_upload();
     void handle_ota_complete();
     void handle_options();
@@ -108,7 +112,7 @@ public:
     ConnectivityManager();
     ~ConnectivityManager();
 
-    void init(Preferences* prefs);
+    void init(Preferences* prefs, HardwareManager* hardware = nullptr);
     void enable(unsigned long timeout_ms = 0);
     void enable_during_bootup();
     void disable();

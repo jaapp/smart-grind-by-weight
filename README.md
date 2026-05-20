@@ -41,6 +41,7 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 - **Original timed run preserved** – there is a setting to enable the original Grind-By-Time mode
 - **Configurable coast compensation** to tune how early the motor stops during predictive weight grinding
 - **WiFi OTA updates** for firmware, with first-boot setup AP, browser settings, and screensaver image upload
+- **Portafilter basket detection** can auto-select Single or Double before Auto Start, configurable on-device and over WiFi
 - **Advanced analytics** using Python Streamlit reports
 - **For Eureka**: No permanent modifications needed - just swap the screen and add 3D printed parts
 

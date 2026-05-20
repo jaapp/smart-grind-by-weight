@@ -74,7 +74,7 @@ void setup() {
     // Set up the reference so HardwareManager can query GrindController state
     hardware_manager.set_grind_controller(&grind_controller);
     
-    connectivity_manager.init(hardware_manager.get_preferences());
+    connectivity_manager.init(hardware_manager.get_preferences(), &hardware_manager);
     
     // Check for OTA failure to determine initial state
     String failed_ota_build = connectivity_manager.check_ota_failure_after_boot();

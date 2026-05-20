@@ -215,6 +215,7 @@ void UIManager::apply_connectivity_settings_changes() {
     if (grind_controller) {
         grind_controller->load_coast_ratio();
     }
+    basket_detector_.load();
     grinding_screen.set_mode(current_mode);
     menu_screen.update_brightness_sliders();
     menu_screen.update_connectivity_startup_toggle();
