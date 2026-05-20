@@ -70,6 +70,9 @@ private:
     ConnectivityManager* connectivity_manager;
     
     lv_timer_t* jog_timer;
+    lv_obj_t* screensaver_overlay_ = nullptr;
+    lv_obj_t* screensaver_canvas_ = nullptr;
+    uint8_t* screensaver_buffer_ = nullptr;
 
     float edit_target;
     float original_target;
@@ -80,6 +83,7 @@ private:
     unsigned long jog_start_time;
     int jog_stage;
     int jog_direction;
+    bool screensaver_visible_ = false;
 
     // Static instance pointer for grind event callback
     static UIManager* instance;
@@ -134,11 +138,16 @@ public:
     
     void set_background_active(bool active);
     void refresh_auto_action_settings();
+    void show_screensaver();
+    void hide_screensaver();
     
 
 private:
     void create_ui();
     void update_auto_actions();
+    void apply_connectivity_settings_changes();
+    void create_screensaver_overlay();
+    bool load_screensaver_image();
     
     // State-specific update methods
 

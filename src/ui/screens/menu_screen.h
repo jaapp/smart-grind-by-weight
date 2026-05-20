@@ -48,6 +48,13 @@ private:
     lv_obj_t* connectivity_startup_toggle;
     lv_obj_t* connectivity_status_label;
     lv_obj_t* connectivity_detail_label;
+    lv_obj_t* connectivity_mode_label = nullptr;
+    lv_obj_t* connectivity_ssid_label = nullptr;
+    lv_obj_t* connectivity_ip_label = nullptr;
+    lv_obj_t* connectivity_host_label = nullptr;
+    lv_obj_t* connectivity_mac_label = nullptr;
+    lv_obj_t* connectivity_rssi_label = nullptr;
+    lv_obj_t* connectivity_ota_label = nullptr;
     lv_obj_t* logging_toggle;
     lv_obj_t* brightness_normal_slider;
     lv_obj_t* brightness_screensaver_slider;

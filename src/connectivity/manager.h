@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <FS.h>
 #include <Preferences.h>
 #include <WebServer.h>
 #include <esp_ota_ops.h>
@@ -40,17 +41,22 @@ private:
     bool setup_ap_active_;
     bool ota_in_progress_;
     bool ota_error_;
+    bool screensaver_upload_error_;
     bool restart_pending_;
+    volatile bool settings_changed_;
 
     String sta_ssid_;
     String status_message_;
     String ota_error_message_;
+    String screensaver_error_message_;
     String expected_firmware_version_;
 
+    File screensaver_upload_file_;
     const esp_partition_t* ota_partition_;
     esp_ota_handle_t ota_handle_;
     size_t ota_received_bytes_;
     size_t ota_total_bytes_;
+    size_t screensaver_received_bytes_;
     unsigned long last_reconnect_attempt_ms_;
     unsigned long restart_at_ms_;
 
@@ -69,8 +75,14 @@ private:
     void send_json_response(int code, const String& body);
     void handle_root();
     void handle_status();
+    void handle_settings_get();
+    void handle_settings_post();
     void handle_wifi_save();
     void handle_wifi_clear();
+    void handle_screensaver_status();
+    void handle_screensaver_upload();
+    void handle_screensaver_complete();
+    void handle_screensaver_clear();
     void handle_ota_upload();
     void handle_ota_complete();
     void handle_options();
@@ -82,6 +94,15 @@ private:
     void schedule_restart();
     void store_expected_firmware_version(const String& version);
     String html_escape(const String& value) const;
+    String json_escape(const String& value) const;
+    String build_status_json() const;
+    String build_settings_json() const;
+    String build_screensaver_json() const;
+    bool get_request_bool(const char* key, bool current_value, bool& found);
+    float get_request_float(const char* key, float current_value, float min_value, float max_value, bool& found);
+    int get_request_int(const char* key, int current_value, int min_value, int max_value, bool& found);
+    String get_request_string(const char* key, bool& found);
+    void mark_settings_changed();
 
 public:
     ConnectivityManager();
@@ -116,6 +137,13 @@ public:
     String get_setup_address() const;
     String get_hostname() const { return WIFI_HOSTNAME; }
     String get_active_ssid() const;
+    String get_mac_address() const;
+    int32_t get_rssi_dbm() const;
+    const char* get_mode_label() const;
+    String get_ota_url() const;
+    bool has_screensaver_image() const;
+    size_t get_screensaver_image_size() const;
+    bool consume_settings_changed();
 
     void set_ui_status_callback(UIStatusCallback callback);
     bool dequeue_ui_status(char* out, size_t out_len);

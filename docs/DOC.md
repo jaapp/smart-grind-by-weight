@@ -272,7 +272,7 @@ The auto-tune feature models your grinder's motor response behavior by measuring
 
 ### Diagnostics System
 
-The system includes comprehensive load cell health monitoring accessible via **Menu → Diagnostics**. A warning icon (⚠) appears in the top-right corner when diagnostics are active - tap it to navigate directly to the diagnostics page.
+The system includes comprehensive load cell health monitoring accessible via **Menu → Diagnostics**. Active warnings are shown on the Diagnostics page and can be cleared there when the underlying condition has been resolved.
 
 **Diagnostic Types:**
 1. **Load Cell Not Calibrated** - Appears until calibration is completed via Menu → Calibrate (Tools section)
@@ -383,8 +383,9 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   +-- WiFi
     |   |   |-- WiFi toggle
     |   |   |-- WiFi startup toggle (configurable auto-enable)
-    |   |   |-- Connection status display
-    |   |   \-- Device URL / setup AP address
+    |   |   |-- Connection status, mode, SSID, IP, host URL
+    |   |   |-- MAC address and RSSI
+    |   |   \-- OTA endpoint
     |   |
     |   +-- Display
     |   |   |-- Normal brightness slider
@@ -450,6 +451,21 @@ Both automation settings rely on the same smoothed weight deltas used for flow d
 ## 📶 WiFi Connectivity
 
 WiFi can be configured in **Menu → WiFi** with optional auto-startup. If no credentials are saved, the grinder starts a `GrindByWeight-Setup` access point; join it and open `http://192.168.4.1` to save your home WiFi credentials. Once connected, the grinder is available at `http://grindbyweight.local` or its displayed IP address. WiFi enables wireless firmware updates through the built-in HTTP OTA endpoint.
+
+The device web page also exposes the same practical settings as the touchscreen menu: grind mode, purge mode and amount, freshness, automation toggles, logging, brightness, WiFi startup, and OTA upload. Settings are stored in the existing NVS preference namespaces, so the web UI does not duplicate settings storage.
+
+Machine-readable endpoints are available for future integrations:
+
+```text
+GET  /api/status
+GET  /api/settings
+POST /api/settings
+GET  /api/screensaver
+POST /api/screensaver
+POST /api/screensaver/clear
+```
+
+Screensaver images are uploaded from the browser page. The browser resizes the selected image to the 280x456 display and converts it to raw RGB565 before upload; the firmware stores that fixed-size file in LittleFS and shows it when the screen dims.
 
 ---
 

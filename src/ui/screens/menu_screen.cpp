@@ -267,11 +267,15 @@ void MenuScreen::create_connectivity_page(lv_obj_t* parent) {
     create_toggle_row(parent, "Enabled", &connectivity_toggle);
     create_toggle_row(parent, "Startup", &connectivity_startup_toggle);
 
-    connectivity_status_label = lv_label_create(parent);
-    lv_label_set_text(connectivity_status_label, "WiFi: Disabled");
-    lv_obj_set_style_text_font(connectivity_status_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(connectivity_status_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_clear_flag(connectivity_status_label, LV_OBJ_FLAG_SCROLLABLE);
+    create_separator(parent, "Status");
+    create_data_label(parent, "State:", &connectivity_status_label);
+    create_data_label(parent, "Mode:", &connectivity_mode_label);
+    create_data_label(parent, "SSID:", &connectivity_ssid_label, true);
+    create_data_label(parent, "IP:", &connectivity_ip_label, true);
+    create_data_label(parent, "Host:", &connectivity_host_label, true);
+    create_data_label(parent, "MAC:", &connectivity_mac_label, true);
+    create_data_label(parent, "RSSI:", &connectivity_rssi_label);
+    create_data_label(parent, "OTA:", &connectivity_ota_label, true);
 
     connectivity_detail_label = lv_label_create(parent);
     lv_label_set_text(connectivity_detail_label, "");
@@ -738,33 +742,59 @@ void MenuScreen::update_connectivity_status() {
         lv_obj_clear_state(connectivity_toggle, LV_STATE_CHECKED);
     }
     
-    // Update status text
-    if (connectivity_manager->is_enabled()) {
+    if (connectivity_status_label) {
+        lv_label_set_text(connectivity_status_label, connectivity_manager->get_status_label());
+    }
+    if (connectivity_mode_label) {
+        lv_label_set_text(connectivity_mode_label, connectivity_manager->get_mode_label());
+    }
+
+    String ip = connectivity_manager->get_ip_address();
+    String ssid = connectivity_manager->get_active_ssid();
+    String host = connectivity_manager->is_setup_mode()
+                      ? String("http://") + ip
+                      : String("http://") + WIFI_HOSTNAME + ".local";
+    String ota = connectivity_manager->get_ota_url();
+
+    if (connectivity_ssid_label) {
+        lv_label_set_text(connectivity_ssid_label, ssid.isEmpty() ? "--" : ssid.c_str());
+    }
+    if (connectivity_ip_label) {
+        lv_label_set_text(connectivity_ip_label, ip.isEmpty() ? "--" : ip.c_str());
+    }
+    if (connectivity_host_label) {
+        lv_label_set_text(connectivity_host_label, connectivity_manager->is_enabled() && !ip.isEmpty() ? host.c_str() : "--");
+    }
+    if (connectivity_mac_label) {
+        String mac = connectivity_manager->get_mac_address();
+        lv_label_set_text(connectivity_mac_label, mac.isEmpty() ? "--" : mac.c_str());
+    }
+    if (connectivity_rssi_label) {
+        char rssi_text[24];
         if (connectivity_manager->is_connected()) {
-            lv_label_set_text(connectivity_status_label, "WiFi: Connected");
-        } else if (connectivity_manager->is_setup_mode()) {
-            lv_label_set_text(connectivity_status_label, "WiFi: Setup AP");
+            snprintf(rssi_text, sizeof(rssi_text), "%ld dBm", static_cast<long>(connectivity_manager->get_rssi_dbm()));
         } else {
-            lv_label_set_text(connectivity_status_label, connectivity_manager->get_status_label());
+            snprintf(rssi_text, sizeof(rssi_text), "--");
         }
-        lv_obj_clear_flag(connectivity_status_label, LV_OBJ_FLAG_HIDDEN);
-        
-        char detail_text[96];
-        String ip = connectivity_manager->get_ip_address();
+        lv_label_set_text(connectivity_rssi_label, rssi_text);
+    }
+    if (connectivity_ota_label) {
+        lv_label_set_text(connectivity_ota_label, ota.isEmpty() ? "--" : ota.c_str());
+    }
+
+    if (connectivity_manager->is_enabled()) {
+        char detail_text[120];
         if (connectivity_manager->is_setup_mode()) {
-            snprintf(detail_text, sizeof(detail_text), "Join %s, then open http://%s",
-                     WIFI_SETUP_AP_SSID, ip.c_str());
+            snprintf(detail_text, sizeof(detail_text), "Join %s, then open the Host URL above.",
+                     WIFI_SETUP_AP_SSID);
         } else if (!ip.isEmpty()) {
-            snprintf(detail_text, sizeof(detail_text), "http://%s.local or %s",
-                     WIFI_HOSTNAME, ip.c_str());
+            snprintf(detail_text, sizeof(detail_text), "Use Host for settings and OTA updates.");
         } else {
             snprintf(detail_text, sizeof(detail_text), "Waiting for network");
         }
         lv_label_set_text(connectivity_detail_label, detail_text);
         lv_obj_clear_flag(connectivity_detail_label, LV_OBJ_FLAG_HIDDEN);
     } else {
-        // When nothing to display hide the status labels
-        lv_obj_add_flag(connectivity_status_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(connectivity_detail_label, LV_OBJ_FLAG_HIDDEN);
     }
 }

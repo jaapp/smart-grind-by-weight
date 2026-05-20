@@ -1,6 +1,8 @@
 #include "ui_manager.h"
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <Preferences.h>
+#include <esp_heap_caps.h>
 #include <cmath>
 #include "../config/constants.h"
 #include "screens/calibration_screen.h"
@@ -10,7 +12,12 @@
 // Static instance pointer for grind event callbacks
 UIManager* UIManager::instance = nullptr;
 
-UIManager::~UIManager() = default;
+UIManager::~UIManager() {
+    if (screensaver_buffer_) {
+        heap_caps_free(screensaver_buffer_);
+        screensaver_buffer_ = nullptr;
+    }
+}
 
 void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
                      ProfileController* pc, GrindController* gc, ConnectivityManager* connectivity) {
@@ -29,6 +36,10 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     current_tab = profile_controller->get_current_profile();
     current_mode = profile_controller->get_grind_mode();
     jog_timer = nullptr;
+    screensaver_overlay_ = nullptr;
+    screensaver_canvas_ = nullptr;
+    screensaver_buffer_ = nullptr;
+    screensaver_visible_ = false;
     // Initialize the unified overlay system
     BlockingOperationOverlay::getInstance().init();
     jog_start_time = 0;
@@ -126,6 +137,8 @@ void UIManager::update() {
         screen_timeout_controller_->update();
     }
 
+    apply_connectivity_settings_changes();
+
     bool ota_cycle_consumed = false;
     if (ota_data_export_controller_) {
         ota_cycle_consumed = ota_data_export_controller_->update();
@@ -180,8 +193,128 @@ void UIManager::update() {
     }
 }
 
+void UIManager::apply_connectivity_settings_changes() {
+    if (!connectivity_manager || !connectivity_manager->consume_settings_changed()) {
+        return;
+    }
+
+    if (profile_controller) {
+        profile_controller->load_profiles();
+        current_tab = profile_controller->get_current_profile();
+        current_mode = profile_controller->get_grind_mode();
+        edit_target = get_current_profile_target(*profile_controller, current_mode);
+    }
+
+    if (ready_controller_) {
+        ready_controller_->refresh_profiles();
+    }
+    grinding_screen.set_mode(current_mode);
+    menu_screen.update_brightness_sliders();
+    menu_screen.update_connectivity_startup_toggle();
+    menu_screen.update_logging_toggle();
+    menu_screen.update_grind_mode_toggles();
+    refresh_auto_action_settings();
+
+    if (hardware_manager && menu_controller_) {
+        hardware_manager->get_display()->set_brightness(menu_controller_->get_normal_brightness());
+    }
+}
+
+void UIManager::create_screensaver_overlay() {
+    if (screensaver_overlay_) {
+        return;
+    }
+
+    screensaver_overlay_ = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(screensaver_overlay_, LV_PCT(100), LV_PCT(100));
+    lv_obj_align(screensaver_overlay_, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_bg_color(screensaver_overlay_, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
+    lv_obj_set_style_bg_opa(screensaver_overlay_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(screensaver_overlay_, 0, 0);
+    lv_obj_set_style_pad_all(screensaver_overlay_, 0, 0);
+    lv_obj_clear_flag(screensaver_overlay_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(screensaver_overlay_, LV_OBJ_FLAG_CLICKABLE);
+
+    screensaver_canvas_ = lv_canvas_create(screensaver_overlay_);
+    lv_obj_set_size(screensaver_canvas_, WIFI_SCREENSAVER_WIDTH_PX, WIFI_SCREENSAVER_HEIGHT_PX);
+    lv_obj_center(screensaver_canvas_);
+    lv_obj_clear_flag(screensaver_canvas_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(screensaver_canvas_, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_add_flag(screensaver_overlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+bool UIManager::load_screensaver_image() {
+    File file = LittleFS.open(WIFI_SCREENSAVER_PATH, "r");
+    if (!file) {
+        return false;
+    }
+
+    if (file.size() != WIFI_SCREENSAVER_BYTES) {
+        file.close();
+        return false;
+    }
+
+    if (!screensaver_buffer_) {
+        screensaver_buffer_ = static_cast<uint8_t*>(
+            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN,
+                                    WIFI_SCREENSAVER_BYTES,
+                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        if (!screensaver_buffer_) {
+            screensaver_buffer_ = static_cast<uint8_t*>(
+                heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN,
+                                        WIFI_SCREENSAVER_BYTES,
+                                        MALLOC_CAP_8BIT));
+        }
+    }
+
+    if (!screensaver_buffer_) {
+        file.close();
+        return false;
+    }
+
+    size_t bytes_read = file.read(screensaver_buffer_, WIFI_SCREENSAVER_BYTES);
+    file.close();
+    return bytes_read == WIFI_SCREENSAVER_BYTES;
+}
+
+void UIManager::show_screensaver() {
+    if (screensaver_visible_) {
+        return;
+    }
+
+    if (!load_screensaver_image()) {
+        return;
+    }
+
+    create_screensaver_overlay();
+    if (!screensaver_overlay_ || !screensaver_canvas_) {
+        return;
+    }
+
+    lv_canvas_set_buffer(screensaver_canvas_, screensaver_buffer_,
+                         WIFI_SCREENSAVER_WIDTH_PX,
+                         WIFI_SCREENSAVER_HEIGHT_PX,
+                         LV_COLOR_FORMAT_RGB565);
+    lv_obj_clear_flag(screensaver_overlay_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(screensaver_overlay_);
+    screensaver_visible_ = true;
+}
+
+void UIManager::hide_screensaver() {
+    if (!screensaver_visible_) {
+        return;
+    }
+
+    if (screensaver_overlay_) {
+        lv_obj_add_flag(screensaver_overlay_, LV_OBJ_FLAG_HIDDEN);
+    }
+    screensaver_visible_ = false;
+}
+
 void UIManager::switch_to_state(UIState new_state) {
     state_machine->transition_to(new_state);
+    hide_screensaver();
 
     // Hide all screens before showing the requested one
     ready_screen.hide();
