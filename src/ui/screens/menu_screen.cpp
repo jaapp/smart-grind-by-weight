@@ -425,7 +425,7 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Grinder Purging section
     create_separator(parent, "Purging");
-    create_description_label(parent, "Decide what do do with the grinded coffee after the grinder is primed.");
+    create_description_label(parent, "Choose whether priming coffee is kept or discarded after the grinder is saturated.");
 
     // Radio button group for grinder purge mode (Keep/Remove)
     const char* grinder_purge_modes[] = {"Keep", "Remove"};
@@ -456,7 +456,7 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Coast Compensation section
     create_separator(parent, "Coast Compensation");
-    create_description_label(parent, "How much coast the system expects after motor stop. Higher values reduce overshoot.");
+    create_description_label(parent, "Coffee keeps falling after motor stop. Higher coast stops earlier to reduce overshoot; lower coast stops later if doses undershoot.");
 
     // Slider for coast ratio (0.70 to 1.50 in 0.05 steps)
     const uint32_t coast_slider_min = static_cast<uint32_t>(GRIND_LATENCY_TO_COAST_RATIO_MIN * kCoastRatioSliderScale + 0.5f);

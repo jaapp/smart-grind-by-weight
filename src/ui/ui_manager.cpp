@@ -64,14 +64,14 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
         screensaver_controller_->is_startup_enabled() &&
         screensaver_controller_->has_image()) {
         screensaver_controller_->show();
-        // Auto-hide after 3 seconds
+        // Auto-hide after the configured startup duration
         lv_timer_create([](lv_timer_t* t) {
             auto* sc = static_cast<ScreensaverController*>(lv_timer_get_user_data(t));
             if (sc && sc->is_visible()) {
                 sc->hide();
             }
             lv_timer_delete(t);
-        }, 3000, screensaver_controller_.get());
+        }, screensaver_controller_->get_startup_duration_ms(), screensaver_controller_.get());
     }
 
     initialized = true;
@@ -212,12 +212,18 @@ void UIManager::apply_connectivity_settings_changes() {
     if (ready_controller_) {
         ready_controller_->refresh_profiles();
     }
+    if (grind_controller) {
+        grind_controller->load_coast_ratio();
+    }
     grinding_screen.set_mode(current_mode);
     menu_screen.update_brightness_sliders();
     menu_screen.update_connectivity_startup_toggle();
     menu_screen.update_logging_toggle();
     menu_screen.update_grind_mode_toggles();
     menu_screen.update_screensaver_toggles();
+    if (screen_timeout_controller_) {
+        screen_timeout_controller_->reload_settings();
+    }
     refresh_auto_action_settings();
 
     if (hardware_manager && menu_controller_) {

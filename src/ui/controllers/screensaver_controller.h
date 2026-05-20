@@ -23,6 +23,12 @@ public:
     /// Read NVS preference: show image during sleep/dim
     bool is_sleep_enabled() const;
 
+    /// Read NVS preference: startup image duration
+    uint32_t get_startup_duration_ms() const;
+
+    /// Read NVS preference: inactivity delay before dim/screensaver
+    uint32_t get_sleep_delay_ms() const;
+
     /// Load image from LittleFS and display as full-screen overlay
     void show();
 

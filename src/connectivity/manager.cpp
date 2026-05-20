@@ -27,6 +27,21 @@ int clamp_int(int value, int min_value, int max_value) {
     return value;
 }
 
+void append_write_error(String& errors, const char* setting_name) {
+    if (!errors.isEmpty()) {
+        errors += ", ";
+    }
+    errors += setting_name;
+}
+
+bool record_preference_write(size_t written, const char* setting_name, String& errors) {
+    if (written > 0) {
+        return true;
+    }
+    append_write_error(errors, setting_name);
+    return false;
+}
+
 String extract_json_value(const String& body, const char* key) {
     if (body.isEmpty() || !key) {
         return "";
@@ -468,8 +483,8 @@ void ConnectivityManager::handle_root() {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GrindByWeight WiFi</title>
 <style>
-:root{color-scheme:dark;--bg:#101010;--panel:#1b1b1b;--muted:#a8a8a8;--line:#323232;--red:#d71920;--blue:#00aaff;--green:#2aa84a;--text:#f5f5f5}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}main{max-width:760px;margin:0 auto;padding:22px}h1{margin:0 0 18px;font-size:30px}h2{margin:0 0 14px;font-size:21px}section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin:14px 0}label{display:block;margin:12px 0 6px;color:var(--muted)}input,select,button{width:100%;font:inherit;border:0;border-radius:6px;padding:11px;margin:0 0 10px}input,select{background:#0b0b0b;color:var(--text);border:1px solid var(--line)}input[type=checkbox]{width:auto;margin-right:8px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.check{display:flex;align-items:center;color:var(--text);margin:10px 0}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{flex:1 1 160px}button{background:var(--red);color:#fff;font-weight:700;cursor:pointer}.secondary{background:#333}.ok{color:var(--green)}.warn{color:#f2a12b}.muted{color:var(--muted)}dl{display:grid;grid-template-columns:135px 1fr;gap:8px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-word}.value{float:right;color:var(--muted)}@media(max-width:620px){main{padding:14px}.row{grid-template-columns:1fr}dl{grid-template-columns:1fr}dt{margin-top:8px}}
+:root{color-scheme:dark;--bg:#101010;--panel:#1b1b1b;--muted:#a8a8a8;--line:#323232;--red:#d71920;--blue:#00aaff;--green:#2aa84a;--text:#f5f5f5;--soft:#242424}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}main{max-width:760px;margin:0 auto;padding:22px}h1{margin:0 0 18px;font-size:30px}h2{margin:0 0 6px;font-size:21px}section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin:14px 0}form{margin:0}.section-note,.hint{color:var(--muted);font-size:14px;line-height:1.4}.section-note{margin:0 0 12px}.hint{margin:4px 0 10px}.field{padding:12px 0;border-top:1px solid var(--line)}.field:first-child{border-top:0}.field label,.field-title{display:flex;justify-content:space-between;gap:12px;margin:0;color:var(--text);font-weight:700}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.wide{grid-column:1/-1}.toggle-list{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}.check{display:flex;align-items:flex-start;gap:10px;color:var(--text);margin:0;padding:10px 0}.check input{width:auto;margin:3px 0 0;flex:0 0 auto}.check strong{display:block}.check small{display:block;color:var(--muted);font-size:13px;line-height:1.35;margin-top:3px}input,select,button{width:100%;font:inherit;border:0;border-radius:6px;padding:11px;margin:0 0 10px}input,select{background:#0b0b0b;color:var(--text);border:1px solid var(--line)}input[type=range]{height:36px;padding:0;accent-color:var(--blue)}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{flex:1 1 160px}button{background:var(--red);color:#fff;font-weight:700;cursor:pointer}.secondary{background:#333}.ok{color:var(--green)}.warn{color:#f2a12b}.muted{color:var(--muted)}dl{display:grid;grid-template-columns:135px 1fr;gap:8px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-word}.value{white-space:nowrap;color:var(--muted);font-weight:400}@media(max-width:620px){main{padding:14px}.row,.settings-grid,.toggle-list{grid-template-columns:1fr}dl{grid-template-columns:1fr}dt{margin-top:8px}}
 </style>
 </head>
 <body>
@@ -484,6 +499,7 @@ void ConnectivityManager::handle_root() {
 
 <section>
 <h2>Network</h2>
+<p class="section-note">Save the WiFi network the grinder should join. Clearing credentials reboots into setup access-point mode.</p>
 <form method="post" action="/wifi">
 <label>SSID</label><input name="ssid" id="ssid" required>
 <label>Password</label><input name="password" type="password" autocomplete="current-password">
@@ -494,22 +510,32 @@ void ConnectivityManager::handle_root() {
 
 <section>
 <h2>Device Settings</h2>
+<p class="section-note">These settings are saved on the grinder and apply to both the touchscreen and WiFi controls.</p>
 <form id="settingsForm">
-<div class="row">
-<div><label>Grind Mode</label><select id="grind_mode"><option value="0">Weight</option><option value="1">Time</option></select></div>
-<div><label>Purge Mode</label><select id="purge_mode"><option value="0">Keep purge grinds</option><option value="1">Remove purge grinds</option></select></div>
+<div class="settings-grid">
+<div class="field"><label>Grind Mode</label><p class="hint">Weight mode stops at the saved gram target. Time mode runs each profile for its saved seconds.</p><select id="grind_mode" name="grind_mode"><option value="0">Weight</option><option value="1">Time</option></select></div>
+<div class="field"><label>Purge Mode</label><p class="hint">Keep continues after priming. Remove pauses after priming so stale grinds can be discarded before the dose.</p><select id="purge_mode" name="purge_mode"><option value="0">Keep purge grinds</option><option value="1">Remove purge grinds</option></select></div>
+<div class="field"><label>Purge Amount <span class="value" id="purge_amount_g_value"></span></label><p class="hint">Minimum coffee used to fill the chute before a weight-mode dose starts.</p><input id="purge_amount_g" name="purge_amount_g" type="range" min="0.1" max="2.5" step="0.1"></div>
+<div class="field"><label>Freshness <span class="value" id="freshness_hours_value"></span></label><p class="hint">How long previous grinds are treated as fresh before the purge confirmation appears.</p><input id="freshness_hours" name="freshness_hours" type="range" min="0.5" max="48" step="0.5"></div>
+<div class="field wide"><label>Grind Coast <span class="value" id="coast_ratio_value"></span></label><p class="hint">Prediction for coffee that keeps falling after the motor stops. Higher stops earlier to reduce overshoot; lower stops later if shots tend to undershoot.</p><input id="coast_ratio" name="coast_ratio" type="range" min="0.7" max="1.5" step="0.05"></div>
+<div class="field"><label>Brightness <span class="value" id="brightness_normal_value"></span></label><p class="hint">Normal touchscreen brightness while you are using the grinder.</p><input id="brightness_normal" name="brightness_normal" type="range" min="0.15" max="1" step="0.01"></div>
+<div class="field"><label>Screensaver Brightness <span class="value" id="brightness_screensaver_value"></span></label><p class="hint">Dimmed brightness used after inactivity and while the screensaver image is shown.</p><input id="brightness_screensaver" name="brightness_screensaver" type="range" min="0.15" max="1" step="0.01"></div>
+<div class="field"><label>Screensaver After <span class="value" id="screensaver_sleep_delay_min_value"></span></label><p class="hint">Inactivity time before the screen dims and the sleep screensaver can appear.</p><input id="screensaver_sleep_delay_min" name="screensaver_sleep_delay_min" type="range" min="1" max="60" step="1"></div>
+<div class="field"><label>Startup Duration <span class="value" id="screensaver_startup_duration_s_value"></span></label><p class="hint">How long the uploaded screensaver image stays visible during boot.</p><input id="screensaver_startup_duration_s" name="screensaver_startup_duration_s" type="range" min="1" max="30" step="1"></div>
 </div>
-<label>Purge Amount <span class="value" id="purge_amount_value"></span></label><input id="purge_amount_g" type="range" min="0.1" max="2.5" step="0.1">
-<label>Freshness <span class="value" id="freshness_value"></span></label><input id="freshness_hours" type="range" min="0.5" max="48" step="0.5">
-<label>Brightness <span class="value" id="brightness_normal_value"></span></label><input id="brightness_normal" type="range" min="0.15" max="1" step="0.01">
-<label>Screensaver Brightness <span class="value" id="brightness_screensaver_value"></span></label><input id="brightness_screensaver" type="range" min="0.15" max="1" step="0.01">
-<label class="check"><input id="wifi_startup" type="checkbox">Start WiFi on boot</label>
-<label class="check"><input id="swipe_enabled" type="checkbox">Swipe mode switching</label>
-<label class="check"><input id="auto_start" type="checkbox">Start on cup</label>
-<label class="check"><input id="auto_return" type="checkbox">Return on cup removal</label>
-<label class="check"><input id="logging_enabled" type="checkbox">Grind logging</label>
-<label class="check"><input id="screensaver_startup" type="checkbox">Show screensaver on startup</label>
-<label class="check"><input id="screensaver_sleep" type="checkbox">Show screensaver when dimmed</label>
+<div class="field wide">
+<div class="field-title">Toggles</div>
+<p class="hint">Quick behavior switches. Auto Start can optionally be paired with basket detection from the touchscreen menu.</p>
+<div class="toggle-list">
+<label class="check"><input id="wifi_startup" name="wifi_startup" type="checkbox"><span><strong>Start WiFi on boot</strong><small>Connect automatically after startup.</small></span></label>
+<label class="check"><input id="swipe_enabled" name="swipe_enabled" type="checkbox"><span><strong>Swipe mode switching</strong><small>Allow vertical swipes between Weight and Time modes.</small></span></label>
+<label class="check"><input id="auto_start" name="auto_start" type="checkbox"><span><strong>Start on cup</strong><small>Start the active profile when a cup or portafilter lands on the scale.</small></span></label>
+<label class="check"><input id="auto_return" name="auto_return" type="checkbox"><span><strong>Return on cup removal</strong><small>Leave the completion screen when the finished cup is removed.</small></span></label>
+<label class="check"><input id="logging_enabled" name="logging_enabled" type="checkbox"><span><strong>Grind logging</strong><small>Save grind data for later diagnostics and analysis.</small></span></label>
+<label class="check"><input id="screensaver_startup" name="screensaver_startup" type="checkbox"><span><strong>Show screensaver on startup</strong><small>Display the uploaded image while booting.</small></span></label>
+<label class="check"><input id="screensaver_sleep" name="screensaver_sleep" type="checkbox"><span><strong>Show screensaver when dimmed</strong><small>Use the uploaded image after inactivity.</small></span></label>
+</div>
+</div>
 <button type="submit">Save Settings</button>
 <p id="settingsMessage" class="muted"></p>
 </form>
@@ -517,6 +543,7 @@ void ConnectivityManager::handle_root() {
 
 <section>
 <h2>Screensaver Image</h2>
+<p class="section-note">Upload one image for startup and dimmed-screen display. Timing and brightness are controlled in Device Settings.</p>
 <input id="screensaverFile" type="file" accept="image/*">
 <div class="actions"><button id="uploadScreensaver" type="button">Upload Image</button><button id="clearScreensaver" class="secondary" type="button">Clear Image</button></div>
 <p id="imageMessage" class="muted">Images are resized to the device display before upload.</p>
@@ -524,6 +551,7 @@ void ConnectivityManager::handle_root() {
 
 <section>
 <h2>OTA Update</h2>
+<p class="section-note">Upload a firmware .bin directly to this grinder. The device restarts when the update is applied.</p>
 <form method="post" action="/ota" enctype="multipart/form-data">
 <input type="file" name="firmware" accept=".bin" required>
 <button type="submit">Upload Firmware</button>
@@ -536,10 +564,10 @@ const W=280,H=456;
 function pct(v){return Math.round(Number(v)*100)+"%"}
 function setMsg(id,text,cls="muted"){const el=$(id);el.textContent=text;el.className=cls}
 async function json(path,opts){const r=await fetch(path,opts);const t=await r.text();let data={};try{data=t?JSON.parse(t):{}}catch(e){throw new Error(t||r.statusText)}if(!r.ok)throw new Error(data.error||t||r.statusText);return data}
-function renderStatus(s){
+function renderStatus(s,prefillWifi=false){
   const rows=[["State",s.status],["Mode",s.mode],["SSID",s.ssid||"--"],["IP",s.ip||"--"],["Host",s.host_url||"--"],["MAC",s.mac||"--"],["RSSI",s.connected?(s.rssi_dbm+" dBm"):"--"],["OTA",s.ota_active?(s.ota_progress+"%"):(s.ota_url||"--")],["Build","#"+s.build],["Version",s.version]];
   $("statusList").innerHTML=rows.map(r=>"<dt>"+r[0]+"</dt><dd>"+r[1]+"</dd>").join("");
-  $("ssid").value=s.setup_ap?"":(s.ssid||"");
+  if(prefillWifi)$("ssid").value=s.setup_ap?"":(s.ssid||"");
 }
 function bindRange(id,fmt){const el=$(id),out=$(id+"_value");const upd=()=>out.textContent=fmt(el.value);el.addEventListener("input",upd);upd()}
 function renderSettings(x){
@@ -547,15 +575,17 @@ function renderSettings(x){
   $("wifi_startup").checked=!!s.wifi_startup;$("logging_enabled").checked=!!s.logging_enabled;$("swipe_enabled").checked=!!s.swipe_enabled;$("auto_start").checked=!!s.auto_start;$("auto_return").checked=!!s.auto_return;
   $("screensaver_startup").checked=!!s.screensaver_startup;$("screensaver_sleep").checked=!!s.screensaver_sleep;
   $("grind_mode").value=String(s.grind_mode_index);$("purge_mode").value=String(s.purge_mode_index);
-  $("purge_amount_g").value=s.purge_amount_g;$("freshness_hours").value=s.freshness_hours;$("brightness_normal").value=s.brightness_normal;$("brightness_screensaver").value=s.brightness_screensaver;
-  ["purge_amount_g","freshness_hours","brightness_normal","brightness_screensaver"].forEach(id=>$(id).dispatchEvent(new Event("input")));
+  $("purge_amount_g").value=s.purge_amount_g;$("freshness_hours").value=s.freshness_hours;$("coast_ratio").value=s.coast_ratio;$("brightness_normal").value=s.brightness_normal;$("brightness_screensaver").value=s.brightness_screensaver;
+  $("screensaver_sleep_delay_min").value=s.screensaver_sleep_delay_min;$("screensaver_startup_duration_s").value=s.screensaver_startup_duration_s;
+  ["purge_amount_g","freshness_hours","coast_ratio","brightness_normal","brightness_screensaver","screensaver_sleep_delay_min","screensaver_startup_duration_s"].forEach(id=>$(id).dispatchEvent(new Event("input")));
   $("screensaverState").textContent=s.screensaver_image?"Screensaver image stored: "+s.screensaver_image_bytes+" bytes":"No screensaver image stored";
 }
-async function load(){try{renderStatus(await json("/api/status"));renderSettings(await json("/api/settings"))}catch(e){setMsg("settingsMessage",e.message,"warn")}}
+async function refreshStatus(){renderStatus(await json("/api/status"))}
+async function load(){try{renderStatus(await json("/api/status"),true);renderSettings(await json("/api/settings"))}catch(e){setMsg("settingsMessage",e.message,"warn")}}
 function settingsPayload(){
   const p=new URLSearchParams();
   ["wifi_startup","logging_enabled","swipe_enabled","auto_start","auto_return","screensaver_startup","screensaver_sleep"].forEach(id=>p.set(id,$(id).checked?"1":"0"));
-  ["grind_mode","purge_mode","purge_amount_g","freshness_hours","brightness_normal","brightness_screensaver"].forEach(id=>p.set(id,$(id).value));
+  ["grind_mode","purge_mode","purge_amount_g","freshness_hours","coast_ratio","brightness_normal","brightness_screensaver","screensaver_sleep_delay_min","screensaver_startup_duration_s"].forEach(id=>p.set(id,$(id).value));
   return p;
 }
 $("settingsForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("settingsMessage","Saving...");try{await json("/api/settings",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:settingsPayload()});setMsg("settingsMessage","Settings saved","ok");load()}catch(err){setMsg("settingsMessage",err.message,"warn")}});
@@ -572,8 +602,8 @@ async function imageToRgb565(file){
 }
 $("uploadScreensaver").addEventListener("click",async()=>{const f=$("screensaverFile").files[0];if(!f){setMsg("imageMessage","Choose an image first","warn");return}setMsg("imageMessage","Converting image...");try{const raw=await imageToRgb565(f);const form=new FormData();form.append("image",new Blob([raw],{type:"application/octet-stream"}),"screensaver.rgb565");setMsg("imageMessage","Uploading...");await json("/api/screensaver",{method:"POST",body:form});setMsg("imageMessage","Screensaver image saved","ok");load()}catch(e){setMsg("imageMessage",e.message,"warn")}});
 $("clearScreensaver").addEventListener("click",async()=>{try{await json("/api/screensaver/clear",{method:"POST"});setMsg("imageMessage","Screensaver image cleared","ok");load()}catch(e){setMsg("imageMessage",e.message,"warn")}});
-bindRange("purge_amount_g",v=>Number(v).toFixed(1)+"g");bindRange("freshness_hours",v=>Number(v).toFixed(1)+"h");bindRange("brightness_normal",pct);bindRange("brightness_screensaver",pct);
-load();setInterval(load,5000);
+bindRange("purge_amount_g",v=>Number(v).toFixed(1)+"g");bindRange("freshness_hours",v=>Number(v).toFixed(1)+"h");bindRange("coast_ratio",v=>Math.round(Number(v)*100)+"%");bindRange("brightness_normal",pct);bindRange("brightness_screensaver",pct);bindRange("screensaver_sleep_delay_min",v=>Number(v).toFixed(0)+" min");bindRange("screensaver_startup_duration_s",v=>Number(v).toFixed(0)+" s");
+load();setInterval(()=>refreshStatus().catch(()=>{}),5000);
 </script>
 </body>
 </html>)HTML";
@@ -749,10 +779,16 @@ String ConnectivityManager::build_settings_json() const {
 
     bool screensaver_startup = false;
     bool screensaver_sleep = false;
+    uint32_t screensaver_startup_duration_ms = USER_SCREENSAVER_STARTUP_DURATION_DEFAULT_MS;
+    uint32_t screensaver_sleep_delay_ms = USER_SCREEN_AUTO_DIM_TIMEOUT_DEFAULT_MS;
     Preferences screensaver_prefs;
-    if (screensaver_prefs.begin("screensaver", true)) {
-        screensaver_startup = screensaver_prefs.getBool("startup", false);
-        screensaver_sleep = screensaver_prefs.getBool("sleep", false);
+    if (screensaver_prefs.begin(USER_SCREENSAVER_PREF_NAMESPACE, true)) {
+        screensaver_startup = screensaver_prefs.getBool(USER_SCREENSAVER_PREF_KEY_STARTUP, false);
+        screensaver_sleep = screensaver_prefs.getBool(USER_SCREENSAVER_PREF_KEY_SLEEP, false);
+        screensaver_startup_duration_ms = screensaver_prefs.getUInt(USER_SCREENSAVER_PREF_KEY_STARTUP_DURATION_MS,
+                                                                    USER_SCREENSAVER_STARTUP_DURATION_DEFAULT_MS);
+        screensaver_sleep_delay_ms = screensaver_prefs.getUInt(USER_SCREENSAVER_PREF_KEY_SLEEP_DELAY_MS,
+                                                               USER_SCREEN_AUTO_DIM_TIMEOUT_DEFAULT_MS);
         screensaver_prefs.end();
     }
 
@@ -760,22 +796,31 @@ String ConnectivityManager::build_settings_json() const {
     int purge_mode_index = GRIND_PURGE_MODE_DEFAULT;
     float purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;
     float freshness_hours = GRIND_FRESHNESS_DEFAULT_HOURS;
+    float coast_ratio = GRIND_LATENCY_TO_COAST_RATIO_DEFAULT;
     if (preferences_) {
         grind_mode_index = preferences_->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
         purge_mode_index = preferences_->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
         purge_amount_g = preferences_->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         freshness_hours = preferences_->getFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, GRIND_FRESHNESS_DEFAULT_HOURS);
+        coast_ratio = preferences_->getFloat(GrindController::PREF_KEY_COAST_RATIO, GRIND_LATENCY_TO_COAST_RATIO_DEFAULT);
     }
 
     grind_mode_index = clamp_int(grind_mode_index, 0, 1);
     purge_mode_index = clamp_int(purge_mode_index, 0, 1);
     purge_amount_g = clamp_float(purge_amount_g, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
     freshness_hours = clamp_float(freshness_hours, 0.5f, 48.0f);
+    coast_ratio = clamp_float(coast_ratio, GRIND_LATENCY_TO_COAST_RATIO_MIN, GRIND_LATENCY_TO_COAST_RATIO_MAX);
     brightness_normal = clamp_float(brightness_normal, 0.15f, 1.0f);
     brightness_screensaver = clamp_float(brightness_screensaver, 0.15f, 1.0f);
+    screensaver_startup_duration_ms = clamp_int(screensaver_startup_duration_ms,
+                                                USER_SCREENSAVER_STARTUP_DURATION_MIN_MS,
+                                                USER_SCREENSAVER_STARTUP_DURATION_MAX_MS);
+    screensaver_sleep_delay_ms = clamp_int(screensaver_sleep_delay_ms,
+                                           USER_SCREEN_AUTO_DIM_TIMEOUT_MIN_MS,
+                                           USER_SCREEN_AUTO_DIM_TIMEOUT_MAX_MS);
 
     String json;
-    json.reserve(900);
+    json.reserve(1200);
     json += "{\"ok\":true,\"settings\":{";
     json += "\"wifi_startup\":";
     json += wifi_startup ? "true" : "false";
@@ -803,10 +848,16 @@ String ConnectivityManager::build_settings_json() const {
     json += String(purge_amount_g, 1);
     json += ",\"freshness_hours\":";
     json += String(freshness_hours, 1);
+    json += ",\"coast_ratio\":";
+    json += String(coast_ratio, 2);
     json += ",\"brightness_normal\":";
     json += String(brightness_normal, 2);
     json += ",\"brightness_screensaver\":";
     json += String(brightness_screensaver, 2);
+    json += ",\"screensaver_sleep_delay_min\":";
+    json += String(static_cast<float>(screensaver_sleep_delay_ms) / 60000.0f, 0);
+    json += ",\"screensaver_startup_duration_s\":";
+    json += String(static_cast<float>(screensaver_startup_duration_ms) / 1000.0f, 0);
     json += ",\"screensaver_image\":";
     json += has_screensaver_image() ? "true" : "false";
     json += ",\"screensaver_image_bytes\":";
@@ -826,14 +877,15 @@ void ConnectivityManager::handle_settings_get() {
 void ConnectivityManager::handle_settings_post() {
     bool changed = false;
     bool found = false;
+    String write_errors;
 
     Preferences wifi_prefs;
     if (wifi_prefs.begin(WIFI_PREF_NAMESPACE, false)) {
         bool current = wifi_prefs.getBool(WIFI_PREF_KEY_STARTUP, true);
         bool value = get_request_bool("wifi_startup", current, found);
         if (found) {
-            wifi_prefs.putBool(WIFI_PREF_KEY_STARTUP, value);
-            changed = true;
+            changed = record_preference_write(wifi_prefs.putBool(WIFI_PREF_KEY_STARTUP, value),
+                                              "WiFi startup", write_errors) || changed;
         }
         wifi_prefs.end();
     }
@@ -843,8 +895,8 @@ void ConnectivityManager::handle_settings_post() {
         bool current = logging_prefs.getBool("enabled", false);
         bool value = get_request_bool("logging_enabled", current, found);
         if (found) {
-            logging_prefs.putBool("enabled", value);
-            changed = true;
+            changed = record_preference_write(logging_prefs.putBool("enabled", value),
+                                              "grind logging", write_errors) || changed;
         }
         logging_prefs.end();
     }
@@ -854,8 +906,8 @@ void ConnectivityManager::handle_settings_post() {
         bool current = swipe_prefs.getBool("enabled", false);
         bool value = get_request_bool("swipe_enabled", current, found);
         if (found) {
-            swipe_prefs.putBool("enabled", value);
-            changed = true;
+            changed = record_preference_write(swipe_prefs.putBool("enabled", value),
+                                              "swipe mode switching", write_errors) || changed;
         }
         swipe_prefs.end();
     }
@@ -865,33 +917,63 @@ void ConnectivityManager::handle_settings_post() {
         bool current_start = auto_prefs.getBool("auto_start", false);
         bool start_value = get_request_bool("auto_start", current_start, found);
         if (found) {
-            auto_prefs.putBool("auto_start", start_value);
-            changed = true;
+            changed = record_preference_write(auto_prefs.putBool("auto_start", start_value),
+                                              "start on cup", write_errors) || changed;
         }
 
         bool current_return = auto_prefs.getBool("auto_return", false);
         bool return_value = get_request_bool("auto_return", current_return, found);
         if (found) {
-            auto_prefs.putBool("auto_return", return_value);
-            changed = true;
+            changed = record_preference_write(auto_prefs.putBool("auto_return", return_value),
+                                              "return on cup removal", write_errors) || changed;
         }
         auto_prefs.end();
     }
 
     Preferences screensaver_prefs;
-    if (screensaver_prefs.begin("screensaver", false)) {
-        bool current_startup = screensaver_prefs.getBool("startup", false);
+    if (screensaver_prefs.begin(USER_SCREENSAVER_PREF_NAMESPACE, false)) {
+        bool current_startup = screensaver_prefs.getBool(USER_SCREENSAVER_PREF_KEY_STARTUP, false);
         bool startup = get_request_bool("screensaver_startup", current_startup, found);
         if (found) {
-            screensaver_prefs.putBool("startup", startup);
-            changed = true;
+            changed = record_preference_write(screensaver_prefs.putBool(USER_SCREENSAVER_PREF_KEY_STARTUP, startup),
+                                              "startup screensaver", write_errors) || changed;
         }
 
-        bool current_sleep = screensaver_prefs.getBool("sleep", false);
+        bool current_sleep = screensaver_prefs.getBool(USER_SCREENSAVER_PREF_KEY_SLEEP, false);
         bool sleep = get_request_bool("screensaver_sleep", current_sleep, found);
         if (found) {
-            screensaver_prefs.putBool("sleep", sleep);
-            changed = true;
+            changed = record_preference_write(screensaver_prefs.putBool(USER_SCREENSAVER_PREF_KEY_SLEEP, sleep),
+                                              "sleep screensaver", write_errors) || changed;
+        }
+
+        uint32_t current_startup_ms = screensaver_prefs.getUInt(USER_SCREENSAVER_PREF_KEY_STARTUP_DURATION_MS,
+                                                                USER_SCREENSAVER_STARTUP_DURATION_DEFAULT_MS);
+        float current_startup_s = static_cast<float>(current_startup_ms) / 1000.0f;
+        float startup_s = get_request_float("screensaver_startup_duration_s", current_startup_s,
+                                            static_cast<float>(USER_SCREENSAVER_STARTUP_DURATION_MIN_MS) / 1000.0f,
+                                            static_cast<float>(USER_SCREENSAVER_STARTUP_DURATION_MAX_MS) / 1000.0f,
+                                            found);
+        if (found) {
+            changed = record_preference_write(
+                          screensaver_prefs.putUInt(USER_SCREENSAVER_PREF_KEY_STARTUP_DURATION_MS,
+                                                    static_cast<uint32_t>(startup_s * 1000.0f + 0.5f)),
+                          "startup duration",
+                          write_errors) || changed;
+        }
+
+        uint32_t current_sleep_ms = screensaver_prefs.getUInt(USER_SCREENSAVER_PREF_KEY_SLEEP_DELAY_MS,
+                                                              USER_SCREEN_AUTO_DIM_TIMEOUT_DEFAULT_MS);
+        float current_sleep_min = static_cast<float>(current_sleep_ms) / 60000.0f;
+        float sleep_min = get_request_float("screensaver_sleep_delay_min", current_sleep_min,
+                                            static_cast<float>(USER_SCREEN_AUTO_DIM_TIMEOUT_MIN_MS) / 60000.0f,
+                                            static_cast<float>(USER_SCREEN_AUTO_DIM_TIMEOUT_MAX_MS) / 60000.0f,
+                                            found);
+        if (found) {
+            changed = record_preference_write(
+                          screensaver_prefs.putUInt(USER_SCREENSAVER_PREF_KEY_SLEEP_DELAY_MS,
+                                                    static_cast<uint32_t>(sleep_min * 60000.0f + 0.5f)),
+                          "screensaver delay",
+                          write_errors) || changed;
         }
         screensaver_prefs.end();
     }
@@ -901,15 +983,15 @@ void ConnectivityManager::handle_settings_post() {
         float current_normal = brightness_prefs.getFloat("normal", USER_SCREEN_BRIGHTNESS_NORMAL);
         float normal = get_request_float("brightness_normal", current_normal, 0.15f, 1.0f, found);
         if (found) {
-            brightness_prefs.putFloat("normal", normal);
-            changed = true;
+            changed = record_preference_write(brightness_prefs.putFloat("normal", normal),
+                                              "brightness", write_errors) || changed;
         }
 
         float current_screensaver = brightness_prefs.getFloat("screensaver", USER_SCREEN_BRIGHTNESS_DIMMED);
         float screensaver = get_request_float("brightness_screensaver", current_screensaver, 0.15f, 1.0f, found);
         if (found) {
-            brightness_prefs.putFloat("screensaver", screensaver);
-            changed = true;
+            changed = record_preference_write(brightness_prefs.putFloat("screensaver", screensaver),
+                                              "screensaver brightness", write_errors) || changed;
         }
         brightness_prefs.end();
     }
@@ -918,35 +1000,55 @@ void ConnectivityManager::handle_settings_post() {
         int current_grind_mode = preferences_->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
         int grind_mode = get_request_int("grind_mode", current_grind_mode, 0, 1, found);
         if (found) {
-            preferences_->putInt("grind_mode", grind_mode);
-            changed = true;
+            changed = record_preference_write(preferences_->putInt("grind_mode", grind_mode),
+                                              "grind mode", write_errors) || changed;
         }
 
         int current_purge_mode = preferences_->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
         int purge_mode = get_request_int("purge_mode", current_purge_mode, 0, 1, found);
         if (found) {
-            preferences_->putInt(GrindController::PREF_KEY_GRINDER_MODE, purge_mode);
-            changed = true;
+            changed = record_preference_write(preferences_->putInt(GrindController::PREF_KEY_GRINDER_MODE, purge_mode),
+                                              "purge mode", write_errors) || changed;
         }
 
         float current_purge_amount = preferences_->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         float purge_amount = get_request_float("purge_amount_g", current_purge_amount,
                                                GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G, found);
         if (found) {
-            preferences_->putFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, purge_amount);
-            changed = true;
+            changed = record_preference_write(preferences_->putFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, purge_amount),
+                                              "purge amount", write_errors) || changed;
         }
 
         float current_freshness = preferences_->getFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, GRIND_FRESHNESS_DEFAULT_HOURS);
         float freshness = get_request_float("freshness_hours", current_freshness, 0.5f, 48.0f, found);
         if (found) {
-            preferences_->putFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, freshness);
-            changed = true;
+            changed = record_preference_write(preferences_->putFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, freshness),
+                                              "freshness", write_errors) || changed;
+        }
+
+        float current_coast_ratio = preferences_->getFloat(GrindController::PREF_KEY_COAST_RATIO, GRIND_LATENCY_TO_COAST_RATIO_DEFAULT);
+        float coast_ratio = get_request_float("coast_ratio", current_coast_ratio,
+                                              GRIND_LATENCY_TO_COAST_RATIO_MIN,
+                                              GRIND_LATENCY_TO_COAST_RATIO_MAX,
+                                              found);
+        if (found) {
+            changed = record_preference_write(preferences_->putFloat(GrindController::PREF_KEY_COAST_RATIO, coast_ratio),
+                                              "grind coast", write_errors) || changed;
         }
     }
 
     if (changed) {
         mark_settings_changed();
+    }
+
+    if (!write_errors.isEmpty()) {
+        String json;
+        json.reserve(120);
+        json += "{\"ok\":false,\"error\":\"Could not persist: ";
+        json += json_escape(write_errors);
+        json += "\"}";
+        send_json_response(500, json);
+        return;
     }
 
     send_json_response(200, build_settings_json());

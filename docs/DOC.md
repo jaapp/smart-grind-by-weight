@@ -304,6 +304,8 @@ All profiles are fully customizable. Default grind-by-weight targets (fallback t
 - **Double**: 18 g (10 s)  
 - **Custom**: 21.5 g (12 s)
 
+The ready screen uses distinct Single, Double, and Custom dose icons above the target value so the active profile is easier to recognize at a glance.
+
 > 💡 **Tip** – the target label always shows the active unit (`g` or `s`). Long-press to edit in whichever mode you are currently using.
 
 ### Navigation
@@ -320,11 +322,13 @@ Access **Menu → Grind Settings** to configure:
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
 - **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
 - **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
+- **Basket Detection**: Optional Auto Start extension that compares the placed portafilter/basket weight against stored Single and Double basket weights, then switches to the matching profile before grinding. No match or ambiguous overlap will not start.
 - **Purging** *(Advanced)*: Control how the grinder saturates itself before weight-mode grinding
   - **Prime mode**: Keeps the coffee used to saturate the grinder, continues immediately
   - **Purge mode** (default): Prompts you to discard stale grinds before continuing
-  - **Amount slider**: Configure purge/prime amount (0.1g-5.0g, default 1.0g). Amount is a minimum target; actual output will be slightly higher.
+  - **Amount slider**: Configure purge/prime amount (0.1g-2.5g, default 1.0g). Amount is a minimum target; actual output will be slightly higher.
   - **"Keep purge grinds from now on" checkbox**: Appears during purge confirmation - switches to Prime mode when checked
+- **Coast Compensation**: Sets how much coffee is expected to keep falling after motor stop. Higher values stop earlier and reduce overshoot; lower values stop later if doses tend to undershoot.
 
   *Explanation:* The time between motor start and grinds hitting the cup (grind latency) is used to predict the coast time (how long grinds will keep coming after the motor is disengaged). Purging clears stale coffee and saturates the grinder with fresh grounds, ensuring accurate latency detection. If you prefer to keep all coffee without manual intervention, select Prime mode.
 
@@ -389,15 +393,19 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   |
     |   +-- Display
     |   |   |-- Normal brightness slider
-    |   |   \-- Screensaver brightness slider
+    |   |   |-- Screensaver brightness slider
+    |   |   \-- Custom image startup/sleep toggles
     |   |
     |   \-- Grind Settings
     |       |-- Swipe Gestures toggle (enable/disable vertical swipes)
     |       |-- Time Mode toggle (direct weight/time mode selection)
     |       |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
     |       |-- Return on Removal toggle (drop back to Ready when that weight leaves)
+    |       |-- Basket Detection controls (capture Single/Double basket weights)
     |       |-- Purging (Prime/Purge radio buttons)
-    |       \-- Amount slider (0.1g-5.0g for purge/prime operation)
+    |       |-- Amount slider (0.1g-2.5g for purge/prime operation)
+    |       |-- Freshness slider
+    |       \-- Coast Compensation slider
     |
     \-- Info
         +-- Diagnostics
@@ -452,7 +460,7 @@ Both automation settings rely on the same smoothed weight deltas used for flow d
 
 WiFi can be configured in **Menu → WiFi** with optional auto-startup. If no credentials are saved, the grinder starts a `GrindByWeight-Setup` access point; join it and open `http://192.168.4.1` to save your home WiFi credentials. Once connected, the grinder is available at `http://grindbyweight.local` or its displayed IP address. WiFi enables wireless firmware updates through the built-in HTTP OTA endpoint.
 
-The device web page also exposes the same practical settings as the touchscreen menu: grind mode, purge mode and amount, freshness, automation toggles, logging, brightness, WiFi startup, and OTA upload. Settings are stored in the existing NVS preference namespaces, so the web UI does not duplicate settings storage.
+The device web page also exposes the same practical settings as the touchscreen menu: grind mode, purge mode and amount, freshness, coast compensation, automation toggles, logging, brightness, WiFi startup, screensaver timing, and OTA upload. Each setting includes inline help text, and settings are stored in the existing NVS preference namespaces so the web UI does not duplicate settings storage.
 
 Machine-readable endpoints are available for future integrations:
 
@@ -465,7 +473,7 @@ POST /api/screensaver
 POST /api/screensaver/clear
 ```
 
-Screensaver images are uploaded from the browser page. The browser resizes the selected image to the 280x456 display and converts it to raw RGB565 before upload; the firmware stores that fixed-size file in LittleFS and shows it when the screen dims.
+Screensaver images are uploaded from the browser page. The browser resizes the selected image to the 280x456 display and converts it to raw RGB565 before upload; the firmware stores that fixed-size file in LittleFS and shows it on startup or when the screen dims. The web settings can also adjust the startup image duration and the inactivity delay before the dimmed screensaver state.
 
 ---
 

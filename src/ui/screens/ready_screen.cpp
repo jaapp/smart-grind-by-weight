@@ -4,6 +4,69 @@
 #include "../../controllers/grind_mode_traits.h"
 #include "../ui_helpers.h"
 
+namespace {
+
+lv_obj_t* create_icon_part(lv_obj_t* parent, int x, int y, int width, int height,
+                           lv_color_t color, int radius) {
+    lv_obj_t* part = lv_obj_create(parent);
+    lv_obj_set_size(part, width, height);
+    lv_obj_set_pos(part, x, y);
+    lv_obj_set_style_bg_color(part, color, 0);
+    lv_obj_set_style_bg_opa(part, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(part, 0, 0);
+    lv_obj_set_style_pad_all(part, 0, 0);
+    lv_obj_set_style_radius(part, radius, 0);
+    lv_obj_clear_flag(part, LV_OBJ_FLAG_SCROLLABLE);
+    return part;
+}
+
+void create_steam(lv_obj_t* parent, int x, int y, int height, lv_color_t color) {
+    lv_obj_t* steam = create_icon_part(parent, x, y, 7, height, color, LV_RADIUS_CIRCLE);
+    lv_obj_set_style_bg_opa(steam, LV_OPA_50, 0);
+}
+
+void create_dot(lv_obj_t* parent, int x, int y, int size, lv_color_t color) {
+    lv_obj_t* dot = create_icon_part(parent, x, y, size, size, color, LV_RADIUS_CIRCLE);
+    lv_obj_set_style_shadow_width(dot, 8, 0);
+    lv_obj_set_style_shadow_color(dot, color, 0);
+    lv_obj_set_style_shadow_opa(dot, LV_OPA_50, 0);
+}
+
+void create_cup(lv_obj_t* parent, int x, int y, int width, int height, lv_color_t accent) {
+    lv_obj_t* saucer = create_icon_part(parent, x - 8, y + height + 8, width + 20, 7,
+                                        lv_color_hex(0x4A4A4A), 4);
+    lv_obj_set_style_bg_opa(saucer, LV_OPA_70, 0);
+
+    lv_obj_t* handle = lv_obj_create(parent);
+    lv_obj_set_size(handle, 20, height - 8);
+    lv_obj_set_pos(handle, x + width - 5, y + 7);
+    lv_obj_set_style_bg_opa(handle, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(handle, 4, 0);
+    lv_obj_set_style_border_color(handle, accent, 0);
+    lv_obj_set_style_border_opa(handle, LV_OPA_70, 0);
+    lv_obj_set_style_pad_all(handle, 0, 0);
+    lv_obj_set_style_radius(handle, LV_RADIUS_CIRCLE, 0);
+    lv_obj_clear_flag(handle, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* body = create_icon_part(parent, x, y, width, height, accent, 10);
+    lv_obj_set_style_border_width(body, 2, 0);
+    lv_obj_set_style_border_color(body, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_style_border_opa(body, LV_OPA_50, 0);
+    lv_obj_set_style_shadow_width(body, 14, 0);
+    lv_obj_set_style_shadow_color(body, accent, 0);
+    lv_obj_set_style_shadow_opa(body, LV_OPA_50, 0);
+
+    lv_obj_t* coffee = create_icon_part(parent, x + 7, y + 7, width - 14, 7,
+                                        lv_color_hex(0x201713), LV_RADIUS_CIRCLE);
+    lv_obj_set_style_bg_opa(coffee, LV_OPA_80, 0);
+
+    lv_obj_t* shine = create_icon_part(parent, x + 9, y + 16, 6, height - 22,
+                                       lv_color_hex(THEME_COLOR_TEXT_PRIMARY), LV_RADIUS_CIRCLE);
+    lv_obj_set_style_bg_opa(shine, LV_OPA_30, 0);
+}
+
+} // namespace
+
 void ReadyScreen::create() {
     screen = lv_obj_create(lv_scr_act());
     lv_obj_set_size(screen, LV_PCT(100), LV_PCT(80));
@@ -66,7 +129,9 @@ void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(parent, 0, 0);
+    lv_obj_set_style_pad_gap(parent, 8, 0);
+
+    create_dose_icon(parent, profile_index);
 
     lv_obj_t* name_label;
     (void)create_profile_label(parent, &name_label, &weight_labels[profile_index]);
@@ -77,6 +142,37 @@ void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const
     snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
     lv_label_set_text(weight_labels[profile_index], weight_text);
     lv_obj_add_flag(weight_labels[profile_index], LV_OBJ_FLAG_CLICKABLE);
+}
+
+void ReadyScreen::create_dose_icon(lv_obj_t* parent, int profile_index) {
+    lv_obj_t* icon = lv_obj_create(parent);
+    lv_obj_set_size(icon, 132, 80);
+    lv_obj_set_style_bg_opa(icon, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(icon, 0, 0);
+    lv_obj_set_style_pad_all(icon, 0, 0);
+    lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+
+    switch (profile_index) {
+        case 0:
+            create_steam(icon, 62, 8, 18, lv_color_hex(THEME_COLOR_ACCENT));
+            create_cup(icon, 42, 30, 48, 32, lv_color_hex(THEME_COLOR_ACCENT));
+            break;
+
+        case 1:
+            create_steam(icon, 43, 10, 15, lv_color_hex(THEME_COLOR_PRIMARY));
+            create_steam(icon, 82, 10, 15, lv_color_hex(THEME_COLOR_WARNING));
+            create_cup(icon, 25, 34, 38, 27, lv_color_hex(THEME_COLOR_PRIMARY));
+            create_cup(icon, 68, 34, 38, 27, lv_color_hex(THEME_COLOR_WARNING));
+            break;
+
+        default:
+            create_dot(icon, 37, 11, 11, lv_color_hex(THEME_COLOR_PRIMARY));
+            create_dot(icon, 61, 6, 12, lv_color_hex(THEME_COLOR_ACCENT));
+            create_dot(icon, 87, 12, 10, lv_color_hex(THEME_COLOR_SUCCESS));
+            create_cup(icon, 42, 34, 48, 32, lv_color_hex(THEME_COLOR_NEUTRAL));
+            create_steam(icon, 63, 18, 12, lv_color_hex(THEME_COLOR_SECONDARY));
+            break;
+    }
 }
 
 void ReadyScreen::create_menu_page(lv_obj_t* parent) {

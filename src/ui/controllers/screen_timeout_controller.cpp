@@ -7,9 +7,17 @@
 #include "../ui_manager.h"
 
 ScreenTimeoutController::ScreenTimeoutController(UIManager* manager)
-    : ui_manager_(manager), screen_dimmed_(false) {}
+    : ui_manager_(manager)
+    , timeout_ms_(USER_SCREEN_AUTO_DIM_TIMEOUT_MS)
+    , screen_dimmed_(false) {}
 
 void ScreenTimeoutController::register_events() {}
+
+void ScreenTimeoutController::reload_settings() {
+    timeout_ms_ = screensaver_controller_
+                      ? screensaver_controller_->get_sleep_delay_ms()
+                      : USER_SCREEN_AUTO_DIM_TIMEOUT_MS;
+}
 
 void ScreenTimeoutController::update() {
     if (!ui_manager_) {
@@ -49,10 +57,10 @@ void ScreenTimeoutController::update() {
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
     auto* sensor = hardware->get_weight_sensor();
     bool recent_weight_activity = sensor &&
-                                  sensor->weight_range_exceeds(USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
+                                  sensor->weight_range_exceeds(timeout_ms_,
                                                                USER_WEIGHT_ACTIVITY_THRESHOLD_G);
 
-    bool should_dim = (ms_since_touch >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS) && !recent_weight_activity;
+    bool should_dim = (ms_since_touch >= timeout_ms_) && !recent_weight_activity;
 
     if (should_dim && !screen_dimmed_) {
         float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;

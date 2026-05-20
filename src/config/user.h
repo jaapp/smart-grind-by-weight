@@ -46,10 +46,22 @@
 //------------------------------------------------------------------------------
 // SCREEN AUTO-DIMMING
 //------------------------------------------------------------------------------
-#define USER_SCREEN_AUTO_DIM_TIMEOUT_MS 300000                                 // Time before screen dims due to inactivity
+#define USER_SCREEN_AUTO_DIM_TIMEOUT_DEFAULT_MS 300000                         // Default time before screen dims due to inactivity
+#define USER_SCREEN_AUTO_DIM_TIMEOUT_MIN_MS 60000                              // Minimum configurable auto-dim delay
+#define USER_SCREEN_AUTO_DIM_TIMEOUT_MAX_MS 3600000                            // Maximum configurable auto-dim delay
+#define USER_SCREEN_AUTO_DIM_TIMEOUT_MS USER_SCREEN_AUTO_DIM_TIMEOUT_DEFAULT_MS // Backward-compatible auto-dim default
 #define USER_SCREEN_BRIGHTNESS_NORMAL 1.0f                                     // Normal screen brightness
 #define USER_SCREEN_BRIGHTNESS_DIMMED 0.35f                                    // Dimmed screen brightness
 #define USER_WEIGHT_ACTIVITY_THRESHOLD_G 1.0f                                  // Weight change threshold for screen timeout reset (grams)
+
+#define USER_SCREENSAVER_PREF_NAMESPACE "screensaver"                          // NVS namespace for screensaver settings
+#define USER_SCREENSAVER_PREF_KEY_STARTUP "startup"                            // Show image during startup
+#define USER_SCREENSAVER_PREF_KEY_SLEEP "sleep"                                // Show image during screen dim
+#define USER_SCREENSAVER_PREF_KEY_STARTUP_DURATION_MS "startup_ms"              // Startup image duration
+#define USER_SCREENSAVER_PREF_KEY_SLEEP_DELAY_MS "sleep_ms"                    // Auto-dim/screensaver delay
+#define USER_SCREENSAVER_STARTUP_DURATION_DEFAULT_MS 3000                      // Default startup screensaver duration
+#define USER_SCREENSAVER_STARTUP_DURATION_MIN_MS 1000                          // Minimum startup screensaver duration
+#define USER_SCREENSAVER_STARTUP_DURATION_MAX_MS 30000                         // Maximum startup screensaver duration
 
 //------------------------------------------------------------------------------
 // AUTO ACTIONS

@@ -7,6 +7,16 @@
 #include <Preferences.h>
 #include <esp_heap_caps.h>
 
+namespace {
+
+uint32_t clamp_duration_ms(uint32_t value, uint32_t min_value, uint32_t max_value) {
+    if (value < min_value) return min_value;
+    if (value > max_value) return max_value;
+    return value;
+}
+
+} // namespace
+
 ScreensaverController::ScreensaverController()
     : overlay_screen_(nullptr)
     , previous_screen_(nullptr)
@@ -26,18 +36,40 @@ bool ScreensaverController::has_image() const {
 
 bool ScreensaverController::is_startup_enabled() const {
     Preferences prefs;
-    prefs.begin("screensaver", true);
-    bool enabled = prefs.getBool("startup", false);
+    prefs.begin(USER_SCREENSAVER_PREF_NAMESPACE, true);
+    bool enabled = prefs.getBool(USER_SCREENSAVER_PREF_KEY_STARTUP, false);
     prefs.end();
     return enabled;
 }
 
 bool ScreensaverController::is_sleep_enabled() const {
     Preferences prefs;
-    prefs.begin("screensaver", true);
-    bool enabled = prefs.getBool("sleep", false);
+    prefs.begin(USER_SCREENSAVER_PREF_NAMESPACE, true);
+    bool enabled = prefs.getBool(USER_SCREENSAVER_PREF_KEY_SLEEP, false);
     prefs.end();
     return enabled;
+}
+
+uint32_t ScreensaverController::get_startup_duration_ms() const {
+    Preferences prefs;
+    prefs.begin(USER_SCREENSAVER_PREF_NAMESPACE, true);
+    uint32_t duration_ms = prefs.getUInt(USER_SCREENSAVER_PREF_KEY_STARTUP_DURATION_MS,
+                                         USER_SCREENSAVER_STARTUP_DURATION_DEFAULT_MS);
+    prefs.end();
+    return clamp_duration_ms(duration_ms,
+                             USER_SCREENSAVER_STARTUP_DURATION_MIN_MS,
+                             USER_SCREENSAVER_STARTUP_DURATION_MAX_MS);
+}
+
+uint32_t ScreensaverController::get_sleep_delay_ms() const {
+    Preferences prefs;
+    prefs.begin(USER_SCREENSAVER_PREF_NAMESPACE, true);
+    uint32_t delay_ms = prefs.getUInt(USER_SCREENSAVER_PREF_KEY_SLEEP_DELAY_MS,
+                                      USER_SCREEN_AUTO_DIM_TIMEOUT_DEFAULT_MS);
+    prefs.end();
+    return clamp_duration_ms(delay_ms,
+                             USER_SCREEN_AUTO_DIM_TIMEOUT_MIN_MS,
+                             USER_SCREEN_AUTO_DIM_TIMEOUT_MAX_MS);
 }
 
 void ScreensaverController::show() {

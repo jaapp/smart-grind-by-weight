@@ -31,6 +31,7 @@ public:
     
 private:
     void create_profile_page(lv_obj_t* parent, int profile_index, const char* profile_name, float weight);
+    void create_dose_icon(lv_obj_t* parent, int profile_index);
     void create_menu_page(lv_obj_t* parent);
     static void status_timer_cb(lv_timer_t* timer);
 };
