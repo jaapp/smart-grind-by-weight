@@ -232,7 +232,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('ota')">OTA Update</button>
             <button class="tab" onclick="showTab('initial')">Initial Setup (USB)</button>
-            <button class="tab" onclick="showTab('diagnostics')">Diagnostics</button>
+            <button class="tab" onclick="showTab('diagnostics')">Legacy Diagnostics</button>
         </div>
         
         <!-- Initial Setup Tab -->
@@ -324,12 +324,12 @@
         <!-- Diagnostics Tab -->
         <div id="diagnosticsTab" class="tab-content">
             <div class="section">
-                <h3>🔍 Diagnostic Report</h3>
-                <p>Generate a comprehensive diagnostic report from your device to attach to GitHub issues for troubleshooting.</p>
+                <h3>🔍 Legacy BLE Diagnostic Report</h3>
+                <p>Generate a diagnostic report from older BLE firmware. Current WiFi firmware uses on-device diagnostics and serial logs.</p>
 
                 <div class="form-group">
                     <button class="btn" id="getDiagnosticsBtn" onclick="getDiagnosticReport()">
-                        <span>📋</span> Connect & Get Diagnostics
+                        <span>📋</span> Connect via BLE & Get Diagnostics
                     </button>
                 </div>
 

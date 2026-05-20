@@ -697,7 +697,7 @@ async function getDiagnosticReport() {
 
     try {
         btn.disabled = true;
-        statusDiv.innerHTML = '<div class="status info">Connecting to device...</div>';
+        statusDiv.innerHTML = '<div class="status info">Connecting to legacy BLE firmware...</div>';
 
         // Request device
         device = await navigator.bluetooth.requestDevice({
