@@ -53,6 +53,8 @@ public:
         CONFIRM,
         CONFIRM_CANCEL,
         PURGE_CONFIRM_CONTINUE,
+        SCREENSAVER_STARTUP_TOGGLE,
+        SCREENSAVER_SLEEP_TOGGLE,
         COUNT
     };
 

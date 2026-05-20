@@ -232,6 +232,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('ota')">OTA Update (BLE)</button>
             <button class="tab" onclick="showTab('initial')">Initial Setup (USB)</button>
+            <button class="tab" onclick="showTab('screensaver')">Screensaver</button>
             <button class="tab" onclick="showTab('diagnostics')">Diagnostics</button>
         </div>
         
@@ -304,6 +305,37 @@
             
             <div class="progress" id="progressContainer" style="display: none;">
                 <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </div>
+
+        <!-- Screensaver Tab -->
+        <div id="screensaverTab" class="tab-content">
+            <div class="section">
+                <h3>🖼️ Custom Screensaver Image</h3>
+                <p>Upload a custom image to display on startup or when the grinder enters power-saving mode. The image must be exactly <strong>280 x 456 pixels</strong>.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="screensaverFile">Select Image File</label>
+                <input type="file" id="screensaverFile" accept=".png,.jpg,.jpeg,.bmp,.webp" onchange="handleScreensaverFileSelect(event)">
+            </div>
+
+            <div id="screensaverPreviewContainer" style="display: none; text-align: center; margin-bottom: 20px;">
+                <canvas id="screensaverPreview" style="border: 2px solid #e2e8f0; border-radius: 8px; max-width: 100%; height: auto;"></canvas>
+            </div>
+
+            <div id="screensaverValidation" class="status" style="display: none;"></div>
+
+            <button class="btn" id="uploadScreensaverBtn" onclick="uploadScreensaver()" disabled>Upload to Device</button>
+
+            <div class="progress" id="screensaverProgressContainer" style="display: none;">
+                <div class="progress-bar" id="screensaverProgressBar"></div>
+            </div>
+
+            <div id="screensaverStatus" class="status info" style="display: none;"></div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn" id="deleteScreensaverBtn" onclick="deleteScreensaver()" style="background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);">Delete Image from Device</button>
             </div>
         </div>
 

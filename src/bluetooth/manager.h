@@ -12,6 +12,7 @@
 #include "../config/constants.h"
 #include "ota_handler.h"
 #include "data_stream.h"
+#include "image_upload_handler.h"
 
 // Forward declaration to avoid circular dependency
 class UIManager;
@@ -94,6 +95,7 @@ private:
     // Component handlers
     OTAHandler ota_handler;
     DataStreamManager data_stream;
+    ImageUploadHandler image_handler;
     
     // Data export state
     bool data_export_in_progress;
@@ -124,6 +126,8 @@ private:
     void handle_ota_data_chunk(BLECharacteristic* characteristic);
     void handle_debug_command(BLECharacteristic* characteristic);
     void handle_data_control_command(BLECharacteristic* characteristic);
+    void handle_image_control_command(uint8_t command, const String& value);
+    void set_image_status(BLEImageStatus status);
     void send_next_data_chunk();
     void send_measurement_count();
     void send_log_message(const char* message);
@@ -181,6 +185,7 @@ public:
     bool is_connected() const { return device_connected; }
     bool is_updating() const { return ota_handler.is_ota_active(); }
     bool is_debug_stream_active() const { return debug_stream_active; }
+    bool has_screensaver_image() const { return image_handler.has_image(); }
     
     /**
      * OTA progress information

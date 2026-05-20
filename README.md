@@ -1,16 +1,4 @@
-# Smart Grind-by-Weight - user-configurable Coast Compensation setting + median-based coast prediction using learned measurements
-
-This fork adds two improvements to the coast prediction algorithm:
-
-1. **Configurable Coast Compensation slider** (Menu → Grind Mode → Coast Compensation): Adjustable from 70% to 150% in 5% increments, stored in NVS. This acts as a multiplier on the predicted coast value, allowing users to fine-tune when the motor stops for their specific grinder model. Default: 90%.
-
-2. **Median-based coast prediction**: Instead of estimating coast solely from startup latency, the system now measures the actual coffee delivered after each motor stop and stores the last 5 measurements. The median of these values is used as the coast prediction for subsequent grinds, making the system self-learning and robust against outliers (e.g. clumping). On cold start (no history yet), the original latency-based algorithm is used as fallback.
-
-In combination, the coast ratio slider acts as a fine-tuning multiplier on the learned median value. At 100%, the pure median prediction is used. Tested on a Eureka Mignon Stark with consistent results at 125%.
-
-
-
-
+# Smart Grind-by-Weight
 
 **Turn any grinder into a precision smart grind-by-weight system**
 
@@ -51,6 +39,7 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 - **High accuracy**: ±0.03g error tolerance  
 - **Zero-shot learning**: Algorithm adapts instantly to any grind size, bean setting, humidity etc. without manual tuning
 - **Original timed run preserved** – there is a setting to enable the original Grind-By-Time mode
+- **Configurable coast compensation** to tune how early the motor stops during predictive weight grinding
 - **BLE OTA updates** for firmware
 - **Advanced analytics** using BLE data transfer and Python Streamlit reports
 - **For Eureka**: No permanent modifications needed - just swap the screen and add 3D printed parts

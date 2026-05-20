@@ -19,6 +19,30 @@ const BLE_DEBUG_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const BLE_SYSINFO_SERVICE_UUID = '77889900-aabb-ccdd-eeff-112233445566';
 const BLE_SYSINFO_DIAGNOSTICS_CHAR_UUID = '22334455-ff00-1111-2222-334455667788';
 
+// Image upload uses the existing Data Service (no separate service needed)
+// Data Service UUIDs are defined above as BLE_DATA_*
+const BLE_DATA_CONTROL_CHAR_UUID = '33445566-7788-99aa-bbcc-ddeeffaabbcc';
+const BLE_DATA_TRANSFER_CHAR_UUID = '44556677-8899-aabb-ccdd-eeffaabbccdd';
+const BLE_DATA_STATUS_CHAR_UUID = '55667788-99aa-bbcc-ddee-ffaabbccddee';
+const BLE_DATA_SERVICE_UUID = '22334455-6677-8899-aabb-ccddeeffffaa';
+
+// Image upload commands (0x30+ range, sent via data control characteristic)
+const BLE_IMG_CMD_START = 0x30;
+const BLE_IMG_CMD_END = 0x32;
+const BLE_IMG_CMD_ABORT = 0x33;
+const BLE_IMG_CMD_DELETE = 0x34;
+
+const BLE_IMG_STATUS_IDLE = 0x30;
+const BLE_IMG_STATUS_READY = 0x31;
+const BLE_IMG_STATUS_RECEIVING = 0x32;
+const BLE_IMG_STATUS_SUCCESS = 0x33;
+const BLE_IMG_STATUS_ERROR = 0x34;
+const BLE_IMG_STATUS_HAS_IMAGE = 0x35;
+
+const IMAGE_WIDTH = 280;
+const IMAGE_HEIGHT = 456;
+const IMAGE_EXPECTED_SIZE = IMAGE_WIDTH * IMAGE_HEIGHT * 2; // RGB565
+
 // Commands and status codes (from your Python implementation)
 const BLE_OTA_CMD_START = 0x01;
 const BLE_OTA_CMD_END = 0x03;
@@ -724,6 +748,227 @@ function downloadDiagnosticReport() {
         }, 3000);
     } catch (error) {
         statusDiv.innerHTML = '<div class="status error">Failed to download report.</div>';
+    }
+}
+
+// =============================================================================
+// SCREENSAVER IMAGE UPLOAD
+// =============================================================================
+
+let screensaverRgb565Data = null; // Converted image data ready for upload
+
+function updateScreensaverStatus(message, type = 'info') {
+    const el = document.getElementById('screensaverStatus');
+    el.textContent = message;
+    el.className = `status ${type}`;
+    el.style.display = 'block';
+    console.log(`[SCREENSAVER ${type.toUpperCase()}] ${message}`);
+}
+
+function updateScreensaverProgress(percent) {
+    const container = document.getElementById('screensaverProgressContainer');
+    const bar = document.getElementById('screensaverProgressBar');
+    if (percent > 0) {
+        container.style.display = 'block';
+        bar.style.width = percent + '%';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function handleScreensaverFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    screensaverRgb565Data = null;
+    document.getElementById('uploadScreensaverBtn').disabled = true;
+
+    const validationEl = document.getElementById('screensaverValidation');
+    validationEl.style.display = 'block';
+    validationEl.textContent = 'Validating image...';
+    validationEl.className = 'status info';
+
+    const img = new Image();
+    img.onload = () => {
+        URL.revokeObjectURL(img.src);
+
+        if (img.width !== IMAGE_WIDTH || img.height !== IMAGE_HEIGHT) {
+            validationEl.textContent = `Invalid dimensions: ${img.width} x ${img.height}. Required: ${IMAGE_WIDTH} x ${IMAGE_HEIGHT} pixels.`;
+            validationEl.className = 'status error';
+            document.getElementById('screensaverPreviewContainer').style.display = 'none';
+            return;
+        }
+
+        // Draw to canvas for preview and conversion
+        const canvas = document.getElementById('screensaverPreview');
+        canvas.width = IMAGE_WIDTH;
+        canvas.height = IMAGE_HEIGHT;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        document.getElementById('screensaverPreviewContainer').style.display = 'block';
+
+        // Convert to RGB565 (byte-swapped for LV_COLOR_16_SWAP = 1)
+        const imageData = ctx.getImageData(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+        screensaverRgb565Data = rgbaToRgb565(imageData.data);
+
+        validationEl.textContent = `Image valid: ${IMAGE_WIDTH} x ${IMAGE_HEIGHT} pixels (${(screensaverRgb565Data.length / 1024).toFixed(0)} KB)`;
+        validationEl.className = 'status success';
+        document.getElementById('uploadScreensaverBtn').disabled = false;
+    };
+
+    img.onerror = () => {
+        URL.revokeObjectURL(img.src);
+        validationEl.textContent = 'Failed to load image file.';
+        validationEl.className = 'status error';
+    };
+
+    img.src = URL.createObjectURL(file);
+}
+
+/**
+ * Convert RGBA pixel data to native (little-endian) RGB565.
+ * LVGL uses LV_COLOR_FORMAT_RGB565 internally and the display driver
+ * handles byte swapping (LV_COLOR_16_SWAP) during flush.
+ */
+function rgbaToRgb565(rgba) {
+    const rgb565 = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGHT * 2);
+    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 2) {
+        const r = rgba[i];
+        const g = rgba[i + 1];
+        const b = rgba[i + 2];
+        const pixel = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+        // Little-endian: low byte first
+        rgb565[j] = pixel & 0xFF;
+        rgb565[j + 1] = (pixel >> 8) & 0xFF;
+    }
+    return rgb565;
+}
+
+async function uploadScreensaver() {
+    if (!screensaverRgb565Data) {
+        updateScreensaverStatus('No valid image to upload.', 'error');
+        return;
+    }
+
+    const uploadBtn = document.getElementById('uploadScreensaverBtn');
+    uploadBtn.disabled = true;
+
+    try {
+        updateScreensaverStatus('Connecting to device...', 'info');
+
+        // Connect via BLE (image upload uses the existing data service)
+        const bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: DEVICE_NAME }],
+            optionalServices: [BLE_DATA_SERVICE_UUID]
+        });
+
+        const bleServer = await bleDevice.gatt.connect();
+        updateScreensaverStatus('Getting data service...', 'info');
+
+        const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
+        const dataChar = await dataService.getCharacteristic(BLE_DATA_TRANSFER_CHAR_UUID);
+        const controlChar = await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID);
+        const imgStatusChar = await dataService.getCharacteristic(BLE_DATA_STATUS_CHAR_UUID);
+
+        // Set up status notifications
+        let lastStatus = BLE_IMG_STATUS_IDLE;
+        await imgStatusChar.startNotifications();
+        imgStatusChar.addEventListener('characteristicvaluechanged', (event) => {
+            const val = new Uint8Array(event.target.value.buffer);
+            if (val.length > 0) lastStatus = val[0];
+        });
+
+        // Send START command: [0x10][size:4 LE]
+        updateScreensaverStatus('Starting upload...', 'info');
+        const startCmd = new Uint8Array(5);
+        startCmd[0] = BLE_IMG_CMD_START;
+        startCmd[1] = screensaverRgb565Data.length & 0xFF;
+        startCmd[2] = (screensaverRgb565Data.length >> 8) & 0xFF;
+        startCmd[3] = (screensaverRgb565Data.length >> 16) & 0xFF;
+        startCmd[4] = (screensaverRgb565Data.length >> 24) & 0xFF;
+        await controlChar.writeValue(startCmd);
+
+        await sleep(200); // Wait for device to prepare
+
+        if (lastStatus === BLE_IMG_STATUS_ERROR) {
+            throw new Error('Device rejected the upload (check image size or OTA status)');
+        }
+
+        // Send data in chunks
+        const totalChunks = Math.ceil(screensaverRgb565Data.length / CHUNK_SIZE);
+        updateScreensaverStatus(`Uploading image (${totalChunks} chunks)...`, 'info');
+        updateScreensaverProgress(0);
+
+        for (let offset = 0; offset < screensaverRgb565Data.length; offset += CHUNK_SIZE) {
+            const end = Math.min(offset + CHUNK_SIZE, screensaverRgb565Data.length);
+            const chunk = screensaverRgb565Data.slice(offset, end);
+            await dataChar.writeValue(chunk);
+
+            const percent = Math.round((end / screensaverRgb565Data.length) * 100);
+            updateScreensaverProgress(percent);
+        }
+
+        // Send END command
+        updateScreensaverStatus('Finalizing...', 'info');
+        const endCmd = new Uint8Array([BLE_IMG_CMD_END]);
+        await controlChar.writeValue(endCmd);
+
+        await sleep(500); // Wait for device to finalize
+
+        if (lastStatus === BLE_IMG_STATUS_ERROR) {
+            throw new Error('Device reported error during finalization');
+        }
+
+        updateScreensaverStatus('Screensaver image uploaded successfully!', 'success');
+        updateScreensaverProgress(100);
+
+        // Disconnect
+        await sleep(500);
+        if (bleDevice.gatt.connected) {
+            bleDevice.gatt.disconnect();
+        }
+
+    } catch (error) {
+        updateScreensaverStatus(`Upload failed: ${error.message}`, 'error');
+        console.error('Screensaver upload error:', error);
+    } finally {
+        uploadBtn.disabled = !screensaverRgb565Data;
+        setTimeout(() => updateScreensaverProgress(0), 3000);
+    }
+}
+
+async function deleteScreensaver() {
+    const deleteBtn = document.getElementById('deleteScreensaverBtn');
+    deleteBtn.disabled = true;
+
+    try {
+        updateScreensaverStatus('Connecting to device...', 'info');
+
+        const bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: DEVICE_NAME }],
+            optionalServices: [BLE_DATA_SERVICE_UUID]
+        });
+
+        const bleServer = await bleDevice.gatt.connect();
+        const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
+        const controlChar = await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID);
+
+        // Send DELETE command
+        const deleteCmd = new Uint8Array([BLE_IMG_CMD_DELETE]);
+        await controlChar.writeValue(deleteCmd);
+
+        await sleep(500);
+        updateScreensaverStatus('Screensaver image deleted from device.', 'success');
+
+        if (bleDevice.gatt.connected) {
+            bleDevice.gatt.disconnect();
+        }
+
+    } catch (error) {
+        updateScreensaverStatus(`Delete failed: ${error.message}`, 'error');
+        console.error('Screensaver delete error:', error);
+    } finally {
+        deleteBtn.disabled = false;
     }
 }
 

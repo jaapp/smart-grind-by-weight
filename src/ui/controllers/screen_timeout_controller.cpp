@@ -1,4 +1,5 @@
 #include "screen_timeout_controller.h"
+#include "screensaver_controller.h"
 
 #include "../../config/constants.h"
 #include "../../hardware/display_manager.h"
@@ -32,6 +33,9 @@ void ScreenTimeoutController::update() {
 
     if (ui_manager_->state_machine && ui_manager_->state_machine->is_state(UIState::GRINDING)) {
         if (screen_dimmed_) {
+            if (screensaver_controller_ && screensaver_controller_->is_visible()) {
+                screensaver_controller_->hide();
+            }
             float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
             if (ui_manager_->menu_controller_) {
                 normal = ui_manager_->menu_controller_->get_normal_brightness();
@@ -57,7 +61,19 @@ void ScreenTimeoutController::update() {
         }
         display->set_brightness(dimmed);
         screen_dimmed_ = true;
+
+        // Show screensaver image if enabled
+        if (screensaver_controller_ &&
+            screensaver_controller_->is_sleep_enabled() &&
+            screensaver_controller_->has_image()) {
+            screensaver_controller_->show();
+        }
     } else if (!should_dim && screen_dimmed_) {
+        // Hide screensaver before restoring brightness
+        if (screensaver_controller_ && screensaver_controller_->is_visible()) {
+            screensaver_controller_->hide();
+        }
+
         float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
         if (ui_manager_->menu_controller_) {
             normal = ui_manager_->menu_controller_->get_normal_brightness();
