@@ -212,6 +212,7 @@ void UIManager::apply_connectivity_settings_changes() {
     if (ready_controller_) {
         ready_controller_->refresh_profiles();
     }
+    basket_detector_.load();
     grinding_screen.set_mode(current_mode);
     menu_screen.update_brightness_sliders();
     menu_screen.update_connectivity_startup_toggle();

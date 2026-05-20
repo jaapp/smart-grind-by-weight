@@ -320,6 +320,7 @@ Access **Menu → Grind Settings** to configure:
 - **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
 - **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
 - **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
+- **Basket Detection**: Optional portafilter workflow for Auto Start. Capture the empty single and double basket/portafilter weights, enable Detect Basket, and adjust the tolerance. When a recognized basket lands on the scale, the firmware selects Single or Double automatically before grinding.
 - **Purging** *(Advanced)*: Control how the grinder saturates itself before weight-mode grinding
   - **Prime mode**: Keeps the coffee used to saturate the grinder, continues immediately
   - **Purge mode** (default): Prompts you to discard stale grinds before continuing
@@ -396,6 +397,7 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |       |-- Time Mode toggle (direct weight/time mode selection)
     |       |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
     |       |-- Return on Removal toggle (drop back to Ready when that weight leaves)
+    |       |-- Basket Detection (Detect Basket, Capture Single/Double, Tolerance)
     |       |-- Purging (Prime/Purge radio buttons)
     |       \-- Amount slider (0.1g-5.0g for purge/prime operation)
     |
@@ -446,13 +448,15 @@ Want the scale to run itself? Enable the automation toggles in **Menu → Grind 
 
 Both automation settings rely on the same smoothed weight deltas used for flow detection, so no extra calibration is required. Leave them disabled if you prefer manual control or experience false triggers with lighter accessories.
 
+For direct-to-portafilter workflows, enable **Basket Detection** and capture both empty basket weights. A matched single basket selects the Single profile; a matched double basket selects the Double profile. If neither basket matches or both are inside the tolerance window, the firmware shows a short status message and does not auto-start.
+
 ---
 
 ## 📶 WiFi Connectivity
 
 WiFi can be configured in **Menu → WiFi** with optional auto-startup. If no credentials are saved, the grinder starts a `GrindByWeight-Setup` access point; join it and open `http://192.168.4.1` to save your home WiFi credentials. Once connected, the grinder is available at `http://grindbyweight.local` or its displayed IP address. WiFi enables wireless firmware updates through the built-in HTTP OTA endpoint.
 
-The device web page also exposes the same practical settings as the touchscreen menu: grind mode, purge mode and amount, freshness, automation toggles, logging, brightness, WiFi startup, and OTA upload. Settings are stored in the existing NVS preference namespaces, so the web UI does not duplicate settings storage.
+The device web page also exposes the same practical settings as the touchscreen menu: grind mode, purge mode and amount, freshness, automation toggles, basket detection, logging, brightness, WiFi startup, screensaver image upload, and OTA upload. Settings are stored in the existing NVS preference namespaces, so the web UI does not duplicate settings storage.
 
 Machine-readable endpoints are available for future integrations:
 
@@ -460,6 +464,8 @@ Machine-readable endpoints are available for future integrations:
 GET  /api/status
 GET  /api/settings
 POST /api/settings
+POST /api/basket/capture/single
+POST /api/basket/capture/double
 GET  /api/screensaver
 POST /api/screensaver
 POST /api/screensaver/clear

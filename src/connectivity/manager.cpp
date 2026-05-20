@@ -6,10 +6,13 @@
 #include <esp_system.h>
 #include <esp_task_wdt.h>
 #include <ctype.h>
+#include <cmath>
 
 #include "../config/build_info.h"
+#include "../controllers/basket_detector.h"
 #include "../controllers/grind_controller.h"
 #include "../controllers/grind_mode.h"
+#include "../hardware/hardware_manager.h"
 #include "../logging/grind_logging.h"
 #include "../tasks/task_manager.h"
 
@@ -25,6 +28,17 @@ int clamp_int(int value, int min_value, int max_value) {
     if (value < min_value) return min_value;
     if (value > max_value) return max_value;
     return value;
+}
+
+float sanitize_basket_weight(float weight_g) {
+    if (!std::isfinite(weight_g)) {
+        return 0.0f;
+    }
+    const float absolute_weight_g = std::fabs(weight_g);
+    if (absolute_weight_g <= 0.0f) {
+        return 0.0f;
+    }
+    return absolute_weight_g;
 }
 
 String extract_json_value(const String& body, const char* key) {
@@ -98,6 +112,7 @@ bool parse_bool_value(String value, bool fallback) {
 
 ConnectivityManager::ConnectivityManager()
     : preferences_(nullptr)
+    , hardware_manager_(nullptr)
     , server_(WIFI_HTTP_PORT)
     , ui_status_queue_(nullptr)
     , state_(ConnectivityState::WIFI_DISABLED)
@@ -126,8 +141,9 @@ ConnectivityManager::~ConnectivityManager() {
     disable();
 }
 
-void ConnectivityManager::init(Preferences* prefs) {
+void ConnectivityManager::init(Preferences* prefs, HardwareManager* hardware) {
     preferences_ = prefs;
+    hardware_manager_ = hardware;
     if (!ui_status_queue_) {
         ui_status_queue_ = xQueueCreate(8, sizeof(ConnectivityUIStatusMessage));
     }
@@ -346,6 +362,8 @@ void ConnectivityManager::register_routes() {
                [this]() { handle_screensaver_complete(); },
                [this]() { handle_screensaver_upload(); });
     server_.on(WIFI_API_SCREENSAVER_CLEAR_PATH, HTTP_POST, [this]() { handle_screensaver_clear(); });
+    server_.on(WIFI_API_BASKET_CAPTURE_SINGLE_PATH, HTTP_POST, [this]() { handle_basket_capture(true); });
+    server_.on(WIFI_API_BASKET_CAPTURE_DOUBLE_PATH, HTTP_POST, [this]() { handle_basket_capture(false); });
     server_.on("/wifi", HTTP_POST, [this]() { handle_wifi_save(); });
     server_.on("/wifi/clear", HTTP_POST, [this]() { handle_wifi_clear(); });
     server_.on(WIFI_OTA_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
@@ -354,6 +372,8 @@ void ConnectivityManager::register_routes() {
     server_.on(WIFI_API_SETTINGS_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_SCREENSAVER_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_SCREENSAVER_CLEAR_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
+    server_.on(WIFI_API_BASKET_CAPTURE_SINGLE_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
+    server_.on(WIFI_API_BASKET_CAPTURE_DOUBLE_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on("/wifi", HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on("/wifi/clear", HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_OTA_PATH, HTTP_POST,
@@ -508,6 +528,15 @@ void ConnectivityManager::handle_root() {
 <label class="check"><input id="auto_start" type="checkbox">Start on cup</label>
 <label class="check"><input id="auto_return" type="checkbox">Return on cup removal</label>
 <label class="check"><input id="logging_enabled" type="checkbox">Grind logging</label>
+<h2>Basket Detection</h2>
+<label class="check"><input id="basket_detect" type="checkbox">Choose Single/Double by basket weight</label>
+<div class="row">
+<div><label>Single Basket</label><input id="basket_single_g" type="number" min="0" max="1000" step="0.1"></div>
+<div><label>Double Basket</label><input id="basket_double_g" type="number" min="0" max="1000" step="0.1"></div>
+</div>
+<div class="actions"><button id="captureSingleBasket" type="button" class="secondary">Capture Single</button><button id="captureDoubleBasket" type="button" class="secondary">Capture Double</button></div>
+<label>Basket Tolerance <span class="value" id="basket_tolerance_g_value"></span></label><input id="basket_tolerance_g" type="range" min="1" max="30" step="1">
+<p id="basketMessage" class="muted"></p>
 <label class="check"><input id="screensaver_startup" type="checkbox">Show screensaver on startup</label>
 <label class="check"><input id="screensaver_sleep" type="checkbox">Show screensaver when dimmed</label>
 <button type="submit">Save Settings</button>
@@ -545,20 +574,25 @@ function bindRange(id,fmt){const el=$(id),out=$(id+"_value");const upd=()=>out.t
 function renderSettings(x){
   const s=x.settings||x;
   $("wifi_startup").checked=!!s.wifi_startup;$("logging_enabled").checked=!!s.logging_enabled;$("swipe_enabled").checked=!!s.swipe_enabled;$("auto_start").checked=!!s.auto_start;$("auto_return").checked=!!s.auto_return;
+  $("basket_detect").checked=!!s.basket_detect;$("basket_single_g").value=Number(s.basket_single_g||0).toFixed(1);$("basket_double_g").value=Number(s.basket_double_g||0).toFixed(1);$("basket_tolerance_g").value=s.basket_tolerance_g;
   $("screensaver_startup").checked=!!s.screensaver_startup;$("screensaver_sleep").checked=!!s.screensaver_sleep;
   $("grind_mode").value=String(s.grind_mode_index);$("purge_mode").value=String(s.purge_mode_index);
   $("purge_amount_g").value=s.purge_amount_g;$("freshness_hours").value=s.freshness_hours;$("brightness_normal").value=s.brightness_normal;$("brightness_screensaver").value=s.brightness_screensaver;
-  ["purge_amount_g","freshness_hours","brightness_normal","brightness_screensaver"].forEach(id=>$(id).dispatchEvent(new Event("input")));
+  ["purge_amount_g","freshness_hours","brightness_normal","brightness_screensaver","basket_tolerance_g"].forEach(id=>$(id).dispatchEvent(new Event("input")));
+  $("basketMessage").textContent=s.basket_configured?"Basket detection configured":"Capture or enter both basket weights";
   $("screensaverState").textContent=s.screensaver_image?"Screensaver image stored: "+s.screensaver_image_bytes+" bytes":"No screensaver image stored";
 }
 async function load(){try{renderStatus(await json("/api/status"));renderSettings(await json("/api/settings"))}catch(e){setMsg("settingsMessage",e.message,"warn")}}
 function settingsPayload(){
   const p=new URLSearchParams();
-  ["wifi_startup","logging_enabled","swipe_enabled","auto_start","auto_return","screensaver_startup","screensaver_sleep"].forEach(id=>p.set(id,$(id).checked?"1":"0"));
-  ["grind_mode","purge_mode","purge_amount_g","freshness_hours","brightness_normal","brightness_screensaver"].forEach(id=>p.set(id,$(id).value));
+  ["wifi_startup","logging_enabled","swipe_enabled","auto_start","auto_return","basket_detect","screensaver_startup","screensaver_sleep"].forEach(id=>p.set(id,$(id).checked?"1":"0"));
+  ["grind_mode","purge_mode","purge_amount_g","freshness_hours","brightness_normal","brightness_screensaver","basket_single_g","basket_double_g","basket_tolerance_g"].forEach(id=>p.set(id,$(id).value));
   return p;
 }
 $("settingsForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("settingsMessage","Saving...");try{await json("/api/settings",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:settingsPayload()});setMsg("settingsMessage","Settings saved","ok");load()}catch(err){setMsg("settingsMessage",err.message,"warn")}});
+async function captureBasket(kind){setMsg("basketMessage","Capturing "+kind+" basket...");try{const data=await json("/api/basket/capture/"+kind,{method:"POST"});renderSettings(data);const s=data.settings||data;const key=kind==="single"?"basket_single_g":"basket_double_g";setMsg("basketMessage","Captured "+kind+": "+Number(s[key]||0).toFixed(1)+"g","ok")}catch(e){setMsg("basketMessage",e.message,"warn")}}
+$("captureSingleBasket").addEventListener("click",()=>captureBasket("single"));
+$("captureDoubleBasket").addEventListener("click",()=>captureBasket("double"));
 async function imageToRgb565(file){
   const img=new Image();const url=URL.createObjectURL(file);
   await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url});
@@ -572,7 +606,7 @@ async function imageToRgb565(file){
 }
 $("uploadScreensaver").addEventListener("click",async()=>{const f=$("screensaverFile").files[0];if(!f){setMsg("imageMessage","Choose an image first","warn");return}setMsg("imageMessage","Converting image...");try{const raw=await imageToRgb565(f);const form=new FormData();form.append("image",new Blob([raw],{type:"application/octet-stream"}),"screensaver.rgb565");setMsg("imageMessage","Uploading...");await json("/api/screensaver",{method:"POST",body:form});setMsg("imageMessage","Screensaver image saved","ok");load()}catch(e){setMsg("imageMessage",e.message,"warn")}});
 $("clearScreensaver").addEventListener("click",async()=>{try{await json("/api/screensaver/clear",{method:"POST"});setMsg("imageMessage","Screensaver image cleared","ok");load()}catch(e){setMsg("imageMessage",e.message,"warn")}});
-bindRange("purge_amount_g",v=>Number(v).toFixed(1)+"g");bindRange("freshness_hours",v=>Number(v).toFixed(1)+"h");bindRange("brightness_normal",pct);bindRange("brightness_screensaver",pct);
+bindRange("purge_amount_g",v=>Number(v).toFixed(1)+"g");bindRange("freshness_hours",v=>Number(v).toFixed(1)+"h");bindRange("brightness_normal",pct);bindRange("brightness_screensaver",pct);bindRange("basket_tolerance_g",v=>"±"+Number(v).toFixed(0)+"g");
 load();setInterval(load,5000);
 </script>
 </body>
@@ -760,22 +794,33 @@ String ConnectivityManager::build_settings_json() const {
     int purge_mode_index = GRIND_PURGE_MODE_DEFAULT;
     float purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;
     float freshness_hours = GRIND_FRESHNESS_DEFAULT_HOURS;
+    bool basket_detect = false;
+    float basket_single_g = 0.0f;
+    float basket_double_g = 0.0f;
+    float basket_tolerance_g = USER_BASKET_DETECTION_TOLERANCE_DEFAULT_G;
     if (preferences_) {
         grind_mode_index = preferences_->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
         purge_mode_index = preferences_->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
         purge_amount_g = preferences_->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         freshness_hours = preferences_->getFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, GRIND_FRESHNESS_DEFAULT_HOURS);
+        basket_detect = preferences_->getBool(BasketDetector::PREF_KEY_ENABLED, false);
+        basket_single_g = sanitize_basket_weight(preferences_->getFloat(BasketDetector::PREF_KEY_SINGLE_WEIGHT_G, 0.0f));
+        basket_double_g = sanitize_basket_weight(preferences_->getFloat(BasketDetector::PREF_KEY_DOUBLE_WEIGHT_G, 0.0f));
+        basket_tolerance_g = preferences_->getFloat(BasketDetector::PREF_KEY_TOLERANCE_G, USER_BASKET_DETECTION_TOLERANCE_DEFAULT_G);
     }
 
     grind_mode_index = clamp_int(grind_mode_index, 0, 1);
     purge_mode_index = clamp_int(purge_mode_index, 0, 1);
     purge_amount_g = clamp_float(purge_amount_g, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
     freshness_hours = clamp_float(freshness_hours, 0.5f, 48.0f);
+    basket_tolerance_g = clamp_float(basket_tolerance_g,
+                                     USER_BASKET_DETECTION_TOLERANCE_MIN_G,
+                                     USER_BASKET_DETECTION_TOLERANCE_MAX_G);
     brightness_normal = clamp_float(brightness_normal, 0.15f, 1.0f);
     brightness_screensaver = clamp_float(brightness_screensaver, 0.15f, 1.0f);
 
     String json;
-    json.reserve(900);
+    json.reserve(1150);
     json += "{\"ok\":true,\"settings\":{";
     json += "\"wifi_startup\":";
     json += wifi_startup ? "true" : "false";
@@ -787,6 +832,16 @@ String ConnectivityManager::build_settings_json() const {
     json += auto_start ? "true" : "false";
     json += ",\"auto_return\":";
     json += auto_return ? "true" : "false";
+    json += ",\"basket_detect\":";
+    json += basket_detect ? "true" : "false";
+    json += ",\"basket_configured\":";
+    json += (basket_single_g > 0.0f && basket_double_g > 0.0f) ? "true" : "false";
+    json += ",\"basket_single_g\":";
+    json += String(basket_single_g, 1);
+    json += ",\"basket_double_g\":";
+    json += String(basket_double_g, 1);
+    json += ",\"basket_tolerance_g\":";
+    json += String(basket_tolerance_g, 0);
     json += ",\"screensaver_startup\":";
     json += screensaver_startup ? "true" : "false";
     json += ",\"screensaver_sleep\":";
@@ -915,6 +970,39 @@ void ConnectivityManager::handle_settings_post() {
     }
 
     if (preferences_) {
+        bool current_basket_detect = preferences_->getBool(BasketDetector::PREF_KEY_ENABLED, false);
+        bool basket_detect = get_request_bool("basket_detect", current_basket_detect, found);
+        if (found) {
+            preferences_->putBool(BasketDetector::PREF_KEY_ENABLED, basket_detect);
+            changed = true;
+        }
+
+        float current_single = sanitize_basket_weight(
+            preferences_->getFloat(BasketDetector::PREF_KEY_SINGLE_WEIGHT_G, 0.0f));
+        float single = get_request_float("basket_single_g", current_single, 0.0f, USER_MAX_TARGET_WEIGHT_G, found);
+        if (found) {
+            preferences_->putFloat(BasketDetector::PREF_KEY_SINGLE_WEIGHT_G, sanitize_basket_weight(single));
+            changed = true;
+        }
+
+        float current_double = sanitize_basket_weight(
+            preferences_->getFloat(BasketDetector::PREF_KEY_DOUBLE_WEIGHT_G, 0.0f));
+        float double_basket = get_request_float("basket_double_g", current_double, 0.0f, USER_MAX_TARGET_WEIGHT_G, found);
+        if (found) {
+            preferences_->putFloat(BasketDetector::PREF_KEY_DOUBLE_WEIGHT_G, sanitize_basket_weight(double_basket));
+            changed = true;
+        }
+
+        float current_tolerance = preferences_->getFloat(BasketDetector::PREF_KEY_TOLERANCE_G,
+                                                         USER_BASKET_DETECTION_TOLERANCE_DEFAULT_G);
+        float tolerance = get_request_float("basket_tolerance_g", current_tolerance,
+                                            USER_BASKET_DETECTION_TOLERANCE_MIN_G,
+                                            USER_BASKET_DETECTION_TOLERANCE_MAX_G, found);
+        if (found) {
+            preferences_->putFloat(BasketDetector::PREF_KEY_TOLERANCE_G, tolerance);
+            changed = true;
+        }
+
         int current_grind_mode = preferences_->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
         int grind_mode = get_request_int("grind_mode", current_grind_mode, 0, 1, found);
         if (found) {
@@ -948,6 +1036,49 @@ void ConnectivityManager::handle_settings_post() {
     if (changed) {
         mark_settings_changed();
     }
+
+    send_json_response(200, build_settings_json());
+}
+
+void ConnectivityManager::handle_basket_capture(bool capture_single) {
+    if (!hardware_manager_) {
+        send_json_response(503, "{\"ok\":false,\"error\":\"Hardware manager unavailable\"}");
+        return;
+    }
+
+    WeightSensor* sensor = hardware_manager_->get_weight_sensor();
+    if (!sensor) {
+        send_json_response(503, "{\"ok\":false,\"error\":\"Weight sensor unavailable\"}");
+        return;
+    }
+
+    if (sensor->is_tare_in_progress()) {
+        send_json_response(409, "{\"ok\":false,\"error\":\"Scale is taring, try again shortly\"}");
+        return;
+    }
+
+    float settle_time_s = 0.0f;
+    const float captured_weight_g = sensor->get_precision_settled_weight(&settle_time_s);
+    const float stored_weight_g = sanitize_basket_weight(captured_weight_g);
+    if (stored_weight_g <= USER_BASKET_DETECTION_REMOVAL_THRESHOLD_G) {
+        send_json_response(400, "{\"ok\":false,\"error\":\"Place the basket on the scale before capture\"}");
+        return;
+    }
+
+    if (!preferences_) {
+        send_json_response(503, "{\"ok\":false,\"error\":\"Preferences unavailable\"}");
+        return;
+    }
+
+    preferences_->putFloat(capture_single ? BasketDetector::PREF_KEY_SINGLE_WEIGHT_G
+                                          : BasketDetector::PREF_KEY_DOUBLE_WEIGHT_G,
+                           stored_weight_g);
+    mark_settings_changed();
+
+    LOG_BLE("WiFi: Captured %s basket weight %.2fg after %.2fs settling\n",
+            capture_single ? "single" : "double",
+            static_cast<double>(stored_weight_g),
+            static_cast<double>(settle_time_s));
 
     send_json_response(200, build_settings_json());
 }
