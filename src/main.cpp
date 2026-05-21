@@ -9,6 +9,7 @@
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "connectivity/manager.h"
+#include "home_assistant/manager.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -75,6 +76,7 @@ void setup() {
     hardware_manager.set_grind_controller(&grind_controller);
     
     connectivity_manager.init(hardware_manager.get_preferences(), &hardware_manager);
+    home_assistant_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &ui_manager, &connectivity_manager);
     
     // Check for OTA failure to determine initial state
     String failed_ota_build = connectivity_manager.check_ota_failure_after_boot();

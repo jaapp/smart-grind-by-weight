@@ -7,6 +7,7 @@
 #include "../controllers/profile_controller.h"
 #include "../controllers/grind_controller.h"
 #include "../connectivity/manager.h"
+#include "../home_assistant/manager.h"
 #include "../ui/ui_manager.h"
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
@@ -470,6 +471,8 @@ void TaskManager::connectivity_task_impl() {
         if (connectivity_manager) {
             connectivity_manager->handle();
         }
+
+        home_assistant_manager.handle();
         
         uint32_t end_time = millis();
         record_task_timing(4, start_time, end_time); // Task index 4 for connectivity
