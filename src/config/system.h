@@ -35,7 +35,7 @@
 #define SYS_TASK_WEIGHT_SAMPLING_STACK_SIZE 4096                               // 4KB stack for weight sampling (was 2KB, increased for BLE_LOG)
 #define SYS_TASK_GRIND_CONTROL_STACK_SIZE 6144                                 // 6KB stack for grind control logic (was 4KB, increased for complex algorithms)
 #define SYS_TASK_UI_STACK_SIZE 8192                                            // 8KB stack for LVGL rendering (unchanged)
-#define SYS_TASK_BLUETOOTH_STACK_SIZE 4096                                     // 4KB stack for BLE operations (unchanged)
+#define SYS_TASK_BLUETOOTH_STACK_SIZE 8192                                     // 8KB stack for BLE plus optional Home Assistant MQTT publishing
 #define SYS_TASK_FILE_IO_STACK_SIZE 6144                                       // 6KB stack for LittleFS operations (was 4KB, increased for file operations)
 
 // Task Priorities (higher number = higher priority)
@@ -101,4 +101,3 @@
 //------------------------------------------------------------------------------
 #define SYS_WEIGHT_DISPLAY_FORMAT "%.1fg"                                      // Weight display format string
 #define SYS_RAW_VALUE_FORMAT "%ld"                                             // Raw load cell value format string
-

@@ -41,6 +41,7 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 - **Original timed run preserved** – there is a setting to enable the original Grind-By-Time mode
 - **Configurable coast compensation** to tune how early the motor stops during predictive weight grinding
 - **BLE OTA updates** for firmware
+- **Native Home Assistant MQTT Discovery integration** for grind telemetry and controls
 - **Advanced analytics** using BLE data transfer and Python Streamlit reports
 - **For Eureka**: No permanent modifications needed - just swap the screen and add 3D printed parts
 
@@ -121,6 +122,8 @@ In this project, that's most obvious when at state management - it's a bit clutt
 **Want to dive deeper?** → Check out **[DOC.md](docs/DOC.md)** for comprehensive documentation.
 
 **Different grinder?** → See **[Grinder Compatibility Matrix](docs/GRINDER_COMPATIBILITY.md)** for adaptation guidance.
+
+**Home Assistant?** → See **[Home Assistant Integration](docs/HOME_ASSISTANT.md)** for MQTT setup and exposed entities.
 
 **Having issues?** → See **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** for common problems and solutions.
 

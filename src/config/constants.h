@@ -19,3 +19,4 @@
 #include "user.h"
 #include "build_info.h"
 #include "logging.h"
+#include "home_assistant.h"

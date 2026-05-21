@@ -230,6 +230,16 @@ public:
     bool is_control_loop_paused() const { return control_loop_paused_; }
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
+    float get_tolerance() const { return tolerance; }
+    float get_final_weight() const { return final_weight; }
+    int get_pulse_attempt_count() const { return pulse_attempts; }
+    GrindPhase get_phase() const { return phase; }
+    GrindPhase get_timeout_phase() const { return timeout_phase; }
+    uint8_t get_phase_id() const { return get_current_phase_id(); }
+    int get_progress_percent_for_home_assistant() const { return get_progress_percent(); }
+    const char* get_current_phase_name() const { return get_phase_name(); }
+    const char* get_timeout_phase_name() const { return get_phase_name(timeout_phase); }
+    const char* get_last_error_message() const { return last_error_message; }
     static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
     static constexpr const char* PREF_KEY_GRINDER_MODE = "grinder_mode";
     static constexpr const char* PREF_KEY_GRINDER_AMOUNT_G = "grinder_amount_g";
@@ -297,8 +307,6 @@ private:
     bool is_timeout() const { return phase == GrindPhase::TIMEOUT; } 
     int get_progress_percent() const;
     float get_grind_time() const;
-    GrindPhase get_phase() const { return phase; }
-    GrindPhase get_timeout_phase() const { return timeout_phase; }
     const char* get_phase_name(GrindPhase p = static_cast<GrindPhase>(-1)) const;
 
     void set_error_message(const char* message);

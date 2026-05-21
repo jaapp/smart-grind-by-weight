@@ -132,6 +132,17 @@ void UIManager::create_ui() {
 void UIManager::update() {
     if (!initialized) return;
 
+    if (settings_refresh_pending_) {
+        settings_refresh_pending_ = false;
+        process_pending_settings_refresh();
+    }
+
+    RemoteAction remote_action = pending_remote_action_;
+    if (remote_action != RemoteAction::NONE) {
+        pending_remote_action_ = RemoteAction::NONE;
+        process_remote_action(remote_action);
+    }
+
     // Update diagnostics controller
     if (diagnostics_controller_) {
         diagnostics_controller_->update(hardware_manager, grind_controller, millis());
@@ -316,6 +327,79 @@ void UIManager::show_confirmation(const char* title, const char* message,
     if (confirm_controller_) {
         confirm_controller_->show(title, message, confirm_text, confirm_color,
                                   std::move(on_confirm), cancel_text, std::move(on_cancel));
+    }
+}
+
+void UIManager::request_remote_action(RemoteAction action) {
+    if (action == RemoteAction::NONE) {
+        return;
+    }
+    pending_remote_action_ = action;
+}
+
+void UIManager::process_pending_settings_refresh() {
+    if (profile_controller) {
+        current_tab = profile_controller->get_current_profile();
+        current_mode = profile_controller->get_grind_mode();
+        edit_target = get_current_profile_target(*profile_controller, current_mode);
+    }
+
+    refresh_auto_action_settings();
+
+    grinding_screen.set_mode(current_mode);
+    if (ready_controller_) {
+        ready_controller_->refresh_profiles();
+    }
+    if (edit_controller_ && state_machine && state_machine->is_state(UIState::EDIT)) {
+        edit_controller_->update_display();
+    }
+    if (grinding_controller_) {
+        grinding_controller_->update_grinding_targets();
+        grinding_controller_->update_grind_button_icon();
+    }
+}
+
+void UIManager::process_remote_action(RemoteAction action) {
+    if (!state_machine) {
+        return;
+    }
+
+    switch (action) {
+        case RemoteAction::START_GRIND:
+            if (state_machine->is_state(UIState::READY) && current_tab < USER_PROFILE_COUNT && grinding_controller_) {
+                grinding_controller_->handle_grind_button();
+            }
+            break;
+
+        case RemoteAction::STOP_OR_RETURN:
+            if ((state_machine->is_state(UIState::GRINDING) ||
+                 state_machine->is_state(UIState::PURGE_CONFIRM) ||
+                 state_machine->is_state(UIState::GRIND_COMPLETE) ||
+                 state_machine->is_state(UIState::GRIND_TIMEOUT)) &&
+                grinding_controller_) {
+                grinding_controller_->handle_grind_button();
+            }
+            break;
+
+        case RemoteAction::TIME_MODE_PULSE:
+            if (grinding_controller_) {
+                grinding_controller_->handle_pulse_button();
+            }
+            break;
+
+        case RemoteAction::TARE:
+            if (hardware_manager && (!grind_controller || !grind_controller->is_active())) {
+                UIOperations::execute_tare(hardware_manager, [this]() {
+                    if (menu_screen.is_scale_page_active()) {
+                        auto* sensor = hardware_manager ? hardware_manager->get_weight_sensor() : nullptr;
+                        menu_screen.update_scale_weight(sensor ? sensor->get_display_weight() : 0.0f);
+                    }
+                });
+            }
+            break;
+
+        case RemoteAction::NONE:
+            break;
     }
 }
 

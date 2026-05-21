@@ -103,6 +103,14 @@ private:
     std::unique_ptr<DiagnosticsController> diagnostics_controller_;
 
 public:
+    enum class RemoteAction {
+        NONE,
+        START_GRIND,
+        STOP_OR_RETURN,
+        TIME_MODE_PULSE,
+        TARE
+    };
+
     ReadyScreen ready_screen;
     EditScreen edit_screen;
     GrindingScreen grinding_screen;
@@ -136,6 +144,9 @@ public:
     GrindController* get_grind_controller() { return grind_controller; }
     OtaDataExportController* get_ota_data_export_controller() { return ota_data_export_controller_.get(); }
     void set_current_tab(int tab) { current_tab = tab; }
+    void set_current_mode(GrindMode mode) { current_mode = mode; }
+    void request_settings_refresh() { settings_refresh_pending_ = true; }
+    void request_remote_action(RemoteAction action);
     
     void set_background_active(bool active);
     void refresh_auto_action_settings();
@@ -143,6 +154,8 @@ public:
 
 private:
     void create_ui();
+    void process_pending_settings_refresh();
+    void process_remote_action(RemoteAction action);
     void update_auto_actions();
     void schedule_basket_auto_start(int profile_index, const char* status_text);
     void complete_pending_basket_auto_start();
@@ -164,4 +177,7 @@ private:
         int pending_basket_profile = -1;
         lv_timer_t* basket_start_timer = nullptr;
     } auto_actions_;
+
+    volatile bool settings_refresh_pending_ = false;
+    volatile RemoteAction pending_remote_action_ = RemoteAction::NONE;
 };
