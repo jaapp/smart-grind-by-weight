@@ -57,8 +57,24 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     
     // Register grind event callback
     grind_controller->set_ui_event_callback(GrindingUIController::dispatch_event);
-    
-    
+
+    // Show startup screensaver only on normal ready boot, never over boot warnings.
+    if (screensaver_controller_ &&
+        state_machine &&
+        state_machine->is_state(UIState::READY) &&
+        screensaver_controller_->is_startup_enabled() &&
+        screensaver_controller_->has_image()) {
+        screensaver_controller_->show();
+        uint32_t startup_timeout_ms = screensaver_controller_->get_startup_timeout_ms();
+        lv_timer_create([](lv_timer_t* t) {
+            auto* sc = static_cast<ScreensaverController*>(lv_timer_get_user_data(t));
+            if (sc && sc->is_visible()) {
+                sc->hide();
+            }
+            lv_timer_delete(t);
+        }, startup_timeout_ms, screensaver_controller_.get());
+    }
+
     initialized = true;
 }
 
@@ -315,12 +331,18 @@ void UIManager::init_controllers() {
     confirm_controller_ = std::make_unique<ConfirmUIController>(this);
     ota_data_export_controller_ = std::make_unique<OtaDataExportController>(this);
     screen_timeout_controller_ = std::make_unique<ScreenTimeoutController>(this);
+    screensaver_controller_ = std::make_unique<ScreensaverController>();
     jog_adjust_controller_ = std::make_unique<JogAdjustController>(this);
     diagnostics_controller_ = std::make_unique<DiagnosticsController>();
 
     // Initialize diagnostics controller
     if (diagnostics_controller_) {
         diagnostics_controller_->init(hardware_manager);
+    }
+
+    // Wire screensaver controller into screen timeout controller
+    if (screen_timeout_controller_ && screensaver_controller_) {
+        screen_timeout_controller_->set_screensaver_controller(screensaver_controller_.get());
     }
 }
 

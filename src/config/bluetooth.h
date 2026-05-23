@@ -51,6 +51,18 @@
 #define BLE_SYSINFO_MAX_PAYLOAD_BYTES 512                                       // Maximum payload size for system info
 
 //------------------------------------------------------------------------------
+// IMAGE UPLOAD (via Data Service)
+//------------------------------------------------------------------------------
+// Image upload reuses the Data Service to avoid extra BLE heap allocation.
+// Commands use 0x30+ range on the data control characteristic.
+// Image data chunks are written to the data transfer characteristic.
+
+// Image file constants
+#define BLE_IMAGE_EXPECTED_SIZE  255360                                           // 280 * 456 * 2 bytes (RGB565)
+#define BLE_IMAGE_FILENAME       "/screensaver.rgb565"                            // Final image file on LittleFS
+#define BLE_IMAGE_TEMP_FILENAME  "/screensaver.rgb565.tmp"                        // Temp file during upload
+
+//------------------------------------------------------------------------------
 // BLE TIMEOUT SETTINGS
 //------------------------------------------------------------------------------
 #define BLE_AUTO_DISABLE_TIMEOUT_MS (30 * 60 * 1000)                          // Auto-disable BLE after inactivity

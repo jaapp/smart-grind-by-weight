@@ -12,6 +12,7 @@
 #include "../config/constants.h"
 #include "ota_handler.h"
 #include "data_stream.h"
+#include "image_upload_handler.h"
 
 // Forward declaration to avoid circular dependency
 class UIManager;
@@ -44,6 +45,24 @@ enum BLEDataStatus {
     BLE_DATA_EXPORTING = 0x21,
     BLE_DATA_COMPLETE = 0x22,
     BLE_DATA_ERROR = 0x23
+};
+
+// Screensaver timing settings commands/statuses, multiplexed on the Data service
+enum BLEScreensaverSettingsCommand {
+    BLE_SETTINGS_CMD_GET_SCREENSAVER = 0x40,
+    BLE_SETTINGS_CMD_SET_SCREENSAVER = 0x41
+};
+
+enum BLEScreensaverSettingsStatus {
+    BLE_SETTINGS_STATUS_VALUE = 0x42,
+    BLE_SETTINGS_STATUS_ERROR = 0x44
+};
+
+enum BLEScreensaverSettingsError {
+    BLE_SETTINGS_ERROR_BUSY = 0x01,
+    BLE_SETTINGS_ERROR_INVALID_LENGTH = 0x02,
+    BLE_SETTINGS_ERROR_INVALID_RANGE = 0x03,
+    BLE_SETTINGS_ERROR_STORAGE = 0x04
 };
 
 /**
@@ -94,6 +113,7 @@ private:
     // Component handlers
     OTAHandler ota_handler;
     DataStreamManager data_stream;
+    ImageUploadHandler image_handler;
     
     // Data export state
     bool data_export_in_progress;
@@ -124,6 +144,12 @@ private:
     void handle_ota_data_chunk(BLECharacteristic* characteristic);
     void handle_debug_command(BLECharacteristic* characteristic);
     void handle_data_control_command(BLECharacteristic* characteristic);
+    void handle_image_control_command(uint8_t command, const String& value);
+    void set_image_status(BLEImageStatus status);
+    void handle_screensaver_settings_command(uint8_t command, const String& value);
+    void send_screensaver_settings();
+    void send_screensaver_settings_error(BLEScreensaverSettingsError error);
+    bool is_data_channel_busy_for_settings() const;
     void send_next_data_chunk();
     void send_measurement_count();
     void send_log_message(const char* message);
@@ -181,6 +207,7 @@ public:
     bool is_connected() const { return device_connected; }
     bool is_updating() const { return ota_handler.is_ota_active(); }
     bool is_debug_stream_active() const { return debug_stream_active; }
+    bool has_screensaver_image() const { return image_handler.has_image(); }
     
     /**
      * OTA progress information

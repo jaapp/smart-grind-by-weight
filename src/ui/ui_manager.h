@@ -25,6 +25,7 @@
 #include "controllers/ota_data_export_controller.h"
 #include "controllers/ready_controller.h"
 #include "controllers/screen_timeout_controller.h"
+#include "controllers/screensaver_controller.h"
 #include "controllers/menu_controller.h"
 #include "controllers/status_indicator_controller.h"
 #include "../system/state_machine.h"
@@ -95,6 +96,7 @@ private:
     std::unique_ptr<ConfirmUIController> confirm_controller_;
     std::unique_ptr<OtaDataExportController> ota_data_export_controller_;
     std::unique_ptr<ScreenTimeoutController> screen_timeout_controller_;
+    std::unique_ptr<ScreensaverController> screensaver_controller_;
     std::unique_ptr<JogAdjustController> jog_adjust_controller_;
     std::unique_ptr<DiagnosticsController> diagnostics_controller_;
 

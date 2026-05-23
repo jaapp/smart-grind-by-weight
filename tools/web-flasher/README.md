@@ -16,6 +16,11 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 - Full firmware updates (no delta compression)
 - Progress tracking and status updates
 
+### 🖼️ Screensaver
+- Upload a custom 280 × 456 RGB565 screensaver image
+- Configure idle timeout and startup image duration over BLE
+- Brightness and image enable toggles remain on the grinder
+
 ## Browser Support
 
 - ✅ **Chrome** (Desktop & Android) - Full support
@@ -39,6 +44,13 @@ A browser-based firmware flashing tool for the Smart Grind By Weight ESP32 coffe
 4. Click "Connect to Device"
 5. Click "Flash Firmware" when connected
 
+### For Screensaver Settings
+1. Ensure grinder is powered and BLE enabled
+2. Go to the "Screensaver" tab
+3. Click "Connect & Load Settings" to read current timing values
+4. Set idle timeout (30-3600 seconds) and startup timeout (1-30 seconds)
+5. Click "Save Settings"
+
 ## Firmware Sources
 
 The firmware list is pulled straight from GitHub Releases—no files are stored in this repo. If you need the exact asset mapping, see [DOC.md](../../docs/DOC.md).
@@ -47,15 +59,20 @@ The firmware list is pulled straight from GitHub Releases—no files are stored 
 
 ### BLE Services Used
 - **OTA Service**: `12345678-1234-1234-1234-123456789abc`
-- **Data Transfer**: `87654321-4321-4321-4321-cba987654321`
-- **Control Commands**: `11111111-2222-3333-4444-555555555555`
-- **Status Updates**: `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+- **OTA Data**: `87654321-4321-4321-4321-cba987654321`
+- **OTA Control**: `11111111-2222-3333-4444-555555555555`
+- **OTA Status**: `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+- **Data Service**: `22334455-6677-8899-aabb-ccddeeffffaa`
+- **Data Control**: `33445566-7788-99aa-bbcc-ddeeffaabbcc`
+- **Data Transfer**: `44556677-8899-aabb-ccdd-eeffaabbccdd`
+- **Data Status**: `55667788-99aa-bbcc-ddee-ffaabbccddee`
 
 ### Protocol
 - Based on existing Python BLE implementation
 - 512-byte chunks for firmware transfer
 - Status notifications for progress tracking
 - Command structure: START → DATA_CHUNKS → END
+- Screensaver image upload and timing settings reuse the Data service
 
 ## Development
 

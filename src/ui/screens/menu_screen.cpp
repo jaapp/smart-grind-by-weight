@@ -1,6 +1,8 @@
 #include "menu_screen.h"
 #include <Arduino.h>
 #include <algorithm>
+#include <LittleFS.h>
+#include <Preferences.h>
 #include "../../config/constants.h"
 #include "../../logging/grind_logging.h"
 #include "../../system/statistics_manager.h"
@@ -318,6 +320,22 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
         lv_obj_add_event_cb(brightness_screensaver_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED)));
     }
+
+    // Custom screensaver image toggles
+    create_separator(parent, "Custom Image");
+    create_description_label(parent, "Show uploaded image on startup or when display dims.");
+    create_toggle_row(parent, "Startup", &screensaver_startup_toggle);
+    create_toggle_row(parent, "Sleep", &screensaver_sleep_toggle);
+
+    if (screensaver_startup_toggle) {
+        lv_obj_add_event_cb(screensaver_startup_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_STARTUP_TOGGLE)));
+    }
+    if (screensaver_sleep_toggle) {
+        lv_obj_add_event_cb(screensaver_sleep_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_SLEEP_TOGGLE)));
+    }
+
 }
 
 
@@ -617,6 +635,7 @@ void MenuScreen::show() {
     update_bluetooth_startup_toggle();
     update_logging_toggle();
     update_grind_mode_toggles();
+    update_screensaver_toggles();
 
     LOG_BLE("[%lums MENU] Menu screen shown successfully\n", millis());
 }
@@ -907,6 +926,44 @@ void MenuScreen::update_grind_freshness_hours_label(float hours) {
         }
         lv_label_set_text(grind_freshness_hours_label, buffer);
     }
+}
+
+void MenuScreen::update_screensaver_toggles() {
+    bool image_exists = LittleFS.exists(BLE_IMAGE_FILENAME);
+
+    Preferences prefs;
+    prefs.begin("screensaver", true);
+    bool startup_on = prefs.getBool("startup", false);
+    bool sleep_on = prefs.getBool("sleep", false);
+    prefs.end();
+
+    if (screensaver_startup_toggle) {
+        if (startup_on && image_exists) {
+            lv_obj_add_state(screensaver_startup_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(screensaver_startup_toggle, LV_STATE_CHECKED);
+        }
+        // Disable toggles if no image is uploaded
+        if (image_exists) {
+            lv_obj_clear_state(screensaver_startup_toggle, LV_STATE_DISABLED);
+        } else {
+            lv_obj_add_state(screensaver_startup_toggle, LV_STATE_DISABLED);
+        }
+    }
+
+    if (screensaver_sleep_toggle) {
+        if (sleep_on && image_exists) {
+            lv_obj_add_state(screensaver_sleep_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(screensaver_sleep_toggle, LV_STATE_CHECKED);
+        }
+        if (image_exists) {
+            lv_obj_clear_state(screensaver_sleep_toggle, LV_STATE_DISABLED);
+        } else {
+            lv_obj_add_state(screensaver_sleep_toggle, LV_STATE_DISABLED);
+        }
+    }
+
 }
 
 lv_obj_t* MenuScreen::create_separator(lv_obj_t* parent, const char* text) {

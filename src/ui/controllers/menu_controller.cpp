@@ -60,6 +60,9 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER, [this](lv_event_t*) { handle_brightness_screensaver_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
 
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_STARTUP_TOGGLE, [this](lv_event_t*) { handle_screensaver_startup_toggle(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_SLEEP_TOGGLE, [this](lv_event_t*) { handle_screensaver_sleep_toggle(); });
+
     // Note: Event registration for menu widgets is done in the page creation functions
     // (menu_screen.cpp) because the menu is created lazily and destroyed on hide.
     // Attempting to register events here would fail silently since widgets don't exist yet.
@@ -559,6 +562,31 @@ void MenuUIController::handle_brightness_screensaver_slider_released() {
     float normal = get_normal_brightness();
     ui_manager_->get_hardware_manager()->get_display()->set_brightness(normal);
     LOG_DEBUG_PRINTF("Touch released - restored normal brightness to %.2f\n", normal);
+}
+
+void MenuUIController::handle_screensaver_startup_toggle() {
+    auto* toggle = ui_manager_->menu_screen.get_screensaver_startup_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    Preferences prefs;
+    prefs.begin("screensaver", false);
+    prefs.putBool("startup", enabled);
+    prefs.end();
+
+    LOG_BLE("Screensaver startup: %s\n", enabled ? "enabled" : "disabled");
+}
+
+void MenuUIController::handle_screensaver_sleep_toggle() {
+    auto* toggle = ui_manager_->menu_screen.get_screensaver_sleep_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    Preferences prefs;
+    prefs.begin("screensaver", false);
+    prefs.putBool("sleep", enabled);
+    prefs.end();
+
 }
 
 void MenuUIController::perform_factory_reset() {

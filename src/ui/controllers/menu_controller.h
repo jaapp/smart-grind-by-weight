@@ -37,6 +37,8 @@ public:
     void handle_brightness_normal_slider_released();
     void handle_brightness_screensaver_slider();
     void handle_brightness_screensaver_slider_released();
+    void handle_screensaver_startup_toggle();
+    void handle_screensaver_sleep_toggle();
 
     float get_normal_brightness() const;
     float get_screensaver_brightness() const;
