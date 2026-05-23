@@ -7,6 +7,7 @@
 #include <nvs_flash.h>
 #include <nvs.h>
 #include "../system/performance_monitor.h"
+#include "../system/screensaver_settings.h"
 #include "../system/statistics_manager.h"
 #include "../system/diagnostics_controller.h"
 #include "../config/constants.h"
@@ -847,6 +848,11 @@ void BluetoothManager::handle_data_control_command(BLECharacteristic* characteri
             handle_image_control_command(command, data);
             break;
 
+        case BLE_SETTINGS_CMD_GET_SCREENSAVER:
+        case BLE_SETTINGS_CMD_SET_SCREENSAVER:
+            handle_screensaver_settings_command(command, data);
+            break;
+
         default:
             log("Bluetooth Data: Unknown command: 0x%02X\n", command);
             set_data_status(BLE_DATA_ERROR);
@@ -972,6 +978,94 @@ void BluetoothManager::set_image_status(BLEImageStatus status) {
     uint8_t val = static_cast<uint8_t>(status);
     data_status_characteristic->setValue(&val, 1);
     data_status_characteristic->notify();
+}
+
+void BluetoothManager::handle_screensaver_settings_command(uint8_t command, const String& value) {
+    if (is_data_channel_busy_for_settings()) {
+        LOG_BLE("Screensaver settings: rejected command 0x%02X while data channel is busy\n", command);
+        send_screensaver_settings_error(BLE_SETTINGS_ERROR_BUSY);
+        return;
+    }
+
+    switch (command) {
+        case BLE_SETTINGS_CMD_GET_SCREENSAVER:
+            send_screensaver_settings();
+            break;
+
+        case BLE_SETTINGS_CMD_SET_SCREENSAVER: {
+            if (value.length() != 4) {
+                LOG_BLE("Screensaver settings: invalid SET length %d\n",
+                        static_cast<int>(value.length()));
+                send_screensaver_settings_error(BLE_SETTINGS_ERROR_INVALID_LENGTH);
+                return;
+            }
+
+            const auto* data = reinterpret_cast<const uint8_t*>(value.c_str());
+            uint16_t idle_timeout_s = static_cast<uint16_t>(data[1]) |
+                                      (static_cast<uint16_t>(data[2]) << 8);
+            uint8_t startup_timeout_s = data[3];
+
+            if (!ScreensaverSettings::is_valid_idle_timeout(idle_timeout_s) ||
+                !ScreensaverSettings::is_valid_startup_timeout(startup_timeout_s)) {
+                LOG_BLE("Screensaver settings: rejected idle=%u startup=%u\n",
+                        idle_timeout_s, startup_timeout_s);
+                send_screensaver_settings_error(BLE_SETTINGS_ERROR_INVALID_RANGE);
+                return;
+            }
+
+            if (!ScreensaverSettings::save_timing(idle_timeout_s, startup_timeout_s)) {
+                LOG_BLE("Screensaver settings: failed to save timing preferences\n");
+                send_screensaver_settings_error(BLE_SETTINGS_ERROR_STORAGE);
+                return;
+            }
+
+            LOG_BLE("Screensaver settings: saved idle=%us startup=%us\n",
+                    idle_timeout_s, startup_timeout_s);
+            send_screensaver_settings();
+            break;
+        }
+
+        default:
+            send_screensaver_settings_error(BLE_SETTINGS_ERROR_INVALID_RANGE);
+            break;
+    }
+}
+
+void BluetoothManager::send_screensaver_settings() {
+    if (!data_status_characteristic) {
+        return;
+    }
+
+    auto settings = ScreensaverSettings::load_timing();
+    uint8_t payload[4] = {
+        static_cast<uint8_t>(BLE_SETTINGS_STATUS_VALUE),
+        static_cast<uint8_t>(settings.idle_timeout_s & 0xFF),
+        static_cast<uint8_t>((settings.idle_timeout_s >> 8) & 0xFF),
+        settings.startup_timeout_s,
+    };
+
+    data_status_characteristic->setValue(payload, sizeof(payload));
+    data_status_characteristic->notify();
+}
+
+void BluetoothManager::send_screensaver_settings_error(BLEScreensaverSettingsError error) {
+    if (!data_status_characteristic) {
+        return;
+    }
+
+    uint8_t payload[2] = {
+        static_cast<uint8_t>(BLE_SETTINGS_STATUS_ERROR),
+        static_cast<uint8_t>(error),
+    };
+
+    data_status_characteristic->setValue(payload, sizeof(payload));
+    data_status_characteristic->notify();
+}
+
+bool BluetoothManager::is_data_channel_busy_for_settings() const {
+    return ota_handler.is_ota_active() ||
+           data_export_in_progress ||
+           image_handler.is_upload_active();
 }
 
 String BluetoothManager::check_ota_failure_after_boot() {

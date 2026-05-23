@@ -92,7 +92,7 @@
             color: #4a5568;
         }
         
-        input[type="text"], input[type="file"], select {
+        input[type="text"], input[type="number"], input[type="file"], select {
             width: 100%;
             padding: 12px;
             border: 2px solid #e2e8f0;
@@ -210,6 +210,22 @@
         #browserWarning {
             display: none;
         }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .button-row .btn {
+            flex: 1;
+        }
+
+        @media (max-width: 600px) {
+            .button-row {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
@@ -313,6 +329,26 @@
             <div class="section">
                 <h3>🖼️ Custom Screensaver Image</h3>
                 <p>Upload a custom image to display on startup or when the grinder enters power-saving mode. The image must be exactly <strong>280 x 456 pixels</strong>.</p>
+            </div>
+
+            <div class="section">
+                <h3>⏱️ Screensaver Timing</h3>
+                <p>Set the idle timeout and startup image duration. Screensaver brightness remains configurable on the grinder.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="screensaverIdleTimeout">Idle Timeout (seconds)</label>
+                <input type="number" id="screensaverIdleTimeout" min="30" max="3600" step="1" value="300">
+            </div>
+
+            <div class="form-group">
+                <label for="screensaverStartupTimeout">Startup Timeout (seconds)</label>
+                <input type="number" id="screensaverStartupTimeout" min="1" max="30" step="1" value="3">
+            </div>
+
+            <div class="button-row">
+                <button class="btn" id="loadScreensaverSettingsBtn" onclick="loadScreensaverSettings()">Connect & Load Settings</button>
+                <button class="btn" id="saveScreensaverSettingsBtn" onclick="saveScreensaverSettings()">Save Settings</button>
             </div>
 
             <div class="form-group">

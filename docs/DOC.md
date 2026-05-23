@@ -232,6 +232,11 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 - ✅ **Automatic version listing** - all releases available in dropdown
 - ✅ **Wireless updates** - once installed, never need USB again
 
+**Screensaver tools:**
+- Upload a custom 280 × 456 image from the **Screensaver** tab
+- Configure idle timeout (30-3600 seconds) and startup image timeout (1-30 seconds)
+- Screensaver brightness and startup/sleep enable toggles remain on the grinder under **Menu → Display**
+
 *Initial USB flashing powered by [ESP Web Tools](https://esphome.github.io/esp-web-tools/)*
 
 ### Command Line (Fallback)
@@ -345,6 +350,7 @@ Need a simple live readout? Open **Menu → Scale** to jump into a full-screen w
 - **Arc Layout**: Clean, minimal arc-based interface
 - **Nerdy Layout**: Detailed charts showing flow rates and real-time grinding analytics
 - **Switching**: Tap anywhere on grind screen to switch between layouts during grinding
+- **Screensaver**: Custom image can show on startup or when the display dims. During BLE OTA updates and OTA failure warnings, the screensaver is disabled so progress and recovery prompts stay visible.
 
 ---
 
@@ -381,9 +387,10 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   |   |-- Connection status display
     |   |   \-- Auto-disable timer display
     |   |
-    |   +-- Display
-    |   |   |-- Normal brightness slider
-    |   |   \-- Screensaver brightness slider
+	    |   +-- Display
+	    |   |   |-- Normal brightness slider
+	    |   |   |-- Screensaver brightness slider
+	    |   |   \-- Screensaver startup/sleep toggles
     |   |
     |   \-- Grind Settings
     |       |-- Swipe Gestures toggle (enable/disable vertical swipes)

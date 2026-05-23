@@ -1,6 +1,7 @@
 #include "screensaver_controller.h"
 #include "../../config/constants.h"
 #include "../../config/logging.h"
+#include "../../system/screensaver_settings.h"
 #include <algorithm>
 #include <cstring>
 #include <LittleFS.h>
@@ -38,6 +39,11 @@ bool ScreensaverController::is_sleep_enabled() const {
     bool enabled = prefs.getBool("sleep", false);
     prefs.end();
     return enabled;
+}
+
+uint32_t ScreensaverController::get_startup_timeout_ms() const {
+    auto settings = ScreensaverSettings::load_timing();
+    return static_cast<uint32_t>(settings.startup_timeout_s) * 1000U;
 }
 
 void ScreensaverController::show() {
@@ -146,4 +152,3 @@ void ScreensaverController::free_image() {
         image_buffer_ = nullptr;
     }
 }
-
