@@ -58,19 +58,21 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     // Register grind event callback
     grind_controller->set_ui_event_callback(GrindingUIController::dispatch_event);
 
-    // Show startup screensaver if enabled and image exists
+    // Show startup screensaver only on normal ready boot, never over boot warnings.
     if (screensaver_controller_ &&
+        state_machine &&
+        state_machine->is_state(UIState::READY) &&
         screensaver_controller_->is_startup_enabled() &&
         screensaver_controller_->has_image()) {
         screensaver_controller_->show();
-        // Auto-hide after 3 seconds
+        uint32_t startup_timeout_ms = screensaver_controller_->get_startup_timeout_ms();
         lv_timer_create([](lv_timer_t* t) {
             auto* sc = static_cast<ScreensaverController*>(lv_timer_get_user_data(t));
             if (sc && sc->is_visible()) {
                 sc->hide();
             }
             lv_timer_delete(t);
-        }, 3000, screensaver_controller_.get());
+        }, startup_timeout_ms, screensaver_controller_.get());
     }
 
     initialized = true;

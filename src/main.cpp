@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <Preferences.h>
 #include <esp_system.h>
 #include "hardware/hardware_manager.h"
 #include "system/state_machine.h"
@@ -8,6 +9,7 @@
 #include "controllers/grind_controller.h"
 #include "ui/ui_manager.h"
 #include "config/constants.h"
+#include "system/screensaver_settings.h"
 #include "bluetooth/manager.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
@@ -30,6 +32,45 @@ static uint32_t core1_cycle_time_min_ms = UINT32_MAX;
 static uint32_t core1_cycle_time_max_ms = 0;
 static uint32_t core1_last_heartbeat_time = 0;
 #endif
+
+namespace {
+
+float load_startup_display_brightness() {
+    Preferences prefs;
+    float brightness = USER_SCREEN_BRIGHTNESS_NORMAL;
+    if (prefs.begin("brightness", true)) {
+        brightness = prefs.getFloat("normal", USER_SCREEN_BRIGHTNESS_NORMAL);
+        prefs.end();
+    }
+
+    if (brightness < 0.15f) {
+        brightness = 0.15f;
+    }
+    return brightness;
+}
+
+void draw_early_startup_splash_if_ready() {
+    if (!state_machine.is_state(UIState::READY) ||
+        !ScreensaverSettings::is_startup_enabled() ||
+        !LittleFS.exists(BLE_IMAGE_FILENAME)) {
+        return;
+    }
+
+    DisplayManager* display = hardware_manager.get_display();
+    if (!display || !display->is_initialized()) {
+        return;
+    }
+
+    display->set_brightness(load_startup_display_brightness());
+
+    if (display->draw_rgb565_file(BLE_IMAGE_FILENAME,
+                                  HW_DISPLAY_WIDTH_PX,
+                                  HW_DISPLAY_HEIGHT_PX)) {
+        LOG_BLE("[STARTUP] Early screensaver splash drawn\n");
+    }
+}
+
+}  // namespace
 
 void setup() {
     Serial.begin(HW_SERIAL_BAUD_RATE);
@@ -92,6 +133,8 @@ void setup() {
     } else {
         state_machine.init(UIState::READY);
     }
+
+    draw_early_startup_splash_if_ready();
     
     ui_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &bluetooth_manager);
     

@@ -2,6 +2,7 @@
 #include "../config/constants.h"
 #include "../config/logging.h"
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <esp_heap_caps.h>
 #include <algorithm>
 #include <cstring>
@@ -98,6 +99,69 @@ void DisplayManager::update() {
     
     touch_driver.update();
     lv_timer_handler();
+}
+
+bool DisplayManager::draw_rgb565_file(const char* path, uint16_t width, uint16_t height) {
+    if (!initialized || !gfx_device || !path || width == 0 || height == 0) {
+        return false;
+    }
+
+    const size_t expected_size = static_cast<size_t>(width) * height * sizeof(uint16_t);
+    File file = LittleFS.open(path, "r");
+    if (!file) {
+        LOG_BLE("[DISPLAY] RGB565 draw skipped: failed to open %s\n", path);
+        return false;
+    }
+
+    if (file.size() != expected_size) {
+        LOG_BLE("[DISPLAY] RGB565 draw skipped: %s size %u != %u\n",
+                path,
+                static_cast<unsigned>(file.size()),
+                static_cast<unsigned>(expected_size));
+        file.close();
+        return false;
+    }
+
+    uint16_t rows_per_chunk = 16;
+    uint16_t* row_buffer = nullptr;
+    while (rows_per_chunk >= 4 && row_buffer == nullptr) {
+        row_buffer = static_cast<uint16_t*>(
+            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN,
+                                    static_cast<size_t>(width) * rows_per_chunk * sizeof(uint16_t),
+                                    MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
+        if (!row_buffer) {
+            rows_per_chunk /= 2;
+        }
+    }
+
+    if (!row_buffer) {
+        LOG_BLE("[DISPLAY] RGB565 draw skipped: row buffer allocation failed\n");
+        file.close();
+        return false;
+    }
+
+    const int16_t x = static_cast<int16_t>((screen_width > width) ? ((screen_width - width) / 2) : 0);
+    const int16_t y = static_cast<int16_t>((screen_height > height) ? ((screen_height - height) / 2) : 0);
+    bool success = true;
+
+    for (uint16_t current_y = 0; current_y < height; current_y += rows_per_chunk) {
+        const uint16_t rows = std::min<uint16_t>(rows_per_chunk, height - current_y);
+        const size_t bytes_to_read = static_cast<size_t>(width) * rows * sizeof(uint16_t);
+        const size_t bytes_read = file.read(reinterpret_cast<uint8_t*>(row_buffer), bytes_to_read);
+        if (bytes_read != bytes_to_read) {
+            LOG_BLE("[DISPLAY] RGB565 draw aborted: short read at row %u\n", current_y);
+            success = false;
+            break;
+        }
+
+        // Screensaver uploads are stored as native little-endian RGB565.
+        // Arduino_GFX converts native pixels to the panel byte order here.
+        gfx_device->draw16bitRGBBitmap(x, y + current_y, row_buffer, width, rows);
+    }
+
+    heap_caps_free(row_buffer);
+    file.close();
+    return success;
 }
 
 // Update the refresh area to be full width

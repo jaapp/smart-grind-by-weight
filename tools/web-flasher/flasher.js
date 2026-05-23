@@ -39,9 +39,25 @@ const BLE_IMG_STATUS_SUCCESS = 0x33;
 const BLE_IMG_STATUS_ERROR = 0x34;
 const BLE_IMG_STATUS_HAS_IMAGE = 0x35;
 
+// Screensaver settings commands/statuses (0x40+ range on Data Service)
+const BLE_SETTINGS_CMD_GET_SCREENSAVER = 0x40;
+const BLE_SETTINGS_CMD_SET_SCREENSAVER = 0x41;
+const BLE_SETTINGS_STATUS_VALUE = 0x42;
+const BLE_SETTINGS_STATUS_ERROR = 0x44;
+
+const BLE_SETTINGS_ERROR_BUSY = 0x01;
+const BLE_SETTINGS_ERROR_INVALID_LENGTH = 0x02;
+const BLE_SETTINGS_ERROR_INVALID_RANGE = 0x03;
+const BLE_SETTINGS_ERROR_STORAGE = 0x04;
+
 const IMAGE_WIDTH = 280;
 const IMAGE_HEIGHT = 456;
 const IMAGE_EXPECTED_SIZE = IMAGE_WIDTH * IMAGE_HEIGHT * 2; // RGB565
+
+const SCREENSAVER_IDLE_TIMEOUT_MIN_S = 30;
+const SCREENSAVER_IDLE_TIMEOUT_MAX_S = 3600;
+const SCREENSAVER_STARTUP_TIMEOUT_MIN_S = 1;
+const SCREENSAVER_STARTUP_TIMEOUT_MAX_S = 30;
 
 // Commands and status codes (from your Python implementation)
 const BLE_OTA_CMD_START = 0x01;
@@ -776,6 +792,194 @@ function updateScreensaverProgress(percent) {
     }
 }
 
+async function connectScreensaverDataService() {
+    const bleDevice = await navigator.bluetooth.requestDevice({
+        filters: [{ name: DEVICE_NAME }],
+        optionalServices: [BLE_DATA_SERVICE_UUID]
+    });
+
+    const bleServer = await bleDevice.gatt.connect();
+    const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
+
+    return {
+        bleDevice,
+        dataChar: await dataService.getCharacteristic(BLE_DATA_TRANSFER_CHAR_UUID),
+        controlChar: await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID),
+        statusChar: await dataService.getCharacteristic(BLE_DATA_STATUS_CHAR_UUID)
+    };
+}
+
+function disconnectBleDevice(bleDevice) {
+    if (bleDevice?.gatt?.connected) {
+        bleDevice.gatt.disconnect();
+    }
+}
+
+function screensaverSettingsErrorMessage(code) {
+    switch (code) {
+        case BLE_SETTINGS_ERROR_BUSY:
+            return 'Device is busy with OTA, data export, or image upload.';
+        case BLE_SETTINGS_ERROR_INVALID_LENGTH:
+            return 'Device rejected the settings payload.';
+        case BLE_SETTINGS_ERROR_INVALID_RANGE:
+            return 'One or more values are outside the supported range.';
+        case BLE_SETTINGS_ERROR_STORAGE:
+            return 'Device could not save settings.';
+        default:
+            return `Device rejected settings (error ${code}).`;
+    }
+}
+
+function waitForScreensaverSettings(statusChar, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            cleanup();
+            reject(new Error('Timed out waiting for screensaver settings'));
+        }, timeoutMs);
+
+        const handler = (event) => {
+            const val = new Uint8Array(event.target.value.buffer);
+            if (val.length === 0) return;
+
+            if (val[0] === BLE_SETTINGS_STATUS_VALUE && val.length >= 4) {
+                cleanup();
+                resolve({
+                    idleTimeoutS: val[1] | (val[2] << 8),
+                    startupTimeoutS: val[3]
+                });
+            } else if (val[0] === BLE_SETTINGS_STATUS_ERROR) {
+                cleanup();
+                const code = val.length >= 2 ? val[1] : 0;
+                reject(new Error(screensaverSettingsErrorMessage(code)));
+            }
+        };
+
+        function cleanup() {
+            clearTimeout(timeoutId);
+            statusChar.removeEventListener('characteristicvaluechanged', handler);
+        }
+
+        statusChar.addEventListener('characteristicvaluechanged', handler);
+    });
+}
+
+function applyScreensaverSettings(settings) {
+    document.getElementById('screensaverIdleTimeout').value = settings.idleTimeoutS;
+    document.getElementById('screensaverStartupTimeout').value = settings.startupTimeoutS;
+}
+
+function readSecondsInput(id, min, max, label) {
+    const input = document.getElementById(id);
+    const value = Number.parseInt(input.value, 10);
+
+    if (!Number.isInteger(value) || value < min || value > max) {
+        throw new Error(`${label} must be between ${min} and ${max} seconds.`);
+    }
+
+    return value;
+}
+
+async function loadScreensaverSettings() {
+    const loadBtn = document.getElementById('loadScreensaverSettingsBtn');
+    const saveBtn = document.getElementById('saveScreensaverSettingsBtn');
+    let bleDevice = null;
+    let statusChar = null;
+
+    try {
+        loadBtn.disabled = true;
+        saveBtn.disabled = true;
+        updateScreensaverStatus('Connecting to device...', 'info');
+
+        const connection = await connectScreensaverDataService();
+        bleDevice = connection.bleDevice;
+        statusChar = connection.statusChar;
+
+        await statusChar.startNotifications();
+        const settingsPromise = waitForScreensaverSettings(statusChar);
+
+        updateScreensaverStatus('Loading screensaver settings...', 'info');
+        await connection.controlChar.writeValue(new Uint8Array([BLE_SETTINGS_CMD_GET_SCREENSAVER]));
+
+        const settings = await settingsPromise;
+        applyScreensaverSettings(settings);
+        updateScreensaverStatus('Screensaver settings loaded.', 'success');
+    } catch (error) {
+        updateScreensaverStatus(`Load failed: ${error.message}`, 'error');
+        console.error('Screensaver settings load error:', error);
+    } finally {
+        if (statusChar) {
+            try {
+                await statusChar.stopNotifications();
+            } catch (e) {
+                // Ignore cleanup errors.
+            }
+        }
+        disconnectBleDevice(bleDevice);
+        loadBtn.disabled = false;
+        saveBtn.disabled = false;
+    }
+}
+
+async function saveScreensaverSettings() {
+    const loadBtn = document.getElementById('loadScreensaverSettingsBtn');
+    const saveBtn = document.getElementById('saveScreensaverSettingsBtn');
+    let bleDevice = null;
+    let statusChar = null;
+
+    try {
+        const idleTimeoutS = readSecondsInput(
+            'screensaverIdleTimeout',
+            SCREENSAVER_IDLE_TIMEOUT_MIN_S,
+            SCREENSAVER_IDLE_TIMEOUT_MAX_S,
+            'Idle timeout'
+        );
+        const startupTimeoutS = readSecondsInput(
+            'screensaverStartupTimeout',
+            SCREENSAVER_STARTUP_TIMEOUT_MIN_S,
+            SCREENSAVER_STARTUP_TIMEOUT_MAX_S,
+            'Startup timeout'
+        );
+
+        loadBtn.disabled = true;
+        saveBtn.disabled = true;
+        updateScreensaverStatus('Connecting to device...', 'info');
+
+        const connection = await connectScreensaverDataService();
+        bleDevice = connection.bleDevice;
+        statusChar = connection.statusChar;
+
+        await statusChar.startNotifications();
+        const settingsPromise = waitForScreensaverSettings(statusChar);
+
+        const payload = new Uint8Array(4);
+        payload[0] = BLE_SETTINGS_CMD_SET_SCREENSAVER;
+        payload[1] = idleTimeoutS & 0xFF;
+        payload[2] = (idleTimeoutS >> 8) & 0xFF;
+        payload[3] = startupTimeoutS;
+
+        updateScreensaverStatus('Saving screensaver settings...', 'info');
+        await connection.controlChar.writeValue(payload);
+
+        const settings = await settingsPromise;
+        applyScreensaverSettings(settings);
+        updateScreensaverStatus('Screensaver settings saved.', 'success');
+    } catch (error) {
+        updateScreensaverStatus(`Save failed: ${error.message}`, 'error');
+        console.error('Screensaver settings save error:', error);
+    } finally {
+        if (statusChar) {
+            try {
+                await statusChar.stopNotifications();
+            } catch (e) {
+                // Ignore cleanup errors.
+            }
+        }
+        disconnectBleDevice(bleDevice);
+        loadBtn.disabled = false;
+        saveBtn.disabled = false;
+    }
+}
+
 function handleScreensaverFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -852,33 +1056,31 @@ async function uploadScreensaver() {
 
     const uploadBtn = document.getElementById('uploadScreensaverBtn');
     uploadBtn.disabled = true;
+    let bleDevice = null;
+    let controlChar = null;
+    let statusChar = null;
+    let statusHandler = null;
+    let uploadActive = false;
 
     try {
         updateScreensaverStatus('Connecting to device...', 'info');
 
-        // Connect via BLE (image upload uses the existing data service)
-        const bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: DEVICE_NAME }],
-            optionalServices: [BLE_DATA_SERVICE_UUID]
-        });
-
-        const bleServer = await bleDevice.gatt.connect();
+        const connection = await connectScreensaverDataService();
+        bleDevice = connection.bleDevice;
+        controlChar = connection.controlChar;
+        statusChar = connection.statusChar;
         updateScreensaverStatus('Getting data service...', 'info');
-
-        const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
-        const dataChar = await dataService.getCharacteristic(BLE_DATA_TRANSFER_CHAR_UUID);
-        const controlChar = await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID);
-        const imgStatusChar = await dataService.getCharacteristic(BLE_DATA_STATUS_CHAR_UUID);
 
         // Set up status notifications
         let lastStatus = BLE_IMG_STATUS_IDLE;
-        await imgStatusChar.startNotifications();
-        imgStatusChar.addEventListener('characteristicvaluechanged', (event) => {
+        await statusChar.startNotifications();
+        statusHandler = (event) => {
             const val = new Uint8Array(event.target.value.buffer);
             if (val.length > 0) lastStatus = val[0];
-        });
+        };
+        statusChar.addEventListener('characteristicvaluechanged', statusHandler);
 
-        // Send START command: [0x10][size:4 LE]
+        // Send START command: [0x30][size:4 LE]
         updateScreensaverStatus('Starting upload...', 'info');
         const startCmd = new Uint8Array(5);
         startCmd[0] = BLE_IMG_CMD_START;
@@ -887,6 +1089,7 @@ async function uploadScreensaver() {
         startCmd[3] = (screensaverRgb565Data.length >> 16) & 0xFF;
         startCmd[4] = (screensaverRgb565Data.length >> 24) & 0xFF;
         await controlChar.writeValue(startCmd);
+        uploadActive = true;
 
         await sleep(200); // Wait for device to prepare
 
@@ -902,7 +1105,7 @@ async function uploadScreensaver() {
         for (let offset = 0; offset < screensaverRgb565Data.length; offset += CHUNK_SIZE) {
             const end = Math.min(offset + CHUNK_SIZE, screensaverRgb565Data.length);
             const chunk = screensaverRgb565Data.slice(offset, end);
-            await dataChar.writeValue(chunk);
+            await connection.dataChar.writeValue(chunk);
 
             const percent = Math.round((end / screensaverRgb565Data.length) * 100);
             updateScreensaverProgress(percent);
@@ -918,20 +1121,34 @@ async function uploadScreensaver() {
         if (lastStatus === BLE_IMG_STATUS_ERROR) {
             throw new Error('Device reported error during finalization');
         }
+        uploadActive = false;
 
         updateScreensaverStatus('Screensaver image uploaded successfully!', 'success');
         updateScreensaverProgress(100);
-
-        // Disconnect
-        await sleep(500);
-        if (bleDevice.gatt.connected) {
-            bleDevice.gatt.disconnect();
-        }
 
     } catch (error) {
         updateScreensaverStatus(`Upload failed: ${error.message}`, 'error');
         console.error('Screensaver upload error:', error);
     } finally {
+        if (uploadActive && controlChar && bleDevice?.gatt?.connected) {
+            try {
+                await controlChar.writeValue(new Uint8Array([BLE_IMG_CMD_ABORT]));
+            } catch (abortError) {
+                console.error('Could not abort screensaver upload:', abortError);
+            }
+        }
+
+        if (statusChar && statusHandler) {
+            statusChar.removeEventListener('characteristicvaluechanged', statusHandler);
+            try {
+                await statusChar.stopNotifications();
+            } catch (e) {
+                // Ignore cleanup errors.
+            }
+        }
+
+        await sleep(200);
+        disconnectBleDevice(bleDevice);
         uploadBtn.disabled = !screensaverRgb565Data;
         setTimeout(() => updateScreensaverProgress(0), 3000);
     }
@@ -940,34 +1157,26 @@ async function uploadScreensaver() {
 async function deleteScreensaver() {
     const deleteBtn = document.getElementById('deleteScreensaverBtn');
     deleteBtn.disabled = true;
+    let bleDevice = null;
 
     try {
         updateScreensaverStatus('Connecting to device...', 'info');
 
-        const bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: DEVICE_NAME }],
-            optionalServices: [BLE_DATA_SERVICE_UUID]
-        });
-
-        const bleServer = await bleDevice.gatt.connect();
-        const dataService = await bleServer.getPrimaryService(BLE_DATA_SERVICE_UUID);
-        const controlChar = await dataService.getCharacteristic(BLE_DATA_CONTROL_CHAR_UUID);
+        const connection = await connectScreensaverDataService();
+        bleDevice = connection.bleDevice;
 
         // Send DELETE command
         const deleteCmd = new Uint8Array([BLE_IMG_CMD_DELETE]);
-        await controlChar.writeValue(deleteCmd);
+        await connection.controlChar.writeValue(deleteCmd);
 
         await sleep(500);
         updateScreensaverStatus('Screensaver image deleted from device.', 'success');
-
-        if (bleDevice.gatt.connected) {
-            bleDevice.gatt.disconnect();
-        }
 
     } catch (error) {
         updateScreensaverStatus(`Delete failed: ${error.message}`, 'error');
         console.error('Screensaver delete error:', error);
     } finally {
+        disconnectBleDevice(bleDevice);
         deleteBtn.disabled = false;
     }
 }

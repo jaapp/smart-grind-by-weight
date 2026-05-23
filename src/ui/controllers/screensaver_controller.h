@@ -23,6 +23,9 @@ public:
     /// Read NVS preference: show image during sleep/dim
     bool is_sleep_enabled() const;
 
+    /// Read NVS preference: startup display duration in milliseconds
+    uint32_t get_startup_timeout_ms() const;
+
     /// Load image from LittleFS and display as full-screen overlay
     void show();
 

@@ -35,6 +35,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
   - [🔍 Diagnostic Report](#-diagnostic-report)
     - [Report Contents](#report-contents)
     - [Access Methods](#access-methods)
+  - [Screensaver](#screensaver)
   - [📊 Analytics \& Data Export](#-analytics--data-export)
     - [Launch Interactive Dashboard](#launch-interactive-dashboard)
     - [Available Tools](#available-tools)
@@ -232,6 +233,11 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 - ✅ **Automatic version listing** - all releases available in dropdown
 - ✅ **Wireless updates** - once installed, never need USB again
 
+**Screensaver tools:**
+- Upload a custom 280 × 456 image from the **Screensaver** tab
+- Configure idle timeout (30-3600 seconds) and startup image timeout (1-30 seconds)
+- Screensaver brightness and startup/sleep enable toggles remain on the grinder under **Menu → Display**
+
 *Initial USB flashing powered by [ESP Web Tools](https://esphome.github.io/esp-web-tools/)*
 
 ### Command Line (Fallback)
@@ -345,6 +351,7 @@ Need a simple live readout? Open **Menu → Scale** to jump into a full-screen w
 - **Arc Layout**: Clean, minimal arc-based interface
 - **Nerdy Layout**: Detailed charts showing flow rates and real-time grinding analytics
 - **Switching**: Tap anywhere on grind screen to switch between layouts during grinding
+- **Screensaver**: Custom image can show on startup or when the display dims.
 
 ---
 
@@ -381,9 +388,10 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   |   |-- Connection status display
     |   |   \-- Auto-disable timer display
     |   |
-    |   +-- Display
-    |   |   |-- Normal brightness slider
-    |   |   \-- Screensaver brightness slider
+	    |   +-- Display
+	    |   |   |-- Normal brightness slider
+	    |   |   |-- Screensaver brightness slider
+	    |   |   \-- Screensaver startup/sleep toggles
     |   |
     |   \-- Grind Settings
     |       |-- Swipe Gestures toggle (enable/disable vertical swipes)
@@ -486,6 +494,17 @@ python3 tools/grinder.py diagnostics --save diagnostic-report.txt
 - Checking motor latency settings after auto-tune
 - Confirming firmware version and compile-time parameters
 - General troubleshooting and system health assessment
+
+---
+
+## Screensaver
+
+The screensaver uses a custom 280 × 456 RGB565 image uploaded from the Web Flasher.
+
+- **Timing settings**: Configure idle timeout and startup image timeout in the Web Flasher **Screensaver** tab.
+- **Device settings**: Configure brightness and startup/sleep enable toggles under **Menu → Display**.
+- **Startup behavior**: On normal Ready boots, the image is drawn early while the full UI initializes, then the regular timed screensaver overlay takes over.
+- **OTA behavior**: During BLE OTA updates and OTA failure warnings, the screensaver is disabled so progress and recovery prompts stay visible.
 
 ---
 

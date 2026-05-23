@@ -1,10 +1,10 @@
 #include "screensaver_controller.h"
 #include "../../config/constants.h"
 #include "../../config/logging.h"
+#include "../../system/screensaver_settings.h"
 #include <algorithm>
 #include <cstring>
 #include <LittleFS.h>
-#include <Preferences.h>
 #include <esp_heap_caps.h>
 
 ScreensaverController::ScreensaverController()
@@ -25,19 +25,16 @@ bool ScreensaverController::has_image() const {
 }
 
 bool ScreensaverController::is_startup_enabled() const {
-    Preferences prefs;
-    prefs.begin("screensaver", true);
-    bool enabled = prefs.getBool("startup", false);
-    prefs.end();
-    return enabled;
+    return ScreensaverSettings::is_startup_enabled();
 }
 
 bool ScreensaverController::is_sleep_enabled() const {
-    Preferences prefs;
-    prefs.begin("screensaver", true);
-    bool enabled = prefs.getBool("sleep", false);
-    prefs.end();
-    return enabled;
+    return ScreensaverSettings::is_sleep_enabled();
+}
+
+uint32_t ScreensaverController::get_startup_timeout_ms() const {
+    auto settings = ScreensaverSettings::load_timing();
+    return static_cast<uint32_t>(settings.startup_timeout_s) * 1000U;
 }
 
 void ScreensaverController::show() {
@@ -146,4 +143,3 @@ void ScreensaverController::free_image() {
         image_buffer_ = nullptr;
     }
 }
-
