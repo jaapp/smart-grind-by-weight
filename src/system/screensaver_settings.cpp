@@ -8,6 +8,18 @@ namespace {
 constexpr const char* kPrefsNamespace = "screensaver";
 constexpr const char* kIdleTimeoutKey = "idle_timeout_s";
 constexpr const char* kStartupTimeoutKey = "startup_s";
+constexpr const char* kStartupEnabledKey = "startup";
+constexpr const char* kSleepEnabledKey = "sleep";
+
+bool get_bool_setting(const char* key, bool default_value) {
+    Preferences prefs;
+    if (!prefs.begin(kPrefsNamespace, true)) {
+        return default_value;
+    }
+    bool value = prefs.getBool(key, default_value);
+    prefs.end();
+    return value;
+}
 
 }  // namespace
 
@@ -19,6 +31,14 @@ bool is_valid_idle_timeout(uint16_t idle_timeout_s) {
 
 bool is_valid_startup_timeout(uint8_t startup_timeout_s) {
     return startup_timeout_s >= kMinStartupTimeoutS && startup_timeout_s <= kMaxStartupTimeoutS;
+}
+
+bool is_startup_enabled() {
+    return get_bool_setting(kStartupEnabledKey, false);
+}
+
+bool is_sleep_enabled() {
+    return get_bool_setting(kSleepEnabledKey, false);
 }
 
 ScreensaverTimingSettings load_timing() {

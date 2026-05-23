@@ -24,6 +24,7 @@ public:
     void init();
     void update();
     void set_brightness(float brightness);
+    bool draw_rgb565_file(const char* path, uint16_t width, uint16_t height);
     
     uint32_t get_width() const { return screen_width; }
     uint32_t get_height() const { return screen_height; }
