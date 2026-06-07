@@ -11,6 +11,7 @@ public:
     // Event type enumeration for dispatch
     enum class EventType {
         TAB_CHANGE,
+        PROFILE_SELECT,
         PROFILE_LONG_PRESS,
         GRIND_BUTTON,
         PULSE_BUTTON,
@@ -31,6 +32,7 @@ public:
         CONNECTIVITY_TOGGLE,
         CONNECTIVITY_STARTUP_TOGGLE,
         LOGGING_TOGGLE,
+        READY_UI_ADVANCED_TOGGLE,
         GRIND_MODE_SWIPE_TOGGLE,
         GRIND_MODE_RADIO_BUTTON,
         AUTO_START_TOGGLE,
@@ -58,6 +60,14 @@ public:
         CONFIRM,
         CONFIRM_CANCEL,
         PURGE_CONFIRM_CONTINUE,
+        BEAN_CARD,
+        BEAN_BACK,
+        BEAN_SELECT,
+        BEAN_FEEDBACK_FINER,
+        BEAN_FEEDBACK_OK,
+        BEAN_FEEDBACK_COARSER,
+        BEAN_FEEDBACK_SKIP,
+        READY_SETTINGS,
         SCREENSAVER_STARTUP_TOGGLE,
         SCREENSAVER_SLEEP_TOGGLE,
         COUNT

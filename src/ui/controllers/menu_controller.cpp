@@ -47,6 +47,7 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::CONNECTIVITY_STARTUP_TOGGLE, [this](lv_event_t*) { handle_connectivity_startup_toggle(); });
     EventBridgeLVGL::register_handler(ET::LOGGING_TOGGLE, [this](lv_event_t*) { handle_logging_toggle(); });
 
+    EventBridgeLVGL::register_handler(ET::READY_UI_ADVANCED_TOGGLE, [this](lv_event_t*) { handle_ready_ui_advanced_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
@@ -312,6 +313,26 @@ void MenuUIController::handle_logging_toggle() {
     prefs.end();
 
     LOG_DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
+}
+
+void MenuUIController::handle_ready_ui_advanced_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->menu_screen.get_ready_ui_advanced_toggle();
+    if (!toggle) return;
+
+    const bool advanced_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin(USER_READY_UI_PREF_NAMESPACE, false);
+    prefs.putBool(USER_READY_UI_PREF_KEY_ADVANCED, advanced_enabled);
+    prefs.end();
+
+    if (ui_manager_->ready_controller_) {
+        ui_manager_->ready_controller_->reload_ready_ui_mode();
+    }
+
+    LOG_DEBUG_PRINTLN(advanced_enabled ? "Advanced ready UI enabled" : "Normal ready UI enabled");
 }
 
 void MenuUIController::handle_grind_mode_swipe_toggle() {

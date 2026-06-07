@@ -28,6 +28,7 @@
 #define WIFI_STATUS_PATH "/status"
 #define WIFI_API_STATUS_PATH "/api/status"
 #define WIFI_API_SETTINGS_PATH "/api/settings"
+#define WIFI_API_BEANS_PATH "/api/beans"
 #define WIFI_API_SCREENSAVER_PATH "/api/screensaver"
 #define WIFI_API_SCREENSAVER_CLEAR_PATH "/api/screensaver/clear"
 #define WIFI_API_BASKET_CAPTURE_SINGLE_PATH "/api/basket/capture/single"

@@ -45,6 +45,7 @@ void MenuScreen::create(ConnectivityManager* connectivity, GrindController* grin
     scale_weight_label = nullptr;
     scale_tare_button = nullptr;
     scale_item = nullptr;
+    ready_ui_advanced_toggle = nullptr;
     basket_detect_toggle = nullptr;
     basket_single_label = nullptr;
     basket_double_label = nullptr;
@@ -391,6 +392,9 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
         this
     );
 
+    create_description_label(parent, "Advanced uses the bean tracking ready screen. Normal restores the classic swipe pages.");
+    create_toggle_row(parent, "Advanced UI", &ready_ui_advanced_toggle);
+
     // Descriptive label for swipe functionality
     lv_obj_t* swipe_desc_label = lv_label_create(parent);
     lv_label_set_text(swipe_desc_label, "Enable swiping vertically to switch between Weight/Time modes");
@@ -466,6 +470,10 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Register events for the toggles (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
+    if (ready_ui_advanced_toggle) {
+        lv_obj_add_event_cb(ready_ui_advanced_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::READY_UI_ADVANCED_TOGGLE)));
+    }
     if (grind_mode_swipe_toggle) {
         lv_obj_add_event_cb(grind_mode_swipe_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_MODE_SWIPE_TOGGLE)));
@@ -1333,6 +1341,14 @@ void MenuScreen::update_grind_mode_toggles() {
     bool swipe_enabled = swipe_prefs.getBool("enabled", false);
     swipe_prefs.end();
 
+    bool advanced_ui_enabled = USER_READY_UI_ADVANCED_DEFAULT;
+    Preferences ready_ui_prefs;
+    if (ready_ui_prefs.begin(USER_READY_UI_PREF_NAMESPACE, true)) {
+        advanced_ui_enabled = ready_ui_prefs.getBool(USER_READY_UI_PREF_KEY_ADVANCED,
+                                                    USER_READY_UI_ADVANCED_DEFAULT);
+        ready_ui_prefs.end();
+    }
+
     // Read current grind mode from main grinder preferences using hardware manager
     int mode_index = 0; // Default to Weight (index 0)
     int grinder_purge_mode_index = GRIND_PURGE_MODE_DEFAULT;  // Default to Purge
@@ -1349,6 +1365,14 @@ void MenuScreen::update_grind_mode_toggles() {
 
     if (grind_mode_radio_group) {
         radio_button_group_set_selection(grind_mode_radio_group, mode_index);
+    }
+
+    if (ready_ui_advanced_toggle) {
+        if (advanced_ui_enabled) {
+            lv_obj_add_state(ready_ui_advanced_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(ready_ui_advanced_toggle, LV_STATE_CHECKED);
+        }
     }
 
     if (grind_mode_swipe_toggle) {

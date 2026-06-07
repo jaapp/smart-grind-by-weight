@@ -5,8 +5,10 @@
 #include <cstring>
 
 #include "../../config/constants.h"
+#include "../../controllers/bean_controller.h"
 #include "../../controllers/grind_events.h"
 #include "../../controllers/grind_mode.h"
+#include "../../controllers/grind_mode_traits.h"
 #include "../../logging/grind_logging.h"
 #include "../ui_manager.h"
 
@@ -30,8 +32,10 @@ void GrindingUIController::build_controls() {
     lv_obj_set_style_border_width(grind_button_, 0, 0);
     lv_obj_set_style_shadow_width(grind_button_, 0, 0);
 
-    grind_icon_ = lv_img_create(grind_button_);
-    lv_img_set_src(grind_icon_, LV_SYMBOL_PLAY);
+    grind_icon_ = lv_label_create(grind_button_);
+    lv_label_set_text(grind_icon_, "GRIND");
+    lv_obj_set_width(grind_icon_, 88);
+    lv_obj_set_style_text_align(grind_icon_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(grind_icon_);
     lv_obj_set_style_text_font(grind_icon_, &lv_font_montserrat_24, 0);
 
@@ -43,8 +47,10 @@ void GrindingUIController::build_controls() {
     lv_obj_set_style_border_width(pulse_button_, 0, 0);
     lv_obj_set_style_shadow_width(pulse_button_, 0, 0);
 
-    pulse_icon_ = lv_img_create(pulse_button_);
-    lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
+    pulse_icon_ = lv_label_create(pulse_button_);
+    lv_label_set_text(pulse_icon_, LV_SYMBOL_PLUS);
+    lv_obj_set_width(pulse_icon_, 88);
+    lv_obj_set_style_text_align(pulse_icon_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(pulse_icon_);
     lv_obj_set_style_text_font(pulse_icon_, &lv_font_montserrat_32, 0);
 
@@ -125,6 +131,10 @@ void GrindingUIController::on_state_changed(UIState new_state) {
         case UIState::EDIT:
             enter_edit_state();
             break;
+        case UIState::BEAN_LIST:
+        case UIState::BEAN_FEEDBACK:
+            enter_menu_state();
+            break;
         case UIState::GRINDING:
             enter_grinding_state();
             break;
@@ -195,7 +205,28 @@ void GrindingUIController::handle_grind_button() {
             ui_manager_->grind_controller->stop_grind();
         }
     } else if (ui_manager_->state_machine->is_state(UIState::READY)) {
-        if (ui_manager_->current_tab == 3) {
+        if (ui_manager_->ready_screen.is_advanced_ui_enabled() &&
+            ui_manager_->current_tab >= USER_PROFILE_COUNT) {
+            int profile = ui_manager_->profile_controller
+                              ? ui_manager_->profile_controller->get_current_profile()
+                              : BeanController::kDoubleProfileIndex;
+            if (profile < 0 || profile >= USER_PROFILE_COUNT) {
+                profile = BeanController::kDoubleProfileIndex;
+            }
+            ui_manager_->current_tab = profile;
+            if (ui_manager_->profile_controller) {
+                ui_manager_->profile_controller->set_current_profile(profile);
+                ui_manager_->edit_target = get_current_profile_target(*ui_manager_->profile_controller,
+                                                                      ui_manager_->current_mode);
+            }
+            ui_manager_->ready_screen.set_active_tab(profile);
+            if (ui_manager_->ready_controller_) {
+                ui_manager_->ready_controller_->refresh_profiles();
+                ui_manager_->ready_controller_->refresh_bean_summary();
+            }
+        }
+
+        if (ui_manager_->current_tab >= USER_PROFILE_COUNT) {
             ui_manager_->switch_to_state(UIState::MENU);
             return;
         }
@@ -281,6 +312,9 @@ void GrindingUIController::handle_purge_confirm_continue() {
         if (prefs) {
             prefs->putInt(GrindController::PREF_KEY_GRINDER_MODE, static_cast<int>(GrinderPurgeMode::PRIME));
         }
+        ui_manager_->grind_controller->mark_current_purge_removed(false);
+    } else {
+        ui_manager_->grind_controller->mark_current_purge_removed(true);
     }
 
     // Hide the purge confirmation screen and continue grinding
@@ -298,26 +332,28 @@ void GrindingUIController::update_grind_button_icon() {
 
     if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
         // During purge confirm, show STOP icon (user can cancel the grind)
-        lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
+        lv_label_set_text(grind_icon_, LV_SYMBOL_STOP);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_ERROR), 0);
     } else if (ui_manager_->state_machine->is_state(UIState::GRINDING)) {
-        lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
+        lv_label_set_text(grind_icon_, LV_SYMBOL_STOP);
         lv_obj_set_style_bg_color(grind_button_,
                                   ui_manager_->current_mode == GrindMode::TIME
                                       ? lv_color_hex(THEME_COLOR_ACCENT)
                                       : lv_color_hex(THEME_COLOR_PRIMARY),
                                   0);
     } else if (ui_manager_->state_machine->is_state(UIState::GRIND_COMPLETE)) {
-        lv_img_set_src(grind_icon_, LV_SYMBOL_OK);
+        lv_label_set_text(grind_icon_, LV_SYMBOL_OK);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
     } else if (ui_manager_->state_machine->is_state(UIState::GRIND_TIMEOUT)) {
-        lv_img_set_src(grind_icon_, LV_SYMBOL_CLOSE);
+        lv_label_set_text(grind_icon_, LV_SYMBOL_CLOSE);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_WARNING), 0);
-    } else if (ui_manager_->state_machine->is_state(UIState::READY) && ui_manager_->current_tab == 3) {
-        lv_img_set_src(grind_icon_, LV_SYMBOL_SETTINGS);
+    } else if (ui_manager_->state_machine->is_state(UIState::READY) &&
+               ui_manager_->current_tab == USER_PROFILE_COUNT &&
+               !ui_manager_->ready_screen.is_advanced_ui_enabled()) {
+        lv_label_set_text(grind_icon_, LV_SYMBOL_SETTINGS);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     } else {
-        lv_img_set_src(grind_icon_, LV_SYMBOL_PLAY);
+        lv_label_set_text(grind_icon_, "GRIND");
         lv_obj_set_style_bg_color(grind_button_,
                                   ui_manager_->current_mode == GrindMode::TIME
                                       ? lv_color_hex(THEME_COLOR_ACCENT)
@@ -348,19 +384,19 @@ void GrindingUIController::update_button_layout() {
 
             if (in_purge_confirm) {
                 // Purge confirm: pulse button acts as CONTINUE (always enabled)
-                lv_img_set_src(pulse_icon_, LV_SYMBOL_OK);
+                lv_label_set_text(pulse_icon_, LV_SYMBOL_OK);
                 lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
             } else if (ui_manager_->grind_controller && ui_manager_->grind_controller->can_pulse()) {
                 // Time mode pulse: enable/disable based on can_pulse()
-                lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
+                lv_label_set_text(pulse_icon_, LV_SYMBOL_PLUS);
                 lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
             } else {
                 // Time mode pulse: disabled
-                lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
+                lv_label_set_text(pulse_icon_, LV_SYMBOL_PLUS);
                 lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_add_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_50, LV_STATE_DISABLED);
@@ -372,6 +408,11 @@ void GrindingUIController::update_button_layout() {
         if (pulse_button_) {
             lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
         }
+    }
+
+    lv_obj_move_foreground(grind_button_);
+    if (pulse_button_ && !lv_obj_has_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_move_foreground(pulse_button_);
     }
 }
 
@@ -486,8 +527,28 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
             LOG_BLE("GRIND COMPLETE - Final settled weight captured: %.2fg (Progress: %d%%)\n",
                     final_grind_weight_, final_grind_progress_);
             chart_updates_enabled_ = false;
-            ui_manager_->switch_to_state(UIState::GRIND_COMPLETE);
-            start_grind_complete_timer();
+            const bool double_weight_grind =
+                ui_manager_->profile_controller &&
+                ui_manager_->profile_controller->get_current_profile() == BeanController::kDoubleProfileIndex &&
+                event_data.mode == GrindMode::WEIGHT;
+            const bool has_active_bean =
+                ui_manager_->bean_controller && ui_manager_->bean_controller->has_active_bean();
+
+            if (double_weight_grind && has_active_bean && final_grind_weight_ > 0.0f) {
+                ui_manager_->bean_controller->add_dose_used_g(final_grind_weight_);
+                if (ui_manager_->grind_controller &&
+                    ui_manager_->grind_controller->was_purge_removed_for_session()) {
+                    ui_manager_->bean_controller->add_purge_used_g(
+                        ui_manager_->grind_controller->get_session_purge_amount_g());
+                }
+                if (ui_manager_->ready_controller_) {
+                    ui_manager_->ready_controller_->refresh_bean_summary();
+                }
+                ui_manager_->switch_to_state(UIState::BEAN_FEEDBACK);
+            } else {
+                ui_manager_->switch_to_state(UIState::GRIND_COMPLETE);
+                start_grind_complete_timer();
+            }
             break;
         }
         case UIGrindEvent::TIMEOUT: {

@@ -24,6 +24,7 @@ public:
     void handle_connectivity_toggle();
     void handle_connectivity_startup_toggle();
     void handle_logging_toggle();
+    void handle_ready_ui_advanced_toggle();
     void handle_grind_mode_swipe_toggle();
     void handle_grind_mode_radio_button();
     void handle_auto_start_toggle();

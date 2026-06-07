@@ -6,6 +6,7 @@
 #include "system/statistics_manager.h"
 #include "controllers/profile_controller.h"
 #include "controllers/grind_controller.h"
+#include "controllers/bean_controller.h"
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "connectivity/manager.h"
@@ -19,6 +20,7 @@ HardwareManager hardware_manager;
 StateMachine state_machine;
 ProfileController profile_controller;
 GrindController grind_controller;
+BeanController bean_controller;
 UIManager ui_manager;
 ConnectivityManager g_connectivity_manager;
 ConnectivityManager& connectivity_manager = g_connectivity_manager;
@@ -69,13 +71,14 @@ void setup() {
     
     hardware_manager.init();
     profile_controller.init(hardware_manager.get_preferences());
+    bean_controller.init();
     statistics_manager.init(hardware_manager.get_preferences());
     grind_controller.init(hardware_manager.get_load_cell(), hardware_manager.get_grinder(), hardware_manager.get_preferences());
     
     // Set up the reference so HardwareManager can query GrindController state
     hardware_manager.set_grind_controller(&grind_controller);
     
-    connectivity_manager.init(hardware_manager.get_preferences(), &hardware_manager);
+    connectivity_manager.init(hardware_manager.get_preferences(), &hardware_manager, &bean_controller);
     home_assistant_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &ui_manager, &connectivity_manager);
     
     // Check for OTA failure to determine initial state
@@ -95,7 +98,7 @@ void setup() {
         state_machine.init(UIState::READY);
     }
     
-    ui_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &connectivity_manager);
+    ui_manager.init(&hardware_manager, &state_machine, &profile_controller, &grind_controller, &bean_controller, &connectivity_manager);
     
     // Store OTA failure info in ui_manager if needed
     if (ota_failed) {
@@ -173,6 +176,23 @@ void loop() {
             statistics_manager.update_uptime(pending_uptime_minutes);
             pending_uptime_minutes = 0;
         }
+    }
+
+    static uint32_t last_connectivity_fallback_ms = 0;
+    static uint32_t last_home_assistant_ms = 0;
+    if (task_manager.should_service_connectivity_in_loop() &&
+        current_time - last_connectivity_fallback_ms >= SYS_TASK_CONNECTIVITY_INTERVAL_MS) {
+        last_connectivity_fallback_ms = current_time;
+        connectivity_manager.handle();
+    }
+
+    if (task_manager.should_service_connectivity_in_loop() &&
+        home_assistant_manager.is_enabled() &&
+        !connectivity_manager.is_setup_mode() &&
+        !connectivity_manager.is_updating() &&
+        current_time - last_home_assistant_ms >= SYS_HOME_ASSISTANT_HANDLE_INTERVAL_MS) {
+        last_home_assistant_ms = current_time;
+        home_assistant_manager.handle();
     }
     
     // Check OTA state and suspend hardware tasks if needed

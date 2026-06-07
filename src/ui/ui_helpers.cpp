@@ -37,9 +37,9 @@ void set_label_text_int(lv_obj_t* label, int32_t value, const char* unit) {
     char buf[24];
 
     if (unit) {
-        snprintf(buf, sizeof(buf), "%ld %s", value, unit);
+        snprintf(buf, sizeof(buf), "%d %s", static_cast<int>(value), unit);
     } else {
-        snprintf(buf, sizeof(buf), "%ld", value);
+        snprintf(buf, sizeof(buf), "%d", static_cast<int>(value));
     }
 
     lv_label_set_text(label, buf);

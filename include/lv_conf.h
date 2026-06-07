@@ -1010,7 +1010,11 @@
 /* Documentation for several of the below items can be found here: https://docs.lvgl.io/master/details/auxiliary-modules/index.html . */
 
 /** 1: Enable API to take snapshot for object */
-#define LV_USE_SNAPSHOT 0
+#if defined(SG_SIMULATOR)
+    #define LV_USE_SNAPSHOT 1
+#else
+    #define LV_USE_SNAPSHOT 0
+#endif
 
 /** 1: Enable system monitor component */
 #define LV_USE_SYSMON   0
@@ -1169,7 +1173,11 @@
  *==================*/
 
 /** Use SDL to open window on PC and handle mouse and keyboard. */
-#define LV_USE_SDL              0
+#if defined(SG_SIMULATOR)
+    #define LV_USE_SDL          1
+#else
+    #define LV_USE_SDL          0
+#endif
 #if LV_USE_SDL
     #define LV_SDL_INCLUDE_PATH     <SDL2/SDL.h>
     #define LV_SDL_RENDER_MODE      LV_DISPLAY_RENDER_MODE_DIRECT   /**< LV_DISPLAY_RENDER_MODE_DIRECT is recommended for best performance */

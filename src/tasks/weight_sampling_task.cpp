@@ -323,7 +323,11 @@ void WeightSamplingTask::reset_performance_metrics() {
 }
 
 float WeightSamplingTask::get_current_sps() const {
+#if SYS_ENABLE_REALTIME_HEARTBEAT
     return weight_sensor ? weight_sensor->get_current_sps() : 0.0f;
+#else
+    return weight_sensor ? weight_sensor->get_detected_sample_rate_sps() : 0.0f;
+#endif
 }
 
 void WeightSamplingTask::print_performance_stats() const {

@@ -29,13 +29,15 @@
 #define SYS_TASK_GRIND_CONTROL_INTERVAL_MS 20                                  // Grind controller update interval (50Hz) - Core 0
 #define SYS_TASK_UI_INTERVAL_MS 16                                             // UI rendering frequency (60Hz) - Core 1  
 #define SYS_TASK_CONNECTIVITY_INTERVAL_MS 20                                   // Connectivity handling frequency (50Hz) - Core 1
+#define SYS_HOME_ASSISTANT_HANDLE_INTERVAL_MS 1000                             // Keep optional MQTT work from starving the HTTP/OTA server
 #define SYS_TASK_FILE_IO_INTERVAL_MS 100                                       // File I/O operations frequency (10Hz) - Core 1
+#define SYS_CONNECTIVITY_USE_TASK 0                                            // Service Wi-Fi/HTTP from main loop to preserve heap on ESP32-S3 UI builds
 
 // Task Stack Sizes (bytes) - Increased for BLE_LOG overhead and complex operations
 #define SYS_TASK_WEIGHT_SAMPLING_STACK_SIZE 4096                               // 4KB stack for weight sampling (was 2KB, increased for BLE_LOG)
 #define SYS_TASK_GRIND_CONTROL_STACK_SIZE 6144                                 // 6KB stack for grind control logic (was 4KB, increased for complex algorithms)
 #define SYS_TASK_UI_STACK_SIZE 8192                                            // 8KB stack for LVGL rendering (unchanged)
-#define SYS_TASK_CONNECTIVITY_STACK_SIZE 8192                                  // 8KB stack for Wi-Fi HTTP/OTA plus optional Home Assistant MQTT publishing
+#define SYS_TASK_CONNECTIVITY_STACK_SIZE 16384                                 // 16KB stack for Wi-Fi HTTP/OTA, local web UI, and Home Assistant MQTT publishing
 #define SYS_TASK_FILE_IO_STACK_SIZE 6144                                       // 6KB stack for LittleFS operations (was 4KB, increased for file operations)
 
 // Task Priorities (higher number = higher priority)
@@ -93,7 +95,7 @@
 //------------------------------------------------------------------------------
 // DEBUG HEARTBEAT CONFIGURATION
 //------------------------------------------------------------------------------
-#define SYS_ENABLE_REALTIME_HEARTBEAT 1                                            // Enable Core 0/Core 1 heartbeat logging (0=disabled, 1=enabled)
+#define SYS_ENABLE_REALTIME_HEARTBEAT 0                                            // Enable Core 0/Core 1 heartbeat logging (0=disabled, 1=enabled)
 #define SYS_REALTIME_HEARTBEAT_INTERVAL_MS 10000                                   // Heartbeat interval in milliseconds
 
 //------------------------------------------------------------------------------

@@ -35,6 +35,7 @@ TaskManager::TaskManager() {
     
     tasks_initialized = false;
     ota_suspended = false;
+    connectivity_loop_fallback = false;
     instance = this;
 }
 
@@ -119,6 +120,7 @@ void TaskManager::cleanup_queues() {
 
 bool TaskManager::create_all_tasks() {
     // Create tasks in order of priority (highest to lowest)
+    connectivity_loop_fallback = false;
     
     if (!create_weight_sampling_task()) {
         LOG_BLE("ERROR: Failed to create weight sampling task\n");
@@ -135,15 +137,18 @@ bool TaskManager::create_all_tasks() {
         return false;
     }
     
-    
+#if SYS_CONNECTIVITY_USE_TASK
     if (!create_connectivity_task()) {
-        LOG_BLE("ERROR: Failed to create connectivity task\n");
-        return false;
+        connectivity_loop_fallback = true;
+        LOG_BLE("WARNING: Connectivity task unavailable; servicing WiFi/HTTP from main loop fallback\n");
     }
+#else
+    connectivity_loop_fallback = true;
+    LOG_BLE("Connectivity: servicing WiFi/HTTP from main loop fallback\n");
+#endif
     
     if (!create_file_io_task()) {
-        LOG_BLE("ERROR: Failed to create file I/O task\n");
-        return false;
+        LOG_BLE("WARNING: Failed to create file I/O task; continuing without async file I/O\n");
     }
     
     return true;
@@ -214,24 +219,38 @@ bool TaskManager::create_ui_render_task() {
 
 
 bool TaskManager::create_connectivity_task() {
-    BaseType_t result = xTaskCreatePinnedToCore(
-        connectivity_task_wrapper,
-        "Connectivity",
+    constexpr uint32_t kFallbackStackSizes[] = {
         SYS_TASK_CONNECTIVITY_STACK_SIZE,
-        nullptr,
-        SYS_TASK_PRIORITY_CONNECTIVITY,
-        &task_handles.connectivity_task,
-        1  // Pin to Core 1
-    );
-    
-    if (result != pdPASS) {
-        LOG_BLE("ERROR: Failed to create connectivity task\n");
-        return false;
+        12288,
+        8192,
+    };
+
+    for (uint32_t stack_size : kFallbackStackSizes) {
+        BaseType_t result = xTaskCreatePinnedToCore(
+            connectivity_task_wrapper,
+            "Connectivity",
+            stack_size,
+            nullptr,
+            SYS_TASK_PRIORITY_CONNECTIVITY,
+            &task_handles.connectivity_task,
+            1  // Pin to Core 1
+        );
+
+        if (result == pdPASS) {
+            LOG_BLE("✅ Connectivity Task created (Core 1, Priority %d, %dHz, Stack %lu bytes)\n",
+                    SYS_TASK_PRIORITY_CONNECTIVITY,
+                    1000 / SYS_TASK_CONNECTIVITY_INTERVAL_MS,
+                    static_cast<unsigned long>(stack_size));
+            return true;
+        }
+
+        LOG_BLE("WARNING: Failed to create connectivity task with %lu byte stack, free heap %u bytes\n",
+                static_cast<unsigned long>(stack_size),
+                static_cast<unsigned int>(ESP.getFreeHeap()));
     }
-    
-    LOG_BLE("✅ Connectivity Task created (Core 1, Priority %d, %dHz)\n",
-            SYS_TASK_PRIORITY_CONNECTIVITY, 1000 / SYS_TASK_CONNECTIVITY_INTERVAL_MS);
-    return true;
+
+    LOG_BLE("ERROR: Failed to create connectivity task after fallback attempts\n");
+    return false;
 }
 
 bool TaskManager::create_file_io_task() {
@@ -257,41 +276,44 @@ bool TaskManager::create_file_io_task() {
 
 void TaskManager::suspend_hardware_tasks() {
     if (ota_suspended) return;
-    
-    LOG_BLE("TaskManager: Suspending hardware tasks for OTA operations\n");
-    
+
+    LOG_BLE("TaskManager: Suspending real-time tasks for OTA operations\n");
+
+    // Remove each task from the task watchdog before suspending it. A suspended
+    // task can no longer feed the WDT, so leaving it subscribed would trip a
+    // watchdog reset during the firmware flash.
     if (task_handles.weight_sampling_task) {
+        esp_task_wdt_delete(task_handles.weight_sampling_task);
         vTaskSuspend(task_handles.weight_sampling_task);
     }
-    
+
     if (task_handles.grind_control_task) {
+        esp_task_wdt_delete(task_handles.grind_control_task);
         vTaskSuspend(task_handles.grind_control_task);
     }
 
-    if (task_handles.file_io_task) {
-        vTaskSuspend(task_handles.file_io_task);
-    }
-    
+    // The File I/O task is intentionally left running: suspending it while it
+    // holds the SPI-flash lock would deadlock the OTA flash writes. It drains
+    // its queue and idles once grinding is suspended.
+
     ota_suspended = true;
 }
 
 void TaskManager::resume_hardware_tasks() {
     if (!ota_suspended) return;
-    
-    LOG_BLE("TaskManager: Resuming hardware tasks after OTA operations\n");
-    
+
+    LOG_BLE("TaskManager: Resuming real-time tasks after OTA operations\n");
+
     if (task_handles.weight_sampling_task) {
         vTaskResume(task_handles.weight_sampling_task);
-    }
-    
-    if (task_handles.grind_control_task) {
-        vTaskResume(task_handles.grind_control_task);
+        esp_task_wdt_add(task_handles.weight_sampling_task);
     }
 
-    if (task_handles.file_io_task) {
-        vTaskResume(task_handles.file_io_task);
+    if (task_handles.grind_control_task) {
+        vTaskResume(task_handles.grind_control_task);
+        esp_task_wdt_add(task_handles.grind_control_task);
     }
-    
+
     ota_suspended = false;
 }
 
@@ -390,6 +412,7 @@ void TaskManager::connectivity_task_wrapper(void* parameter) {
     if (instance) {
         instance->connectivity_task_impl();
         instance->task_handles.connectivity_task = nullptr;
+        instance->connectivity_loop_fallback = true;
     }
     vTaskDelete(nullptr);
 }
@@ -462,6 +485,7 @@ void TaskManager::ui_render_task_impl() {
 void TaskManager::connectivity_task_impl() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(SYS_TASK_CONNECTIVITY_INTERVAL_MS);
+    uint32_t last_home_assistant_ms = 0;
     
     LOG_BLE("Connectivity Task started on Core %d\n", xPortGetCoreID());
     
@@ -472,10 +496,15 @@ void TaskManager::connectivity_task_impl() {
             connectivity_manager->handle();
         }
 
-        home_assistant_manager.handle();
+        if (home_assistant_manager.is_enabled() &&
+            (!connectivity_manager || (!connectivity_manager->is_setup_mode() && !connectivity_manager->is_updating())) &&
+            start_time - last_home_assistant_ms >= SYS_HOME_ASSISTANT_HANDLE_INTERVAL_MS) {
+            last_home_assistant_ms = start_time;
+            home_assistant_manager.handle();
+        }
         
         uint32_t end_time = millis();
-        record_task_timing(4, start_time, end_time); // Task index 4 for connectivity
+        record_task_timing(3, start_time, end_time); // Task index 3 for connectivity
         
         // Use vTaskDelayUntil for predictable timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -488,7 +517,7 @@ void TaskManager::file_io_task_impl() {
 }
 
 void TaskManager::record_task_timing(int task_index, uint32_t start_time, uint32_t end_time) {
-    if (task_index < 0 || task_index >= 6) return;
+    if (task_index < 0 || task_index >= 5) return;
     
     TaskMetrics& metrics = task_metrics[task_index];
     uint32_t cycle_duration = end_time - start_time;
@@ -531,11 +560,12 @@ void TaskManager::print_task_heartbeat(int task_index, const char* task_name) co
 }
 
 bool TaskManager::are_tasks_healthy() const {
+    bool connectivity_available = task_handles.connectivity_task || connectivity_loop_fallback;
     return tasks_initialized && 
            task_handles.weight_sampling_task && 
            task_handles.grind_control_task &&
            task_handles.ui_render_task &&
-           task_handles.connectivity_task &&
+           connectivity_available &&
            task_handles.file_io_task;
 }
 
@@ -547,7 +577,9 @@ void TaskManager::print_task_status() const {
     LOG_BLE("  WeightSampling: %s\n", task_handles.weight_sampling_task ? "RUNNING" : "NULL");
     LOG_BLE("  GrindControl: %s\n", task_handles.grind_control_task ? "RUNNING" : "NULL");
     LOG_BLE("  UIRender: %s\n", task_handles.ui_render_task ? "RUNNING" : "NULL");
-    LOG_BLE("  Connectivity: %s\n", task_handles.connectivity_task ? "RUNNING" : "NULL");
+    LOG_BLE("  Connectivity: %s%s\n",
+            task_handles.connectivity_task ? "RUNNING" : "NULL",
+            connectivity_loop_fallback ? " (MAIN LOOP FALLBACK)" : "");
     LOG_BLE("  FileIO: %s\n", task_handles.file_io_task ? "RUNNING" : "NULL");
     LOG_BLE("========================\n");
 }

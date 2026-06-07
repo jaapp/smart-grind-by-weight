@@ -8,6 +8,8 @@
 #include "screens/ready_screen.h"
 #include "screens/edit_screen.h"
 #include "screens/grinding_screen.h"
+#include "screens/bean_list_screen.h"
+#include "screens/bean_feedback_screen.h"
 #include "screens/menu_screen.h"
 #include "screens/calibration_screen.h"
 #include "screens/confirm_screen.h"
@@ -35,6 +37,7 @@
 #include "../controllers/grind_controller.h"
 #include "../controllers/grind_events.h"
 #include "../controllers/grind_mode.h"
+#include "../controllers/bean_controller.h"
 #include "../hardware/hardware_manager.h"
 #include "../connectivity/manager.h"
 
@@ -69,6 +72,7 @@ private:
     StateMachine* state_machine;
     ProfileController* profile_controller;
     GrindController* grind_controller;
+    BeanController* bean_controller;
     ConnectivityManager* connectivity_manager;
     BasketDetector basket_detector_;
     
@@ -114,6 +118,8 @@ public:
     ReadyScreen ready_screen;
     EditScreen edit_screen;
     GrindingScreen grinding_screen;
+    BeanListScreen bean_list_screen;
+    BeanFeedbackScreen bean_feedback_screen;
     MenuScreen menu_screen;
     CalibrationScreen calibration_screen;
     ConfirmScreen confirm_screen;
@@ -124,7 +130,8 @@ public:
 
     ~UIManager();
     void init(HardwareManager* hw_mgr, StateMachine* sm, 
-              ProfileController* pc, GrindController* gc, ConnectivityManager* connectivity);
+              ProfileController* pc, GrindController* gc, BeanController* beans,
+              ConnectivityManager* connectivity);
     void update();
     void switch_to_state(UIState new_state);
     // Helper method to show confirmation dialog
@@ -142,6 +149,7 @@ public:
     BasketDetector* get_basket_detector() { return &basket_detector_; }
     HardwareManager* get_hardware_manager() { return hardware_manager; }
     GrindController* get_grind_controller() { return grind_controller; }
+    BeanController* get_bean_controller() { return bean_controller; }
     OtaDataExportController* get_ota_data_export_controller() { return ota_data_export_controller_.get(); }
     void set_current_tab(int tab) { current_tab = tab; }
     void set_current_mode(GrindMode mode) { current_mode = mode; }

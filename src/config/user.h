@@ -54,6 +54,10 @@
 #define USER_SCREEN_BRIGHTNESS_DIMMED 0.35f                                    // Dimmed screen brightness
 #define USER_WEIGHT_ACTIVITY_THRESHOLD_G 1.0f                                  // Weight change threshold for screen timeout reset (grams)
 
+#define USER_READY_UI_PREF_NAMESPACE "ready_ui"                                // NVS namespace for ready screen layout
+#define USER_READY_UI_PREF_KEY_ADVANCED "advanced"                             // Use compact bean-tracking ready UI
+#define USER_READY_UI_ADVANCED_DEFAULT true                                    // Default to the bean-tracking UI for this feature branch
+
 #define USER_SCREENSAVER_PREF_NAMESPACE "screensaver"                          // NVS namespace for screensaver settings
 #define USER_SCREENSAVER_PREF_KEY_STARTUP "startup"                            // Show image during startup
 #define USER_SCREENSAVER_PREF_KEY_SLEEP "sleep"                                // Show image during screen dim

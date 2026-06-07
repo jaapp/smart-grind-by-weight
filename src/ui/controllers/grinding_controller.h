@@ -26,6 +26,8 @@ public:
     void update_button_layout();
     void update_grinding_targets();
     void reset_grind_complete_timer();
+    lv_obj_t* get_grind_button() const { return grind_button_; }
+    lv_obj_t* get_pulse_button() const { return pulse_button_; }
 
     void handle_grind_event(const GrindEventData& event_data);
     static void dispatch_event(const GrindEventData& event_data);

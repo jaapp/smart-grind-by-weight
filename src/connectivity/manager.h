@@ -4,7 +4,7 @@
 #include <FS.h>
 #include <Preferences.h>
 #include <WebServer.h>
-#include <esp_ota_ops.h>
+#include <Update.h>
 #include <functional>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -12,6 +12,7 @@
 #include "../config/constants.h"
 
 class HardwareManager;
+class BeanController;
 
 using UIStatusCallback = std::function<void(const char*)>;
 
@@ -33,6 +34,7 @@ class ConnectivityManager {
 private:
     Preferences* preferences_;
     HardwareManager* hardware_manager_;
+    BeanController* bean_controller_;
     WebServer server_;
     QueueHandle_t ui_status_queue_;
     UIStatusCallback ui_status_callback_;
@@ -42,6 +44,7 @@ private:
     bool server_started_;
     bool routes_registered_;
     bool setup_ap_active_;
+    bool sta_connecting_;
     bool ota_in_progress_;
     bool ota_error_;
     bool screensaver_upload_error_;
@@ -55,12 +58,12 @@ private:
     String expected_firmware_version_;
 
     File screensaver_upload_file_;
-    const esp_partition_t* ota_partition_;
-    esp_ota_handle_t ota_handle_;
+    UpdateClass ota_updater_;
     size_t ota_received_bytes_;
     size_t ota_total_bytes_;
     size_t screensaver_received_bytes_;
     unsigned long last_reconnect_attempt_ms_;
+    unsigned long sta_connect_started_ms_;
     unsigned long restart_at_ms_;
 
     void enqueue_ui_status(const char* status);
@@ -68,20 +71,26 @@ private:
     bool load_credentials(String& ssid, String& password) const;
     void save_credentials(const String& ssid, const String& password);
     void clear_credentials();
-    bool connect_station();
+    bool begin_station_connect();
+    void poll_station_connect();
     bool start_setup_ap();
     bool start_mdns();
     void register_routes();
-    void start_http_server();
+    void start_http_server(bool restart = false);
     void send_cors_headers();
     void send_plain_response(int code, const char* body);
     void send_json_response(int code, const String& body);
+    void send_html_response(const char* body);
     void handle_root();
+    void handle_setup_recovery_root();
     void handle_status();
     void handle_settings_get();
     void handle_settings_post();
+    void handle_beans_get();
+    void handle_beans_post();
     void handle_wifi_save();
     void handle_wifi_clear();
+    void handle_ota_page();
     void handle_screensaver_status();
     void handle_screensaver_upload();
     void handle_screensaver_complete();
@@ -92,7 +101,7 @@ private:
     void handle_options();
     void handle_not_found();
     bool begin_ota(size_t expected_size);
-    bool write_ota_chunk(const uint8_t* data, size_t size);
+    bool write_ota_chunk(uint8_t* data, size_t size);
     bool finish_ota();
     void abort_ota();
     void schedule_restart();
@@ -101,6 +110,7 @@ private:
     String json_escape(const String& value) const;
     String build_status_json() const;
     String build_settings_json() const;
+    String build_beans_json() const;
     String build_screensaver_json() const;
     bool get_request_bool(const char* key, bool current_value, bool& found);
     float get_request_float(const char* key, float current_value, float min_value, float max_value, bool& found);
@@ -112,7 +122,7 @@ public:
     ConnectivityManager();
     ~ConnectivityManager();
 
-    void init(Preferences* prefs, HardwareManager* hardware = nullptr);
+    void init(Preferences* prefs, HardwareManager* hardware = nullptr, BeanController* beans = nullptr);
     void enable(unsigned long timeout_ms = 0);
     void enable_during_bootup();
     void disable();

@@ -13,11 +13,13 @@ UIManager* UIManager::instance = nullptr;
 UIManager::~UIManager() = default;
 
 void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
-                     ProfileController* pc, GrindController* gc, ConnectivityManager* connectivity) {
+                     ProfileController* pc, GrindController* gc, BeanController* beans,
+                     ConnectivityManager* connectivity) {
     hardware_manager = hw_mgr;
     state_machine = sm;
     profile_controller = pc;
     grind_controller = gc;
+    bean_controller = beans;
     connectivity_manager = connectivity;
     
     // Set static instance for event callbacks
@@ -94,6 +96,8 @@ void UIManager::create_ui() {
     grinding_screen.init(hardware_manager->get_preferences());
     grinding_screen.create();
     grinding_screen.set_mode(current_mode);
+    bean_list_screen.create();
+    bean_feedback_screen.create();
     menu_screen.create(connectivity_manager, grind_controller, &basket_detector_, &grinding_screen, hardware_manager, diagnostics_controller_.get());
     calibration_screen.create();
     confirm_screen.create();
@@ -103,7 +107,9 @@ void UIManager::create_ui() {
     ota_update_failed_screen.create();
     
     if (ready_controller_) {
+        ready_controller_->reload_ready_ui_mode();
         ready_controller_->refresh_profiles();
+        ready_controller_->refresh_bean_summary();
     }
 
     if (grinding_controller_) {
@@ -118,6 +124,8 @@ void UIManager::create_ui() {
     ready_screen.hide();
     edit_screen.hide();
     grinding_screen.hide();
+    bean_list_screen.hide();
+    bean_feedback_screen.hide();
     menu_screen.hide();
     calibration_screen.hide();
     confirm_screen.hide();
@@ -222,6 +230,7 @@ void UIManager::apply_connectivity_settings_changes() {
 
     if (ready_controller_) {
         ready_controller_->refresh_profiles();
+        ready_controller_->refresh_bean_summary();
     }
     if (grind_controller) {
         grind_controller->load_coast_ratio();
@@ -253,6 +262,8 @@ void UIManager::switch_to_state(UIState new_state) {
     ready_screen.hide();
     edit_screen.hide();
     grinding_screen.hide();
+    bean_list_screen.hide();
+    bean_feedback_screen.hide();
     menu_screen.hide();
     calibration_screen.hide();
     confirm_screen.hide();
@@ -263,11 +274,20 @@ void UIManager::switch_to_state(UIState new_state) {
 
     switch (new_state) {
         case UIState::READY:
+            if (ready_screen.is_advanced_ui_enabled() && current_tab >= USER_PROFILE_COUNT) {
+                int profile = profile_controller ? profile_controller->get_current_profile()
+                                                 : BeanController::kDoubleProfileIndex;
+                if (profile < 0 || profile >= USER_PROFILE_COUNT) {
+                    profile = BeanController::kDoubleProfileIndex;
+                }
+                current_tab = profile;
+            }
             ready_screen.show();
             ready_screen.set_active_tab(current_tab);
             grinding_screen.set_mode(current_mode);
             if (ready_controller_) {
                 ready_controller_->refresh_profiles();
+                ready_controller_->refresh_bean_summary();
             }
             break;
 
@@ -276,6 +296,20 @@ void UIManager::switch_to_state(UIState new_state) {
             edit_screen.update_profile_name(profile_controller->get_current_name());
             edit_screen.set_mode(current_mode);
             edit_screen.update_target(edit_target);
+            break;
+
+        case UIState::BEAN_LIST:
+            if (ready_controller_) {
+                ready_controller_->refresh_bean_list();
+            }
+            bean_list_screen.show();
+            break;
+
+        case UIState::BEAN_FEEDBACK:
+            if (ready_controller_) {
+                ready_controller_->refresh_feedback_screen();
+            }
+            bean_feedback_screen.show();
             break;
 
         case UIState::GRINDING:
@@ -388,6 +422,7 @@ void UIManager::process_pending_settings_refresh() {
 
     grinding_screen.set_mode(current_mode);
     if (ready_controller_) {
+        ready_controller_->reload_ready_ui_mode();
         ready_controller_->refresh_profiles();
     }
     if (edit_controller_ && state_machine && state_machine->is_state(UIState::EDIT)) {

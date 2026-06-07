@@ -44,7 +44,7 @@ class GrinderTool:
     def __init__(self):
         self.script_dir = Path(__file__).parent
         self.project_dir = self.script_dir.parent
-        self.venv_dir = self.script_dir / "venv"
+        self.venv_dir = Path(os.environ.get("SG_TOOL_VENV", self.script_dir / "venv"))
         
         # Platform-specific paths
         if platform.system() == "Windows":
@@ -144,7 +144,15 @@ class GrinderTool:
             self.print_error(f"Failed to set up environment: {e}")
             return False
     
-    def run_command(self, cmd: List[str], cwd: Optional[Path] = None, capture_output: bool = False) -> subprocess.CompletedProcess:
+    def platformio_env(self) -> Dict[str, str]:
+        """Return a local PlatformIO environment for reproducible builds."""
+        env = os.environ.copy()
+        env.setdefault("PLATFORMIO_CORE_DIR", str(self.project_dir / ".pio-core"))
+        env.setdefault("PLATFORMIO_SETTING_ENABLE_TELEMETRY", "no")
+        return env
+
+    def run_command(self, cmd: List[str], cwd: Optional[Path] = None, capture_output: bool = False,
+                    env: Optional[Dict[str, str]] = None) -> subprocess.CompletedProcess:
         """Run a command with proper error handling."""
         try:
             return subprocess.run(
@@ -152,7 +160,8 @@ class GrinderTool:
                 cwd=cwd or self.project_dir,
                 capture_output=capture_output,
                 text=True,
-                check=False
+                check=False,
+                env=env
             )
         except FileNotFoundError as e:
             self.print_error(f"Command not found: {cmd[0]}")
@@ -193,7 +202,7 @@ class GrinderTool:
         result = self.run_command([
             str(self.venv_python), "-m", "platformio", "run", 
             "-e", "waveshare-esp32s3-touch-amoled-164"
-        ])
+        ], env=self.platformio_env())
         
         if result.returncode == 0:
             self.print_success("Firmware build completed")
@@ -201,6 +210,93 @@ class GrinderTool:
             self.print_error("Build failed")
         
         return result.returncode
+
+    def cmd_build_rescue(self, args: argparse.Namespace) -> int:
+        """Build the small recovery firmware used as a reliable OTA bridge."""
+        self.print_header("Building Rescue OTA Firmware")
+
+        if not self.check_venv():
+            return 1
+
+        result = self.run_command([
+            str(self.venv_python), "-m", "platformio", "run",
+            "-e", "waveshare-esp32s3-touch-amoled-164-rescue-ota"
+        ], env=self.platformio_env())
+
+        if result.returncode == 0:
+            rescue_dir = self.project_dir / "firmware_cache" / "rescue"
+            latest = rescue_dir / "rescue_latest.bin"
+            if latest.exists():
+                self.print_success(f"Rescue OTA firmware ready: {latest}")
+            else:
+                self.print_success("Rescue OTA firmware build completed")
+        else:
+            self.print_error("Rescue OTA build failed")
+
+        return result.returncode
+
+    def cmd_preview(self, args: argparse.Namespace) -> int:
+        """Build and run the native LVGL touchscreen preview."""
+        self.print_header("LVGL Touchscreen Preview")
+
+        if not self.check_venv():
+            return 1
+
+        env = self.platformio_env()
+        result = self.run_command([
+            str(self.venv_python), "-m", "platformio", "run", "-e", "lvgl-sdl-preview"
+        ], env=env)
+
+        if result.returncode != 0:
+            self.print_error("Preview build failed")
+            return result.returncode
+
+        program_name = "program.exe" if platform.system() == "Windows" else "program"
+        program = self.project_dir / ".pio" / "build" / "lvgl-sdl-preview" / program_name
+        if not program.exists():
+            self.print_error(f"Preview executable not found: {program}")
+            return 1
+
+        if args.click_test:
+            result = self.run_command([str(program), "--click-test"], env=env)
+            if result.returncode != 0:
+                self.print_error("Touchscreen click-dummy test failed")
+                return result.returncode
+            self.print_success("Touchscreen click-dummy test passed")
+
+        scenes = args.scenes or ["ready", "list", "feedback"]
+        if args.interactive:
+            scene = scenes[0]
+            self.print_info(f"Starting interactive SDL preview: {scene}")
+            return self.run_command([str(program), scene], env=env).returncode
+
+        output_dir = Path(args.output_dir) if args.output_dir else self.project_dir / ".pio" / "preview"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        converter = shutil.which("sips") or shutil.which("magick")
+        for scene in scenes:
+            ppm = output_dir / f"{scene}.ppm"
+            result = self.run_command([
+                str(program), scene, "--screenshot", str(ppm)
+            ], env=env)
+            if result.returncode != 0:
+                self.print_error(f"Failed to capture preview scene: {scene}")
+                return result.returncode
+
+            display_path = ppm
+            if converter:
+                png = output_dir / f"{scene}.png"
+                if Path(converter).name == "sips":
+                    convert_cmd = [converter, "-s", "format", "png", str(ppm), "--out", str(png)]
+                else:
+                    convert_cmd = [converter, str(ppm), str(png)]
+                convert_result = self.run_command(convert_cmd, capture_output=True, env=env)
+                if convert_result.returncode == 0 and png.exists():
+                    display_path = png
+
+            self.print_success(f"Captured {scene}: {display_path}")
+
+        return 0
     
     async def cmd_upload(self, args: argparse.Namespace) -> int:
         """Upload firmware via WiFi or BLE OTA."""
@@ -209,20 +305,14 @@ class GrinderTool:
         if not firmware_path:
             self.print_info("Finding latest firmware file...")
             build_dir = self.project_dir / ".pio" / "build"
-            
-            firmware_files = []
-            if build_dir.exists():
-                for firmware_file in build_dir.rglob("*.bin"):
-                    if firmware_file.name == "firmware.bin":
-                        firmware_files.append(firmware_file)
-            
-            if not firmware_files:
-                self.print_error("No firmware file found")
+
+            production_firmware = build_dir / "waveshare-esp32s3-touch-amoled-164" / "firmware.bin"
+            if production_firmware.exists():
+                firmware_path = production_firmware
+            else:
+                self.print_error("No production firmware file found")
                 self.print_info("Run: python3 grinder.py build")
                 return 1
-            
-            # Get the most recently modified firmware
-            firmware_path = max(firmware_files, key=lambda f: f.stat().st_mtime)
         
         transport = getattr(args, 'transport', 'wifi')
         self.print_header("WiFi OTA Upload" if transport == 'wifi' else "BLE OTA Upload")
@@ -232,6 +322,8 @@ class GrinderTool:
             return 1
 
         if transport == 'wifi':
+            if not getattr(args, "skip_safety_checks", False) and not self.verify_source_safety_guards():
+                return 1
             host = getattr(args, 'host', self.default_wifi_host)
             return self.upload_via_wifi(Path(firmware_path), host)
         
@@ -252,6 +344,17 @@ class GrinderTool:
             value = "http://" + value
         return value.rstrip("/")
 
+    def validate_wifi_firmware_path(self, firmware_path: Path) -> bool:
+        """Avoid remote flashing known non-production artifacts."""
+        normalized_parts = [part.lower() for part in firmware_path.resolve().parts]
+        if any(part == "mock" or part.endswith("-mock") for part in normalized_parts):
+            self.print_error(f"Refusing WiFi OTA of mock firmware: {firmware_path}")
+            return False
+        if firmware_path.suffix.lower() != ".bin":
+            self.print_error(f"Firmware must be a .bin file: {firmware_path}")
+            return False
+        return True
+
     def get_firmware_version(self) -> str:
         """Read the firmware version from build_info.h for post-OTA validation."""
         build_info = self.project_dir / "src" / "config" / "build_info.h"
@@ -264,28 +367,163 @@ class GrinderTool:
             pass
         return ""
 
+    def verify_source_safety_guards(self) -> bool:
+        """Check source-level recovery guards before any remote-only deployment."""
+        checks = [
+            (
+                self.project_dir / "src" / "config" / "system.h",
+                "#define SYS_CONNECTIVITY_USE_TASK 0",
+                "WiFi/HTTP must be serviced from the main loop on the production UI build",
+            ),
+            (
+                self.project_dir / "src" / "connectivity" / "manager.cpp",
+                "handle_setup_recovery_root",
+                "Setup AP recovery page must be present",
+            ),
+            (
+                self.project_dir / "src" / "connectivity" / "manager.cpp",
+                'server_.on("/ping", HTTP_GET',
+                "HTTP ping endpoint must be present",
+            ),
+            (
+                self.project_dir / "src" / "connectivity" / "manager.cpp",
+                'server_.on("/generate_204", HTTP_GET',
+                "Captive portal probe route must be present",
+            ),
+            (
+                self.project_dir / "src" / "connectivity" / "manager.cpp",
+                "setup_ap_active_ && server_.method() == HTTP_GET",
+                "Unknown setup AP GET routes must fall back to recovery page",
+            ),
+            (
+                self.project_dir / "src" / "main.cpp",
+                "task_manager.should_service_connectivity_in_loop()",
+                "Main loop connectivity fallback must be active",
+            ),
+            (
+                self.project_dir / "src" / "controllers" / "grind_controller.cpp",
+                "grind_mode != GrindMode::TIME",
+                "Time grind must remain available when HX711 is disconnected",
+            ),
+        ]
+
+        for path, needle, message in checks:
+            try:
+                content = path.read_text()
+            except OSError as exc:
+                self.print_error(f"Safety guard check failed: cannot read {path}: {exc}")
+                return False
+            if needle not in content:
+                self.print_error(f"Safety guard missing: {message}")
+                self.print_info(f"Expected marker not found in {path}: {needle}")
+                return False
+
+        self.print_success("Source safety guards present")
+        return True
+
+    def cmd_safety_check(self, args: argparse.Namespace) -> int:
+        """Run local safety checks required before remote-only deployments."""
+        self.print_header("Firmware Safety Check")
+
+        if not self.verify_source_safety_guards():
+            return 1
+
+        if not getattr(args, "skip_web_ui", False):
+            result = self.run_command(["node", "tools/test-web-ui.mjs"])
+            if result.returncode != 0:
+                self.print_error("Embedded web UI harness failed")
+                return result.returncode
+
+        if not getattr(args, "skip_preview", False):
+            preview_args = argparse.Namespace(
+                click_test=True,
+                scenes=["ready", "list", "feedback"],
+                interactive=False,
+                output_dir=None,
+            )
+            result = self.cmd_preview(preview_args)
+            if result != 0:
+                return result
+
+        self.print_success("Firmware safety check passed")
+        return 0
+
+    def fetch_text(self, url: str, timeout: int = 8) -> str:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            return response.read().decode("utf-8", errors="replace")
+
+    def fetch_json_url(self, url: str, timeout: int = 8) -> Dict[str, Any]:
+        return json.loads(self.fetch_text(url, timeout=timeout))
+
+    def preflight_wifi_device(self, base_url: str) -> Dict[str, Any]:
+        """Verify the currently running firmware still exposes recovery-critical HTTP routes."""
+        ping_url = base_url + "/ping"
+        ping_text = self.fetch_text(ping_url, timeout=8).strip().lower()
+        if ping_text != "ok":
+            raise RuntimeError(f"{ping_url} returned {ping_text!r}, expected 'ok'")
+
+        status = None
+        last_status_error: Optional[Exception] = None
+        for path in ("/api/status", "/status"):
+            try:
+                status = self.fetch_json_url(base_url + path, timeout=8)
+                break
+            except Exception as exc:
+                last_status_error = exc
+        if status is None:
+            raise RuntimeError(f"status endpoint unavailable: {last_status_error}")
+
+        settings = self.fetch_json_url(base_url + "/api/settings", timeout=8)
+        if "settings" not in settings:
+            raise RuntimeError("/api/settings did not return a settings object")
+
+        beans = self.fetch_json_url(base_url + "/api/beans", timeout=8)
+        if "beans" not in beans:
+            raise RuntimeError("/api/beans did not return a beans array")
+
+        self.print_success("Device HTTP preflight passed")
+        return status
+
+    def wait_for_wifi_device(self, base_url: str, expected_version: str = "", timeout_s: int = 90) -> bool:
+        """Wait for the device to return after OTA and verify basic HTTP service."""
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            try:
+                status = self.preflight_wifi_device(base_url)
+                if expected_version and status.get("version") != expected_version:
+                    self.print_warning(
+                        f"Device is reachable, but version is {status.get('version')} "
+                        f"instead of expected {expected_version}"
+                    )
+                    return False
+                self.print_success("Device returned after OTA with HTTP recovery endpoints alive")
+                return True
+            except Exception:
+                time.sleep(3)
+        return False
+
     def upload_via_wifi(self, firmware_path: Path, host: str) -> int:
         """Upload a firmware binary to the device's WiFi OTA endpoint."""
         if not firmware_path.exists():
             self.print_error(f"Firmware file not found: {firmware_path}")
             return 1
+        if not self.validate_wifi_firmware_path(firmware_path):
+            return 1
 
         base_url = self.normalize_wifi_base_url(host)
-        status_url = base_url + "/status"
         ota_url = base_url + "/ota"
         version = self.get_firmware_version()
 
         try:
-            self.print_info(f"Checking device at {status_url}")
-            with urllib.request.urlopen(status_url, timeout=8) as response:
-                status = json.loads(response.read().decode("utf-8"))
+            self.print_info(f"Checking device at {base_url}")
+            status = self.preflight_wifi_device(base_url)
             self.print_info(
                 f"Device: {status.get('device', 'unknown')} "
                 f"v{status.get('version', '?')} at {status.get('ip', host)}"
             )
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
             self.print_error(f"Could not reach WiFi device: {exc}")
-            self.print_info("Make sure the grinder is on the same network or use --host <device-ip>.")
+            self.print_info("OTA aborted. Keep the existing firmware until /ping, /api/status, /api/settings, and /api/beans respond.")
             return 1
 
         boundary = f"----GrindByWeight{int(time.time())}"
@@ -327,6 +565,8 @@ class GrinderTool:
             self.print_success("WiFi OTA upload complete; device is rebooting")
             if response_text:
                 self.print_info(response_text)
+            if not self.wait_for_wifi_device(base_url, version):
+                self.print_warning("Post-OTA HTTP verification did not complete. Check the device before starting another update.")
             return 0
         except urllib.error.HTTPError as exc:
             self.print_error(f"WiFi OTA failed: HTTP {exc.code} {exc.reason}")
@@ -340,6 +580,11 @@ class GrinderTool:
     
     async def cmd_build_upload(self, args: argparse.Namespace) -> int:
         """Build firmware and upload via selected transport."""
+        if not getattr(args, "skip_safety_checks", False):
+            safety_result = self.cmd_safety_check(argparse.Namespace(skip_preview=False, skip_web_ui=False))
+            if safety_result != 0:
+                return safety_result
+
         build_result = self.cmd_build(args)
         if build_result != 0:
             return build_result
@@ -518,7 +763,7 @@ class GrinderTool:
         # Use PlatformIO from the project venv
         result = self.run_command([
             str(self.venv_python), "-m", "platformio", "run", "--target", "clean"
-        ])
+        ], env=self.platformio_env())
         
         # Also remove .pio/build directory
         build_dir = self.project_dir / ".pio" / "build"
@@ -558,6 +803,9 @@ def create_parser() -> argparse.ArgumentParser:
         epilog=f"""
 {COLORS['YELLOW']}Examples:{COLORS['RESET']}
   python3 grinder.py build-upload              # Build and upload firmware
+  python3 grinder.py preview                   # Capture LVGL touchscreen screenshots
+  python3 grinder.py preview --interactive     # Open native SDL touchscreen preview
+  python3 grinder.py preview --click-test      # Run LVGL click-dummy flow test
   python3 grinder.py build-upload --force-full # Build and force full firmware update
   python3 grinder.py analyze                   # Export data and show interactive report
   python3 grinder.py report                    # Just show report from existing data
@@ -572,6 +820,13 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Build & Upload Commands
     build_parser = subparsers.add_parser('build', help='Build firmware using PlatformIO')
+    build_rescue_parser = subparsers.add_parser('build-rescue', help='Build lightweight rescue OTA firmware')
+
+    preview_parser = subparsers.add_parser('preview', help='Build and run the native LVGL touchscreen preview')
+    preview_parser.add_argument('scenes', nargs='*', help='Preview scenes to capture/open (default: ready list feedback)')
+    preview_parser.add_argument('--interactive', action='store_true', help='Open the SDL preview window instead of screenshots')
+    preview_parser.add_argument('--click-test', action='store_true', help='Run scripted LVGL click-dummy navigation checks before screenshots')
+    preview_parser.add_argument('--output-dir', help='Screenshot output directory (default: .pio/preview)')
     
     upload_parser = subparsers.add_parser('upload', help='Upload firmware via WiFi or BLE OTA')
     upload_parser.add_argument('firmware', nargs='?', help='Path to firmware .bin file (finds latest if not specified)')
@@ -579,12 +834,18 @@ def create_parser() -> argparse.ArgumentParser:
     upload_parser.add_argument('--host', default='grindbyweight.local', help='WiFi device host/IP for --transport wifi')
     upload_parser.add_argument('--force-full', action='store_true', help='Force full firmware update (skip delta patching)')
     upload_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
+    upload_parser.add_argument('--skip-safety-checks', action='store_true', help='Bypass local source guard checks before WiFi OTA')
     
     build_upload_parser = subparsers.add_parser('build-upload', help='Build firmware and upload via WiFi or BLE')
     build_upload_parser.add_argument('--transport', choices=['wifi', 'ble'], default='wifi', help='OTA transport (default: wifi)')
     build_upload_parser.add_argument('--host', default='grindbyweight.local', help='WiFi device host/IP for --transport wifi')
     build_upload_parser.add_argument('--force-full', action='store_true', help='Force full firmware update (skip delta patching)')
     build_upload_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
+    build_upload_parser.add_argument('--skip-safety-checks', action='store_true', help='Bypass local safety checks before build/upload')
+
+    safety_parser = subparsers.add_parser('safety-check', help='Run local release safety checks before remote-only deployment')
+    safety_parser.add_argument('--skip-preview', action='store_true', help='Skip LVGL SDL click-dummy preview')
+    safety_parser.add_argument('--skip-web-ui', action='store_true', help='Skip embedded web UI harness')
     
     # Data & Analysis Commands
     export_parser = subparsers.add_parser('export', help='Export grind data from device to database')
@@ -637,10 +898,16 @@ async def main():
         # Map commands to methods
         if args.command == 'build':
             return tool.cmd_build(args)
+        elif args.command == 'build-rescue':
+            return tool.cmd_build_rescue(args)
+        elif args.command == 'preview':
+            return tool.cmd_preview(args)
         elif args.command == 'upload':
             return await tool.cmd_upload(args)
         elif args.command == 'build-upload':
             return await tool.cmd_build_upload(args)
+        elif args.command == 'safety-check':
+            return tool.cmd_safety_check(args)
         elif args.command == 'export':
             return await tool.cmd_export(args)
         elif args.command in ['analyze', 'analyse']:

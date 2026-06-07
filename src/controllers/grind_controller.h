@@ -183,6 +183,7 @@ private:
     // Grind freshness tracking
     bool grinder_purged_since_boot;      // Tracks if grinder has been used since boot (RAM only)
     uint64_t last_purge_runtime_ms;      // Runtime when last grind completed (persisted)
+    bool purge_removed_for_session;      // User discarded stale purge grinds in current session
 
 public:
     enum class GrindSessionResult {
@@ -282,6 +283,9 @@ public:
     // Grind freshness accessors
     bool get_grinder_purged_since_boot() const { return grinder_purged_since_boot; }
     uint64_t get_last_purge_runtime_ms() const { return last_purge_runtime_ms; }
+    float get_session_purge_amount_g() const { return grinder_purge_amount_g_for_session; }
+    bool was_purge_removed_for_session() const { return purge_removed_for_session; }
+    void mark_current_purge_removed(bool removed) { purge_removed_for_session = removed; }
     
     // Removed - predictive logic now inline in update_realtime()
     

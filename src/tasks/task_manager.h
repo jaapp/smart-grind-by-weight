@@ -75,6 +75,7 @@ private:
     TaskMetrics task_metrics[5]; // One for each task
     bool tasks_initialized;
     bool ota_suspended;
+    bool connectivity_loop_fallback;
     
     // Static instance for task callbacks
     static TaskManager* instance;
@@ -100,6 +101,7 @@ public:
     // Task monitoring
     bool are_tasks_healthy() const;
     void print_task_status() const;
+    bool should_service_connectivity_in_loop() const { return connectivity_loop_fallback; }
     
     // Static task function wrappers
     static void weight_sampling_task_wrapper(void* parameter);

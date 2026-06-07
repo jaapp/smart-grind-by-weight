@@ -1,7 +1,13 @@
 #pragma once
 
 #include <cstdio>
+#if __has_include("../../include/git_info.h")
 #include "../../include/git_info.h"
+#else
+#define BUILD_NUMBER 0
+#define GIT_COMMIT_ID "unknown"
+#define GIT_BRANCH "unknown"
+#endif
 
 // Build information - BUILD_FIRMWARE_VERSION is automatically updated by release scripts
 #define BUILD_FIRMWARE_VERSION "1.4.0"                                          // Firmware version string (updated by release automation)

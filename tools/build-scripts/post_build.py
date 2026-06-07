@@ -43,8 +43,16 @@ def archive_firmware(source, target, env):
         print(f"❌ Firmware binary not found: {firmware_path}")
         return
     
-    # Set up cache directory
+    is_mock_build = pioenv.endswith("-mock")
+    is_rescue_build = pioenv.endswith("-rescue-ota")
+
+    # Set up cache directory. Keep mock firmware out of the production cache root,
+    # because OTA users normally pick files from this directory manually.
     cache_dir = os.path.join(project_dir, "firmware_cache")
+    if is_rescue_build:
+        cache_dir = os.path.join(cache_dir, "rescue")
+    elif is_mock_build:
+        cache_dir = os.path.join(cache_dir, "mock")
     
     # Get build number and firmware info
     build_number = get_build_number(env)
@@ -57,11 +65,18 @@ def archive_firmware(source, target, env):
     os.makedirs(cache_dir, exist_ok=True)
     
     # Archive the firmware with build number naming
-    cached_firmware_path = os.path.join(cache_dir, f"build_{build_number:03d}.bin")
+    archive_name = f"build_{build_number:03d}.bin"
+    if is_rescue_build:
+        archive_name = f"rescue_build_{build_number:03d}.bin"
+    elif is_mock_build:
+        archive_name = f"mock_build_{build_number:03d}.bin"
+    cached_firmware_path = os.path.join(cache_dir, archive_name)
     
     try:
         shutil.copy2(firmware_path, cached_firmware_path)
-        print(f"✅ Archived firmware: build_{build_number:03d}.bin")
+        if is_rescue_build:
+            shutil.copy2(firmware_path, os.path.join(cache_dir, "rescue_latest.bin"))
+        print(f"✅ Archived firmware: {archive_name}")
         print(f"📁 Cache location: {cached_firmware_path}")
         
     except Exception as e:

@@ -3,13 +3,15 @@
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
 #include <esp_system.h>
-#include <esp_task_wdt.h>
 #include <ctype.h>
 #include <cmath>
+#include <cstring>
 
 #include "../config/build_info.h"
 #include "../controllers/basket_detector.h"
+#include "../controllers/bean_controller.h"
 #include "../controllers/grind_controller.h"
 #include "../controllers/grind_mode.h"
 #include "../hardware/hardware_manager.h"
@@ -123,11 +125,29 @@ bool parse_bool_value(String value, bool fallback) {
     return fallback;
 }
 
+const char* reset_reason_label(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_POWERON: return "POWERON";
+        case ESP_RST_EXT: return "EXT";
+        case ESP_RST_SW: return "SW";
+        case ESP_RST_PANIC: return "PANIC";
+        case ESP_RST_INT_WDT: return "INT_WDT";
+        case ESP_RST_TASK_WDT: return "TASK_WDT";
+        case ESP_RST_WDT: return "WDT";
+        case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT: return "BROWNOUT";
+        case ESP_RST_SDIO: return "SDIO";
+        case ESP_RST_UNKNOWN:
+        default: return "UNKNOWN";
+    }
+}
+
 } // namespace
 
 ConnectivityManager::ConnectivityManager()
     : preferences_(nullptr)
     , hardware_manager_(nullptr)
+    , bean_controller_(nullptr)
     , server_(WIFI_HTTP_PORT)
     , ui_status_queue_(nullptr)
     , state_(ConnectivityState::WIFI_DISABLED)
@@ -135,17 +155,17 @@ ConnectivityManager::ConnectivityManager()
     , server_started_(false)
     , routes_registered_(false)
     , setup_ap_active_(false)
+    , sta_connecting_(false)
     , ota_in_progress_(false)
     , ota_error_(false)
     , screensaver_upload_error_(false)
     , restart_pending_(false)
     , settings_changed_(false)
-    , ota_partition_(nullptr)
-    , ota_handle_(0)
     , ota_received_bytes_(0)
     , ota_total_bytes_(0)
     , screensaver_received_bytes_(0)
     , last_reconnect_attempt_ms_(0)
+    , sta_connect_started_ms_(0)
     , restart_at_ms_(0) {
 }
 
@@ -156,9 +176,10 @@ ConnectivityManager::~ConnectivityManager() {
     disable();
 }
 
-void ConnectivityManager::init(Preferences* prefs, HardwareManager* hardware) {
+void ConnectivityManager::init(Preferences* prefs, HardwareManager* hardware, BeanController* beans) {
     preferences_ = prefs;
     hardware_manager_ = hardware;
+    bean_controller_ = beans;
     if (!ui_status_queue_) {
         ui_status_queue_ = xQueueCreate(8, sizeof(ConnectivityUIStatusMessage));
     }
@@ -251,7 +272,10 @@ void ConnectivityManager::enable(unsigned long timeout_ms) {
     WiFi.setSleep(false);
     WiFi.setHostname(WIFI_HOSTNAME);
 
-    if (!connect_station()) {
+    // Kick off a non-blocking station connect. handle() polls the result and
+    // falls back to the setup AP if the connection times out. If there are no
+    // stored credentials we go straight to the setup AP.
+    if (!begin_station_connect()) {
         start_setup_ap();
     }
 }
@@ -287,10 +311,16 @@ void ConnectivityManager::disable() {
 
     enabled_ = false;
     setup_ap_active_ = false;
+    sta_connecting_ = false;
     set_state(ConnectivityState::WIFI_DISABLED, "WiFi disabled");
 }
 
-bool ConnectivityManager::connect_station() {
+// Start a station connection without blocking. The actual association happens
+// on the Wi-Fi stack's own task; poll_station_connect() (called from handle())
+// finalizes the connection or falls back to the setup AP on timeout. This keeps
+// the single-threaded HTTP server responsive instead of freezing it for up to
+// WIFI_CONNECT_TIMEOUT_MS while WiFi associates/reconnects.
+bool ConnectivityManager::begin_station_connect() {
     String ssid;
     String password;
     if (!load_credentials(ssid, password)) {
@@ -302,34 +332,55 @@ bool ConnectivityManager::connect_station() {
     setup_ap_active_ = false;
     set_state(ConnectivityState::WIFI_CONNECTING, "Connecting to WiFi...");
 
+    MDNS.end();
+    WiFi.setSleep(false);
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(WIFI_HOSTNAME);
     WiFi.begin(ssid.c_str(), password.c_str());
 
-    unsigned long start_ms = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - start_ms < WIFI_CONNECT_TIMEOUT_MS) {
-        delay(250);
-    }
-
-    if (WiFi.status() != WL_CONNECTED) {
-        LOG_BLE("WiFi: Failed to connect to %s\n", ssid.c_str());
-        WiFi.disconnect(false);
-        return false;
-    }
-
-    LOG_BLE("WiFi: Connected to %s, IP %s\n", ssid.c_str(), WiFi.localIP().toString().c_str());
-    start_mdns();
-    start_http_server();
-    set_state(ConnectivityState::WIFI_CONNECTED, "WiFi connected");
+    sta_connecting_ = true;
+    sta_connect_started_ms_ = millis();
+    last_reconnect_attempt_ms_ = sta_connect_started_ms_;
     return true;
+}
+
+void ConnectivityManager::poll_station_connect() {
+    if (!sta_connecting_) {
+        return;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        sta_connecting_ = false;
+        LOG_BLE("WiFi: Connected to %s, IP %s\n",
+                sta_ssid_.c_str(), WiFi.localIP().toString().c_str());
+        start_mdns();
+        start_http_server(true);
+        set_state(ConnectivityState::WIFI_CONNECTED, "WiFi connected");
+        return;
+    }
+
+    if (millis() - sta_connect_started_ms_ >= WIFI_CONNECT_TIMEOUT_MS) {
+        sta_connecting_ = false;
+        LOG_BLE("WiFi: Failed to connect to %s, starting setup AP\n", sta_ssid_.c_str());
+        WiFi.disconnect(false);
+        start_setup_ap();
+    }
 }
 
 bool ConnectivityManager::start_setup_ap() {
     setup_ap_active_ = true;
     sta_ssid_ = "";
 
+    MDNS.end();
+    WiFi.disconnect(true, true);
+    WiFi.softAPdisconnect(true);
+    delay(100);
+    WiFi.setSleep(false);
     WiFi.mode(WIFI_AP);
     WiFi.setHostname(WIFI_HOSTNAME);
+    WiFi.softAPConfig(IPAddress(192, 168, 4, 1),
+                      IPAddress(192, 168, 4, 1),
+                      IPAddress(255, 255, 255, 0));
 
     bool ok = false;
     if (strlen(WIFI_SETUP_AP_PASSWORD) >= 8) {
@@ -343,7 +394,7 @@ bool ConnectivityManager::start_setup_ap() {
         return false;
     }
 
-    start_http_server();
+    start_http_server(true);
     LOG_BLE("WiFi: Setup AP ready: %s at %s\n",
             WIFI_SETUP_AP_SSID,
             WiFi.softAPIP().toString().c_str());
@@ -368,10 +419,19 @@ void ConnectivityManager::register_routes() {
     }
 
     server_.on(WIFI_SETUP_PATH, HTTP_GET, [this]() { handle_root(); });
+    server_.on("/generate_204", HTTP_GET, [this]() { handle_root(); });
+    server_.on("/gen_204", HTTP_GET, [this]() { handle_root(); });
+    server_.on("/hotspot-detect.html", HTTP_GET, [this]() { handle_root(); });
+    server_.on("/library/test/success.html", HTTP_GET, [this]() { handle_root(); });
+    server_.on("/connecttest.txt", HTTP_GET, [this]() { handle_root(); });
+    server_.on("/ncsi.txt", HTTP_GET, [this]() { handle_root(); });
+    server_.on("/ping", HTTP_GET, [this]() { send_plain_response(200, "ok"); });
     server_.on(WIFI_STATUS_PATH, HTTP_GET, [this]() { handle_status(); });
     server_.on(WIFI_API_STATUS_PATH, HTTP_GET, [this]() { handle_status(); });
     server_.on(WIFI_API_SETTINGS_PATH, HTTP_GET, [this]() { handle_settings_get(); });
     server_.on(WIFI_API_SETTINGS_PATH, HTTP_POST, [this]() { handle_settings_post(); });
+    server_.on(WIFI_API_BEANS_PATH, HTTP_GET, [this]() { handle_beans_get(); });
+    server_.on(WIFI_API_BEANS_PATH, HTTP_POST, [this]() { handle_beans_post(); });
     server_.on(WIFI_API_SCREENSAVER_PATH, HTTP_GET, [this]() { handle_screensaver_status(); });
     server_.on(WIFI_API_SCREENSAVER_PATH, HTTP_POST,
                [this]() { handle_screensaver_complete(); },
@@ -381,10 +441,13 @@ void ConnectivityManager::register_routes() {
     server_.on(WIFI_API_BASKET_CAPTURE_DOUBLE_PATH, HTTP_POST, [this]() { handle_basket_capture(false); });
     server_.on("/wifi", HTTP_POST, [this]() { handle_wifi_save(); });
     server_.on("/wifi/clear", HTTP_POST, [this]() { handle_wifi_clear(); });
+    server_.on(WIFI_OTA_PATH, HTTP_GET, [this]() { handle_ota_page(); });
     server_.on(WIFI_OTA_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
+    server_.on("/ping", HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_STATUS_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_STATUS_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_SETTINGS_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
+    server_.on(WIFI_API_BEANS_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_SCREENSAVER_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_SCREENSAVER_CLEAR_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
     server_.on(WIFI_API_BASKET_CAPTURE_SINGLE_PATH, HTTP_OPTIONS, [this]() { handle_options(); });
@@ -399,8 +462,13 @@ void ConnectivityManager::register_routes() {
     routes_registered_ = true;
 }
 
-void ConnectivityManager::start_http_server() {
+void ConnectivityManager::start_http_server(bool restart) {
     register_routes();
+    if (restart && server_started_) {
+        server_.stop();
+        server_started_ = false;
+        delay(20);
+    }
     if (!server_started_) {
         server_.begin(WIFI_HTTP_PORT);
         server_started_ = true;
@@ -422,12 +490,17 @@ void ConnectivityManager::handle() {
         esp_restart();
     }
 
+    // Drive an in-flight station connect to completion without blocking.
+    if (sta_connecting_) {
+        poll_station_connect();
+        return;
+    }
+
     if (!setup_ap_active_ && !ota_in_progress_ && WiFi.status() != WL_CONNECTED) {
         unsigned long now = millis();
         if (now - last_reconnect_attempt_ms_ >= WIFI_RECONNECT_INTERVAL_MS) {
-            last_reconnect_attempt_ms_ = now;
             LOG_BLE("WiFi: Connection lost, retrying station connection\n");
-            if (!connect_station()) {
+            if (!begin_station_connect()) {
                 start_setup_ap();
             }
         }
@@ -449,6 +522,26 @@ void ConnectivityManager::send_plain_response(int code, const char* body) {
 void ConnectivityManager::send_json_response(int code, const String& body) {
     send_cors_headers();
     server_.send(code, "application/json", body);
+}
+
+void ConnectivityManager::send_html_response(const char* body) {
+    if (!body) {
+        send_plain_response(500, "Missing page");
+        return;
+    }
+
+    constexpr size_t kChunkSize = 1024;
+    const size_t length = strlen(body);
+    send_cors_headers();
+    server_.setContentLength(length);
+    server_.send(200, "text/html; charset=utf-8", "");
+
+    for (size_t offset = 0; offset < length; offset += kChunkSize) {
+        const size_t remaining = length - offset;
+        const size_t chunk = remaining > kChunkSize ? kChunkSize : remaining;
+        server_.sendContent(body + offset, chunk);
+        delay(0);
+    }
 }
 
 String ConnectivityManager::html_escape(const String& value) const {
@@ -495,16 +588,20 @@ String ConnectivityManager::json_escape(const String& value) const {
 }
 
 void ConnectivityManager::handle_root() {
-    send_cors_headers();
+    if (setup_ap_active_) {
+        handle_setup_recovery_root();
+        return;
+    }
 
     static const char body[] = R"HTML(<!doctype html>
 <html>
 <head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GrindByWeight WiFi</title>
 <style>
 :root{color-scheme:dark;--bg:#101010;--panel:#1b1b1b;--muted:#a8a8a8;--line:#323232;--red:#d71920;--blue:#00aaff;--green:#2aa84a;--text:#f5f5f5;--soft:#242424}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}main{max-width:760px;margin:0 auto;padding:22px}h1{margin:0 0 18px;font-size:30px}h2{margin:0 0 6px;font-size:21px}section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin:14px 0}form{margin:0}.section-note,.hint{color:var(--muted);font-size:14px;line-height:1.4}.section-note{margin:0 0 12px}.hint{margin:4px 0 10px}.field{padding:12px 0;border-top:1px solid var(--line)}.field:first-child{border-top:0}.field label,.field-title{display:flex;justify-content:space-between;gap:12px;margin:0;color:var(--text);font-weight:700}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.wide{grid-column:1/-1}.toggle-list{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}.check{display:flex;align-items:flex-start;gap:10px;color:var(--text);margin:0;padding:10px 0}.check input{width:auto;margin:3px 0 0;flex:0 0 auto}.check strong{display:block}.check small{display:block;color:var(--muted);font-size:13px;line-height:1.35;margin-top:3px}input,select,button{width:100%;font:inherit;border:0;border-radius:6px;padding:11px;margin:0 0 10px}input,select{background:#0b0b0b;color:var(--text);border:1px solid var(--line)}input[type=range]{height:36px;padding:0;accent-color:var(--blue)}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{flex:1 1 160px}button{background:var(--red);color:#fff;font-weight:700;cursor:pointer}.secondary{background:#333}.ok{color:var(--green)}.warn{color:#f2a12b}.muted{color:var(--muted)}dl{display:grid;grid-template-columns:135px 1fr;gap:8px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-word}.value{white-space:nowrap;color:var(--muted);font-weight:400}@media(max-width:620px){main{padding:14px}.row,.settings-grid,.toggle-list{grid-template-columns:1fr}dl{grid-template-columns:1fr}dt{margin-top:8px}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}main{max-width:760px;margin:0 auto;padding:22px}h1{margin:0 0 18px;font-size:30px}h2{margin:0 0 6px;font-size:21px}section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin:14px 0}form{margin:0}.section-note,.hint{color:var(--muted);font-size:14px;line-height:1.4}.section-note{margin:0 0 12px}.hint{margin:4px 0 10px}.field{padding:12px 0;border-top:1px solid var(--line)}.field:first-child{border-top:0}.field label,.field-title{display:flex;justify-content:space-between;gap:12px;margin:0;color:var(--text);font-weight:700}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.wide{grid-column:1/-1}.toggle-list{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}.check{display:flex;align-items:flex-start;gap:10px;color:var(--text);margin:0;padding:10px 0}.check input{width:auto;margin:3px 0 0;flex:0 0 auto}.check strong{display:block}.check small{display:block;color:var(--muted);font-size:13px;line-height:1.35;margin-top:3px}input,select,button{width:100%;font:inherit;border:0;border-radius:6px;padding:11px;margin:0 0 10px}input,select{background:#0b0b0b;color:var(--text);border:1px solid var(--line)}input[type=range]{height:36px;padding:0;accent-color:var(--blue)}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{flex:1 1 160px}button{background:var(--red);color:#fff;font-weight:700;cursor:pointer}.secondary{background:#333}.ok{color:var(--green)}.warn{color:#f2a12b}.muted{color:var(--muted)}dl{display:grid;grid-template-columns:135px 1fr;gap:8px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-word}.value{white-space:nowrap;color:var(--muted);font-weight:400}.bean-list{display:grid;gap:10px;margin:12px 0}.bean{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px}.bean.active{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}.bean-head{display:flex;justify-content:space-between;gap:12px;font-weight:700}.bean-sub{color:var(--muted);font-size:13px;margin:5px 0 10px}.bean-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:13px;color:var(--muted)}.bean-stats strong{display:block;color:var(--text);font-size:16px}.bean-actions{display:flex;gap:8px;margin-top:12px}.bean-actions button{padding:9px;margin:0}@media(max-width:620px){main{padding:14px}.row,.settings-grid,.toggle-list{grid-template-columns:1fr}.bean-stats{grid-template-columns:1fr}dl{grid-template-columns:1fr}dt{margin-top:8px}}
 </style>
 </head>
 <body>
@@ -515,6 +612,25 @@ void ConnectivityManager::handle_root() {
 <h2>WiFi Status</h2>
 <dl id="statusList"><dt>Status</dt><dd>Loading...</dd></dl>
 <p class="muted" id="screensaverState"></p>
+</section>
+
+<section>
+<h2>Coffee Beans</h2>
+<p class="section-note">Manage beans stored on the grinder. V1 uses the Double-shot grind size only.</p>
+<div id="beanList" class="bean-list"></div>
+<form id="beanForm">
+<input id="bean_id" type="hidden">
+<div class="row">
+<div><label>Name</label><input id="bean_name" maxlength="32" placeholder="Bean name"></div>
+<div><label>Roaster</label><input id="bean_roaster" maxlength="24" placeholder="Roaster"></div>
+</div>
+<div class="row">
+<div><label>Bag Size (g)</label><input id="bean_bag_size_g" type="number" min="0" max="5000" step="1" value="250"></div>
+<div><label>Double Grind Size</label><input id="bean_mahlgrad" type="number" min="1" max="50" step="0.5" value="25"></div>
+</div>
+<div class="actions"><button type="submit">Save Bean</button><button id="newBean" class="secondary" type="button">New Bean</button></div>
+<p id="beanMessage" class="muted"></p>
+</form>
 </section>
 
 <section>
@@ -548,6 +664,7 @@ void ConnectivityManager::handle_root() {
 <p class="hint">Quick behavior switches. Auto Start can optionally be paired with basket detection from the touchscreen menu.</p>
 <div class="toggle-list">
 <label class="check"><input id="wifi_startup" name="wifi_startup" type="checkbox"><span><strong>Start WiFi on boot</strong><small>Connect automatically after startup.</small></span></label>
+<label class="check"><input id="advanced_ui" name="advanced_ui" type="checkbox"><span><strong>Advanced touchscreen UI</strong><small>Use the bean tracking ready screen; off restores the classic profile pages.</small></span></label>
 <label class="check"><input id="swipe_enabled" name="swipe_enabled" type="checkbox"><span><strong>Swipe mode switching</strong><small>Allow vertical swipes between Weight and Time modes.</small></span></label>
 <label class="check"><input id="auto_start" name="auto_start" type="checkbox"><span><strong>Start on cup</strong><small>Start the active profile when a cup or portafilter lands on the scale.</small></span></label>
 <label class="check"><input id="auto_return" name="auto_return" type="checkbox"><span><strong>Return on cup removal</strong><small>Leave the completion screen when the finished cup is removed.</small></span></label>
@@ -596,6 +713,7 @@ const W=280,H=456;
 function pct(v){return Math.round(Number(v)*100)+"%"}
 function setMsg(id,text,cls="muted"){const el=$(id);el.textContent=text;el.className=cls}
 async function json(path,opts){const r=await fetch(path,opts);const t=await r.text();let data={};try{data=t?JSON.parse(t):{}}catch(e){throw new Error(t||r.statusText)}if(!r.ok)throw new Error(data.error||t||r.statusText);return data}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function renderStatus(s,prefillWifi=false){
   const rows=[["State",s.status],["Mode",s.mode],["SSID",s.ssid||"--"],["IP",s.ip||"--"],["Host",s.host_url||"--"],["MAC",s.mac||"--"],["RSSI",s.connected?(s.rssi_dbm+" dBm"):"--"],["OTA",s.ota_active?(s.ota_progress+"%"):(s.ota_url||"--")],["Build","#"+s.build],["Version",s.version]];
   $("statusList").innerHTML=rows.map(r=>"<dt>"+r[0]+"</dt><dd>"+r[1]+"</dd>").join("");
@@ -604,7 +722,7 @@ function renderStatus(s,prefillWifi=false){
 function bindRange(id,fmt){const el=$(id),out=$(id+"_value");const upd=()=>out.textContent=fmt(el.value);el.addEventListener("input",upd);upd()}
 function renderSettings(x){
   const s=x.settings||x;
-  $("wifi_startup").checked=!!s.wifi_startup;$("logging_enabled").checked=!!s.logging_enabled;$("swipe_enabled").checked=!!s.swipe_enabled;$("auto_start").checked=!!s.auto_start;$("auto_return").checked=!!s.auto_return;
+  $("wifi_startup").checked=!!s.wifi_startup;$("advanced_ui").checked=!!s.advanced_ui;$("logging_enabled").checked=!!s.logging_enabled;$("swipe_enabled").checked=!!s.swipe_enabled;$("auto_start").checked=!!s.auto_start;$("auto_return").checked=!!s.auto_return;
   $("basket_detect").checked=!!s.basket_detect;$("basket_single_g").value=Number(s.basket_single_g||0).toFixed(1);$("basket_double_g").value=Number(s.basket_double_g||0).toFixed(1);$("basket_tolerance_g").value=s.basket_tolerance_g;
   $("screensaver_startup").checked=!!s.screensaver_startup;$("screensaver_sleep").checked=!!s.screensaver_sleep;
   $("grind_mode").value=String(s.grind_mode_index);$("purge_mode").value=String(s.purge_mode_index);
@@ -614,15 +732,33 @@ function renderSettings(x){
   $("basketMessage").textContent=s.basket_configured?"Basket detection configured":"Capture or enter both basket weights";
   $("screensaverState").textContent=s.screensaver_image?"Screensaver image stored: "+s.screensaver_image_bytes+" bytes":"No screensaver image stored";
 }
+function clearBeanForm(clearMessage=true){$("bean_id").value="";$("bean_name").value="";$("bean_roaster").value="";$("bean_bag_size_g").value=250;$("bean_mahlgrad").value=25;if(clearMessage)setMsg("beanMessage","")}
+function editBean(b){$("bean_id").value=b.id;$("bean_name").value=b.name||"";$("bean_roaster").value=b.roaster||"";$("bean_bag_size_g").value=b.bag_size_g||0;$("bean_mahlgrad").value=Number(b.mahlgrad||25).toFixed(1);setMsg("beanMessage","Editing "+(b.name||"bean"))}
+function renderBeans(data){
+  const beans=data.beans||[];
+  $("beanList").innerHTML=beans.length?beans.map(b=>`<div class="bean ${b.active?"active":""}"><div class="bean-head"><span>${esc(b.name||"Unnamed bean")}</span><span>Grind ${Number(b.mahlgrad).toFixed(1).replace(".0","")}</span></div><div class="bean-sub">${esc(b.roaster||"No roaster")}</div><div class="bean-stats"><span><strong>${Number(b.dose_used_g||0).toFixed(1)}g</strong>Dose</span><span><strong>${Number(b.purge_used_g||0).toFixed(1)}g</strong>Purge</span><span><strong>${Number(b.total_used_g||0).toFixed(1)}g</strong>Total</span></div><div class="bean-actions"><button type="button" class="secondary" data-act="edit" data-id="${b.id}">Edit</button><button type="button" class="secondary" data-act="active" data-id="${b.id}">${b.active?"Active":"Set Active"}</button><button type="button" class="secondary" data-act="delete" data-id="${b.id}">Delete</button></div></div>`).join(""):`<p class="muted">No beans stored yet. Add the first bean below.</p>`;
+  $("beanList").querySelectorAll("button").forEach(btn=>btn.addEventListener("click",async()=>{
+    const id=btn.dataset.id,act=btn.dataset.act,b=beans.find(x=>String(x.id)===String(id));
+    if(act==="edit"){editBean(b);return}
+    try{
+      if(act==="active")await json("/api/beans",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({action:"set_active",id})});
+      if(act==="delete")await json("/api/beans",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({action:"delete",id})});
+      setMsg("beanMessage",act==="delete"?"Bean deleted":"Active bean updated","ok");await loadBeans()
+    }catch(e){setMsg("beanMessage",e.message,"warn")}
+  }));
+}
+async function loadBeans(){renderBeans(await json("/api/beans"))}
 async function refreshStatus(){renderStatus(await json("/api/status"))}
-async function load(){try{renderStatus(await json("/api/status"),true);renderSettings(await json("/api/settings"))}catch(e){setMsg("settingsMessage",e.message,"warn")}}
+async function load(){try{renderStatus(await json("/api/status"),true);renderSettings(await json("/api/settings"));await loadBeans()}catch(e){setMsg("settingsMessage",e.message,"warn")}}
 function settingsPayload(){
   const p=new URLSearchParams();
-  ["wifi_startup","logging_enabled","swipe_enabled","auto_start","auto_return","basket_detect","screensaver_startup","screensaver_sleep"].forEach(id=>p.set(id,$(id).checked?"1":"0"));
+  ["wifi_startup","advanced_ui","logging_enabled","swipe_enabled","auto_start","auto_return","basket_detect","screensaver_startup","screensaver_sleep"].forEach(id=>p.set(id,$(id).checked?"1":"0"));
   ["grind_mode","purge_mode","purge_amount_g","freshness_hours","coast_ratio","brightness_normal","brightness_screensaver","screensaver_sleep_delay_min","screensaver_startup_duration_s","basket_single_g","basket_double_g","basket_tolerance_g"].forEach(id=>p.set(id,$(id).value));
   return p;
 }
-$("settingsForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("settingsMessage","Saving...");try{await json("/api/settings",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:settingsPayload()});setMsg("settingsMessage","Settings saved","ok");load()}catch(err){setMsg("settingsMessage",err.message,"warn")}});
+$("settingsForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("settingsMessage","Saving...");try{await json("/api/settings",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:settingsPayload()});setMsg("settingsMessage","Settings saved","ok");await load()}catch(err){setMsg("settingsMessage",err.message,"warn")}});
+$("newBean").addEventListener("click",clearBeanForm);
+$("beanForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("beanMessage","Saving...");const id=$("bean_id").value;const body=new URLSearchParams({action:id?"update":"create",name:$("bean_name").value,roaster:$("bean_roaster").value,bag_size_g:$("bean_bag_size_g").value,mahlgrad:$("bean_mahlgrad").value});if(id)body.set("id",id);try{await json("/api/beans",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});setMsg("beanMessage","Bean saved","ok");clearBeanForm(false);await loadBeans()}catch(err){setMsg("beanMessage",err.message,"warn")}});
 async function captureBasket(kind){setMsg("basketMessage","Capturing "+kind+" basket...");try{const data=await json("/api/basket/capture/"+kind,{method:"POST"});renderSettings(data);const s=data.settings||data;const key=kind==="single"?"basket_single_g":"basket_double_g";setMsg("basketMessage","Captured "+kind+": "+Number(s[key]||0).toFixed(1)+"g","ok")}catch(e){setMsg("basketMessage",e.message,"warn")}}
 $("captureSingleBasket").addEventListener("click",()=>captureBasket("single"));
 $("captureDoubleBasket").addEventListener("click",()=>captureBasket("double"));
@@ -645,7 +781,59 @@ load();setInterval(()=>refreshStatus().catch(()=>{}),5000);
 </body>
 </html>)HTML";
 
-    server_.send(200, "text/html", body);
+    send_html_response(body);
+}
+
+void ConnectivityManager::handle_setup_recovery_root() {
+    send_cors_headers();
+
+    String html;
+    html.reserve(2300);
+    html += F("<!doctype html><html><head><meta charset=\"utf-8\">"
+              "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+              "<title>GrindByWeight Recovery</title>"
+              "<style>"
+              ":root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101010;color:#f4f4f4;font-family:Arial,sans-serif}"
+              "main{max-width:520px;margin:0 auto;padding:18px}h1{font-size:26px;margin:0 0 8px}h2{font-size:19px;margin:0 0 8px}"
+              "section{border:1px solid #333;background:#1a1a1a;border-radius:8px;padding:14px;margin:12px 0}"
+              "p,small{color:#aaa;line-height:1.4}label{display:block;font-weight:700;margin:10px 0 5px}"
+              "input,button{width:100%;font:inherit;border:0;border-radius:6px;padding:12px;margin:0 0 10px}"
+              "input{background:#080808;color:#fff;border:1px solid #444}button{background:#d71920;color:#fff;font-weight:700}"
+              "dl{display:grid;grid-template-columns:110px 1fr;gap:7px;margin:0}dt{color:#aaa}dd{margin:0;word-break:break-word}"
+              ".secondary{background:#333}.warn{color:#f6b24a}.ok{color:#24d060}"
+              "</style></head><body><main><h1>GrindByWeight Recovery</h1>"
+              "<p>Setup access point mode is active. Use this page to restore WiFi or flash firmware over USB-free OTA.</p>"
+              "<section><h2>Status</h2><dl>");
+    html += F("<dt>AP SSID</dt><dd>");
+    html += html_escape(WIFI_SETUP_AP_SSID);
+    html += F("</dd><dt>Address</dt><dd>http://");
+    html += WiFi.softAPIP().toString();
+    html += F("</dd><dt>Build</dt><dd>#");
+    html += String(BUILD_NUMBER);
+    html += F("</dd><dt>Firmware</dt><dd>");
+    html += html_escape(BUILD_FIRMWARE_VERSION);
+    html += F("</dd><dt>MAC</dt><dd>");
+    html += html_escape(WiFi.softAPmacAddress());
+    html += F("</dd></dl></section>"
+              "<section><h2>WiFi</h2>"
+              "<form method=\"post\" action=\"/wifi\">"
+              "<label>Network name</label><input name=\"ssid\" required autocomplete=\"off\">"
+              "<label>Password</label><input name=\"password\" type=\"password\" autocomplete=\"current-password\">"
+              "<button type=\"submit\">Save WiFi and Restart</button>"
+              "</form>"
+              "<form method=\"post\" action=\"/wifi/clear\"><button class=\"secondary\" type=\"submit\">Clear WiFi Credentials</button></form>"
+              "</section>"
+              "<section><h2>Firmware OTA</h2>"
+              "<form method=\"post\" action=\"/ota\" enctype=\"multipart/form-data\">"
+              "<input type=\"file\" name=\"firmware\" accept=\".bin,application/octet-stream\" required>"
+              "<button type=\"submit\">Upload Firmware</button>"
+              "</form><small>Use the production firmware .bin, not a mock build.</small>"
+              "</section>"
+              "<section><h2>Diagnostics</h2><p><a class=\"ok\" href=\"/ping\">Ping</a> &nbsp; "
+              "<a class=\"ok\" href=\"/api/status\">Status JSON</a></p></section>"
+              "</main></body></html>");
+
+    server_.send(200, "text/html; charset=utf-8", html);
 }
 
 String ConnectivityManager::build_status_json() const {
@@ -655,8 +843,9 @@ String ConnectivityManager::build_status_json() const {
         host_url = setup_ap_active_ ? String("http://") + ip
                                     : String("http://") + WIFI_HOSTNAME + ".local";
     }
+    const esp_reset_reason_t reset_reason = esp_reset_reason();
     String json;
-    json.reserve(900);
+    json.reserve(1300);
     json += "{";
     json += "\"device\":\"" CONNECTIVITY_DEVICE_NAME "\",";
     json += "\"transport\":\"wifi\",";
@@ -667,6 +856,39 @@ String ConnectivityManager::build_status_json() const {
     json += "\"version\":\"" BUILD_FIRMWARE_VERSION "\",";
     json += "\"build\":";
     json += BUILD_NUMBER;
+    json += ",";
+    json += "\"uptime_ms\":";
+    json += String(millis());
+    json += ",";
+    json += "\"reset_reason\":\"";
+    json += reset_reason_label(reset_reason);
+    json += "\",";
+    json += "\"reset_reason_code\":";
+    json += String(static_cast<int>(reset_reason));
+    json += ",";
+    json += "\"free_heap_bytes\":";
+    json += String(ESP.getFreeHeap());
+    json += ",";
+    json += "\"min_free_heap_bytes\":";
+    json += String(ESP.getMinFreeHeap());
+    json += ",";
+    json += "\"max_alloc_heap_bytes\":";
+    json += String(ESP.getMaxAllocHeap());
+    json += ",";
+    json += "\"free_internal_heap_bytes\":";
+    json += String(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    json += ",";
+    json += "\"largest_internal_block_bytes\":";
+    json += String(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    json += ",";
+    json += "\"psram_size_bytes\":";
+    json += String(ESP.getPsramSize());
+    json += ",";
+    json += "\"free_psram_bytes\":";
+    json += String(ESP.getFreePsram());
+    json += ",";
+    json += "\"cpu_mhz\":";
+    json += String(getCpuFrequencyMhz());
     json += ",";
     json += "\"enabled\":";
     json += enabled_ ? "true" : "false";
@@ -805,6 +1027,13 @@ String ConnectivityManager::build_settings_json() const {
         swipe_prefs.end();
     }
 
+    bool advanced_ui = USER_READY_UI_ADVANCED_DEFAULT;
+    Preferences ready_ui_prefs;
+    if (ready_ui_prefs.begin(USER_READY_UI_PREF_NAMESPACE, true)) {
+        advanced_ui = ready_ui_prefs.getBool(USER_READY_UI_PREF_KEY_ADVANCED, USER_READY_UI_ADVANCED_DEFAULT);
+        ready_ui_prefs.end();
+    }
+
     bool auto_start = false;
     bool auto_return = false;
     Preferences auto_prefs;
@@ -876,6 +1105,8 @@ String ConnectivityManager::build_settings_json() const {
     json += logging_enabled ? "true" : "false";
     json += ",\"swipe_enabled\":";
     json += swipe_enabled ? "true" : "false";
+    json += ",\"advanced_ui\":";
+    json += advanced_ui ? "true" : "false";
     json += ",\"auto_start\":";
     json += auto_start ? "true" : "false";
     json += ",\"auto_return\":";
@@ -968,6 +1199,17 @@ void ConnectivityManager::handle_settings_post() {
                                               "swipe mode switching", write_errors) || changed;
         }
         swipe_prefs.end();
+    }
+
+    Preferences ready_ui_prefs;
+    if (ready_ui_prefs.begin(USER_READY_UI_PREF_NAMESPACE, false)) {
+        bool current = ready_ui_prefs.getBool(USER_READY_UI_PREF_KEY_ADVANCED, USER_READY_UI_ADVANCED_DEFAULT);
+        bool value = get_request_bool("advanced_ui", current, found);
+        if (found) {
+            changed = record_preference_write(ready_ui_prefs.putBool(USER_READY_UI_PREF_KEY_ADVANCED, value),
+                                              "advanced ready UI", write_errors) || changed;
+        }
+        ready_ui_prefs.end();
     }
 
     Preferences auto_prefs;
@@ -1147,6 +1389,172 @@ void ConnectivityManager::handle_settings_post() {
     }
 
     send_json_response(200, build_settings_json());
+}
+
+String ConnectivityManager::build_beans_json() const {
+    String json;
+    json.reserve(1300);
+    json += "{\"ok\":true,\"capacity\":";
+    json += String(BeanController::kMaxBeans);
+    json += ",\"count\":";
+    json += bean_controller_ ? String(bean_controller_->count()) : "0";
+    json += ",\"active_bean_id\":";
+    json += bean_controller_ ? String(bean_controller_->get_active_id()) : "0";
+    json += ",\"beans\":[";
+
+    if (bean_controller_) {
+        for (uint8_t i = 0; i < bean_controller_->count(); ++i) {
+            const BeanRecord* bean = bean_controller_->get_bean_at(i);
+            if (!bean) {
+                continue;
+            }
+            if (i > 0) {
+                json += ",";
+            }
+            const uint16_t mg_x2 = bean->mahlgrad_x2[BeanController::kDoubleProfileIndex];
+            const float dose_g = static_cast<float>(bean->dose_used_x10) / 10.0f;
+            const float purge_g = static_cast<float>(bean->purge_used_x10) / 10.0f;
+            json += "{\"id\":";
+            json += String(bean->id);
+            json += ",\"active\":";
+            json += bean_controller_->get_active_id() == bean->id ? "true" : "false";
+            json += ",\"name\":\"";
+            json += json_escape(bean->name);
+            json += "\",\"roaster\":\"";
+            json += json_escape(bean->roaster);
+            json += "\",\"bag_size_g\":";
+            json += String(bean->bag_size_g);
+            json += ",\"mahlgrad_x2\":";
+            json += String(mg_x2);
+            json += ",\"mahlgrad\":";
+            json += String(BeanController::x2_to_mahlgrad(mg_x2), 1);
+            json += ",\"dose_used_g\":";
+            json += String(dose_g, 1);
+            json += ",\"purge_used_g\":";
+            json += String(purge_g, 1);
+            json += ",\"total_used_g\":";
+            json += String(dose_g + purge_g, 1);
+            json += "}";
+        }
+    }
+
+    json += "]}";
+    return json;
+}
+
+void ConnectivityManager::handle_beans_get() {
+    send_json_response(200, build_beans_json());
+}
+
+void ConnectivityManager::handle_beans_post() {
+    if (!bean_controller_) {
+        send_json_response(503, "{\"ok\":false,\"error\":\"Bean controller unavailable\"}");
+        return;
+    }
+
+    bool found = false;
+    String action = get_request_string("action", found);
+    action.trim();
+    action.toLowerCase();
+    if (action.isEmpty()) {
+        send_json_response(400, "{\"ok\":false,\"error\":\"Missing action\"}");
+        return;
+    }
+
+    bool changed = false;
+    if (action == "create") {
+        bool name_found = false;
+        String name = get_request_string("name", name_found);
+        bool roaster_found = false;
+        String roaster = get_request_string("roaster", roaster_found);
+        (void)roaster_found;
+        const int bag_size = get_request_int("bag_size_g", 0, 0, 5000, found);
+        float mg = get_request_float("mahlgrad", 25.0f, 1.0f, 50.0f, found);
+        bool mg_double_found = false;
+        mg = get_request_float("mahlgrad_double", mg, 1.0f, 50.0f, mg_double_found);
+
+        if (!name_found || name.length() == 0) {
+            name = "Unnamed bean";
+        }
+        uint8_t id = 0;
+        changed = bean_controller_->create_bean(name.c_str(), roaster.c_str(),
+                                                static_cast<uint16_t>(bag_size), mg, &id);
+        if (!changed) {
+            send_json_response(400, "{\"ok\":false,\"error\":\"Could not create bean\"}");
+            return;
+        }
+    } else if (action == "update") {
+        const int id = get_request_int("id", 0, 0, 255, found);
+        const BeanRecord* current = bean_controller_->find_bean(static_cast<uint8_t>(id));
+        if (!current) {
+            send_json_response(404, "{\"ok\":false,\"error\":\"Bean not found\"}");
+            return;
+        }
+
+        bool field_found = false;
+        String name = get_request_string("name", field_found);
+        if (!field_found) {
+            name = current->name;
+        }
+        String roaster = get_request_string("roaster", field_found);
+        if (!field_found) {
+            roaster = current->roaster;
+        }
+        const int bag_size = get_request_int("bag_size_g", current->bag_size_g, 0, 5000, field_found);
+        float mg = get_request_float("mahlgrad",
+                                     BeanController::x2_to_mahlgrad(current->mahlgrad_x2[BeanController::kDoubleProfileIndex]),
+                                     1.0f, 50.0f, field_found);
+        bool mg_double_found = false;
+        mg = get_request_float("mahlgrad_double", mg, 1.0f, 50.0f, mg_double_found);
+
+        changed = bean_controller_->update_bean(static_cast<uint8_t>(id), name.c_str(), roaster.c_str(),
+                                                static_cast<uint16_t>(bag_size), mg);
+        if (!changed) {
+            send_json_response(500, "{\"ok\":false,\"error\":\"Could not update bean\"}");
+            return;
+        }
+    } else if (action == "delete") {
+        const int id = get_request_int("id", 0, 0, 255, found);
+        changed = bean_controller_->delete_bean(static_cast<uint8_t>(id));
+        if (!changed) {
+            send_json_response(404, "{\"ok\":false,\"error\":\"Bean not found\"}");
+            return;
+        }
+    } else if (action == "set_active") {
+        const int id = get_request_int("id", 0, 0, 255, found);
+        changed = bean_controller_->set_active_bean(static_cast<uint8_t>(id));
+        if (!changed) {
+            send_json_response(404, "{\"ok\":false,\"error\":\"Bean not found\"}");
+            return;
+        }
+    } else if (action == "feedback") {
+        int id = get_request_int("id", bean_controller_->get_active_id(), 0, 255, found);
+        if (id == 0) {
+            id = bean_controller_->get_active_id();
+        }
+        String feedback = get_request_string("feedback", found);
+        feedback.trim();
+        feedback.toLowerCase();
+        BeanController::Feedback value = BeanController::Feedback::OK;
+        if (feedback == "finer" || feedback == "fine" || feedback == "-1") {
+            value = BeanController::Feedback::FINER;
+        } else if (feedback == "coarser" || feedback == "coarse" || feedback == "1") {
+            value = BeanController::Feedback::COARSER;
+        }
+        changed = bean_controller_->apply_feedback(static_cast<uint8_t>(id), value);
+        if (!changed) {
+            send_json_response(404, "{\"ok\":false,\"error\":\"Bean not found\"}");
+            return;
+        }
+    } else {
+        send_json_response(400, "{\"ok\":false,\"error\":\"Unknown action\"}");
+        return;
+    }
+
+    if (changed) {
+        mark_settings_changed();
+    }
+    send_json_response(200, build_beans_json());
 }
 
 void ConnectivityManager::handle_basket_capture(bool capture_single) {
@@ -1334,6 +1742,22 @@ void ConnectivityManager::handle_wifi_clear() {
     schedule_restart();
 }
 
+void ConnectivityManager::handle_ota_page() {
+    static const char body[] = R"HTML(<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GrindByWeight OTA</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101010;color:#f4f4f4;font-family:Arial,sans-serif}main{max-width:480px;margin:0 auto;padding:18px}section{border:1px solid #333;background:#1a1a1a;border-radius:8px;padding:14px}h1{font-size:26px;margin:0 0 12px}p{color:#aaa;line-height:1.4}a{color:#58b7ff}input,button{width:100%;font:inherit;border:0;border-radius:6px;padding:12px;margin:0 0 10px}input{background:#080808;color:#fff;border:1px solid #444}button{background:#d71920;color:#fff;font-weight:700}
+</style>
+</head>
+<body><main><section><h1>Firmware OTA</h1><p>Upload a production firmware .bin. The grinder restarts after the update is applied.</p><form method="post" action="/ota" enctype="multipart/form-data"><input type="file" name="firmware" accept=".bin,application/octet-stream" required><button type="submit">Upload Firmware</button></form><p><a href="/api/status">Status JSON</a></p></section></main></body>
+</html>)HTML";
+    send_html_response(body);
+}
+
 bool ConnectivityManager::begin_ota(size_t expected_size) {
     if (ota_in_progress_) {
         ota_error_ = true;
@@ -1341,32 +1765,21 @@ bool ConnectivityManager::begin_ota(size_t expected_size) {
         return false;
     }
 
-    ota_partition_ = esp_ota_get_next_update_partition(nullptr);
-    if (!ota_partition_) {
-        ota_error_ = true;
-        ota_error_message_ = "No OTA partition available";
-        return false;
-    }
-
-    LOG_BLE("WiFi OTA: Starting upload to partition %s\n", ota_partition_->label);
-
-    esp_task_wdt_config_t wdt_config = {
-        .timeout_ms = 1800000,
-        .idle_core_mask = (1 << 0) | (1 << 1),
-        .trigger_panic = true,
-    };
-    esp_task_wdt_reconfigure(&wdt_config);
-
+    // Suspend the real-time grind/weight tasks so a grind can't run while we
+    // write flash. The Arduino Update library erases the OTA partition
+    // incrementally as data arrives (one sector at a time), so there is no long
+    // blocking erase up front and no need to reconfigure the task watchdog.
     task_manager.suspend_hardware_tasks();
 
-    esp_err_t err = esp_ota_begin(ota_partition_, OTA_SIZE_UNKNOWN, &ota_handle_);
-    if (err != ESP_OK) {
+    if (!ota_updater_.begin(UPDATE_SIZE_UNKNOWN)) {
         ota_error_ = true;
-        ota_error_message_ = "esp_ota_begin failed";
+        ota_error_message_ = ota_updater_.errorString();
+        LOG_BLE("WiFi OTA: Update.begin failed: %s\n", ota_updater_.errorString());
         task_manager.resume_hardware_tasks();
         return false;
     }
 
+    LOG_BLE("WiFi OTA: Starting upload\n");
     ota_received_bytes_ = 0;
     ota_total_bytes_ = expected_size;
     ota_error_ = false;
@@ -1376,20 +1789,21 @@ bool ConnectivityManager::begin_ota(size_t expected_size) {
     return true;
 }
 
-bool ConnectivityManager::write_ota_chunk(const uint8_t* data, size_t size) {
+bool ConnectivityManager::write_ota_chunk(uint8_t* data, size_t size) {
     if (!ota_in_progress_ || !data || size == 0) {
         return false;
     }
 
-    esp_err_t err = esp_ota_write(ota_handle_, data, size);
-    if (err != ESP_OK) {
+    if (ota_updater_.write(data, size) != size) {
         ota_error_ = true;
-        ota_error_message_ = "esp_ota_write failed";
+        ota_error_message_ = ota_updater_.errorString();
+        LOG_BLE("WiFi OTA: Update.write failed: %s\n", ota_updater_.errorString());
         return false;
     }
 
+    size_t previous = ota_received_bytes_;
     ota_received_bytes_ += size;
-    if (ota_received_bytes_ == size || ota_received_bytes_ % 16384 == 0) {
+    if ((previous / 16384) != (ota_received_bytes_ / 16384)) {
         LOG_BLE("WiFi OTA: Received %u KB\n", static_cast<unsigned int>(ota_received_bytes_ / 1024));
     }
     return true;
@@ -1403,24 +1817,19 @@ bool ConnectivityManager::finish_ota() {
 
     set_state(ConnectivityState::WIFI_OTA_APPLYING, "Applying update...");
 
-    esp_err_t err = esp_ota_end(ota_handle_);
-    if (err != ESP_OK) {
+    // Update.end(true) finalizes the image and sets it as the boot partition.
+    if (!ota_updater_.end(true)) {
         ota_error_ = true;
-        ota_error_message_ = "esp_ota_end failed";
-        abort_ota();
-        return false;
-    }
-
-    err = esp_ota_set_boot_partition(ota_partition_);
-    if (err != ESP_OK) {
-        ota_error_ = true;
-        ota_error_message_ = "esp_ota_set_boot_partition failed";
+        ota_error_message_ = ota_updater_.errorString();
+        LOG_BLE("WiFi OTA: Update.end failed: %s\n", ota_updater_.errorString());
         abort_ota();
         return false;
     }
 
     LOG_BLE("WiFi OTA: Update complete (%u KB), reboot scheduled\n",
             static_cast<unsigned int>(ota_received_bytes_ / 1024));
+    // Leave ota_in_progress_ set so the loop keeps tasks suspended until the
+    // scheduled reboot swaps in the new firmware.
     set_state(ConnectivityState::WIFI_OTA_APPLYING, "Restarting...");
     schedule_restart();
     return true;
@@ -1428,12 +1837,10 @@ bool ConnectivityManager::finish_ota() {
 
 void ConnectivityManager::abort_ota() {
     if (ota_in_progress_) {
-        esp_ota_abort(ota_handle_);
+        ota_updater_.abort();
     }
 
     ota_in_progress_ = false;
-    ota_handle_ = 0;
-    ota_partition_ = nullptr;
     ota_received_bytes_ = 0;
     ota_total_bytes_ = 0;
     task_manager.resume_hardware_tasks();
@@ -1452,8 +1859,12 @@ void ConnectivityManager::handle_ota_upload() {
             break;
 
         case UPLOAD_FILE_WRITE:
-            if (!write_ota_chunk(upload.buf, upload.currentSize)) {
-                ota_error_ = true;
+            // Stop writing (and abort) on the first failure instead of silently
+            // consuming the rest of the upload.
+            if (ota_in_progress_ && !ota_error_) {
+                if (!write_ota_chunk(upload.buf, upload.currentSize)) {
+                    abort_ota();
+                }
             }
             break;
 
@@ -1500,6 +1911,11 @@ void ConnectivityManager::handle_options() {
 void ConnectivityManager::handle_not_found() {
     if (server_.method() == HTTP_OPTIONS) {
         handle_options();
+        return;
+    }
+
+    if (setup_ap_active_ && server_.method() == HTTP_GET) {
+        handle_setup_recovery_root();
         return;
     }
 

@@ -67,6 +67,28 @@ The project has three build targets:
 - Work on new features without hardware setup or bean waste
 - Capture USB serial messages for debugging
 
+### Native Touchscreen Preview: `lvgl-sdl-preview`
+- **Use case:** Daily UI iteration without flashing hardware
+- **Screen:** Runs the real LVGL UI at the Waveshare touchscreen size, `280 x 456`
+- **Interactive mode:** Uses SDL for mouse/touch-style interaction on desktop
+- **Screenshot mode:** Uses an offscreen LVGL display so captures work in headless/sandboxed environments
+- **Mocked services:** Uses simulator stubs for Arduino timing, Preferences storage, profile/grinder state, connectivity callbacks, and bean data
+
+The preview is not an HTML/browser mock. It builds the same LVGL screen code used by the firmware.
+
+```bash
+# Build the preview target and capture Ready, Bean List, and Feedback screenshots
+python3 tools/grinder.py preview
+
+# Capture specific scenes
+python3 tools/grinder.py preview ready list feedback
+
+# Open the interactive SDL preview window
+python3 tools/grinder.py preview --interactive ready
+```
+
+Screenshots are written to `.pio/preview` by default. PlatformIO's package cache for this workflow is kept under `.pio-core` so the preview setup remains local to the repository.
+
 ---
 
 ## 🚀 Building & Flashing
@@ -125,6 +147,9 @@ python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp
 Once the device is running and connected to WiFi:
 
 ```bash
+# Required local safety gate before remote-only updates
+python3 tools/grinder.py safety-check
+
 # Build and upload wirelessly over WiFi (production)
 python3 tools/grinder.py build-upload
 
@@ -143,6 +168,10 @@ python3 tools/grinder.py scan
 # Get device system info from older BLE firmware
 python3 tools/grinder.py info
 ```
+
+Remote-only devices must use `python3 tools/grinder.py build-upload` for normal updates. It runs the same safety gate automatically before building, then verifies `/ping`, `/api/status`, `/api/settings`, and `/api/beans` on the live device before OTA starts. Do not bypass `--skip-safety-checks` unless the device is physically reachable by USB.
+
+The production firmware keeps setup AP recovery reachable at `http://192.168.4.1` when station WiFi cannot connect. Unknown GET routes in setup AP mode intentionally fall back to the recovery page so phone captive-portal probes do not strand the device.
 
 ---
 
