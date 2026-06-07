@@ -108,6 +108,9 @@ void BeanFeedbackScreen::create() {
 }
 
 void BeanFeedbackScreen::update(const char* bean_name, uint16_t mahlgrad_x2) {
+    if (!gs_label || !bean_label) {
+        return;
+    }
     char gs[12];
     BeanController::format_mahlgrad(gs, sizeof(gs), mahlgrad_x2);
     lv_label_set_text(gs_label, gs);

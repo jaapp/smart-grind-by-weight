@@ -716,7 +716,7 @@ async function json(path,opts){const r=await fetch(path,opts);const t=await r.te
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function renderStatus(s,prefillWifi=false){
   const rows=[["State",s.status],["Mode",s.mode],["SSID",s.ssid||"--"],["IP",s.ip||"--"],["Host",s.host_url||"--"],["MAC",s.mac||"--"],["RSSI",s.connected?(s.rssi_dbm+" dBm"):"--"],["OTA",s.ota_active?(s.ota_progress+"%"):(s.ota_url||"--")],["Build","#"+s.build],["Version",s.version]];
-  $("statusList").innerHTML=rows.map(r=>"<dt>"+r[0]+"</dt><dd>"+r[1]+"</dd>").join("");
+  $("statusList").innerHTML=rows.map(r=>"<dt>"+esc(r[0])+"</dt><dd>"+esc(r[1])+"</dd>").join("");
   if(prefillWifi)$("ssid").value=s.setup_ap?"":(s.ssid||"");
 }
 function bindRange(id,fmt){const el=$(id),out=$(id+"_value");const upd=()=>out.textContent=fmt(el.value);el.addEventListener("input",upd);upd()}
@@ -1728,6 +1728,19 @@ void ConnectivityManager::handle_wifi_save() {
 
     if (ssid.isEmpty()) {
         send_plain_response(400, "SSID is required");
+        return;
+    }
+    if (ssid.length() > 32) {
+        send_plain_response(400, "SSID too long (max 32 characters)");
+        return;
+    }
+    // WPA2 passphrases are 8-63 characters; an empty password means an open network.
+    if (!password.isEmpty() && password.length() < 8) {
+        send_plain_response(400, "WiFi password must be at least 8 characters");
+        return;
+    }
+    if (password.length() > 63) {
+        send_plain_response(400, "WiFi password too long (max 63 characters)");
         return;
     }
 
