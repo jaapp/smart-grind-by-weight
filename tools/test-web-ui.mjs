@@ -120,6 +120,8 @@ const state = {
       roaster: 'Fjord',
       bag_size_g: 250,
       mahlgrad: 26.5,
+      mahlgrad_single: 25.5,
+      mahlgrad_double: 26.5,
       dose_used_g: 56,
       purge_used_g: 2,
       total_used_g: 58,
@@ -131,6 +133,8 @@ const state = {
       roaster: 'Five Elephant',
       bag_size_g: 250,
       mahlgrad: 24,
+      mahlgrad_single: 23.5,
+      mahlgrad_double: 24,
       dose_used_g: 12.4,
       purge_used_g: 0,
       total_used_g: 12.4,
@@ -221,7 +225,9 @@ async function fetchMock(path, options = {}) {
         name: form.get('name') || '',
         roaster: form.get('roaster') || '',
         bag_size_g: Number(form.get('bag_size_g') || 0),
-        mahlgrad: Number(form.get('mahlgrad') || 25),
+        mahlgrad: Number(form.get('mahlgrad') || form.get('mahlgrad_double') || 25),
+        mahlgrad_single: Number(form.get('mahlgrad_single') || form.get('mahlgrad') || 25),
+        mahlgrad_double: Number(form.get('mahlgrad_double') || form.get('mahlgrad') || 25),
         dose_used_g: 0,
         purge_used_g: 0,
         total_used_g: 0,
@@ -238,7 +244,9 @@ async function fetchMock(path, options = {}) {
           name: form.get('name') || '',
           roaster: form.get('roaster') || '',
           bag_size_g: Number(form.get('bag_size_g') || 0),
-          mahlgrad: Number(form.get('mahlgrad') || 25),
+          mahlgrad: Number(form.get('mahlgrad') || form.get('mahlgrad_double') || 25),
+          mahlgrad_single: Number(form.get('mahlgrad_single') || form.get('mahlgrad') || 25),
+          mahlgrad_double: Number(form.get('mahlgrad_double') || form.get('mahlgrad') || 25),
         });
       }
     } else if (action === 'set_active') {
@@ -304,11 +312,12 @@ check(
 el('bean_name').value = 'New Bean';
 el('bean_roaster').value = 'April';
 el('bean_bag_size_g').value = '200';
+el('bean_mahlgrad_single').value = '26.0';
 el('bean_mahlgrad').value = '27.5';
 await el('beanForm').dispatch('submit');
 check(
-  state.beans.some((bean) => bean.name === 'New Bean' && bean.mahlgrad === 27.5),
-  'bean create posts and refreshes',
+  state.beans.some((bean) => bean.name === 'New Bean' && bean.mahlgrad_single === 26 && bean.mahlgrad_double === 27.5),
+  'bean create posts single and double grind sizes',
 );
 
 const setActive = el('beanList').children.find(

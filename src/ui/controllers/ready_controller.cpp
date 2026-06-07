@@ -22,6 +22,17 @@ void add_gesture_handler_recursive(lv_obj_t* obj, lv_event_cb_t handler, void* u
     }
 }
 
+uint8_t selected_bean_grind_profile(UIManager* ui_manager) {
+    ProfileController* profiles = ui_manager ? ui_manager->get_profile_controller() : nullptr;
+    if (!profiles) {
+        return BeanController::kDoubleProfileIndex;
+    }
+    const int profile = profiles->get_current_profile();
+    return profile == BeanController::kSingleProfileIndex
+               ? BeanController::kSingleProfileIndex
+               : BeanController::kDoubleProfileIndex;
+}
+
 } // namespace
 
 ReadyUIController::ReadyUIController(UIManager* manager)
@@ -58,7 +69,7 @@ void ReadyUIController::refresh_bean_summary() {
         true,
         bean->name,
         bean->roaster,
-        bean->mahlgrad_x2[BeanController::kDoubleProfileIndex],
+        bean->mahlgrad_x2[selected_bean_grind_profile(ui_manager_)],
         bean->dose_used_x10,
         bean->purge_used_x10,
         bean->bag_size_g);
@@ -80,7 +91,8 @@ void ReadyUIController::refresh_feedback_screen() {
         ui_manager_->bean_feedback_screen.update("", BeanController::kDefaultMahlgradX2);
         return;
     }
-    ui_manager_->bean_feedback_screen.update(bean->name, bean->mahlgrad_x2[BeanController::kDoubleProfileIndex]);
+    ui_manager_->bean_feedback_screen.update(bean->name,
+                                            bean->mahlgrad_x2[selected_bean_grind_profile(ui_manager_)]);
 }
 
 void ReadyUIController::reload_ready_ui_mode() {
@@ -119,6 +131,7 @@ void ReadyUIController::handle_tab_change(int tab) {
         refresh_profiles();
     }
     ui_manager_->ready_screen.set_active_tab(tab);
+    refresh_bean_summary();
 
     if (ui_manager_->grinding_controller_) {
         ui_manager_->grinding_controller_->update_grind_button_icon();
@@ -212,14 +225,17 @@ void ReadyUIController::handle_feedback(EventBridgeLVGL::EventType event_type) {
     bool stay_on_feedback = false;
     switch (event_type) {
         case EventBridgeLVGL::EventType::BEAN_FEEDBACK_FINER:
-            ui_manager_->bean_controller->apply_feedback_to_active(BeanController::Feedback::FINER);
+            ui_manager_->bean_controller->apply_feedback_to_active(selected_bean_grind_profile(ui_manager_),
+                                                                   BeanController::Feedback::FINER);
             stay_on_feedback = true;
             break;
         case EventBridgeLVGL::EventType::BEAN_FEEDBACK_OK:
-            ui_manager_->bean_controller->apply_feedback_to_active(BeanController::Feedback::OK);
+            ui_manager_->bean_controller->apply_feedback_to_active(selected_bean_grind_profile(ui_manager_),
+                                                                   BeanController::Feedback::OK);
             break;
         case EventBridgeLVGL::EventType::BEAN_FEEDBACK_COARSER:
-            ui_manager_->bean_controller->apply_feedback_to_active(BeanController::Feedback::COARSER);
+            ui_manager_->bean_controller->apply_feedback_to_active(selected_bean_grind_profile(ui_manager_),
+                                                                   BeanController::Feedback::COARSER);
             stay_on_feedback = true;
             break;
         case EventBridgeLVGL::EventType::BEAN_FEEDBACK_SKIP:

@@ -158,7 +158,7 @@ bool create_interactive_display() {
 void create_preview_grind_button() {
     preview_grind_button = lv_btn_create(lv_scr_act());
     lv_obj_set_size(preview_grind_button, 96, 96);
-    lv_obj_align(preview_grind_button, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(preview_grind_button, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_radius(preview_grind_button, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(preview_grind_button, lv_color_hex(THEME_COLOR_PRIMARY), 0);
     lv_obj_set_style_border_width(preview_grind_button, 0, 0);
@@ -187,12 +187,18 @@ void seed_beans() {
     if (beans.count() > 0) {
         return;
     }
-    beans.create_bean("Monte Alegre", "Fjord", 250, 26.5f);
-    beans.create_bean("House Blend", "Five Elephant", 250, 24.0f);
-    beans.create_bean("Kii AA", "The Barn", 200, 29.5f);
+    beans.create_bean("Monte Alegre", "Fjord", 250, 25.5f, 26.5f);
+    beans.create_bean("House Blend", "Five Elephant", 250, 23.5f, 24.0f);
+    beans.create_bean("Kii AA", "The Barn", 200, 28.5f, 29.5f);
     beans.set_active_bean(1);
     beans.add_dose_used_g(54.0f);
     beans.add_purge_used_g(2.0f);
+}
+
+uint8_t selected_bean_grind_profile() {
+    return selected_profile == BeanController::kSingleProfileIndex
+               ? BeanController::kSingleProfileIndex
+               : BeanController::kDoubleProfileIndex;
 }
 
 void refresh_ready() {
@@ -206,7 +212,7 @@ void refresh_ready() {
     const BeanRecord* active = beans.get_active_bean();
     if (active) {
         ready_screen.update_bean_summary(true, active->name, active->roaster,
-                                         active->mahlgrad_x2[BeanController::kDoubleProfileIndex],
+                                         active->mahlgrad_x2[selected_bean_grind_profile()],
                                          active->dose_used_x10,
                                          active->purge_used_x10,
                                          active->bag_size_g);
@@ -235,7 +241,7 @@ void show_scene(const char* scene) {
     if (std::strcmp(scene, "feedback") == 0) {
         const BeanRecord* active = beans.get_active_bean();
         feedback_screen.update(active ? active->name : "Bean",
-                               active ? active->mahlgrad_x2[BeanController::kDoubleProfileIndex]
+                               active ? active->mahlgrad_x2[selected_bean_grind_profile()]
                                       : BeanController::kDefaultMahlgradX2);
         feedback_screen.show();
         return;
@@ -359,7 +365,8 @@ void install_handlers() {
                                       });
     EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::BEAN_FEEDBACK_FINER,
                                       [](lv_event_t*) {
-                                          beans.apply_feedback_to_active(BeanController::Feedback::FINER);
+                                          beans.apply_feedback_to_active(selected_bean_grind_profile(),
+                                                                         BeanController::Feedback::FINER);
                                           refresh_ready();
                                           show_scene("feedback");
                                       });
@@ -367,7 +374,8 @@ void install_handlers() {
                                       [](lv_event_t*) { show_scene("ready"); });
     EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::BEAN_FEEDBACK_COARSER,
                                       [](lv_event_t*) {
-                                          beans.apply_feedback_to_active(BeanController::Feedback::COARSER);
+                                          beans.apply_feedback_to_active(selected_bean_grind_profile(),
+                                                                         BeanController::Feedback::COARSER);
                                           refresh_ready();
                                           show_scene("feedback");
                                       });
@@ -474,6 +482,40 @@ bool run_click_test() {
     ok &= expect_true(selected_profile == 0, "single profile works without active bean");
     ok &= click_object(ready_screen.get_advanced_profile_cell(2), "custom cell without active bean");
     ok &= expect_true(selected_profile == 2, "custom profile works without active bean");
+
+    for (uint8_t i = 0; i < BeanController::kMaxBeans; ++i) {
+        char name[32];
+        char roaster[24];
+        std::snprintf(name, sizeof(name), "Stress Bean %02u", static_cast<unsigned>(i + 1));
+        std::snprintf(roaster, sizeof(roaster), "Roaster %02u", static_cast<unsigned>(i + 1));
+        ok &= expect_true(beans.create_bean(name, roaster, 250,
+                                            20.0f + static_cast<float>(i) * 0.5f,
+                                            21.0f + static_cast<float>(i) * 0.5f),
+                          "stress bean create within capacity");
+    }
+    ok &= expect_true(beans.count() == BeanController::kMaxBeans, "stress setup fills max bean capacity");
+    ok &= expect_true(!beans.create_bean("Overflow", "Roaster", 250, 25.0f, 25.0f),
+                      "stress setup rejects bean over capacity");
+
+    const BeanRecord* last = beans.get_bean_at(BeanController::kMaxBeans - 1);
+    const uint8_t last_id = last ? last->id : 0;
+    ok &= expect_true(last_id != 0 && beans.set_active_bean(last_id), "stress setup selects last bean");
+    ok &= expect_true(beans.update_bean(last_id, "Updated Stress Bean", "Stress Roaster",
+                                        333, 31.5f, 32.0f),
+                      "stress setup updates one bean at max capacity");
+    ok &= expect_true(beans.apply_feedback(last_id, BeanController::kSingleProfileIndex,
+                                           BeanController::Feedback::FINER),
+                      "stress setup stores single-dose feedback at max capacity");
+    ok &= expect_true(beans.add_dose_used_g(18.0f) && beans.add_purge_used_g(1.5f),
+                      "stress setup stores bean usage at max capacity");
+    const BeanRecord* first = beans.get_bean_at(0);
+    ok &= expect_true(first && beans.delete_bean(first->id), "stress setup deletes one bean at max capacity");
+    ok &= expect_true(beans.create_bean("Replacement", "Stress Roaster", 250, 25.0f, 26.0f),
+                      "stress setup recreates bean after delete");
+    ok &= expect_true(beans.count() == BeanController::kMaxBeans, "stress setup returns to max capacity");
+    refresh_ready();
+    show_scene("beans");
+    ok &= expect_true(bean_list_screen.is_visible(), "bean list renders max bean capacity");
 
     return ok;
 }

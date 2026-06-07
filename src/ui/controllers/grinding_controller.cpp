@@ -26,7 +26,7 @@ void GrindingUIController::build_controls() {
 
     grind_button_ = lv_btn_create(lv_scr_act());
     lv_obj_set_size(grind_button_, 100, 100);
-    lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, -10);
+    lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, 0);
     lv_obj_set_style_radius(grind_button_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_PRIMARY), 0);
     lv_obj_set_style_border_width(grind_button_, 0, 0);
@@ -41,7 +41,7 @@ void GrindingUIController::build_controls() {
 
     pulse_button_ = lv_btn_create(lv_scr_act());
     lv_obj_set_size(pulse_button_, 100, 100);
-    lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, -10);
+    lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, 0);
     lv_obj_set_style_radius(pulse_button_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
     lv_obj_set_style_border_width(pulse_button_, 0, 0);
@@ -377,9 +377,9 @@ void GrindingUIController::update_button_layout() {
 
     if (in_purge_confirm || should_show_pulse) {
         // Dual button layout: left button at -60, right button at +60
-        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, -10);
+        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, 0);
         if (pulse_button_) {
-            lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, -10);
+            lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, 0);
             lv_obj_clear_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
 
             if (in_purge_confirm) {
@@ -404,7 +404,7 @@ void GrindingUIController::update_button_layout() {
         }
     } else {
         // Single button layout: centered at 0
-        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, 0, 0);
         if (pulse_button_) {
             lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
         }
@@ -527,14 +527,16 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
             LOG_BLE("GRIND COMPLETE - Final settled weight captured: %.2fg (Progress: %d%%)\n",
                     final_grind_weight_, final_grind_progress_);
             chart_updates_enabled_ = false;
-            const bool double_weight_grind =
-                ui_manager_->profile_controller &&
-                ui_manager_->profile_controller->get_current_profile() == BeanController::kDoubleProfileIndex &&
+            const int current_profile = ui_manager_->profile_controller
+                                            ? ui_manager_->profile_controller->get_current_profile()
+                                            : BeanController::kCustomProfileIndex;
+            const bool bean_weight_grind =
+                BeanController::stores_mahlgrad_for_profile(static_cast<uint8_t>(current_profile)) &&
                 event_data.mode == GrindMode::WEIGHT;
             const bool has_active_bean =
                 ui_manager_->bean_controller && ui_manager_->bean_controller->has_active_bean();
 
-            if (double_weight_grind && has_active_bean && final_grind_weight_ > 0.0f) {
+            if (bean_weight_grind && has_active_bean && final_grind_weight_ > 0.0f) {
                 ui_manager_->bean_controller->add_dose_used_g(final_grind_weight_);
                 if (ui_manager_->grind_controller &&
                     ui_manager_->grind_controller->was_purge_removed_for_session()) {

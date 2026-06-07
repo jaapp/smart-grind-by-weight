@@ -19,8 +19,6 @@ private:
     lv_obj_t* bean_mahlgrad_label;
     lv_obj_t* bean_usage_label;
     lv_obj_t* bean_usage_bar;
-    lv_obj_t* wifi_footer_label;
-    lv_obj_t* bluetooth_footer_label;
     lv_obj_t* menu_tab;
     lv_obj_t* status_label;
     lv_timer_t* status_timer;

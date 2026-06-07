@@ -41,6 +41,13 @@ public:
         return len;
     }
 
+    bool remove(const char* key) {
+        if (read_only_) {
+            return false;
+        }
+        return storage().erase(full_key(key)) > 0;
+    }
+
 private:
     std::string namespace_;
     bool read_only_ = false;

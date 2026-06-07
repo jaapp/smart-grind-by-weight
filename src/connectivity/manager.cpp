@@ -414,6 +414,12 @@ void ConnectivityManager::register_routes() {
         return;
     }
 
+    static const char* header_keys[] = {
+        "Content-Type",
+        "X-Firmware-Version",
+    };
+    server_.collectHeaders(header_keys, sizeof(header_keys) / sizeof(header_keys[0]));
+
     server_.on(WIFI_SETUP_PATH, HTTP_GET, [this]() { handle_root(); });
     server_.on("/generate_204", HTTP_GET, [this]() { handle_root(); });
     server_.on("/gen_204", HTTP_GET, [this]() { handle_root(); });
@@ -506,7 +512,7 @@ void ConnectivityManager::handle() {
 void ConnectivityManager::send_cors_headers() {
     server_.sendHeader("Access-Control-Allow-Origin", "*");
     server_.sendHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    server_.sendHeader("Access-Control-Allow-Headers", "Content-Type,Accept");
+    server_.sendHeader("Access-Control-Allow-Headers", "Content-Type,Accept,X-Firmware-Version");
     server_.sendHeader("Access-Control-Max-Age", "600");
 }
 
@@ -612,7 +618,7 @@ void ConnectivityManager::handle_root() {
 
 <section>
 <h2>Coffee Beans</h2>
-<p class="section-note">Manage beans stored on the grinder. V1 uses the Double-shot grind size only.</p>
+<p class="section-note">Manage beans stored on the grinder. Single and Double can use different grind sizes.</p>
 <div id="beanList" class="bean-list"></div>
 <form id="beanForm">
 <input id="bean_id" type="hidden">
@@ -622,7 +628,11 @@ void ConnectivityManager::handle_root() {
 </div>
 <div class="row">
 <div><label>Bag Size (g)</label><input id="bean_bag_size_g" type="number" min="0" max="5000" step="1" value="250"></div>
+<div><label>Single Grind Size</label><input id="bean_mahlgrad_single" type="number" min="1" max="50" step="0.5" value="25"></div>
+</div>
+<div class="row">
 <div><label>Double Grind Size</label><input id="bean_mahlgrad" type="number" min="1" max="50" step="0.5" value="25"></div>
+<div></div>
 </div>
 <div class="actions"><button type="submit">Save Bean</button><button id="newBean" class="secondary" type="button">New Bean</button></div>
 <p id="beanMessage" class="muted"></p>
@@ -728,11 +738,11 @@ function renderSettings(x){
   $("basketMessage").textContent=s.basket_configured?"Basket detection configured":"Capture or enter both basket weights";
   $("screensaverState").textContent=s.screensaver_image?"Screensaver image stored: "+s.screensaver_image_bytes+" bytes":"No screensaver image stored";
 }
-function clearBeanForm(clearMessage=true){$("bean_id").value="";$("bean_name").value="";$("bean_roaster").value="";$("bean_bag_size_g").value=250;$("bean_mahlgrad").value=25;if(clearMessage)setMsg("beanMessage","")}
-function editBean(b){$("bean_id").value=b.id;$("bean_name").value=b.name||"";$("bean_roaster").value=b.roaster||"";$("bean_bag_size_g").value=b.bag_size_g||0;$("bean_mahlgrad").value=Number(b.mahlgrad||25).toFixed(1);setMsg("beanMessage","Editing "+(b.name||"bean"))}
+function clearBeanForm(clearMessage=true){$("bean_id").value="";$("bean_name").value="";$("bean_roaster").value="";$("bean_bag_size_g").value=250;$("bean_mahlgrad_single").value=25;$("bean_mahlgrad").value=25;if(clearMessage)setMsg("beanMessage","")}
+function editBean(b){$("bean_id").value=b.id;$("bean_name").value=b.name||"";$("bean_roaster").value=b.roaster||"";$("bean_bag_size_g").value=b.bag_size_g||0;$("bean_mahlgrad_single").value=Number(b.mahlgrad_single??b.mahlgrad??25).toFixed(1);$("bean_mahlgrad").value=Number(b.mahlgrad_double??b.mahlgrad??25).toFixed(1);setMsg("beanMessage","Editing "+(b.name||"bean"))}
 function renderBeans(data){
   const beans=data.beans||[];
-  $("beanList").innerHTML=beans.length?beans.map(b=>`<div class="bean ${b.active?"active":""}"><div class="bean-head"><span>${esc(b.name||"Unnamed bean")}</span><span>Grind ${Number(b.mahlgrad).toFixed(1).replace(".0","")}</span></div><div class="bean-sub">${esc(b.roaster||"No roaster")}</div><div class="bean-stats"><span><strong>${Number(b.dose_used_g||0).toFixed(1)}g</strong>Dose</span><span><strong>${Number(b.purge_used_g||0).toFixed(1)}g</strong>Purge</span><span><strong>${Number(b.total_used_g||0).toFixed(1)}g</strong>Total</span></div><div class="bean-actions"><button type="button" class="secondary" data-act="edit" data-id="${b.id}">Edit</button><button type="button" class="secondary" data-act="active" data-id="${b.id}">${b.active?"Active":"Set Active"}</button><button type="button" class="secondary" data-act="delete" data-id="${b.id}">Delete</button></div></div>`).join(""):`<p class="muted">No beans stored yet. Add the first bean below.</p>`;
+  $("beanList").innerHTML=beans.length?beans.map(b=>`<div class="bean ${b.active?"active":""}"><div class="bean-head"><span>${esc(b.name||"Unnamed bean")}</span><span>S ${Number(b.mahlgrad_single??b.mahlgrad??25).toFixed(1).replace(".0","")} / D ${Number(b.mahlgrad_double??b.mahlgrad??25).toFixed(1).replace(".0","")}</span></div><div class="bean-sub">${esc(b.roaster||"No roaster")}</div><div class="bean-stats"><span><strong>${Number(b.dose_used_g||0).toFixed(1)}g</strong>Dose</span><span><strong>${Number(b.purge_used_g||0).toFixed(1)}g</strong>Purge</span><span><strong>${Number(b.total_used_g||0).toFixed(1)}g</strong>Total</span></div><div class="bean-actions"><button type="button" class="secondary" data-act="edit" data-id="${b.id}">Edit</button><button type="button" class="secondary" data-act="active" data-id="${b.id}">${b.active?"Active":"Set Active"}</button><button type="button" class="secondary" data-act="delete" data-id="${b.id}">Delete</button></div></div>`).join(""):`<p class="muted">No beans stored yet. Add the first bean below.</p>`;
   $("beanList").querySelectorAll("button").forEach(btn=>btn.addEventListener("click",async()=>{
     const id=btn.dataset.id,act=btn.dataset.act,b=beans.find(x=>String(x.id)===String(id));
     if(act==="edit"){editBean(b);return}
@@ -754,7 +764,7 @@ function settingsPayload(){
 }
 $("settingsForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("settingsMessage","Saving...");try{await json("/api/settings",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:settingsPayload()});setMsg("settingsMessage","Settings saved","ok");await load()}catch(err){setMsg("settingsMessage",err.message,"warn")}});
 $("newBean").addEventListener("click",clearBeanForm);
-$("beanForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("beanMessage","Saving...");const id=$("bean_id").value;const body=new URLSearchParams({action:id?"update":"create",name:$("bean_name").value,roaster:$("bean_roaster").value,bag_size_g:$("bean_bag_size_g").value,mahlgrad:$("bean_mahlgrad").value});if(id)body.set("id",id);try{await json("/api/beans",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});setMsg("beanMessage","Bean saved","ok");clearBeanForm(false);await loadBeans()}catch(err){setMsg("beanMessage",err.message,"warn")}});
+$("beanForm").addEventListener("submit",async e=>{e.preventDefault();setMsg("beanMessage","Saving...");const id=$("bean_id").value;const body=new URLSearchParams({action:id?"update":"create",name:$("bean_name").value,roaster:$("bean_roaster").value,bag_size_g:$("bean_bag_size_g").value,mahlgrad_single:$("bean_mahlgrad_single").value,mahlgrad:$("bean_mahlgrad").value,mahlgrad_double:$("bean_mahlgrad").value});if(id)body.set("id",id);try{await json("/api/beans",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});setMsg("beanMessage","Bean saved","ok");clearBeanForm(false);await loadBeans()}catch(err){setMsg("beanMessage",err.message,"warn")}});
 async function captureBasket(kind){setMsg("basketMessage","Capturing "+kind+" basket...");try{const data=await json("/api/basket/capture/"+kind,{method:"POST"});renderSettings(data);const s=data.settings||data;const key=kind==="single"?"basket_single_g":"basket_double_g";setMsg("basketMessage","Captured "+kind+": "+Number(s[key]||0).toFixed(1)+"g","ok")}catch(e){setMsg("basketMessage",e.message,"warn")}}
 $("captureSingleBasket").addEventListener("click",()=>captureBasket("single"));
 $("captureDoubleBasket").addEventListener("click",()=>captureBasket("double"));
@@ -919,6 +929,7 @@ String ConnectivityManager::build_status_json() const {
     json += "\"ota_active\":";
     json += ota_in_progress_ ? "true" : "false";
     json += ",";
+    json += "\"ota_raw\":true,";
     json += "\"ota_progress\":";
     json += String(get_ota_progress(), 1);
     json += ",";
@@ -1389,7 +1400,7 @@ void ConnectivityManager::handle_settings_post() {
 
 String ConnectivityManager::build_beans_json() const {
     String json;
-    json.reserve(1300);
+    json.reserve(512 + BeanController::kMaxBeans * 260);
     json += "{\"ok\":true,\"capacity\":";
     json += String(BeanController::kMaxBeans);
     json += ",\"count\":";
@@ -1407,7 +1418,8 @@ String ConnectivityManager::build_beans_json() const {
             if (i > 0) {
                 json += ",";
             }
-            const uint16_t mg_x2 = bean->mahlgrad_x2[BeanController::kDoubleProfileIndex];
+            const uint16_t mg_single_x2 = bean->mahlgrad_x2[BeanController::kSingleProfileIndex];
+            const uint16_t mg_double_x2 = bean->mahlgrad_x2[BeanController::kDoubleProfileIndex];
             const float dose_g = static_cast<float>(bean->dose_used_x10) / 10.0f;
             const float purge_g = static_cast<float>(bean->purge_used_x10) / 10.0f;
             json += "{\"id\":";
@@ -1421,9 +1433,17 @@ String ConnectivityManager::build_beans_json() const {
             json += "\",\"bag_size_g\":";
             json += String(bean->bag_size_g);
             json += ",\"mahlgrad_x2\":";
-            json += String(mg_x2);
+            json += String(mg_double_x2);
             json += ",\"mahlgrad\":";
-            json += String(BeanController::x2_to_mahlgrad(mg_x2), 1);
+            json += String(BeanController::x2_to_mahlgrad(mg_double_x2), 1);
+            json += ",\"mahlgrad_single_x2\":";
+            json += String(mg_single_x2);
+            json += ",\"mahlgrad_single\":";
+            json += String(BeanController::x2_to_mahlgrad(mg_single_x2), 1);
+            json += ",\"mahlgrad_double_x2\":";
+            json += String(mg_double_x2);
+            json += ",\"mahlgrad_double\":";
+            json += String(BeanController::x2_to_mahlgrad(mg_double_x2), 1);
             json += ",\"dose_used_g\":";
             json += String(dose_g, 1);
             json += ",\"purge_used_g\":";
@@ -1465,16 +1485,18 @@ void ConnectivityManager::handle_beans_post() {
         String roaster = get_request_string("roaster", roaster_found);
         (void)roaster_found;
         const int bag_size = get_request_int("bag_size_g", 0, 0, 5000, found);
-        float mg = get_request_float("mahlgrad", 25.0f, 1.0f, 50.0f, found);
+        float mg_double = get_request_float("mahlgrad", 25.0f, 1.0f, 50.0f, found);
         bool mg_double_found = false;
-        mg = get_request_float("mahlgrad_double", mg, 1.0f, 50.0f, mg_double_found);
+        mg_double = get_request_float("mahlgrad_double", mg_double, 1.0f, 50.0f, mg_double_found);
+        bool mg_single_found = false;
+        float mg_single = get_request_float("mahlgrad_single", mg_double, 1.0f, 50.0f, mg_single_found);
 
         if (!name_found || name.length() == 0) {
             name = "Unnamed bean";
         }
         uint8_t id = 0;
         changed = bean_controller_->create_bean(name.c_str(), roaster.c_str(),
-                                                static_cast<uint16_t>(bag_size), mg, &id);
+                                                static_cast<uint16_t>(bag_size), mg_single, mg_double, &id);
         if (!changed) {
             send_json_response(400, "{\"ok\":false,\"error\":\"Could not create bean\"}");
             return;
@@ -1497,14 +1519,18 @@ void ConnectivityManager::handle_beans_post() {
             roaster = current->roaster;
         }
         const int bag_size = get_request_int("bag_size_g", current->bag_size_g, 0, 5000, field_found);
-        float mg = get_request_float("mahlgrad",
-                                     BeanController::x2_to_mahlgrad(current->mahlgrad_x2[BeanController::kDoubleProfileIndex]),
-                                     1.0f, 50.0f, field_found);
+        float mg_double = get_request_float("mahlgrad",
+                                            BeanController::x2_to_mahlgrad(current->mahlgrad_x2[BeanController::kDoubleProfileIndex]),
+                                            1.0f, 50.0f, field_found);
         bool mg_double_found = false;
-        mg = get_request_float("mahlgrad_double", mg, 1.0f, 50.0f, mg_double_found);
+        mg_double = get_request_float("mahlgrad_double", mg_double, 1.0f, 50.0f, mg_double_found);
+        bool mg_single_found = false;
+        float mg_single = get_request_float("mahlgrad_single",
+                                            BeanController::x2_to_mahlgrad(current->mahlgrad_x2[BeanController::kSingleProfileIndex]),
+                                            1.0f, 50.0f, mg_single_found);
 
         changed = bean_controller_->update_bean(static_cast<uint8_t>(id), name.c_str(), roaster.c_str(),
-                                                static_cast<uint16_t>(bag_size), mg);
+                                                static_cast<uint16_t>(bag_size), mg_single, mg_double);
         if (!changed) {
             send_json_response(500, "{\"ok\":false,\"error\":\"Could not update bean\"}");
             return;
@@ -1537,7 +1563,12 @@ void ConnectivityManager::handle_beans_post() {
         } else if (feedback == "coarser" || feedback == "coarse" || feedback == "1") {
             value = BeanController::Feedback::COARSER;
         }
-        changed = bean_controller_->apply_feedback(static_cast<uint8_t>(id), value);
+        const int profile = get_request_int("profile", BeanController::kDoubleProfileIndex,
+                                            BeanController::kSingleProfileIndex,
+                                            BeanController::kDoubleProfileIndex, found);
+        changed = bean_controller_->apply_feedback(static_cast<uint8_t>(id),
+                                                   static_cast<uint8_t>(profile),
+                                                   value);
         if (!changed) {
             send_json_response(404, "{\"ok\":false,\"error\":\"Bean not found\"}");
             return;
@@ -1759,10 +1790,38 @@ void ConnectivityManager::handle_ota_page() {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GrindByWeight OTA</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101010;color:#f4f4f4;font-family:Arial,sans-serif}main{max-width:480px;margin:0 auto;padding:18px}section{border:1px solid #333;background:#1a1a1a;border-radius:8px;padding:14px}h1{font-size:26px;margin:0 0 12px}p{color:#aaa;line-height:1.4}a{color:#58b7ff}input,button{width:100%;font:inherit;border:0;border-radius:6px;padding:12px;margin:0 0 10px}input{background:#080808;color:#fff;border:1px solid #444}button{background:#d71920;color:#fff;font-weight:700}
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101010;color:#f4f4f4;font-family:Arial,sans-serif}main{max-width:480px;margin:0 auto;padding:18px}section{border:1px solid #333;background:#1a1a1a;border-radius:8px;padding:14px}h1{font-size:26px;margin:0 0 12px}p{color:#aaa;line-height:1.4}a{color:#58b7ff}input,button{width:100%;font:inherit;border:0;border-radius:6px;padding:12px;margin:0 0 10px}input{background:#080808;color:#fff;border:1px solid #444}button{background:#d71920;color:#fff;font-weight:700}button:disabled{background:#555;color:#aaa}progress{width:100%;height:18px;margin:4px 0 10px}.ok{color:#64d37a}.warn{color:#ffb35c}
 </style>
 </head>
-<body><main><section><h1>Firmware OTA</h1><p>Upload a production firmware .bin. The grinder restarts after the update is applied.</p><form method="post" action="/ota" enctype="multipart/form-data"><input type="file" name="firmware" accept=".bin,application/octet-stream" required><button type="submit">Upload Firmware</button></form><p><a href="/api/status">Status JSON</a></p></section></main></body>
+<body><main><section><h1>Firmware OTA</h1><p>Upload a production firmware .bin. The grinder restarts after the update is applied.</p><form id="otaForm"><input id="firmware" type="file" name="firmware" accept=".bin,application/octet-stream" required><button id="uploadButton" type="submit">Upload Firmware</button></form><progress id="progress" max="100" value="0" hidden></progress><p id="message"></p><p><a href="/api/status">Status JSON</a></p></section></main><script>
+const form=document.getElementById("otaForm"),fileInput=document.getElementById("firmware"),button=document.getElementById("uploadButton"),progress=document.getElementById("progress"),message=document.getElementById("message");
+function setMessage(text,cls){message.textContent=text;message.className=cls||""}
+form.addEventListener("submit",e=>{
+  e.preventDefault();
+  const file=fileInput.files&&fileInput.files[0];
+  if(!file){setMessage("Select a firmware file.","warn");return}
+  const xhr=new XMLHttpRequest();
+  button.disabled=true;
+  progress.hidden=false;
+  progress.value=0;
+  setMessage("Uploading...");
+  const body=new FormData();
+  body.append("firmware",file,file.name);
+  xhr.open("POST","/ota");
+  xhr.upload.onprogress=ev=>{
+    if(ev.lengthComputable){progress.value=Math.round((ev.loaded*100)/ev.total)}
+  };
+  xhr.onload=()=>{
+    button.disabled=false;
+    if(xhr.status>=200&&xhr.status<300){progress.value=100;setMessage("Update complete. Device restarting.","ok");return}
+    let text=xhr.responseText||"OTA failed";
+    try{const json=JSON.parse(text);if(json.error)text=json.error}catch(_){}
+    setMessage(text,"warn");
+  };
+  xhr.onerror=()=>{button.disabled=false;setMessage("Upload connection failed.","warn")};
+  xhr.send(body);
+});
+</script></body>
 </html>)HTML";
     send_html_response(body);
 }
@@ -1788,7 +1847,12 @@ bool ConnectivityManager::begin_ota(size_t expected_size) {
         return false;
     }
 
-    LOG_BLE("WiFi OTA: Starting upload\n");
+    if (expected_size > 0) {
+        LOG_BLE("WiFi OTA: Starting upload, %u bytes expected\n",
+                static_cast<unsigned int>(expected_size));
+    } else {
+        LOG_BLE("WiFi OTA: Starting upload with unknown size\n");
+    }
     ota_received_bytes_ = 0;
     ota_total_bytes_ = expected_size;
     ota_error_ = false;
@@ -1860,12 +1924,26 @@ void ConnectivityManager::abort_ota() {
 }
 
 void ConnectivityManager::handle_ota_upload() {
+    String content_type = server_.header("Content-Type");
+    content_type.toLowerCase();
+    if (!content_type.startsWith("multipart/")) {
+        handle_ota_raw_upload();
+        return;
+    }
+
     HTTPUpload& upload = server_.upload();
 
     switch (upload.status) {
         case UPLOAD_FILE_START:
-            begin_ota(upload.totalSize);
+        {
+            size_t expected_size = upload.totalSize;
+            int request_size = server_.clientContentLength();
+            if (expected_size == 0 && request_size > 0) {
+                expected_size = static_cast<size_t>(request_size);
+            }
+            begin_ota(expected_size);
             break;
+        }
 
         case UPLOAD_FILE_WRITE:
             // Stop writing (and abort) on the first failure instead of silently
@@ -1878,9 +1956,7 @@ void ConnectivityManager::handle_ota_upload() {
             break;
 
         case UPLOAD_FILE_END:
-            if (ota_total_bytes_ == 0) {
-                ota_total_bytes_ = upload.totalSize;
-            }
+            ota_total_bytes_ = upload.totalSize;
             LOG_BLE("WiFi OTA: Upload finished, %u bytes\n",
                     static_cast<unsigned int>(upload.totalSize));
             break;
@@ -1893,10 +1969,54 @@ void ConnectivityManager::handle_ota_upload() {
     }
 }
 
+void ConnectivityManager::handle_ota_raw_upload() {
+    HTTPRaw& upload = server_.raw();
+
+    switch (upload.status) {
+        case RAW_START:
+        {
+            int content_length = server_.clientContentLength();
+            if (content_length <= 0) {
+                ota_error_ = true;
+                ota_error_message_ = "Missing firmware content length";
+                LOG_BLE("WiFi OTA: Raw upload missing Content-Length\n");
+                break;
+            }
+            begin_ota(static_cast<size_t>(content_length));
+            break;
+        }
+
+        case RAW_WRITE:
+            if (ota_in_progress_ && !ota_error_) {
+                if (!write_ota_chunk(upload.buf, upload.currentSize)) {
+                    abort_ota();
+                }
+            }
+            break;
+
+        case RAW_END:
+            if (ota_total_bytes_ == 0) {
+                ota_total_bytes_ = upload.totalSize;
+            }
+            LOG_BLE("WiFi OTA: Raw upload finished, %u bytes\n",
+                    static_cast<unsigned int>(upload.totalSize));
+            break;
+
+        case RAW_ABORTED:
+            ota_error_ = true;
+            ota_error_message_ = "Upload aborted";
+            abort_ota();
+            break;
+    }
+}
+
 void ConnectivityManager::handle_ota_complete() {
     String version = server_.arg("version");
     if (version.isEmpty()) {
         version = server_.arg("fw_version");
+    }
+    if (version.isEmpty()) {
+        version = server_.header("X-Firmware-Version");
     }
 
     if (!version.isEmpty()) {

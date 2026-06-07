@@ -72,7 +72,7 @@ void BeanListScreen::create() {
     lv_obj_set_style_pad_right(list, 10, 0);
     lv_obj_set_style_pad_top(list, 4, 0);
     lv_obj_set_style_pad_bottom(list, 16, 0);
-    lv_obj_set_style_pad_row(list, 10, 0);
+    lv_obj_set_style_pad_row(list, 8, 0);
     lv_obj_set_layout(list, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
 
@@ -87,7 +87,7 @@ lv_obj_t* BeanListScreen::create_row(lv_obj_t* parent, const BeanController* bea
 
     const bool active = beans->get_active_id() == bean->id;
     lv_obj_t* row = lv_btn_create(parent);
-    lv_obj_set_size(row, 260, 74);
+    lv_obj_set_size(row, 260, 96);
     lv_obj_set_style_bg_color(row, lv_color_hex(active ? 0x181818 : 0x111111), 0);
     lv_obj_set_style_radius(row, 8, 0);
     lv_obj_set_style_border_width(row, active ? 2 : 1, 0);
@@ -101,7 +101,7 @@ lv_obj_t* BeanListScreen::create_row(lv_obj_t* parent, const BeanController* bea
 
     if (active) {
         lv_obj_t* marker = lv_obj_create(row);
-        lv_obj_set_size(marker, 4, 44);
+        lv_obj_set_size(marker, 4, 60);
         lv_obj_align(marker, LV_ALIGN_LEFT_MID, 0, 0);
         lv_obj_set_style_bg_color(marker, lv_color_hex(THEME_COLOR_ACCENT), 0);
         lv_obj_set_style_bg_opa(marker, LV_OPA_COVER, 0);
@@ -112,43 +112,49 @@ lv_obj_t* BeanListScreen::create_row(lv_obj_t* parent, const BeanController* bea
     }
 
     lv_obj_t* name = lv_label_create(row);
-    set_label_frame(name, 156, 24, &lv_font_montserrat_16, lv_color_hex(THEME_COLOR_TEXT_PRIMARY));
+    set_label_frame(name, 232, 32, &lv_font_montserrat_24, lv_color_hex(THEME_COLOR_TEXT_PRIMARY));
     lv_label_set_text(name, bean->name);
-    lv_obj_align(name, LV_ALIGN_TOP_LEFT, 14, 13);
+    lv_obj_align(name, LV_ALIGN_TOP_LEFT, 14, 12);
 
     lv_obj_t* sub = lv_label_create(row);
-    set_label_frame(sub, 156, 20, &lv_font_montserrat_14, lv_color_hex(THEME_COLOR_TEXT_SECONDARY));
+    set_label_frame(sub, 130, 22, &lv_font_montserrat_16, lv_color_hex(THEME_COLOR_TEXT_SECONDARY));
     lv_label_set_text(sub, bean->roaster[0] ? bean->roaster : "No roaster");
-    lv_obj_align(sub, LV_ALIGN_TOP_LEFT, 14, 39);
+    lv_obj_align(sub, LV_ALIGN_TOP_LEFT, 14, 50);
 
     lv_obj_t* divider = lv_obj_create(row);
-    lv_obj_set_size(divider, 1, 46);
-    lv_obj_align(divider, LV_ALIGN_RIGHT_MID, -77, 0);
+    lv_obj_set_size(divider, 1, 38);
+    lv_obj_align(divider, LV_ALIGN_TOP_RIGHT, -112, 48);
     lv_obj_set_style_bg_color(divider, lv_color_hex(0x333333), 0);
     lv_obj_set_style_bg_opa(divider, active ? LV_OPA_80 : LV_OPA_50, 0);
     lv_obj_set_style_border_width(divider, 0, 0);
     lv_obj_set_style_pad_all(divider, 0, 0);
     lv_obj_clear_flag(divider, LV_OBJ_FLAG_SCROLLABLE);
 
-    char gs[12];
-    BeanController::format_mahlgrad(gs, sizeof(gs), bean->mahlgrad_x2[BeanController::kDoubleProfileIndex]);
+    char gs[16];
+    char gs_single[8];
+    char gs_double[8];
+    BeanController::format_mahlgrad(gs_single, sizeof(gs_single),
+                                    bean->mahlgrad_x2[BeanController::kSingleProfileIndex]);
+    BeanController::format_mahlgrad(gs_double, sizeof(gs_double),
+                                    bean->mahlgrad_x2[BeanController::kDoubleProfileIndex]);
+    std::snprintf(gs, sizeof(gs), "%s/%s", gs_single, gs_double);
     lv_obj_t* gs_label = lv_label_create(row);
     lv_label_set_text(gs_label, gs);
-    lv_obj_set_size(gs_label, 68, 40);
+    lv_obj_set_size(gs_label, 100, 28);
     lv_label_set_long_mode(gs_label, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_font(gs_label, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_font(gs_label, &lv_font_montserrat_22, 0);
     lv_obj_set_style_text_color(gs_label, lv_color_hex(active ? THEME_COLOR_ACCENT : THEME_COLOR_TEXT_PRIMARY), 0);
     lv_obj_set_style_text_align(gs_label, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_align(gs_label, LV_ALIGN_TOP_RIGHT, -10, 10);
+    lv_obj_align(gs_label, LV_ALIGN_TOP_RIGHT, -10, 48);
 
     lv_obj_t* caption = lv_label_create(row);
-    lv_label_set_text(caption, "Grind");
-    lv_obj_set_size(caption, 68, 18);
+    lv_label_set_text(caption, "S / D");
+    lv_obj_set_size(caption, 100, 18);
     lv_label_set_long_mode(caption, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_font(caption, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(caption, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
     lv_obj_set_style_text_align(caption, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_align(caption, LV_ALIGN_TOP_RIGHT, -12, 48);
+    lv_obj_align(caption, LV_ALIGN_TOP_RIGHT, -12, 74);
 
     return row;
 }

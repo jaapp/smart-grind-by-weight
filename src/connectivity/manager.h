@@ -94,6 +94,7 @@ private:
     void handle_screensaver_clear();
     void handle_basket_capture(bool capture_single);
     void handle_ota_upload();
+    void handle_ota_raw_upload();
     void handle_ota_complete();
     void handle_options();
     void handle_not_found();

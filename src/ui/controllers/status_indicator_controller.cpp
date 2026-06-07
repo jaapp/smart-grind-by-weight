@@ -19,7 +19,7 @@ void StatusIndicatorController::build() {
     lv_label_set_text(connectivity_status_icon_, LV_SYMBOL_WIFI);
     lv_obj_set_style_text_font(connectivity_status_icon_, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(connectivity_status_icon_, lv_color_hex(THEME_COLOR_ACCENT), 0);
-    lv_obj_align(connectivity_status_icon_, LV_ALIGN_TOP_RIGHT, -10, 10);
+    lv_obj_align(connectivity_status_icon_, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
     lv_obj_add_flag(connectivity_status_icon_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(connectivity_status_icon_, LV_OBJ_FLAG_CLICKABLE);
 

@@ -6,13 +6,17 @@ Single script for all grinder operations: build, upload, export, analyze, report
 
 import argparse
 import asyncio
+import concurrent.futures
+import glob
+import ipaddress
 import os
 import sys
 import subprocess
 import platform
+import socket
 import venv
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set, Tuple
 import shutil
 import stat
 import json
@@ -38,6 +42,44 @@ except ImportError:
     # Fallback for systems without colorama
     COLORS = {k: '' for k in ['RED', 'GREEN', 'YELLOW', 'BLUE', 'PURPLE', 'CYAN', 'RESET']}
 
+class ThrottledBytesReader:
+    """File-like reader used to avoid overwhelming weak ESP32 WiFi links."""
+
+    def __init__(self, data: bytes, rate_bps: int = 0, progress_callback=None):
+        self._data = data
+        self._offset = 0
+        self._rate_bps = max(0, int(rate_bps or 0))
+        self._started_at = time.monotonic()
+        self._progress_callback = progress_callback
+        self._next_progress = 10
+
+    def read(self, size: int = -1) -> bytes:
+        if self._offset >= len(self._data):
+            return b""
+
+        if size is None or size < 0:
+            size = len(self._data) - self._offset
+        if self._rate_bps:
+            size = min(size, 8192)
+
+        end = min(self._offset + size, len(self._data))
+        chunk = self._data[self._offset:end]
+        self._offset = end
+
+        if self._rate_bps:
+            target_elapsed = self._offset / float(self._rate_bps)
+            delay = self._started_at + target_elapsed - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+
+        if self._progress_callback and self._data:
+            progress = int((self._offset * 100) / len(self._data))
+            while progress >= self._next_progress and self._next_progress <= 100:
+                self._progress_callback(self._next_progress)
+                self._next_progress += 10
+
+        return chunk
+
 class GrinderTool:
     """Unified grinder tool for cross-platform operations."""
     
@@ -61,6 +103,7 @@ class GrinderTool:
         self.db_path = self.script_dir / "database" / "grinder_data.db"
         self.requirements_txt = self.script_dir / "requirements.txt"
         self.default_wifi_host = "grindbyweight.local"
+        self.wifi_cache_path = self.project_dir / ".pio" / "grinder_wifi_host.json"
     
     def safe_print(self, text: str):
         """Print text with proper encoding handling for all platforms."""
@@ -325,7 +368,9 @@ class GrinderTool:
             if not getattr(args, "skip_safety_checks", False) and not self.verify_source_safety_guards():
                 return 1
             host = getattr(args, 'host', self.default_wifi_host)
-            return self.upload_via_wifi(Path(firmware_path), host)
+            recover_usb = not getattr(args, "no_usb_recover", False)
+            usb_port = getattr(args, "usb_port", None)
+            return self.upload_via_wifi(Path(firmware_path), host, recover_usb=recover_usb, usb_port=usb_port)
         
         cmd = [str(self.venv_python), str(self.ble_tool), "upload", str(firmware_path)]
         
@@ -343,6 +388,40 @@ class GrinderTool:
         if not value.startswith(("http://", "https://")):
             value = "http://" + value
         return value.rstrip("/")
+
+    def is_default_wifi_host(self, host: str) -> bool:
+        value = (host or "").strip().lower()
+        return value in ("", "auto", self.default_wifi_host)
+
+    def load_cached_wifi_host(self) -> Optional[str]:
+        """Read the last working WiFi host so mDNS failures do not break OTA."""
+        try:
+            data = json.loads(self.wifi_cache_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            return None
+        host = str(data.get("host") or "").strip()
+        return host or None
+
+    def save_cached_wifi_host(self, host: str, status: Optional[Dict[str, Any]] = None):
+        """Persist a known-good WiFi host for the next upload attempt."""
+        value = (host or "").strip()
+        if not value:
+            return
+        if status and status.get("ip"):
+            value = self.normalize_wifi_base_url(str(status["ip"]))
+        try:
+            self.wifi_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "host": value,
+                "updated_at": int(time.time()),
+            }
+            if status:
+                data["ip"] = status.get("ip", "")
+                data["version"] = status.get("version", "")
+                data["build"] = status.get("build", "")
+            self.wifi_cache_path.write_text(json.dumps(data, indent=2) + "\n")
+        except OSError:
+            pass
 
     def validate_wifi_firmware_path(self, firmware_path: Path) -> bool:
         """Avoid remote flashing known non-production artifacts."""
@@ -448,17 +527,180 @@ class GrinderTool:
         self.print_success("Firmware safety check passed")
         return 0
 
-    def fetch_text(self, url: str, timeout: int = 8) -> str:
+    def fetch_text(self, url: str, timeout: float = 8) -> str:
         with urllib.request.urlopen(url, timeout=timeout) as response:
             return response.read().decode("utf-8", errors="replace")
 
-    def fetch_json_url(self, url: str, timeout: int = 8) -> Dict[str, Any]:
+    def fetch_json_url(self, url: str, timeout: float = 8) -> Dict[str, Any]:
         return json.loads(self.fetch_text(url, timeout=timeout))
 
-    def preflight_wifi_device(self, base_url: str) -> Dict[str, Any]:
+    def local_ipv4_addresses(self) -> Set[str]:
+        """Best-effort local IPv4 discovery without platform-specific tools."""
+        addresses: Set[str] = set()
+        try:
+            hostname = socket.gethostname()
+            for address in socket.gethostbyname_ex(hostname)[2]:
+                if not address.startswith("127."):
+                    addresses.add(address)
+        except OSError:
+            pass
+
+        for target in ("192.168.0.1", "192.168.1.1", "8.8.8.8"):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(0.2)
+            try:
+                sock.connect((target, 80))
+                address = sock.getsockname()[0]
+                if address and not address.startswith("127."):
+                    addresses.add(address)
+            except OSError:
+                pass
+            finally:
+                sock.close()
+
+        return addresses
+
+    def wifi_scan_targets(self) -> List[str]:
+        networks: Set[ipaddress.IPv4Network] = {
+            ipaddress.ip_network("192.168.0.0/24"),
+            ipaddress.ip_network("192.168.1.0/24"),
+        }
+        for address in self.local_ipv4_addresses():
+            try:
+                networks.add(ipaddress.ip_network(f"{address}/24", strict=False))
+            except ValueError:
+                pass
+
+        targets = ["192.168.4.1"]  # setup AP address
+        for network in sorted(networks, key=lambda item: str(item.network_address)):
+            targets.extend(str(host) for host in network.hosts())
+        return list(dict.fromkeys(targets))
+
+    def probe_wifi_host(self, host: str, timeout: float = 0.7) -> Optional[Tuple[str, Dict[str, Any]]]:
+        base_url = self.normalize_wifi_base_url(host)
+        try:
+            ping_text = self.fetch_text(base_url + "/ping", timeout=timeout).strip().lower()
+            if ping_text != "ok":
+                return None
+            status = self.fetch_json_url(base_url + "/api/status", timeout=timeout)
+            if status.get("device") != "GrindByWeight":
+                return None
+            return base_url, status
+        except Exception:
+            return None
+
+    def discover_wifi_device(self) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """Scan likely LAN ranges for a GrindByWeight HTTP endpoint."""
+        targets = self.wifi_scan_targets()
+        self.print_info(f"Scanning {len(targets)} WiFi targets for GrindByWeight")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=80) as executor:
+            futures = {executor.submit(self.probe_wifi_host, target): target for target in targets}
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    base_url, status = result
+                    self.print_success(f"Found device at {base_url}")
+                    self.save_cached_wifi_host(base_url, status)
+                    return result
+        return None
+
+    def usb_serial_ports(self) -> List[str]:
+        """Return likely ESP32 USB serial ports."""
+        ports: List[str] = []
+        try:
+            from serial.tools import list_ports
+            for port in list_ports.comports():
+                text = f"{port.device} {port.description} {port.hwid}".lower()
+                if "303a" in text or "esp32" in text or "usb jtag/serial" in text or "usbmodem" in text:
+                    ports.append(port.device)
+        except Exception:
+            pass
+
+        for pattern in ("/dev/cu.usbmodem*", "/dev/ttyACM*", "/dev/ttyUSB*"):
+            ports.extend(glob.glob(pattern))
+        return list(dict.fromkeys(ports))
+
+    def reset_wifi_via_usb(self, usb_port: Optional[str] = None, read_seconds: int = 14) -> Optional[str]:
+        """
+        Open the ESP32 USB serial port to trigger the reliable USB-CDC reset path,
+        then watch boot logs for the WiFi IP.
+        """
+        ports = self.usb_serial_ports()
+        port = usb_port or (ports[0] if ports else None)
+        if not port:
+            self.print_warning("No ESP32 USB serial port found for WiFi recovery")
+            return None
+
+        try:
+            import serial
+        except ImportError:
+            self.print_warning("pyserial is not installed; cannot reset over USB")
+            return None
+
+        self.print_info(f"Resetting device via USB serial: {port}")
+        text_buffer = ""
+        try:
+            with serial.Serial(port, 115200, timeout=0.2) as ser:
+                ser.dtr = False
+                ser.rts = False
+                deadline = time.time() + read_seconds
+                while time.time() < deadline:
+                    data = ser.read(4096)
+                    if not data:
+                        continue
+                    text_buffer += data.decode("utf-8", errors="replace")
+                    match = re.search(r"WiFi:\s+Connected to .*?, IP ((?:\d{1,3}\.){3}\d{1,3})", text_buffer)
+                    if match:
+                        ip = match.group(1)
+                        self.print_success(f"Device reported WiFi IP {ip}")
+                        return ip
+        except Exception as exc:
+            self.print_warning(f"USB serial recovery failed: {exc}")
+            return None
+
+        self.print_warning("USB reset completed, but no WiFi IP appeared in serial logs")
+        return None
+
+    def resolve_wifi_base_url(self, host: str, recover_usb: bool = False,
+                              usb_port: Optional[str] = None) -> Optional[str]:
+        """Resolve mDNS/default host through cache, active probing, LAN scan, and USB reset."""
+        candidates: List[str] = []
+        cached_host = self.load_cached_wifi_host()
+        if self.is_default_wifi_host(host) and cached_host:
+            candidates.append(cached_host)
+        candidates.append(host or self.default_wifi_host)
+
+        for candidate in list(dict.fromkeys(candidates)):
+            base_url = self.normalize_wifi_base_url(candidate)
+            try:
+                status = self.preflight_wifi_device(base_url, timeout=4)
+                self.save_cached_wifi_host(base_url, status)
+                return base_url
+            except Exception as exc:
+                self.print_warning(f"WiFi preflight failed at {base_url}: {exc}")
+
+        if self.is_default_wifi_host(host):
+            discovered = self.discover_wifi_device()
+            if discovered:
+                return discovered[0]
+
+        if recover_usb:
+            recovered_host = self.reset_wifi_via_usb(usb_port=usb_port)
+            if recovered_host:
+                base_url = self.normalize_wifi_base_url(recovered_host)
+                try:
+                    status = self.preflight_wifi_device(base_url, timeout=8)
+                    self.save_cached_wifi_host(base_url, status)
+                    return base_url
+                except Exception as exc:
+                    self.print_warning(f"Recovered USB IP did not pass HTTP preflight: {exc}")
+
+        return None
+
+    def preflight_wifi_device(self, base_url: str, timeout: float = 8) -> Dict[str, Any]:
         """Verify the currently running firmware still exposes recovery-critical HTTP routes."""
         ping_url = base_url + "/ping"
-        ping_text = self.fetch_text(ping_url, timeout=8).strip().lower()
+        ping_text = self.fetch_text(ping_url, timeout=timeout).strip().lower()
         if ping_text != "ok":
             raise RuntimeError(f"{ping_url} returned {ping_text!r}, expected 'ok'")
 
@@ -466,18 +708,18 @@ class GrinderTool:
         last_status_error: Optional[Exception] = None
         for path in ("/api/status", "/status"):
             try:
-                status = self.fetch_json_url(base_url + path, timeout=8)
+                status = self.fetch_json_url(base_url + path, timeout=timeout)
                 break
             except Exception as exc:
                 last_status_error = exc
         if status is None:
             raise RuntimeError(f"status endpoint unavailable: {last_status_error}")
 
-        settings = self.fetch_json_url(base_url + "/api/settings", timeout=8)
+        settings = self.fetch_json_url(base_url + "/api/settings", timeout=timeout)
         if "settings" not in settings:
             raise RuntimeError("/api/settings did not return a settings object")
 
-        beans = self.fetch_json_url(base_url + "/api/beans", timeout=8)
+        beans = self.fetch_json_url(base_url + "/api/beans", timeout=timeout)
         if "beans" not in beans:
             raise RuntimeError("/api/beans did not return a beans array")
 
@@ -502,7 +744,8 @@ class GrinderTool:
                 time.sleep(3)
         return False
 
-    def upload_via_wifi(self, firmware_path: Path, host: str) -> int:
+    def upload_via_wifi(self, firmware_path: Path, host: str, recover_usb: bool = False,
+                        usb_port: Optional[str] = None) -> int:
         """Upload a firmware binary to the device's WiFi OTA endpoint."""
         if not firmware_path.exists():
             self.print_error(f"Firmware file not found: {firmware_path}")
@@ -510,13 +753,18 @@ class GrinderTool:
         if not self.validate_wifi_firmware_path(firmware_path):
             return 1
 
-        base_url = self.normalize_wifi_base_url(host)
+        base_url = self.resolve_wifi_base_url(host, recover_usb=recover_usb, usb_port=usb_port)
+        if not base_url:
+            self.print_error("Could not reach WiFi device by cached host, mDNS, LAN scan, or USB recovery")
+            self.print_info("OTA aborted. Connect USB or pass --host with the current IP, then run recover-wifi.")
+            return 1
         ota_url = base_url + "/ota"
         version = self.get_firmware_version()
 
         try:
             self.print_info(f"Checking device at {base_url}")
             status = self.preflight_wifi_device(base_url)
+            supports_raw_ota = bool(status.get("ota_raw"))
             self.print_info(
                 f"Device: {status.get('device', 'unknown')} "
                 f"v{status.get('version', '?')} at {status.get('ip', host)}"
@@ -526,8 +774,13 @@ class GrinderTool:
             self.print_info("OTA aborted. Keep the existing firmware until /ping, /api/status, /api/settings, and /api/beans respond.")
             return 1
 
-        boundary = f"----GrindByWeight{int(time.time())}"
+        if supports_raw_ota:
+            self.print_info("Device advertises raw OTA, but using throttled multipart for reliability")
+        else:
+            self.print_warning("Device does not advertise raw OTA support; using legacy multipart upload")
+
         firmware = firmware_path.read_bytes()
+        boundary = f"----GrindByWeight{int(time.time())}"
         fields = []
         if version:
             fields.append(
@@ -547,10 +800,16 @@ class GrinderTool:
         fields.append(firmware)
         fields.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
         body = b"".join(fields)
+        upload_rate_bps = 32 * 1024
+        upload_reader = ThrottledBytesReader(
+            body,
+            rate_bps=upload_rate_bps,
+            progress_callback=lambda progress: self.print_info(f"Upload progress: {progress}%"),
+        )
 
         request = urllib.request.Request(
             ota_url,
-            data=body,
+            data=upload_reader,
             method="POST",
             headers={
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
@@ -559,8 +818,11 @@ class GrinderTool:
         )
 
         try:
-            self.print_info(f"Uploading {firmware_path.stat().st_size / 1024:.1f} KB to {ota_url}")
-            with urllib.request.urlopen(request, timeout=240) as response:
+            self.print_info(
+                f"Uploading {firmware_path.stat().st_size / 1024:.1f} KB to {ota_url} "
+                f"(multipart, limited to {upload_rate_bps // 1024} KB/s)"
+            )
+            with urllib.request.urlopen(request, timeout=600) as response:
                 response_text = response.read().decode("utf-8", errors="replace")
             self.print_success("WiFi OTA upload complete; device is rebooting")
             if response_text:
@@ -726,6 +988,41 @@ class GrinderTool:
 
         return await self.run_async_command(cmd)
 
+    def cmd_recover_wifi(self, args: argparse.Namespace) -> int:
+        """Find or revive the WiFi HTTP endpoint using LAN discovery and optional USB reset."""
+        self.print_header("WiFi Recovery")
+
+        if not self.check_venv():
+            return 1
+
+        host = getattr(args, "host", self.default_wifi_host)
+        usb_port = getattr(args, "usb_port", None)
+        scan_only = getattr(args, "scan_only", False)
+
+        if scan_only:
+            discovered = self.discover_wifi_device()
+            if not discovered:
+                self.print_error("No GrindByWeight WiFi endpoint found")
+                return 1
+            base_url, status = discovered
+        else:
+            base_url = self.resolve_wifi_base_url(host, recover_usb=True, usb_port=usb_port)
+            if not base_url:
+                self.print_error("Could not recover the WiFi HTTP endpoint")
+                return 1
+            try:
+                status = self.preflight_wifi_device(base_url)
+            except Exception as exc:
+                self.print_error(f"Recovered endpoint failed HTTP preflight: {exc}")
+                return 1
+
+        self.save_cached_wifi_host(base_url, status)
+        self.print_success(
+            f"WiFi ready: {base_url} "
+            f"(v{status.get('version', '?')}, build {status.get('build', '?')})"
+        )
+        return 0
+
     async def cmd_diagnostics(self, args: argparse.Namespace) -> int:
         """Get comprehensive diagnostic report."""
         self.print_header("Diagnostic Report")
@@ -807,6 +1104,7 @@ def create_parser() -> argparse.ArgumentParser:
   python3 grinder.py preview --interactive     # Open native SDL touchscreen preview
   python3 grinder.py preview --click-test      # Run LVGL click-dummy flow test
   python3 grinder.py build-upload --force-full # Build and force full firmware update
+  python3 grinder.py recover-wifi             # Find/revive WiFi endpoint and cache its IP
   python3 grinder.py analyze                   # Export data and show interactive report
   python3 grinder.py report                    # Just show report from existing data
   python3 grinder.py export --db session1.db  # Export to custom database
@@ -835,6 +1133,8 @@ def create_parser() -> argparse.ArgumentParser:
     upload_parser.add_argument('--force-full', action='store_true', help='Force full firmware update (skip delta patching)')
     upload_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     upload_parser.add_argument('--skip-safety-checks', action='store_true', help='Bypass local source guard checks before WiFi OTA')
+    upload_parser.add_argument('--usb-port', help='USB serial port to use if WiFi discovery needs recovery')
+    upload_parser.add_argument('--no-usb-recover', action='store_true', help='Do not reset over USB if WiFi discovery fails')
     
     build_upload_parser = subparsers.add_parser('build-upload', help='Build firmware and upload via WiFi or BLE')
     build_upload_parser.add_argument('--transport', choices=['wifi', 'ble'], default='wifi', help='OTA transport (default: wifi)')
@@ -842,10 +1142,17 @@ def create_parser() -> argparse.ArgumentParser:
     build_upload_parser.add_argument('--force-full', action='store_true', help='Force full firmware update (skip delta patching)')
     build_upload_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     build_upload_parser.add_argument('--skip-safety-checks', action='store_true', help='Bypass local safety checks before build/upload')
+    build_upload_parser.add_argument('--usb-port', help='USB serial port to use if WiFi discovery needs recovery')
+    build_upload_parser.add_argument('--no-usb-recover', action='store_true', help='Do not reset over USB if WiFi discovery fails')
 
     safety_parser = subparsers.add_parser('safety-check', help='Run local release safety checks before remote-only deployment')
     safety_parser.add_argument('--skip-preview', action='store_true', help='Skip LVGL SDL click-dummy preview')
     safety_parser.add_argument('--skip-web-ui', action='store_true', help='Skip embedded web UI harness')
+
+    recover_wifi_parser = subparsers.add_parser('recover-wifi', help='Find/revive the WiFi HTTP endpoint and cache its IP')
+    recover_wifi_parser.add_argument('--host', default='grindbyweight.local', help='Preferred WiFi host/IP before scanning')
+    recover_wifi_parser.add_argument('--usb-port', help='USB serial port to reset/read if WiFi is not reachable')
+    recover_wifi_parser.add_argument('--scan-only', action='store_true', help='Only scan LAN; do not reset over USB')
     
     # Data & Analysis Commands
     export_parser = subparsers.add_parser('export', help='Export grind data from device to database')
@@ -908,6 +1215,8 @@ async def main():
             return await tool.cmd_build_upload(args)
         elif args.command == 'safety-check':
             return tool.cmd_safety_check(args)
+        elif args.command == 'recover-wifi':
+            return tool.cmd_recover_wifi(args)
         elif args.command == 'export':
             return await tool.cmd_export(args)
         elif args.command in ['analyze', 'analyse']:

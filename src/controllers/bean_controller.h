@@ -19,8 +19,10 @@ struct BeanRecord {
 
 class BeanController {
 public:
-    static constexpr uint8_t kMaxBeans = 8;
+    static constexpr uint8_t kMaxBeans = 30;
+    static constexpr uint8_t kSingleProfileIndex = 0;
     static constexpr uint8_t kDoubleProfileIndex = 1;
+    static constexpr uint8_t kCustomProfileIndex = 2;
     static constexpr uint16_t kMinMahlgradX2 = 2;
     static constexpr uint16_t kMaxMahlgradX2 = 100;
     static constexpr uint16_t kDefaultMahlgradX2 = 50;
@@ -47,44 +49,63 @@ public:
     const BeanRecord* get_active_bean() const { return find_bean(active_bean_id_); }
 
     bool create_bean(const char* name, const char* roaster, uint16_t bag_size_g,
-                     float double_mahlgrad, uint8_t* created_id = nullptr);
+                     float single_mahlgrad, float double_mahlgrad, uint8_t* created_id = nullptr);
     bool update_bean(uint8_t id, const char* name, const char* roaster,
-                     uint16_t bag_size_g, float double_mahlgrad);
+                     uint16_t bag_size_g, float single_mahlgrad, float double_mahlgrad);
     bool delete_bean(uint8_t id);
     bool set_active_bean(uint8_t id);
 
-    bool apply_feedback(uint8_t id, Feedback feedback);
-    bool apply_feedback_to_active(Feedback feedback);
+    bool apply_feedback(uint8_t id, uint8_t profile_index, Feedback feedback);
+    bool apply_feedback(uint8_t id, Feedback feedback) {
+        return apply_feedback(id, kDoubleProfileIndex, feedback);
+    }
+    bool apply_feedback_to_active(uint8_t profile_index, Feedback feedback);
+    bool apply_feedback_to_active(Feedback feedback) {
+        return apply_feedback_to_active(kDoubleProfileIndex, feedback);
+    }
     bool add_dose_used_g(float grams);
     bool add_purge_used_g(float grams);
 
     static uint16_t mahlgrad_to_x2(float value);
     static float x2_to_mahlgrad(uint16_t value_x2);
     static void format_mahlgrad(char* out, size_t out_len, uint16_t value_x2);
+    static bool stores_mahlgrad_for_profile(uint8_t profile_index);
 
 private:
-    struct BeanStoreSnapshot {
+    struct BeanStoreMeta {
         uint32_t magic;
         uint8_t version;
         uint8_t active_bean_id;
         uint8_t next_id;
         uint8_t bean_count;
-        BeanRecord beans[kMaxBeans];
+        uint8_t ids[kMaxBeans];
+        uint16_t record_size;
+        uint16_t capacity;
+    };
+
+    static constexpr uint8_t kLegacyMaxBeans = 8;
+    struct LegacyBeanStoreSnapshot {
+        uint32_t magic;
+        uint8_t version;
+        uint8_t active_bean_id;
+        uint8_t next_id;
+        uint8_t bean_count;
+        BeanRecord beans[kLegacyMaxBeans];
     };
 
     static constexpr uint32_t kStoreMagic = 0x4245414Eu; // "BEAN"
-    static constexpr uint8_t kStoreVersion = 1;
+    static constexpr uint8_t kStoreVersion = 3;
     static constexpr const char* kNamespace = "beans";
+    static constexpr const char* kMetaKey = "meta";
     static constexpr const char* kSnapshotKey = "snapshot";
 
-    // Beans are persisted as a single fixed-layout blob. Changing the
-    // BeanRecord / BeanStoreSnapshot layout (e.g. bumping USER_PROFILE_COUNT or
-    // adding a field) makes existing blobs unreadable, so they are discarded on
-    // load(). This tripwire forces a deliberate kStoreVersion bump and migration
-    // decision whenever the on-NVS layout changes; update the expected size to
-    // match only after consciously handling the stored data.
-    static_assert(sizeof(BeanStoreSnapshot) == 616,
-                  "BeanStoreSnapshot layout changed: bump kStoreVersion and review bean migration");
+    // Bean records are stored individually so routine usage/feedback writes do
+    // not rewrite the whole bean database. Keep these tripwires explicit when
+    // changing the on-flash layout.
+    static_assert(sizeof(BeanRecord) == 76,
+                  "BeanRecord layout changed: bump kStoreVersion and review bean migration");
+    static_assert(sizeof(LegacyBeanStoreSnapshot) == 616,
+                  "Legacy bean snapshot layout changed: review migration from v1/v2");
 
     BeanRecord beans_[kMaxBeans] = {};
     uint8_t bean_count_ = 0;
@@ -95,8 +116,13 @@ private:
     uint8_t allocate_id();
     void clear();
     void normalize_after_load();
-    bool persist_snapshot(const BeanStoreSnapshot& snapshot) const;
-    void fill_snapshot(BeanStoreSnapshot& snapshot) const;
+    bool load_current_store();
+    bool load_legacy_snapshot();
+    bool persist_meta() const;
+    bool persist_bean(const BeanRecord& bean) const;
+    bool remove_bean_record(uint8_t id) const;
+    void fill_meta(BeanStoreMeta& meta) const;
     static void copy_text(char* dest, size_t dest_len, const char* src);
+    static void bean_key(uint8_t id, char* out, size_t out_len);
     static uint32_t grams_to_x10(float grams);
 };
