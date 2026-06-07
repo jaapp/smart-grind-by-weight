@@ -69,30 +69,41 @@ def get_git_info():
     
     return commit_id, branch
 
+# Only the production firmware environment advances the build counter. Mock,
+# debug, rescue and preview builds reuse the current number so they don't inflate
+# the production firmware version that OTA reports.
+PRODUCTION_ENV = "waveshare-esp32s3-touch-amoled-164"
+
 def get_next_build_number():
-    """Get and increment the build number."""
+    """Return the build number, incrementing it only for the production build."""
     if platformio_mode:
         project_root = env.get("PROJECT_DIR", os.getcwd())
+        env_name = env.get("PIOENV", "")
     else:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        env_name = ""
     build_number_file = os.path.join(project_root, ".build_number")
-    
-    # Read current build number
-    build_number = 1
+
+    # Read current build number (default 0 so the first production build becomes 1)
+    current = 0
     if os.path.exists(build_number_file):
         try:
             with open(build_number_file, 'r') as f:
-                build_number = int(f.read().strip()) + 1
+                current = int(f.read().strip())
         except (ValueError, IOError):
-            build_number = 1
-    
-    # Write incremented build number
+            current = 0
+
+    if env_name != PRODUCTION_ENV:
+        # Non-production builds report the current number without advancing it.
+        return current if current > 0 else 1
+
+    build_number = current + 1
     try:
         with open(build_number_file, 'w') as f:
             f.write(str(build_number))
     except IOError as e:
         print(f"Warning: Could not write build number: {e}", file=sys.stderr)
-    
+
     return build_number
 
 def create_git_info_header():

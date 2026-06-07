@@ -77,6 +77,15 @@ private:
     static constexpr const char* kNamespace = "beans";
     static constexpr const char* kSnapshotKey = "snapshot";
 
+    // Beans are persisted as a single fixed-layout blob. Changing the
+    // BeanRecord / BeanStoreSnapshot layout (e.g. bumping USER_PROFILE_COUNT or
+    // adding a field) makes existing blobs unreadable, so they are discarded on
+    // load(). This tripwire forces a deliberate kStoreVersion bump and migration
+    // decision whenever the on-NVS layout changes; update the expected size to
+    // match only after consciously handling the stored data.
+    static_assert(sizeof(BeanStoreSnapshot) == 616,
+                  "BeanStoreSnapshot layout changed: bump kStoreVersion and review bean migration");
+
     BeanRecord beans_[kMaxBeans] = {};
     uint8_t bean_count_ = 0;
     uint8_t active_bean_id_ = 0;

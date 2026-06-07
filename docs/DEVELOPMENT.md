@@ -34,7 +34,7 @@ This automatically creates a virtual environment and installs all required depen
 
 ## 🔧 Build Targets
 
-The project has three build targets:
+The project has the following build targets:
 
 ### Production Target: `waveshare-esp32s3-touch-amoled-164`
 - **Use case:** Real hardware with load cell and grinder connected
@@ -88,6 +88,13 @@ python3 tools/grinder.py preview --interactive ready
 ```
 
 Screenshots are written to `.pio/preview` by default. PlatformIO's package cache for this workflow is kept under `.pio-core` so the preview setup remains local to the repository.
+
+### Rescue OTA Target: `waveshare-esp32s3-touch-amoled-164-rescue-ota`
+- **Use case:** A minimal recovery firmware that only runs WiFi (AP + station) and the `/ota` upload page
+- **When to use:** If a production build ever leaves the device unreachable, USB-flash this firmware and then upload a good production `.bin` from its web page
+- **Build:** `python3 tools/grinder.py build-rescue`
+
+**Build hygiene:** Only the production environment advances the build counter in `.build_number`; mock, debug, preview and rescue builds report the current number without incrementing it. The production build excludes the `rescue/`, `simulator/` and (legacy) `bluetooth/` sources via `build_src_filter`, so those development/recovery environments never leak into the shipped firmware.
 
 ---
 
@@ -172,6 +179,10 @@ python3 tools/grinder.py info
 Remote-only devices must use `python3 tools/grinder.py build-upload` for normal updates. It runs the same safety gate automatically before building, then verifies `/ping`, `/api/status`, `/api/settings`, and `/api/beans` on the live device before OTA starts. Do not bypass `--skip-safety-checks` unless the device is physically reachable by USB.
 
 The production firmware keeps setup AP recovery reachable at `http://192.168.4.1` when station WiFi cannot connect. Unknown GET routes in setup AP mode intentionally fall back to the recovery page so phone captive-portal probes do not strand the device.
+
+**Connectivity behavior:** The device connects to station (home) WiFi without blocking — the web server stays responsive while it associates or reconnects, and it falls back to the setup AP only after the connect attempt times out. Once connected, reach it at `http://grindbyweight.local` or its DHCP IP.
+
+**OTA mechanism:** Firmware uploads stream directly into the inactive OTA partition via the Arduino `Update` library, which erases flash incrementally as data arrives. There is no multi-second up-front partition erase, so the upload does not stall and the device only reboots after the image is fully written and verified.
 
 ---
 

@@ -39,7 +39,14 @@ void BeanController::load() {
             bean_count_ = std::min<uint8_t>(snapshot.bean_count, kMaxBeans);
             std::memcpy(beans_, snapshot.beans, sizeof(beans_));
             normalize_after_load();
+        } else {
+            // Surface the discard instead of silently starting empty so a
+            // vanished bean list is diagnosable.
+            LOG_BLE("Beans: stored snapshot rejected (magic/version mismatch) - starting empty\n");
         }
+    } else if (length > 0) {
+        LOG_BLE("Beans: stored data size %u != expected %u - starting empty\n",
+                static_cast<unsigned>(length), static_cast<unsigned>(sizeof(BeanStoreSnapshot)));
     }
 
     prefs.end();

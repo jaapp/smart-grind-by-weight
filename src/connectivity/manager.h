@@ -14,8 +14,6 @@
 class HardwareManager;
 class BeanController;
 
-using UIStatusCallback = std::function<void(const char*)>;
-
 struct ConnectivityUIStatusMessage {
     char text[64];
 };
@@ -37,7 +35,6 @@ private:
     BeanController* bean_controller_;
     WebServer server_;
     QueueHandle_t ui_status_queue_;
-    UIStatusCallback ui_status_callback_;
 
     ConnectivityState state_;
     bool enabled_;
@@ -159,7 +156,6 @@ public:
     size_t get_screensaver_image_size() const;
     bool consume_settings_changed();
 
-    void set_ui_status_callback(UIStatusCallback callback);
     bool dequeue_ui_status(char* out, size_t out_len);
     String check_ota_failure_after_boot();
 };

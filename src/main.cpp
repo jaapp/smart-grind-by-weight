@@ -107,13 +107,6 @@ void setup() {
         }
     }
     
-    // Set up UI status callback to avoid circular dependency
-    connectivity_manager.set_ui_status_callback([](const char* status) {
-        if (auto* ota = ui_manager.get_ota_data_export_controller()) {
-            ota->update_status(status);
-        }
-    });
-    
     // Enable WiFi by default during bootup. If credentials are missing,
     // the device starts a setup AP for initial configuration.
     connectivity_manager.enable_during_bootup();

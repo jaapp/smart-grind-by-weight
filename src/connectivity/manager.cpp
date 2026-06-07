@@ -186,10 +186,6 @@ void ConnectivityManager::init(Preferences* prefs, HardwareManager* hardware, Be
     LOG_BLE("Connectivity: WiFi manager initialized\n");
 }
 
-void ConnectivityManager::set_ui_status_callback(UIStatusCallback callback) {
-    ui_status_callback_ = callback;
-}
-
 void ConnectivityManager::enqueue_ui_status(const char* status) {
     if (!ui_status_queue_ || !status) {
         return;
