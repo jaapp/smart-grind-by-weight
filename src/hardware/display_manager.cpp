@@ -24,7 +24,20 @@ void DisplayManager::init() {
     if (!gfx_device->begin()) {
         return;
     }
-    
+
+#if HW_DISPLAY_ROTATE_180
+    // Arduino_CO5300's built-in rotation uses non-standard MADCTL flip bits that
+    // don't mirror this panel, so we rotate 180deg ourselves. The panel stays on
+    // its rotation-0 address window (centered), and this standard MADCTL flips the
+    // column + row scan order in place to rotate the image 180deg.
+    constexpr uint8_t MADCTL_MX = 0x40;   // column address order (horizontal flip)
+    constexpr uint8_t MADCTL_MY = 0x80;   // row address order (vertical flip)
+    constexpr uint8_t MADCTL_RGB = 0x00;  // RGB color order (panel is RGB, same as rotation 0)
+    bus->beginWrite();
+    bus->writeC8D8(CO5300_W_MADCTL, MADCTL_MY | MADCTL_MX | MADCTL_RGB);
+    bus->endWrite();
+#endif
+
     gfx_device->fillScreen(RGB565_BLACK);
     
     // Initialize LVGL

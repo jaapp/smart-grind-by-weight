@@ -49,7 +49,8 @@
 #define HW_DISPLAY_WIDTH_PX 280                                                // LCD width in pixels
 #define HW_DISPLAY_HEIGHT_PX 456                                               // LCD height in pixels
 #define HW_DISPLAY_OFFSET_X_PX 0                                               // X offset for display positioning
-#define HW_DISPLAY_ROTATION_DEG 0                                              // Display rotation angle
+#define HW_DISPLAY_ROTATION_DEG 0                                              // GFX rotation index; keep 0 so the panel uses its known-good rotation-0 offsets
+#define HW_DISPLAY_ROTATE_180 1                                                // 1 = rotate UI 180deg via MADCTL flip (in-place) + matching touch flip
 #define HW_DISPLAY_IPS_INVERT_X 180                                            // IPS X-axis inversion setting
 #define HW_DISPLAY_IPS_INVERT_Y 24                                             // IPS Y-axis inversion setting
 #define HW_DISPLAY_COLOR_ORDER 20                                              // Color channel ordering
