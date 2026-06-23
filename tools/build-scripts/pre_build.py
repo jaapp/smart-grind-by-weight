@@ -49,7 +49,20 @@ def get_git_info():
             branch = branch_result.stdout.strip()
         else:
             branch = "unknown"
-            
+
+        # Get the author name of the current commit (shown on the About page)
+        author_result = subprocess.run(
+            ['git', 'log', '-1', '--format=%an'],
+            capture_output=True,
+            text=True,
+            cwd=project_dir
+        )
+
+        if author_result.returncode == 0 and author_result.stdout.strip():
+            author = author_result.stdout.strip()
+        else:
+            author = "unknown"
+
         # Check if there are uncommitted changes
         status_result = subprocess.run(
             ['git', 'status', '--porcelain'],
@@ -57,17 +70,18 @@ def get_git_info():
             text=True,
             cwd=project_dir
         )
-        
+
         if status_result.returncode == 0 and status_result.stdout.strip():
             # There are uncommitted changes, append + to commit ID
             commit_id += "+"
-            
+
     except (subprocess.SubprocessError, FileNotFoundError):
         # Git not available or not a git repository
         commit_id = "unknown"
         branch = "unknown"
-    
-    return commit_id, branch
+        author = "unknown"
+
+    return commit_id, branch, author
 
 def get_next_build_number():
     """Get and increment the build number."""
@@ -97,8 +111,8 @@ def get_next_build_number():
 
 def create_git_info_header():
     """Create a header file with Git and build information."""
-    commit_id, branch = get_git_info()
-    
+    commit_id, branch, author = get_git_info()
+
     # Get unique auto-incrementing build number
     build_number = get_next_build_number()
     
@@ -119,6 +133,7 @@ def create_git_info_header():
 
 #define GIT_COMMIT_ID "{commit_id}"
 #define GIT_BRANCH "{branch}"
+#define GIT_COMMIT_AUTHOR "{author}"
 #define BUILD_NUMBER {build_number}
 #define BUILD_TIMESTAMP "{build_timestamp}"
 """
@@ -138,7 +153,7 @@ def main():
     else:
         # PlatformIO pre-build: generate header AND output flags
         create_git_info_header()
-        commit_id, branch = get_git_info()
+        commit_id, branch, author = get_git_info()
         print(f"'-DGIT_COMMIT_ID=\"{commit_id}\"'")
         print(f"'-DGIT_BRANCH=\"{branch}\"'")
 

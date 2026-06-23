@@ -20,6 +20,7 @@ private:
     lv_obj_t* stats_page;
     lv_obj_t* diagnostics_page;
     lv_obj_t* scale_page;
+    lv_obj_t* about_page;
 
     // Info tab elements
     lv_obj_t* info_label;
@@ -150,6 +151,7 @@ private:
     void create_data_page(lv_obj_t* parent);
     void create_stats_page(lv_obj_t* parent);
     void create_diagnostics_page(lv_obj_t* parent);
+    void create_about_page(lv_obj_t* parent);
     lv_obj_t* create_separator(lv_obj_t* parent, const char* text = nullptr);
     lv_obj_t* create_menu_item(lv_obj_t* parent, const char* text);
     lv_obj_t *create_toggle_row(lv_obj_t *parent, const char *text,lv_obj_t **out_toggle);
