@@ -4,8 +4,7 @@
 #include "../hardware/touch_driver.h"
 #include "../hardware/hardware_manager.h"
 #include "../tasks/task_manager.h"
-#include <Arduino.h>
-#include <BLEDevice.h>
+#include "arduino_compat.h"
 
 OTAHandler::OTAHandler() 
     : ota_in_progress(false)
@@ -97,7 +96,7 @@ void OTAHandler::restore_normal_power() {
     LOG_BLE("OTA Power: Normal power mode restored\n");
 }
 
-bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, bool is_full_update, const String& expected_firmware_version) {
+bool OTAHandler::start_ota(uint32_t size, const std::string& expected_build_number, bool is_full_update, const std::string& expected_firmware_version) {
     LOG_OTA_DEBUG("start_ota() called - size=%lu, build=%s, full=%d\n", 
                   (unsigned long)size, expected_build_number.c_str(), is_full_update);
     
@@ -116,17 +115,17 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
                   (unsigned long)patch_size, (unsigned long)received_size, this->is_full_update);
     
     // Store expected build number and firmware version for post-reboot verification
-    if (!expected_build_number.isEmpty() && preferences) {
+    if (!expected_build_number.empty() && preferences) {
         preferences->putString("new_build_nr", expected_build_number);
         LOG_OTA_DEBUG("Stored expected build number: %s\n", expected_build_number.c_str());
     } else {
         LOG_OTA_DEBUG("No expected build number to store\n");
     }
     
-    if (!expected_firmware_version.isEmpty() && preferences) {
+    if (!expected_firmware_version.empty() && preferences) {
         preferences->putString("new_fw_ver", expected_firmware_version);
         LOG_OTA_DEBUG("Stored expected firmware version: %s\n", expected_firmware_version.c_str());
-    } else if (expected_build_number.isEmpty()) {
+    } else if (expected_build_number.empty()) {
         LOG_OTA_DEBUG("No expected firmware version to store\n");
     }
     
@@ -355,7 +354,7 @@ bool OTAHandler::finalize_update() {
     return true;
 }
 
-String OTAHandler::check_ota_failure_after_boot() {
+std::string OTAHandler::check_ota_failure_after_boot() {
     if (!preferences) {
         return "";
     }

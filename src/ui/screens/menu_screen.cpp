@@ -1,5 +1,5 @@
 #include "menu_screen.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <algorithm>
 #include "../../config/constants.h"
 #include "../../logging/grind_logging.h"

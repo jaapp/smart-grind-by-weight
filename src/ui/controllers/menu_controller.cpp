@@ -1,8 +1,8 @@
 #include "menu_controller.h"
 
-#include <Arduino.h>
-#include <LittleFS.h>
-#include <Preferences.h>
+#include "arduino_compat.h"
+#include "littlefs_idf.h"
+#include "preferences_idf.h"
 #include <esp_err.h>
 #include <esp_system.h>
 #include <nvs_flash.h>

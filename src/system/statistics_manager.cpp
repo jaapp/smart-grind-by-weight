@@ -1,6 +1,6 @@
 #include "statistics_manager.h"
 
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cmath>
 #include <cstring>
 #include <freertos/FreeRTOS.h>

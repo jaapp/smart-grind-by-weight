@@ -1,9 +1,9 @@
 #include "manager.h"
 #include <algorithm>
 #include <cstdarg>
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <esp_system.h>
-#include <LittleFS.h>
+#include "littlefs_idf.h"
 #include <nvs_flash.h>
 #include <nvs.h>
 #include "../system/performance_monitor.h"
@@ -894,7 +894,7 @@ void BluetoothManager::onRead(BLECharacteristic* characteristic) {
     // Reserved for future use
 }
 
-String BluetoothManager::check_ota_failure_after_boot() {
+std::string BluetoothManager::check_ota_failure_after_boot() {
     return ota_handler.check_ota_failure_after_boot();
 }
 

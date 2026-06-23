@@ -4,7 +4,7 @@
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
 #include "../config/constants.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <esp_task_wdt.h>
 
 // Global instance

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include "arduino_compat.h"
 
 /**
  * Abstract interface for load cell ADC drivers.

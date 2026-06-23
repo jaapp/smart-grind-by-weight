@@ -1,5 +1,5 @@
 #include "calibration_screen.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cmath>
 #include <limits>
 #include "../../config/constants.h"

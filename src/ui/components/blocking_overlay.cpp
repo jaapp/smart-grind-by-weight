@@ -1,7 +1,7 @@
 #include "blocking_overlay.h"
 #include "../../config/constants.h"
 #include <lvgl.h>
-#include <Arduino.h>
+#include "arduino_compat.h"
 
 // Static instance
 BlockingOperationOverlay* BlockingOperationOverlay::g_instance = nullptr;

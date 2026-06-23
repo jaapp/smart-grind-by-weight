@@ -1,6 +1,6 @@
 #include "ui_manager.h"
-#include <Arduino.h>
-#include <Preferences.h>
+#include "arduino_compat.h"
+#include "preferences_idf.h"
 #include <cmath>
 #include "../config/constants.h"
 #include "screens/calibration_screen.h"

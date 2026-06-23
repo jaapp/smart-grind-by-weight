@@ -1,13 +1,10 @@
 #pragma once
 
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include "ble_compat.h"
+#include "preferences_idf.h"
 #include <functional>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <Preferences.h>
 
 #include "../config/constants.h"
 #include "ota_handler.h"
@@ -222,7 +219,7 @@ public:
      * Check if OTA failed after reboot and return expected build number if so
      * @return Expected build number if OTA failed, empty string if no failure
      */
-    String check_ota_failure_after_boot();
+    std::string check_ota_failure_after_boot();
     
     // BLE Callbacks
     void onConnect(BLEServer* server) override;

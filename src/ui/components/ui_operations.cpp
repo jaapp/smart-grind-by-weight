@@ -1,5 +1,5 @@
 #include "ui_operations.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 
 void UIOperations::execute_tare(HardwareManager* hw_manager, OperationCallback completion) {
     auto& overlay = BlockingOperationOverlay::getInstance();

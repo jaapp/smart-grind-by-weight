@@ -1,9 +1,9 @@
 #include "file_io_task.h"
 #include "../logging/grind_logging.h"
 #include "../config/constants.h"
-#include <Arduino.h>
-#include <LittleFS.h>
-#include <Preferences.h>
+#include "arduino_compat.h"
+#include "littlefs_idf.h"
+#include "preferences_idf.h"
 
 // Global instance
 FileIOTask file_io_task;

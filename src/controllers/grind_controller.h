@@ -8,8 +8,8 @@
 #include "grind_strategy.h"
 #include "weight_grind_strategy.h"
 #include "time_grind_strategy.h"
-#include <Preferences.h>
-#include <LittleFS.h>
+#include "preferences_idf.h"
+#include "littlefs_idf.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 

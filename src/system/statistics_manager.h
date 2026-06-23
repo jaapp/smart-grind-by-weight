@@ -1,5 +1,5 @@
 #pragma once
-#include <Preferences.h>
+#include "preferences_idf.h"
 #include <cstdint>
 
 // Represents the persistent snapshot of lifetime statistics.

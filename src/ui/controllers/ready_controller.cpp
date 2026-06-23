@@ -1,6 +1,6 @@
 #include "ready_controller.h"
 
-#include <Preferences.h>
+#include "preferences_idf.h"
 #include <lvgl.h>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"

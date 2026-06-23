@@ -1,6 +1,6 @@
 #include "ota_data_export_controller.h"
 
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cstring>
 
 #include "../ui_manager.h"

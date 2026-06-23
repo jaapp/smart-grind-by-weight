@@ -4,7 +4,7 @@
 #include "../config/constants.h"
 #include "../system/diagnostics_controller.h"
 #include "../system/statistics_manager.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cstdarg>
 #include <cstring>
 #include <cmath>

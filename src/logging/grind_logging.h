@@ -1,6 +1,6 @@
 #pragma once
-#include <Arduino.h>
-#include <Preferences.h>
+#include "../../include/arduino_compat.h"
+#include "../../include/preferences_idf.h"
 #include "../config/constants.h"
 #include "../controllers/grind_session.h"
 

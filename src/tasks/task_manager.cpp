@@ -14,7 +14,7 @@
 #include "../config/constants.h"
 #include <esp_task_wdt.h>
 #include <esp_heap_caps.h>
-#include <Arduino.h>
+#include "arduino_compat.h"
 
 // Global instance
 TaskManager task_manager;

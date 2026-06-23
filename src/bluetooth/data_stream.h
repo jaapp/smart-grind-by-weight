@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
-#include <LittleFS.h>
+#include "../../include/littlefs_idf.h"
 
 /**
  * DataStreamManager - Handles streaming data from the grind logger

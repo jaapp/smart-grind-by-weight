@@ -1,6 +1,6 @@
 #include "grinding_controller.h"
 
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cstdio>
 #include <cstring>
 
