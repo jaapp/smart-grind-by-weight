@@ -104,3 +104,26 @@ python3 tools/grinder.py analyze
 - Use the src/config/constants.h aggregation file to include constants / settings - dont refer to config files directly.
 - When new features have been added and tested always update the docs as well
 - when making a commit, only focus on the end result not the process we went through to get to the end result
+- **All active firmware development is on the `feat/grinder-enhancements` branch**, not main. Main only has documentation. Always check out the right branch before building or flashing.
+
+## Memory Architecture
+
+**Internal DRAM budget at task-creation time (after UI + BLE init):**
+- Boot: ~270KB free internal
+- After HW init (display DMA buffer): ~246KB
+- After UI init (all LVGL screens): ~120KB — LVGL now routes to PSRAM via custom allocator
+- After BLE stack enable: ~41KB
+- After PSRAM allocator: ~161KB free before tasks (LVGL no longer drains internal DRAM)
+
+**LVGL PSRAM allocator** (`src/hardware/lv_mem_core_psram.cpp`):
+- `LV_USE_STDLIB_MALLOC = LV_STDLIB_CUSTOM` in `include/lv_conf.h`
+- Routes all LVGL heap allocations to PSRAM (`MALLOC_CAP_SPIRAM`) with internal DRAM fallback
+- Without this, LVGL consumes ~127KB of internal DRAM leaving insufficient room for task stacks
+- Do NOT change `LV_USE_STDLIB_MALLOC` back to `LV_STDLIB_CLIB`
+
+**FreeRTOS task stack sizes** (all from internal DRAM — cannot use PSRAM):
+- WeightSampling: 4KB, GrindControl: 6KB, UIRender: 8KB, Bluetooth: 4KB, FileIO: 6KB
+- Total: ~32KB + TCB overhead; fits comfortably with the PSRAM allocator in place
+- `[MEM]` diagnostic prints in `task_manager.cpp` log internal heap at task creation time
+
+**USB flash for recovery**: If OTA breaks screen rendering (task creation failure), USB flash via `pio run -t upload --upload-port /dev/tty.usbmodemXXXX` from the `feat/grinder-enhancements` branch recovers the device.
