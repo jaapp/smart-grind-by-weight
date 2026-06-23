@@ -1,9 +1,13 @@
 #include "weight_sampling_task.h"
 #include "../hardware/WeightSensor.h"
+#include "../controllers/grind_controller.h"
 #include "../logging/grind_logging.h"
 #include "../config/constants.h"
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+
+// Grind state is owned globally; used to avoid re-initializing the HX711 mid-grind.
+extern GrindController grind_controller;
 
 // Global instance
 WeightSamplingTask weight_sampling_task;
@@ -27,7 +31,11 @@ WeightSamplingTask::WeightSamplingTask() {
     // Initialize hardware state
     hardware_initialized = false;
     hardware_validation_passed = false;
-    
+
+    // Runtime fault detection / recovery
+    last_valid_sample_ms = 0;
+    last_recovery_attempt_ms = 0;
+
     instance = this;
 }
 
@@ -134,19 +142,27 @@ void WeightSamplingTask::task_impl() {
     
     // Reset performance metrics
     reset_performance_metrics();
-    
+
+    // Seed the runtime watchdog so it doesn't trip before the first sample arrives
+    last_valid_sample_ms = millis();
+
     // Main sampling loop
     while (task_running) {
         uint32_t cycle_start_time = millis();
-        
+
         // Core sampling operations (extracted from RealtimeController)
-        sample_and_feed_weight_sensor();
-        
+        if (sample_and_feed_weight_sensor()) {
+            last_valid_sample_ms = cycle_start_time;
+        }
+
+        // Detect a chip that has stopped responding and retry it automatically
+        monitor_and_recover_hardware();
+
         // Weight sensor state management (non-blocking operations only)
         if (weight_sensor) {
             weight_sensor->update();  // Coordinate tare state management
         }
-        
+
         // Feed watchdog to prevent timeout
         esp_task_wdt_reset();
         
@@ -248,20 +264,22 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     return hardware_validation_passed;
 }
 
-void WeightSamplingTask::sample_and_feed_weight_sensor() {
-    if (!weight_sensor) return;
-    
+bool WeightSamplingTask::sample_and_feed_weight_sensor() {
+    if (!weight_sensor) return false;
+
     // Call WeightSensor's Core 0 sampling method - this performs HX711 sampling
     // and feeds data to CircularBufferMath, updating all weight readings
     // (Extracted from RealtimeController::sample_and_feed_weight_sensor)
     bool sample_taken = weight_sensor->sample_and_feed_filter();
-    
+
 #if SYS_ENABLE_REALTIME_HEARTBEAT
     // Record timestamp for SPS tracking when a sample was actually taken
     if (sample_taken) {
         weight_sensor->record_sample_timestamp();
     }
 #endif
+
+    return sample_taken;
 }
 
 bool WeightSamplingTask::validate_hardware_ready() const {
@@ -355,13 +373,70 @@ void WeightSamplingTask::handle_hardware_error() {
 
 bool WeightSamplingTask::attempt_hardware_recovery() {
     if (!weight_sensor) return false;
-    
+
     LOG_BLE("WeightSamplingTask: Attempting hardware recovery...\n");
-    
+
     // Reset hardware state flags
     hardware_initialized = false;
     hardware_validation_passed = false;
-    
+
     // Attempt to reinitialize hardware
     return initialize_hx711_hardware();
+}
+
+void WeightSamplingTask::monitor_and_recover_hardware() {
+    if (!weight_sensor) return;
+
+    const uint32_t now = millis();
+
+    if (weight_sensor->has_hardware_fault()) {
+        // A fault is active - retry the chip on a fixed cadence, but never while a
+        // grind is in progress (re-init power-cycles the HX711 and blocks for seconds).
+        if (now - last_recovery_attempt_ms < HW_LOADCELL_RECOVERY_INTERVAL_MS) {
+            return;
+        }
+        if (grind_controller.is_active()) {
+            return;  // defer recovery until grinding stops
+        }
+
+        last_recovery_attempt_ms = now;
+        LOG_BLE("WeightSamplingTask: HX711 fault active - attempting automatic recovery\n");
+        if (attempt_runtime_recovery()) {
+            last_valid_sample_ms = millis();
+            LOG_BLE("✅ WeightSamplingTask: HX711 recovered, resuming sampling\n");
+        } else {
+            LOG_BLE("WeightSamplingTask: HX711 recovery attempt failed, will retry\n");
+        }
+        return;
+    }
+
+    // No fault: watch for a chip that silently stops streaming. A healthy HX711
+    // delivers ~10 SPS, so a multi-second gap means it has stopped responding.
+    if (hardware_initialized && (now - last_valid_sample_ms > HW_LOADCELL_RUNTIME_TIMEOUT_MS)) {
+        LOG_BLE("WeightSamplingTask: HX711 stopped responding (no sample for %lums) - flagging fault\n",
+                (unsigned long)(now - last_valid_sample_ms));
+        weight_sensor->set_hardware_fault(WeightSensor::HardwareFault::NOT_CONNECTED);
+        // Trigger the first recovery attempt on the next cycle rather than after a full interval.
+        last_recovery_attempt_ms = now - HW_LOADCELL_RECOVERY_INTERVAL_MS;
+    }
+}
+
+bool WeightSamplingTask::attempt_runtime_recovery() {
+    // initialize_hx711_hardware() performs several seconds of blocking power-cycle and
+    // validation delays. This task is registered with the task watchdog, so detach it
+    // for the duration to avoid a watchdog panic, then re-attach.
+    esp_task_wdt_delete(nullptr);
+    bool recovered = attempt_hardware_recovery();
+    esp_task_wdt_add(nullptr);
+    esp_task_wdt_reset();
+
+    if (recovered) {
+        // Discard pre-failure samples so the UI doesn't briefly show stale weight.
+        CircularBufferMath* filter = weight_sensor->get_raw_filter();
+        if (filter) {
+            filter->clear_all_samples();
+            filter->reset_display_filter();
+        }
+    }
+    return recovered;
 }

@@ -44,6 +44,10 @@
 // Calibration validation
 #define HW_LOADCELL_CAL_MIN_ADC_VALUE 1000                                    // Minimum ADC value to confirm weight placed on scale
 
+// Runtime fault detection & auto-recovery
+#define HW_LOADCELL_RUNTIME_TIMEOUT_MS 2000                                   // No valid sample for this long (healthy chip streams at 10 SPS) = runtime fault
+#define HW_LOADCELL_RECOVERY_INTERVAL_MS 5000                                 // Minimum spacing between automatic HX711 re-init attempts while faulted
+
 //------------------------------------------------------------------------------
 // DISPLAY SPECIFICATIONS  
 //------------------------------------------------------------------------------
