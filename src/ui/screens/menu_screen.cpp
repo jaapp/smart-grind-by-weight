@@ -260,8 +260,7 @@ void MenuScreen::create_info_page(lv_obj_t* parent) {
     create_data_label(parent, "RAM:", &memory_label);
 }
 
-// Creates a data row where the value label scrolls horizontally if it overflows.
-// Name column is fixed-width; value column fills the remaining space.
+// Creates a stacked data row: name on top, value below scrolling horizontally if it overflows.
 static void create_about_row(lv_obj_t* parent, const char* name, const char* value) {
     lv_obj_t* container = lv_obj_create(parent);
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
@@ -273,25 +272,33 @@ static void create_about_row(lv_obj_t* parent, const char* name, const char* val
     lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
     lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(container, 4, 0);
 
     lv_obj_t* name_label = lv_label_create(container);
     lv_label_set_text(name_label, name);
     lv_obj_set_style_text_font(name_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(name_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-    lv_obj_set_width(name_label, 110);
-    lv_obj_clear_flag(name_label, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_width(name_label, LV_PCT(100));
 
-    // Value label: constrained width so SCROLL mode activates for long text
+    // Value label: full width so SCROLL mode activates for long text
     lv_obj_t* value_label = lv_label_create(container);
     lv_label_set_text(value_label, value);
     lv_obj_set_style_text_font(value_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(value_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_style_text_align(value_label, LV_TEXT_ALIGN_RIGHT, 0);
     lv_label_set_long_mode(value_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_width(value_label, 136);  // 280 - 10 - 14 - 110 - gap(10) = 136
+    lv_obj_set_width(value_label, LV_PCT(100));
     lv_obj_set_style_anim_duration(value_label, 5000, LV_PART_MAIN);
+
+    // Set a style animation template so the circular scroll pauses 2s before repeating.
+    // lv_style stores a pointer, so allocate via lv_malloc (PSRAM) to outlive the function.
+    lv_anim_t * anim_tmpl = static_cast<lv_anim_t *>(lv_malloc(sizeof(lv_anim_t)));
+    if (anim_tmpl) {
+        lv_anim_init(anim_tmpl);
+        anim_tmpl->repeat_delay = 2000;
+        lv_obj_set_style_anim(value_label, anim_tmpl, LV_PART_MAIN);
+    }
 }
 
 void MenuScreen::create_about_page(lv_obj_t* parent) {
