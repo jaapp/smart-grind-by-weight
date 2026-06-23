@@ -31,6 +31,7 @@
 
 // Motor Control
 #define HW_MOTOR_RELAY_PIN 18                                                  // GPIO pin for grinder motor control relay
+#define HW_MOTOR_ACTIVE_LOW 1                                                  // 1 = relay energizes (motor ON) when pin is LOW; 0 = active-high
 #define HW_GRINDER_SETTLING_TIME_MS 500                                        // Startup transient immunity (tune based on mechanical rigidity, 0 to disable)
 
 //------------------------------------------------------------------------------
