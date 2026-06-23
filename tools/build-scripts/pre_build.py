@@ -14,6 +14,7 @@ except:
 import subprocess
 import sys
 import os
+import re
 
 def get_git_info():
     """Get Git commit ID and branch information."""
@@ -50,16 +51,17 @@ def get_git_info():
         else:
             branch = "unknown"
 
-        # Get the author name of the current commit (shown on the About page)
-        author_result = subprocess.run(
-            ['git', 'log', '-1', '--format=%an'],
+        # Get the GitHub username from the remote URL (shown on the About page)
+        remote_result = subprocess.run(
+            ['git', 'remote', 'get-url', 'origin'],
             capture_output=True,
             text=True,
             cwd=project_dir
         )
 
-        if author_result.returncode == 0 and author_result.stdout.strip():
-            author = author_result.stdout.strip()
+        if remote_result.returncode == 0 and remote_result.stdout.strip():
+            match = re.search(r'github\.com[:/]([^/]+)/', remote_result.stdout.strip())
+            author = match.group(1) if match else remote_result.stdout.strip()
         else:
             author = "unknown"
 

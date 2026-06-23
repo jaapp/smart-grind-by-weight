@@ -260,6 +260,40 @@ void MenuScreen::create_info_page(lv_obj_t* parent) {
     create_data_label(parent, "RAM:", &memory_label);
 }
 
+// Creates a data row where the value label scrolls horizontally if it overflows.
+// Name column is fixed-width; value column fills the remaining space.
+static void create_about_row(lv_obj_t* parent, const char* name, const char* value) {
+    lv_obj_t* container = lv_obj_create(parent);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(container, 0, 0);
+    lv_obj_set_style_pad_all(container, 2, 0);
+    lv_obj_set_style_pad_left(container, 10, 0);
+    lv_obj_set_style_pad_right(container, 14, 0);
+    lv_obj_set_style_margin_all(container, 0, 0);
+    lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
+    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_layout(container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t* name_label = lv_label_create(container);
+    lv_label_set_text(name_label, name);
+    lv_obj_set_style_text_font(name_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(name_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_width(name_label, 110);
+    lv_obj_clear_flag(name_label, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Value label: constrained width so SCROLL mode activates for long text
+    lv_obj_t* value_label = lv_label_create(container);
+    lv_label_set_text(value_label, value);
+    lv_obj_set_style_text_font(value_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(value_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_set_style_text_align(value_label, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_long_mode(value_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(value_label, 136);  // 280 - 10 - 14 - 110 - gap(10) = 136
+    lv_obj_set_style_anim_duration(value_label, 5000, LV_PART_MAIN);
+}
+
 void MenuScreen::create_about_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
@@ -275,14 +309,14 @@ void MenuScreen::create_about_page(lv_obj_t* parent) {
     snprintf(version_info, sizeof(version_info), "v%s (#%d)", BUILD_FIRMWARE_VERSION, BUILD_NUMBER);
 
     create_separator(parent, "Device");
-    create_static_data_label(parent, "Name:", PRODUCT_NAME);
-    create_static_data_label(parent, "Model:", PRODUCT_MODEL);
+    create_about_row(parent, "Name:", PRODUCT_NAME);
+    create_about_row(parent, "Model:", PRODUCT_MODEL);
 
     create_separator(parent, "Firmware");
-    create_static_data_label(parent, "Version:", version_info);
-    create_static_data_label(parent, "Commit:", get_git_commit_id());
-    create_static_data_label(parent, "Author:", get_git_commit_author());
-    create_static_data_label(parent, "Updated:", BUILD_TIMESTAMP);
+    create_about_row(parent, "Version:", version_info);
+    create_about_row(parent, "Commit:", get_git_commit_id());
+    create_about_row(parent, "Author:", get_git_commit_author());
+    create_about_row(parent, "Updated:", BUILD_TIMESTAMP);
 
     create_separator(parent, "Credits");
     create_description_label(parent, ORIGINAL_AUTHOR_CREDIT);
