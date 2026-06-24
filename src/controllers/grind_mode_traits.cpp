@@ -20,6 +20,13 @@ constexpr GrindModeTraits kModeTraits[] = {
         "Time: ",
         "Time: ",
         USER_FINE_TIME_ADJUSTMENT_S
+    },
+    {
+        "Cal. Time",
+        "g",            // Primary target is weight
+        "Target: ",
+        " / ",
+        USER_FINE_WEIGHT_ADJUSTMENT_G   // Edit in weight increments
     }
 };
 
@@ -41,6 +48,7 @@ float get_profile_target(const ProfileController& profiles, GrindMode mode, int 
     if (mode == GrindMode::TIME) {
         return profiles.get_profile_time(index);
     }
+    // WEIGHT and CALIBRATED_TIME both use the weight field
     return profiles.get_profile_weight(index);
 }
 
@@ -49,6 +57,7 @@ void set_profile_target(ProfileController& profiles, GrindMode mode, int index, 
         profiles.set_profile_time(index, value);
         return;
     }
+    // WEIGHT and CALIBRATED_TIME both set the weight field
     profiles.set_profile_weight(index, value);
 }
 
@@ -82,6 +91,6 @@ void format_ready_value(char* buffer, std::size_t buffer_len, GrindMode mode, fl
         std::snprintf(buffer, buffer_len, "%.1fs", value);
         return;
     }
+    // WEIGHT and CALIBRATED_TIME show weight format
     std::snprintf(buffer, buffer_len, SYS_WEIGHT_DISPLAY_FORMAT, value);
 }
-

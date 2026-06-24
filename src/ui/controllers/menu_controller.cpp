@@ -327,7 +327,13 @@ void MenuUIController::handle_grind_mode_radio_button() {
     int selected_index = radio_button_group_get_selection(radio_group);
     if (selected_index < 0) return;
 
-    GrindMode new_mode = (selected_index == 0) ? GrindMode::WEIGHT : GrindMode::TIME;
+    GrindMode new_mode;
+    switch (selected_index) {
+        case 0:  new_mode = GrindMode::WEIGHT; break;
+        case 1:  new_mode = GrindMode::TIME; break;
+        case 2:  new_mode = GrindMode::CALIBRATED_TIME; break;
+        default: return;
+    }
     ui_manager_->profile_controller->set_grind_mode(new_mode);
     ui_manager_->current_mode = new_mode;
     if (ui_manager_->ready_controller_) {

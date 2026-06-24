@@ -27,6 +27,7 @@ struct GrindEventData {
     
     // Additional data for specific events
     float final_weight;           // For COMPLETED event
+    uint32_t total_motor_on_time_ms; // For COMPLETED event (used by calibrated time mode)
     const char* error_message;    // For TIMEOUT/ERROR event
     float error_weight;           // For TIMEOUT/ERROR event
     int error_progress;           // For TIMEOUT/ERROR event
