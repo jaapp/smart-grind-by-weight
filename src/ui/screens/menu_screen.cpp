@@ -465,15 +465,15 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_separator(parent, "Purging");
     create_description_label(parent, "Decide what do do with the grinded coffee after the grinder is primed.");
 
-    // Radio button group for grinder purge mode (Keep/Remove)
+    // Radio button group for grinder purge mode (Keep/Remove) — full-width stacked rows
     const char* grinder_purge_modes[] = {"Keep", "Remove"};
     grinder_purge_mode_radio_group = create_radio_button_group(
         parent,
         grinder_purge_modes,
         2,
-        LV_FLEX_FLOW_ROW,
+        LV_FLEX_FLOW_COLUMN,
         1,  // Purge initially selected (index 1)
-        135, 100,  // Width, Height
+        280, 70,  // Width, Height
         grinder_purge_mode_callback,
         this
     );
