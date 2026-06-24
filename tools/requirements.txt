@@ -11,8 +11,7 @@ scipy>=1.9.0
 streamlit>=1.28.0
 plotly>=5.15.0
 
-# Build system (use PlatformIO from the venv, not global `pio`)
-platformio>=6.0.0
+# Firmware is built with native ESP-IDF (idf.py); no PlatformIO dependency.
 
 detools>=0.53.0
 

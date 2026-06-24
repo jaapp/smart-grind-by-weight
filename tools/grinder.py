@@ -176,25 +176,80 @@ class GrinderTool:
             self.print_error(f"Command failed: {e}")
             return 1
     
-    def cmd_build(self, args: argparse.Namespace) -> int:
-        """Build firmware using PlatformIO."""
-        self.print_header("Building Firmware")
-        
-        if not self.check_venv():
+    # ESP-IDF project name (from the root CMakeLists.txt project() call).
+    IDF_PROJECT_NAME = "smart-grind-by-weight"
+
+    def find_idf(self) -> Optional[Path]:
+        """Locate a standalone ESP-IDF install (export.sh present)."""
+        candidates: List[Path] = []
+        if os.environ.get("IDF_PATH"):
+            candidates.append(Path(os.environ["IDF_PATH"]))
+        candidates.append(Path.home() / "esp" / "esp-idf")
+        for c in candidates:
+            if c and (c / "export.sh").exists():
+                return c
+        return None
+
+    def run_idf(self, idf_args: List[str]) -> int:
+        """Source the IDF environment and run idf.py with the given args."""
+        if platform.system() == "Windows":
+            self.print_error("Native idf.py builds via grinder.py are not wired for Windows yet; "
+                             "run 'idf.py build' from an ESP-IDF prompt.")
             return 1
-        
-        # Use PlatformIO from the project venv
-        result = self.run_command([
-            str(self.venv_python), "-m", "platformio", "run", 
-            "-e", "waveshare-esp32s3-touch-amoled-164"
-        ])
-        
-        if result.returncode == 0:
-            self.print_success("Firmware build completed")
-        else:
-            self.print_error("Build failed")
-        
+        idf = self.find_idf()
+        if not idf:
+            self.print_error("ESP-IDF not found. Install it (e.g. to ~/esp/esp-idf) or set IDF_PATH.")
+            return 1
+        quoted = " ".join(f'"{a}"' for a in idf_args)
+        inner = f'. "{idf}/export.sh" >/dev/null 2>&1 && idf.py {quoted}'
+        result = self.run_command(["bash", "-c", inner])
         return result.returncode
+
+    def read_build_number(self) -> int:
+        """Read BUILD_NUMBER from the generated include/git_info.h."""
+        import re
+        git_info = self.project_dir / "include" / "git_info.h"
+        try:
+            match = re.search(r'#define BUILD_NUMBER (\d+)', git_info.read_text())
+            if match:
+                return int(match.group(1))
+        except OSError:
+            pass
+        return 0
+
+    def archive_firmware(self) -> None:
+        """Copy the built firmware into firmware_cache/build_NNN.bin (was post_build.py)."""
+        firmware = self.project_dir / "build" / f"{self.IDF_PROJECT_NAME}.bin"
+        if not firmware.exists():
+            self.print_warning(f"Firmware binary not found: {firmware}")
+            return
+        build_number = self.read_build_number()
+        size = firmware.stat().st_size
+        cache_dir = self.project_dir / "firmware_cache"
+        cache_dir.mkdir(exist_ok=True)
+        dest = cache_dir / f"build_{build_number:03d}.bin"
+        shutil.copy2(firmware, dest)
+        self.print_info(f"Firmware: {size:,} bytes ({size/1024:.1f} KB) | Build #{build_number}")
+        self.print_info(f"Archived: {dest}")
+
+    def cmd_build(self, args: argparse.Namespace) -> int:
+        """Build firmware using native ESP-IDF (idf.py)."""
+        self.print_header("Building Firmware")
+
+        # Generate include/git_info.h (build number, commit, branch) — was the
+        # PlatformIO pre_build.py extra_script, now invoked explicitly.
+        pre_build = self.script_dir / "build-scripts" / "pre_build.py"
+        self.run_command([sys.executable, str(pre_build), "--header"])
+
+        rc = self.run_idf(["build"])
+        if rc != 0:
+            self.print_error("Build failed")
+            return rc
+
+        # Archive the firmware binary (was the post_build.py extra_script).
+        self.archive_firmware()
+        self.print_success("Firmware build completed")
+        return 0
     
     async def cmd_upload(self, args: argparse.Namespace) -> int:
         """Upload firmware via BLE OTA."""
@@ -202,19 +257,22 @@ class GrinderTool:
         
         if not firmware_path:
             self.print_info("Finding latest firmware file...")
-            build_dir = self.project_dir / ".pio" / "build"
-            
+
+            # Prefer the freshly built binary from the native IDF build dir,
+            # then fall back to the most recent archived build in firmware_cache.
             firmware_files = []
-            if build_dir.exists():
-                for firmware_file in build_dir.rglob("*.bin"):
-                    if firmware_file.name == "firmware.bin":
-                        firmware_files.append(firmware_file)
-            
+            built = self.project_dir / "build" / f"{self.IDF_PROJECT_NAME}.bin"
+            if built.exists():
+                firmware_files.append(built)
+            cache_dir = self.project_dir / "firmware_cache"
+            if cache_dir.exists():
+                firmware_files.extend(cache_dir.glob("build_*.bin"))
+
             if not firmware_files:
                 self.print_error("No firmware file found")
                 self.print_info("Run: python3 grinder.py build")
                 return 1
-            
+
             # Get the most recently modified firmware
             firmware_path = max(firmware_files, key=lambda f: f.stat().st_mtime)
         
@@ -405,26 +463,17 @@ class GrinderTool:
             return 1
     
     def cmd_clean(self, args: argparse.Namespace) -> int:
-        """Clean build artifacts."""
+        """Clean build artifacts (native ESP-IDF build directory)."""
         self.print_header("Cleaning Build Artifacts")
-        
-        if not self.check_venv():
-            return 1
-        
-        # Use PlatformIO from the project venv
-        result = self.run_command([
-            str(self.venv_python), "-m", "platformio", "run", "--target", "clean"
-        ])
-        
-        # Also remove .pio/build directory
-        build_dir = self.project_dir / ".pio" / "build"
+
+        # Remove the IDF build directory. (We rmtree directly rather than calling
+        # `idf.py fullclean` so cleaning works even without the IDF env sourced.)
+        build_dir = self.project_dir / "build"
         if build_dir.exists():
             shutil.rmtree(build_dir)
-        
-        if result.returncode == 0:
-            self.print_success("Build artifacts cleaned")
-        
-        return result.returncode
+
+        self.print_success("Build artifacts cleaned")
+        return 0
     
     def cmd_release(self, args: argparse.Namespace) -> int:
         """Create a tagged release using the release helper script."""
@@ -467,7 +516,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest='command', required=True, help='Available commands')
     
     # Build & Upload Commands
-    build_parser = subparsers.add_parser('build', help='Build firmware using PlatformIO')
+    build_parser = subparsers.add_parser('build', help='Build firmware using ESP-IDF (idf.py)')
     
     upload_parser = subparsers.add_parser('upload', help='Upload firmware via BLE OTA')
     upload_parser.add_argument('firmware', nargs='?', help='Path to firmware .bin file (finds latest if not specified)')
