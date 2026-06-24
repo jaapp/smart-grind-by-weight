@@ -126,4 +126,12 @@ python3 tools/grinder.py analyze
 - Total: ~32KB + TCB overhead; fits comfortably with the PSRAM allocator in place
 - `[MEM]` diagnostic prints in `task_manager.cpp` log internal heap at task creation time
 
-**USB flash for recovery**: If OTA breaks screen rendering (task creation failure), USB flash via `pio run -t upload --upload-port /dev/tty.usbmodemXXXX` from the `feat/grinder-enhancements` branch recovers the device.
+**USB flash for recovery**: If OTA breaks screen rendering (task creation failure), USB flash recovers the device. The build is native ESP-IDF (idf.py), so source the IDF env and flash directly: `. ~/esp/esp-idf/export.sh && idf.py -p /dev/tty.usbmodemXXXX flash`.
+
+## Build System
+
+Native **ESP-IDF** (idf.py) — PlatformIO has been removed. `tools/grinder.py` wraps idf.py for `build`/`clean` and keeps the BLE-OTA `upload`/`export`/`report` flows (Python/bleak/streamlit in `tools/venv`).
+- Requires a standalone ESP-IDF install (export.sh on `IDF_PATH` or at `~/esp/esp-idf`).
+- Entry point: `app_main()` in `src/main.cpp`. The IDF "main" component is `main/CMakeLists.txt`, which globs the `src/` tree, force-links it (`WHOLE_ARCHIVE`, needed for LVGL's custom PSRAM allocator), and auto-requires all components. Managed deps live in `main/idf_component.yml`.
+- Project-wide include path and LVGL `*_INCLUDE_SIMPLE` defines are set in the root `CMakeLists.txt`; the custom partition table is wired via `sdkconfig.defaults` (`CONFIG_PARTITION_TABLE_CUSTOM`).
+- `sdkconfig` is generated and git-ignored; edit `sdkconfig.defaults` instead.

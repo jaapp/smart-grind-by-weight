@@ -1,3 +1,8 @@
+# Native ESP-IDF build output and generated config
+# (sdkconfig is generated from sdkconfig.defaults — keep defaults, ignore the rest)
+build/
+sdkconfig
+sdkconfig.old
 .pio
 .vscode/
 

@@ -437,9 +437,7 @@ void MenuUIController::handle_grinder_purge_amount_slider_released() {
         prefs->putFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, amount_g);
     }
 
-    LOG_DEBUG_PRINT("Grinder purge amount set to: ");
-    LOG_DEBUG_PRINT(amount_g);
-    LOG_DEBUG_PRINTLN("g");
+    LOG_DEBUG_PRINTF("Grinder purge amount set to: %.2fg\n", amount_g);
 
     ui_manager_->menu_screen.update_grinder_purge_amount_label(amount_g);
 }
@@ -480,9 +478,7 @@ void MenuUIController::handle_grind_freshness_hours_slider_released() {
         prefs->putFloat(GrindController::PREF_KEY_GRIND_FRESHNESS_HOURS, hours);
     }
 
-    LOG_DEBUG_PRINT("Grind freshness hours set to: ");
-    LOG_DEBUG_PRINT(hours);
-    LOG_DEBUG_PRINTLN("h");
+    LOG_DEBUG_PRINTF("Grind freshness hours set to: %.2fh\n", hours);
 
     ui_manager_->menu_screen.update_grind_freshness_hours_label(hours);
 }
