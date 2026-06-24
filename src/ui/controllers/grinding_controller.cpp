@@ -1,6 +1,6 @@
 #include "grinding_controller.h"
 
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cstdio>
 #include <cstring>
 
@@ -212,6 +212,17 @@ void GrindingUIController::handle_grind_button() {
         if (ui_manager_->profile_controller && ui_manager_->grind_controller) {
             float target_weight = ui_manager_->profile_controller->get_current_weight();
             float target_time_seconds = ui_manager_->profile_controller->get_current_time();
+
+            // For CALIBRATED_TIME: compute time from calibrated flow rate instead of stored time
+            if (ui_manager_->current_mode == GrindMode::CALIBRATED_TIME) {
+                int profile_idx = ui_manager_->profile_controller->get_current_profile();
+                target_time_seconds = ui_manager_->profile_controller->get_calibrated_time(profile_idx);
+                LOG_BLE("[GRIND_START] Calibrated time: %.1fs (flow: %.2f g/s, count: %d)\n",
+                        target_time_seconds,
+                        ui_manager_->profile_controller->get_calibrated_flow_rate(profile_idx),
+                        ui_manager_->profile_controller->get_calibration_count(profile_idx));
+            }
+
             uint32_t target_time_ms = static_cast<uint32_t>((target_time_seconds * 1000.0f) + 0.5f);
             ui_manager_->grind_controller->start_grind(target_weight, target_time_ms, ui_manager_->current_mode);
         }
@@ -383,7 +394,7 @@ void GrindingUIController::update_grinding_targets() {
     const auto& session = ui_manager_->grind_controller->get_session_descriptor();
     ui_manager_->grinding_screen.set_chart_time_prediction(session.target_time_ms);
     ui_manager_->grinding_screen.update_target_weight(session.target_weight);
-    if (session.mode == GrindMode::TIME && session.target_time_ms > 0) {
+    if ((session.mode == GrindMode::TIME || session.mode == GrindMode::CALIBRATED_TIME) && session.target_time_ms > 0) {
         float target_time_seconds = static_cast<float>(session.target_time_ms) / 1000.0f;
         ui_manager_->grinding_screen.update_target_time(target_time_seconds);
     }
@@ -485,6 +496,20 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
             final_grind_progress_ = event_data.progress_percent;
             LOG_BLE("GRIND COMPLETE - Final settled weight captured: %.2fg (Progress: %d%%)\n",
                     final_grind_weight_, final_grind_progress_);
+
+            // Update calibration for CALIBRATED_TIME mode
+            if (event_data.mode == GrindMode::CALIBRATED_TIME &&
+                ui_manager_->profile_controller &&
+                event_data.final_weight >= GRIND_CALIBRATION_MIN_WEIGHT_G &&
+                event_data.total_motor_on_time_ms > 100) {
+                float motor_on_s = static_cast<float>(event_data.total_motor_on_time_ms) / 1000.0f;
+                float measured_flow = event_data.final_weight / motor_on_s;
+                int profile_idx = ui_manager_->profile_controller->get_current_profile();
+                ui_manager_->profile_controller->update_calibration(profile_idx, measured_flow);
+                LOG_BLE("CALIBRATION UPDATE - Profile %d: measured %.2f g/s (weight=%.1fg, time=%.1fs)\n",
+                        profile_idx, measured_flow, event_data.final_weight, motor_on_s);
+            }
+
             chart_updates_enabled_ = false;
             ui_manager_->switch_to_state(UIState::GRIND_COMPLETE);
             start_grind_complete_timer();

@@ -4,7 +4,7 @@
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "grind_controller.h"
-#include <LittleFS.h>
+#include "littlefs_idf.h"
 
 // Auto-tune phases for UI display
 enum class AutoTunePhase {

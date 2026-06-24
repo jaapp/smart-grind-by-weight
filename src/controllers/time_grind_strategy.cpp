@@ -2,7 +2,7 @@
 #include "../config/constants.h"
 #include "grind_controller.h"
 #include "../logging/grind_logging.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 
 void TimeGrindStrategy::on_enter(const GrindSessionDescriptor&,
                                  GrindStrategyContext& context,

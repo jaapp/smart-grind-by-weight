@@ -4,7 +4,7 @@
 #if DEBUG_ENABLE_LOADCELL_MOCK
 #include "mock_hx711_driver.h"
 #endif
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <math.h>
 
 /*

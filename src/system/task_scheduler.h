@@ -1,5 +1,5 @@
 #pragma once
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <vector>
 #include <functional>
 

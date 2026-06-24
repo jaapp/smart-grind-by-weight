@@ -1,7 +1,7 @@
 #include "autotune_controller.h"
 #include "../ui_manager.h"
 #include "../../config/constants.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 
 AutoTuneUIController::AutoTuneUIController(UIManager* manager)
     : ui_manager_(manager)

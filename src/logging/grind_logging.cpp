@@ -1,5 +1,5 @@
 #include "grind_logging.h"
-#include <LittleFS.h>
+#include "../../include/littlefs_idf.h"
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include "../hardware/WeightSensor.h"

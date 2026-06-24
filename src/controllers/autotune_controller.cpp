@@ -1,5 +1,5 @@
 #include "autotune_controller.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cmath>
 #include <cstring>
 #include <cstdarg>

@@ -4,7 +4,7 @@
 #include "../config/constants.h"
 #include "../system/diagnostics_controller.h"
 #include "../system/statistics_manager.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <cstdarg>
 #include <cstring>
 #include <cmath>
@@ -191,6 +191,8 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
         active_strategy = static_cast<IGrindStrategy*>(&weight_strategy);
     } else if (mode == GrindMode::TIME) {
         active_strategy = static_cast<IGrindStrategy*>(&time_strategy);
+    } else if (mode == GrindMode::CALIBRATED_TIME) {
+        active_strategy = static_cast<IGrindStrategy*>(&calibrated_time_strategy);
     } else {
         active_strategy = nullptr;
     }
@@ -354,7 +356,7 @@ void GrindController::update() {
                         grinder->start();  // Ensure motor is running
                     }
                     time_grind_start_ms = loop_data.now;
-                    if (mode == GrindMode::TIME) {
+                    if (mode == GrindMode::TIME || mode == GrindMode::CALIBRATED_TIME) {
                         switch_phase(GrindPhase::TIME_GRINDING, loop_data);
                     } else {
                         // Always run chute operation for weight mode
@@ -433,7 +435,7 @@ void GrindController::update() {
         }
 
         case GrindPhase::TIME_GRINDING:
-            if (mode == GrindMode::TIME && active_strategy) {
+            if ((mode == GrindMode::TIME || mode == GrindMode::CALIBRATED_TIME) && active_strategy) {
                 active_strategy->update(session_descriptor, strategy_context, loop_data);
             }
             break;
@@ -766,9 +768,11 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
 
         event_data.event = UIGrindEvent::COMPLETED;
         // Use final_weight if available (from final_measurement), otherwise use high latency weight
-        event_data.final_weight = (final_weight > 0) ? final_weight : 
+        event_data.final_weight = (final_weight > 0) ? final_weight :
                                  (weight_sensor ? weight_sensor->get_weight_high_latency() : 0.0f);
-        
+        // Motor on time for calibration — for time-based modes, the motor ran for target_time_ms
+        event_data.total_motor_on_time_ms = target_time_ms;
+
         // For time mode, also indicate pulse availability
         if (mode == GrindMode::TIME) {
             event_data.can_pulse = true;

@@ -1,5 +1,5 @@
 #include "ota_update_failed_screen.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include "../../config/constants.h"
 #include "../../config/build_info.h"
 

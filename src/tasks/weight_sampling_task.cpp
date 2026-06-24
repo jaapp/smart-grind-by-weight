@@ -3,7 +3,7 @@
 #include "../controllers/grind_controller.h"
 #include "../logging/grind_logging.h"
 #include "../config/constants.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <esp_task_wdt.h>
 
 // Grind state is owned globally; used to avoid re-initializing the HX711 mid-grind.

@@ -1,0 +1,19 @@
+## IDF Component Manager manifest
+## Managed dependencies are downloaded automatically at build time.
+
+dependencies:
+  idf: ">=5.1.0"
+
+  # LVGL graphics library
+  lvgl/lvgl:
+    version: "^9.0.0"
+    rules:
+      - if: "idf_version >= 5.0.0"
+
+  # Espressif LVGL port (display + touch integration helpers)
+  espressif/esp_lvgl_port:
+    version: "^2.0.0"
+
+  # LittleFS filesystem component
+  joltwallet/littlefs:
+    version: "^1.14.8"

@@ -1,6 +1,6 @@
 #include "hx711_driver.h"
 #include "../config/constants.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include <driver/gpio.h>
 
 /**

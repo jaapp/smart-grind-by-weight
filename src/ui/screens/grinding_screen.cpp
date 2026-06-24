@@ -1,5 +1,5 @@
 #include "grinding_screen.h"
-#include <Preferences.h>
+#include "preferences_idf.h"
 
 GrindingScreen::GrindingScreen() : current_layout(GrindScreenLayout::MINIMAL_ARC), preferences(nullptr), current_mode(GrindMode::WEIGHT) {
     // Layout will be loaded in init() when preferences are available

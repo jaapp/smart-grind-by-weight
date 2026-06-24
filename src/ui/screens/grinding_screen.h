@@ -2,7 +2,7 @@
 #include "grinding_screen_base.h"
 #include "grinding_screen_arc.h"
 #include "grinding_screen_chart.h"
-#include <Preferences.h>
+#include "preferences_idf.h"
 #include "../../controllers/grind_mode.h"
 
 // Unified grinding screen that wraps both implementations

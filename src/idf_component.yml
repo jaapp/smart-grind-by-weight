@@ -1,0 +1,13 @@
+## IDF Component Manager manifest for the main (src/) component.
+## LVGL is handled by PlatformIO's library manager (.pio/libdeps).
+
+dependencies:
+  idf: ">=5.1.0"
+
+  # LittleFS filesystem (not bundled in ESP-IDF 5.x core)
+  joltwallet/littlefs:
+    version: "~1.20.0"
+
+  # SH8601/CO5300 AMOLED panel driver (QSPI)
+  espressif/esp_lcd_sh8601:
+    version: "*"

@@ -1,8 +1,8 @@
 #include "data_stream.h"
 #include "../logging/grind_logging.h"
 #include "../config/constants.h"
-#include <Arduino.h>
-#include <LittleFS.h>
+#include "../../include/arduino_compat.h"
+#include "../../include/littlefs_idf.h"
 
 extern GrindLogger grind_logger;
 

@@ -1,4 +1,5 @@
 #include "ui_helpers.h"
+#include "../../include/arduino_compat.h"
 #include <cstdio>
 #include <cstdlib>
 

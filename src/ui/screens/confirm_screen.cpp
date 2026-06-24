@@ -1,5 +1,5 @@
 #include "confirm_screen.h"
-#include <Arduino.h>
+#include "arduino_compat.h"
 #include "../ui_helpers.h"
 
 void ConfirmScreen::create() {
