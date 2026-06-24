@@ -2,7 +2,6 @@
 
 enum class GrindMode {
     WEIGHT = 0,
-    TIME = 1,
-    CALIBRATED_TIME = 2
+    TIME = 1
 };
 

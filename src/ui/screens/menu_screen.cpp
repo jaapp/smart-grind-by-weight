@@ -430,14 +430,14 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_separator(parent, "Mode Selection");
 
     // Radio button group for grind mode selection at top
-    const char* grind_modes[] = {"Weight", "Time", "Cal. Time"};
+    const char* grind_modes[] = {"Weight", "Time"};
     grind_mode_radio_group = create_radio_button_group(
         parent,
         grind_modes,
-        3,
+        2,
         LV_FLEX_FLOW_ROW,
         0,  // Weight initially selected
-        88, 100,  // Width, Height (narrower to fit 3 buttons)
+        135, 100,  // Width, Height
         grind_mode_callback,
         this
     );
@@ -1203,8 +1203,7 @@ void MenuScreen::update_grind_mode_toggles() {
         Preferences* main_prefs = hardware_manager->get_preferences();
         if (main_prefs) {
             int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
-            mode_index = stored_mode;  // Direct mapping: WEIGHT=0, TIME=1, CALIBRATED_TIME=2
-            if (mode_index < 0 || mode_index > 2) mode_index = 0;
+            mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
             grinder_purge_mode_index = main_prefs->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
             grinder_purge_amount_g = main_prefs->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         }

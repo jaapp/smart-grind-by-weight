@@ -8,7 +8,6 @@
 #include "grind_strategy.h"
 #include "weight_grind_strategy.h"
 #include "time_grind_strategy.h"
-#include "calibrated_time_grind_strategy.h"
 #include "preferences_idf.h"
 #include "littlefs_idf.h"
 #include <freertos/FreeRTOS.h>
@@ -87,7 +86,6 @@ class GrindController {
 private:
     friend class WeightGrindStrategy;
     friend class TimeGrindStrategy;
-    friend class CalibratedTimeGrindStrategy;
 
     WeightSensor* weight_sensor;
     Grinder* grinder;
@@ -167,7 +165,6 @@ private:
     IGrindStrategy* active_strategy = nullptr;
     WeightGrindStrategy weight_strategy;
     TimeGrindStrategy time_strategy;
-    CalibratedTimeGrindStrategy calibrated_time_strategy;
 
     // Mechanical instability tracking
     int mechanical_anomaly_count_ = 0;
