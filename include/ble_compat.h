@@ -273,10 +273,15 @@ public:
     // Internal: called by BLE host sync callback once NimBLE is ready.
     static void on_stack_synced();
 
+    // Internal: starts the NimBLE host task once, after services are registered.
+    // Called from BLEAdvertising::start() on the first advertise.
+    static void ensure_host_started();
+
 private:
     static BLEServer*      s_server;
     static BLEAdvertising* s_advertising;
     static std::string     s_device_name;
     static uint16_t        s_requested_mtu;
     static bool            s_initialized;
+    static bool            s_host_started;
 };
