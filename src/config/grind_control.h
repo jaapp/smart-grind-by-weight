@@ -65,12 +65,6 @@ enum class GrinderPurgeMode {
 #define GRIND_PULSE_FLOW_RATE_FALLBACK_GPS 1.5f                                   // Fallback pulse flow rate when measured rate is invalid or too low
 
 //------------------------------------------------------------------------------
-// CALIBRATED TIME MODE
-//------------------------------------------------------------------------------
-#define GRIND_CALIBRATION_MIN_WEIGHT_G 2.0f                                      // Minimum final weight to accept calibration data
-#define GRIND_CALIBRATION_EMA_MAX_SAMPLES 10                                     // EMA window cap for flow rate smoothing
-
-//------------------------------------------------------------------------------
 // TIMING CONSTRAINTS (Hardware-dependent)
 //------------------------------------------------------------------------------
 // Motor response latency - runtime configurable via auto-tune

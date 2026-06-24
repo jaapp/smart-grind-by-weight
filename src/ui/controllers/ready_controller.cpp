@@ -72,12 +72,9 @@ void ReadyUIController::toggle_mode() {
         return;
     }
 
-    // Cycle: WEIGHT → TIME → CALIBRATED_TIME → WEIGHT
-    switch (ui_manager_->current_mode) {
-        case GrindMode::WEIGHT:          ui_manager_->current_mode = GrindMode::TIME; break;
-        case GrindMode::TIME:            ui_manager_->current_mode = GrindMode::CALIBRATED_TIME; break;
-        case GrindMode::CALIBRATED_TIME: ui_manager_->current_mode = GrindMode::WEIGHT; break;
-    }
+    ui_manager_->current_mode = (ui_manager_->current_mode == GrindMode::WEIGHT)
+                                    ? GrindMode::TIME
+                                    : GrindMode::WEIGHT;
 
     if (ui_manager_->profile_controller) {
         ui_manager_->profile_controller->set_grind_mode(ui_manager_->current_mode);
