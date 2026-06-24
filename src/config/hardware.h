@@ -31,6 +31,7 @@
 
 // Motor Control
 #define HW_MOTOR_RELAY_PIN 18                                                  // GPIO pin for grinder motor control relay
+#define HW_MOTOR_ACTIVE_LOW 1                                                  // 1 = relay energizes (motor ON) when pin is LOW; 0 = active-high
 #define HW_GRINDER_SETTLING_TIME_MS 500                                        // Startup transient immunity (tune based on mechanical rigidity, 0 to disable)
 
 //------------------------------------------------------------------------------
@@ -43,13 +44,18 @@
 // Calibration validation
 #define HW_LOADCELL_CAL_MIN_ADC_VALUE 1000                                    // Minimum ADC value to confirm weight placed on scale
 
+// Runtime fault detection & auto-recovery
+#define HW_LOADCELL_RUNTIME_TIMEOUT_MS 2000                                   // No valid sample for this long (healthy chip streams at 10 SPS) = runtime fault
+#define HW_LOADCELL_RECOVERY_INTERVAL_MS 5000                                 // Minimum spacing between automatic HX711 re-init attempts while faulted
+
 //------------------------------------------------------------------------------
 // DISPLAY SPECIFICATIONS  
 //------------------------------------------------------------------------------
 #define HW_DISPLAY_WIDTH_PX 280                                                // LCD width in pixels
 #define HW_DISPLAY_HEIGHT_PX 456                                               // LCD height in pixels
 #define HW_DISPLAY_OFFSET_X_PX 0                                               // X offset for display positioning
-#define HW_DISPLAY_ROTATION_DEG 0                                              // Display rotation angle
+#define HW_DISPLAY_ROTATION_DEG 0                                              // GFX rotation index; keep 0 so the panel uses its known-good rotation-0 offsets
+#define HW_DISPLAY_ROTATE_180 1                                                // 1 = rotate UI 180deg via MADCTL flip (in-place) + matching touch flip
 #define HW_DISPLAY_IPS_INVERT_X 180                                            // IPS X-axis inversion setting
 #define HW_DISPLAY_IPS_INVERT_Y 24                                             // IPS Y-axis inversion setting
 #define HW_DISPLAY_COLOR_ORDER 20                                              // Color channel ordering

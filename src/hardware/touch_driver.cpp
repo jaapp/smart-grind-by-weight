@@ -95,8 +95,18 @@ void TouchDriver::update() {
     
     uint8_t touches = buf[0] & 0x0F;
     if (touches > 0) {
-        last_touch.x = ((buf[1] & 0x0F) << 8) | buf[2];
-        last_touch.y = ((buf[3] & 0x0F) << 8) | buf[4];
+        uint16_t raw_x = ((buf[1] & 0x0F) << 8) | buf[2];
+        uint16_t raw_y = ((buf[3] & 0x0F) << 8) | buf[4];
+
+#if HW_DISPLAY_ROTATE_180
+        // Display is rotated 180deg via the panel MADCTL, but the touch controller
+        // always reports in its native orientation - mirror both axes to match.
+        raw_x = (HW_DISPLAY_WIDTH_PX - 1) - raw_x;
+        raw_y = (HW_DISPLAY_HEIGHT_PX - 1) - raw_y;
+#endif
+
+        last_touch.x = raw_x;
+        last_touch.y = raw_y;
         last_touch.pressed = true;
 
         // Update last touch time

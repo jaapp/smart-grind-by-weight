@@ -13,6 +13,7 @@
 #include "../logging/grind_logging.h"
 #include "../config/constants.h"
 #include <esp_task_wdt.h>
+#include <esp_heap_caps.h>
 #include <Arduino.h>
 
 // Global instance
@@ -118,28 +119,37 @@ void TaskManager::cleanup_queues() {
 
 bool TaskManager::create_all_tasks() {
     // Create tasks in order of priority (highest to lowest)
-    
+    LOG_BLE("[MEM] Before tasks: internal=%uB free, largest=%uB, PSRAM=%uB free\n",
+            heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+            heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+
     if (!create_weight_sampling_task()) {
         LOG_BLE("ERROR: Failed to create weight sampling task\n");
         return false;
     }
-    
+    LOG_BLE("[MEM] After WeightSampling: internal=%uB free, largest=%uB\n",
+            heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+
     if (!create_grind_control_task()) {
         LOG_BLE("ERROR: Failed to create grind control task\n");
         return false;
     }
-    
+    LOG_BLE("[MEM] After GrindControl: internal=%uB free, largest=%uB\n",
+            heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+
     if (!create_ui_render_task()) {
         LOG_BLE("ERROR: Failed to create UI render task\n");
         return false;
     }
-    
-    
+
     if (!create_bluetooth_task()) {
         LOG_BLE("ERROR: Failed to create bluetooth task\n");
         return false;
     }
-    
+
     if (!create_file_io_task()) {
         LOG_BLE("ERROR: Failed to create file I/O task\n");
         return false;
@@ -473,7 +483,7 @@ void TaskManager::bluetooth_task_impl() {
         }
         
         uint32_t end_time = millis();
-        record_task_timing(4, start_time, end_time); // Task index 4 for bluetooth
+        record_task_timing(3, start_time, end_time); // Task index 3 for bluetooth
         
         // Use vTaskDelayUntil for predictable timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);

@@ -144,6 +144,9 @@ void MenuScreen::create_menu_ui() {
     diagnostics_page = lv_menu_page_create(menu, "Diagnostics");
     create_diagnostics_page(diagnostics_page);
 
+    about_page = lv_menu_page_create(menu, "About");
+    create_about_page(about_page);
+
     // Create menu items grouped with separators
     create_separator(main_page, "Tools");
     scale_item = create_menu_item(main_page, "Scale");
@@ -194,6 +197,9 @@ void MenuScreen::create_menu_ui() {
 
     lv_obj_t* stats_item = create_menu_item(main_page, "Lifetime Stats");
     lv_menu_set_load_page_event(menu, stats_item, stats_page);
+
+    lv_obj_t* about_item = create_menu_item(main_page, "About");
+    lv_menu_set_load_page_event(menu, about_item, about_page);
 
     // Set main page as active (menu will be the landing page)
     lv_menu_set_page(menu, main_page);
@@ -252,6 +258,75 @@ void MenuScreen::create_info_page(lv_obj_t* parent) {
    
     create_data_label(parent, "Uptime:", &uptime_label);
     create_data_label(parent, "RAM:", &memory_label);
+}
+
+// Creates a stacked data row: name on top, value below scrolling horizontally if it overflows.
+static void create_about_row(lv_obj_t* parent, const char* name, const char* value) {
+    lv_obj_t* container = lv_obj_create(parent);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(container, 0, 0);
+    lv_obj_set_style_pad_all(container, 2, 0);
+    lv_obj_set_style_pad_left(container, 10, 0);
+    lv_obj_set_style_pad_right(container, 14, 0);
+    lv_obj_set_style_margin_all(container, 0, 0);
+    lv_obj_set_size(container, 280, LV_SIZE_CONTENT);
+    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_layout(container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(container, 4, 0);
+
+    lv_obj_t* name_label = lv_label_create(container);
+    lv_label_set_text(name_label, name);
+    lv_obj_set_style_text_font(name_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(name_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_width(name_label, LV_PCT(100));
+
+    // Value label: full width so SCROLL mode activates for long text
+    lv_obj_t* value_label = lv_label_create(container);
+    lv_label_set_text(value_label, value);
+    lv_obj_set_style_text_font(value_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(value_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_label_set_long_mode(value_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(value_label, LV_PCT(100));
+    lv_obj_set_style_anim_duration(value_label, 5000, LV_PART_MAIN);
+
+    // Set a style animation template so the circular scroll pauses 2s before repeating.
+    // lv_style stores a pointer, so allocate via lv_malloc (PSRAM) to outlive the function.
+    lv_anim_t * anim_tmpl = static_cast<lv_anim_t *>(lv_malloc(sizeof(lv_anim_t)));
+    if (anim_tmpl) {
+        lv_anim_init(anim_tmpl);
+        anim_tmpl->repeat_delay = 2000;
+        lv_obj_set_style_anim(value_label, anim_tmpl, LV_PART_MAIN);
+    }
+}
+
+void MenuScreen::create_about_page(lv_obj_t* parent) {
+    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(parent, 0, 0);
+
+    // Enable vertical scrolling for the about page content
+    lv_obj_set_scroll_dir(parent, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
+
+    // All About values are fixed at build time, so they are populated once here.
+    char version_info[48];
+    snprintf(version_info, sizeof(version_info), "v%s (#%d)", BUILD_FIRMWARE_VERSION, BUILD_NUMBER);
+
+    create_separator(parent, "Device");
+    create_about_row(parent, "Name:", PRODUCT_NAME);
+    create_about_row(parent, "Model:", PRODUCT_MODEL);
+
+    create_separator(parent, "Firmware");
+    create_about_row(parent, "Version:", version_info);
+    create_about_row(parent, "Commit:", get_git_commit_id());
+    create_about_row(parent, "Author:", get_git_commit_author());
+    create_about_row(parent, "Updated:", BUILD_TIMESTAMP);
+
+    create_separator(parent, "Credits");
+    create_description_label(parent, ORIGINAL_AUTHOR_CREDIT);
 }
 
 

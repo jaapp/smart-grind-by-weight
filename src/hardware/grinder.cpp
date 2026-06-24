@@ -5,6 +5,11 @@
 #include "mock_hx711_driver.h"
 #endif
 
+namespace {
+// Physical pin level corresponding to "motor off" (depends on relay polarity).
+constexpr int MOTOR_OFF_PIN_LEVEL = HW_MOTOR_ACTIVE_LOW ? HIGH : LOW;
+}
+
 void Grinder::init(int pin) {
     motor_pin = pin;
     grinding = false;
@@ -21,16 +26,27 @@ void Grinder::init(int pin) {
     initialized = true;
     return;
 #endif
-    
-    // Initialize RMT for all motor control (both continuous and pulse)
+
+    // Drive the relay to its OFF level as early as possible so the motor stays
+    // off during the brief window before RMT takes over the pin (critical for
+    // active-low relays, which would otherwise energize on a floating/LOW pin).
+    pinMode(motor_pin, OUTPUT);
+    digitalWrite(motor_pin, MOTOR_OFF_PIN_LEVEL);
+
+    // Initialize RMT for all motor control (both continuous and pulse).
+    // RMT symbols always treat level 1 as "motor ON"; for active-low relays the
+    // invert_out flag flips the physical pad so idle (raw 0) rests at the OFF level.
     rmt_tx_channel_config_t tx_chan_config = {
         .gpio_num = (gpio_num_t)motor_pin,
         .clk_src = RMT_CLK_SRC_DEFAULT,
         .resolution_hz = 1000000, // 1MHz resolution = 1µs per tick
         .mem_block_symbols = 64,
         .trans_queue_depth = 4,
+        .flags = {
+            .invert_out = HW_MOTOR_ACTIVE_LOW ? 1u : 0u,
+        },
     };
-    
+
     if (rmt_new_tx_channel(&tx_chan_config, &rmt_channel) == ESP_OK) {
         rmt_enable(rmt_channel);
         rmt_initialized = true;
@@ -194,8 +210,8 @@ bool Grinder::is_pulse_complete() {
     
     // For simplicity, we'll use a transmission done callback approach
     // Since RMT handles the pulse timing in hardware, we can check the GPIO state
-    // as a simple completion indicator
-    if (digitalRead(motor_pin) == LOW) {
+    // as a simple completion indicator (pulse done == pin returned to OFF level)
+    if (digitalRead(motor_pin) == MOTOR_OFF_PIN_LEVEL) {
         pulse_active = false;
         grinding = false;
         emit_background_change(false);

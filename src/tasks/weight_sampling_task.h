@@ -47,6 +47,10 @@ private:
     // Hardware state
     bool hardware_initialized;
     bool hardware_validation_passed;
+
+    // Runtime fault detection & auto-recovery
+    uint32_t last_valid_sample_ms;     // Timestamp of the most recent successful sample
+    uint32_t last_recovery_attempt_ms; // Timestamp of the most recent re-init attempt while faulted
     
     // Static instance for task callback
     static WeightSamplingTask* instance;
@@ -82,7 +86,11 @@ private:
     
     // Hardware management (extracted from RealtimeController)
     bool initialize_hx711_hardware();
-    void sample_and_feed_weight_sensor();
+    bool sample_and_feed_weight_sensor();   // Returns true if a fresh sample was taken this cycle
+
+    // Runtime fault detection and automatic recovery
+    void monitor_and_recover_hardware();    // Detects loss of data and retries the HX711 while faulted
+    bool attempt_runtime_recovery();        // Watchdog-safe wrapper around attempt_hardware_recovery()
     
     // Performance tracking
     void record_timing(uint32_t start_time, uint32_t end_time);
