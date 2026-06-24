@@ -80,7 +80,7 @@ void MenuScreen::create_menu_ui() {
     lv_obj_set_style_pad_top(header, title_padding, 0);
     lv_obj_set_style_pad_bottom(header, title_padding, 0);
 
-    // Get the header label
+    // Get the header label — constrain width and enable horizontal scroll for long titles
     lv_obj_t* header_label = lv_obj_get_child(header, -1);
     if (header_label) {
         lv_obj_set_style_text_align(header_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -89,8 +89,14 @@ void MenuScreen::create_menu_ui() {
         lv_obj_set_style_min_height(header_label, title_target_height, 0);
         lv_obj_set_style_pad_top(header_label, title_padding, 0);
         lv_obj_set_style_pad_bottom(header_label, title_padding, 0);
+
+        // Let the label fill remaining space between back arrow and spacer
+        lv_obj_set_flex_grow(header_label, 1);
+        // Long titles scroll horizontally instead of overflowing
+        lv_label_set_long_mode(header_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        lv_obj_set_style_anim_duration(header_label, 5000, LV_PART_MAIN);
     }
-    // Get and style the chevron first
+    // Get and style the back chevron — add solid background so scrolling title doesn't show through
     lv_obj_t* back_chevron = lv_menu_get_main_header_back_button(menu);
     lv_obj_set_style_text_font(back_chevron, &lv_font_montserrat_32, 0);
     lv_obj_set_ext_click_area(back_chevron, 200);
@@ -98,6 +104,8 @@ void MenuScreen::create_menu_ui() {
     lv_obj_set_style_min_height(back_chevron, title_target_height, 0);
     lv_obj_set_style_pad_top(back_chevron, title_padding, 0);
     lv_obj_set_style_pad_bottom(back_chevron, title_padding, 0);
+    lv_obj_set_style_bg_color(back_chevron, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
+    lv_obj_set_style_bg_opa(back_chevron, LV_OPA_COVER, 0);
 
     // Force layout update to get proper chevron dimensions
     lv_obj_update_layout(header);
@@ -106,7 +114,8 @@ void MenuScreen::create_menu_ui() {
     // Spacer is used to center name of the page name in the header
     lv_obj_t* spacer = lv_obj_create(header);
     lv_obj_set_size(spacer, lv_obj_get_width(back_chevron), lv_obj_get_height(back_chevron));
-    lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(spacer, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
+    lv_obj_set_style_bg_opa(spacer, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(spacer, 0, 0);
     lv_obj_clear_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
 

@@ -109,7 +109,7 @@ void DisplayManager::init()
     io_config.cs_gpio_num         = HW_DISPLAY_CS_PIN;
     io_config.dc_gpio_num         = -1;      // QSPI: no D/C line
     io_config.spi_mode            = 0;
-    io_config.pclk_hz             = 40 * 1000 * 1000;
+    io_config.pclk_hz             = 80 * 1000 * 1000;  // 80 MHz QSPI (CO5300 max)
     io_config.trans_queue_depth   = 10;
     io_config.on_color_trans_done = on_color_trans_done;
     io_config.user_ctx            = this;
@@ -187,7 +187,7 @@ void DisplayManager::init()
     // ------------------------------------------------------------------
     // 5. Allocate LVGL draw buffers (double-buffered, 40 rows each)
     // ------------------------------------------------------------------
-    const size_t buf_pixels = HW_DISPLAY_WIDTH_PX * 40;
+    const size_t buf_pixels = HW_DISPLAY_WIDTH_PX * 80;  // 80 rows per buffer — fewer DMA round-trips
     const size_t buf_bytes  = buf_pixels * sizeof(lv_color_t);
 
     draw_buf1 = static_cast<lv_color_t*>(
@@ -242,9 +242,15 @@ void DisplayManager::init()
     lv_indev_set_type(lvgl_input, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(lvgl_input, touchpad_read_cb);
 
+    // iOS-like scroll feel: minimal dead-zone, smooth deceleration
+    lv_indev_set_scroll_limit(lvgl_input, 2);   // Start scrolling after 2px (default 10) — fast flicks register
+    lv_indev_set_scroll_throw(lvgl_input, 6);   // 6% deceleration per frame (default 10) — smooth coast, less edge bounce
+
     initialized = true;
-    ESP_LOGI(TAG, "Display init complete (%" PRIu32 "x%" PRIu32 ")",
-             screen_width, screen_height);
+    ESP_LOGI(TAG, "Display init complete (%" PRIu32 "x%" PRIu32 ") | %s | 80MHz QSPI | %zu-row bufs",
+             screen_width, screen_height,
+             draw_buf2 ? "double-buffered" : "SINGLE-buffered",
+             (size_t)80);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +263,7 @@ void DisplayManager::update()
 
     touch_driver.update();
 
-    if (lock(0)) {
+    if (lock(5)) {  // Wait up to 5ms for LVGL mutex instead of skipping
         lv_timer_handler();
         unlock();
     }
