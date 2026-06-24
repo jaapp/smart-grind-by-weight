@@ -162,9 +162,11 @@ void UIManager::update() {
             break;
 
         case UIState::READY:
-            // Ready state - no special handling needed
+            if (ready_controller_) {
+                ready_controller_->update();
+            }
             break;
-            
+
         default:
             break;
     }
@@ -181,6 +183,11 @@ void UIManager::update() {
 }
 
 void UIManager::switch_to_state(UIState new_state) {
+    // Any state change must stop a held manual grind (safety net for missed releases)
+    if (ready_controller_) {
+        ready_controller_->stop_manual_grind();
+    }
+
     state_machine->transition_to(new_state);
 
     // Hide all screens before showing the requested one

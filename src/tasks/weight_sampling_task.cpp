@@ -215,7 +215,12 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     // Apply saved calibration factor
     float saved_cal_factor = weight_sensor->get_saved_calibration_factor();
     weight_sensor->set_calibration_factor(saved_cal_factor);
-    
+
+    // Restore the last user tare so the scale starts near zero instead of
+    // showing the raw load-cell reading (offset persists across reboots in NVS)
+    weight_sensor->set_zero_offset(weight_sensor->get_saved_tare_offset());
+
+
     // Hardware stabilization - wait for hardware to be ready
     LOG_BLE("  Waiting for WeightSensor hardware stabilization...\n");
     uint32_t start_time = millis();
@@ -388,6 +393,16 @@ void WeightSamplingTask::monitor_and_recover_hardware() {
     if (!weight_sensor) return;
 
     const uint32_t now = millis();
+
+    // Clear the tare offset exactly once when comms are lost: a stale zero is
+    // meaningless after the chip drops out (the global tare otherwise persists
+    // across screens until reboot or an explicit re-tare).
+    const bool faulted_now = weight_sensor->has_hardware_fault();
+    if (faulted_now && !previously_faulted_) {
+        weight_sensor->set_zero_offset(0);
+        LOG_BLE("WeightSamplingTask: HX711 comms lost - tare offset cleared\n");
+    }
+    previously_faulted_ = faulted_now;
 
     if (weight_sensor->has_hardware_fault()) {
         // A fault is active - retry the chip on a fixed cadence, but never while a

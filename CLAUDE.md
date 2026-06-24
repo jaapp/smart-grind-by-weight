@@ -34,9 +34,9 @@ python3 tools/grinder.py analyze
 **Key Components:**
 - **HardwareManager**: Central hardware coordinator
 - **GrindController**: 9-phase state machine with predictive flow control, 10 pulse corrections, mechanical instability detection, and time mode additional pulses
-- **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered), calibration flag, noise diagnostics
+- **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered), calibration flag, noise diagnostics; tare offset persists in NVS (`hx_tare`) so the scale returns near zero after reboot
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
-- **UIManager**: 7 screens with LVGL integration; menu page surfaces quick Tools (Scale view, Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
+- **UIManager**: 7 screens with LVGL integration; READY screen is a swipe tabview — Single / Double / Custom / MENU / **Scale** (5 tabs, iOS-style page-indicator dots pinned to the bottom edge); menu page surfaces quick Tools (Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
@@ -57,6 +57,12 @@ python3 tools/grinder.py analyze
 - **Preferences**: `chute_mode` (int: 0=Prime, 1=Purge, default=1), `chute_amount_g` (float: 0.1-5.0, default=1.0)
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
+
+**Scale Home Page:** Top-level swipe tab (after MENU) with a large live-weight readout and two round buttons — **TARE** (zero) and **GRIND** (hold-to-grind)
+- **No auto-tare**: opening the page shows live weight against the persisted tare offset; the user tares explicitly
+- **Hold-to-grind**: GRIND runs the motor continuously (`grinder->start()`/`stop()`) only while pressed; releasing, leaving the tab, any state change, or a 10s safety cap stops it. The persistent bottom grind button is hidden on this tab
+- **Accumulating weight**: no taring happens around manual grinding, so weight builds against the last tare (top off a shot in increments)
+- **Tare persistence**: user tares (Scale TARE button + calibration) save to NVS and reload on boot/recovery; pre-grind auto-tares are not persisted. A live HX711 comms loss zeroes the in-RAM offset but leaves NVS intact
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
 - **Mode Selection**: Radio buttons for Weight/Time mode selection

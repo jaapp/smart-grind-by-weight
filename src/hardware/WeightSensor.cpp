@@ -250,6 +250,9 @@ void WeightSensor::tare() {
     if (doTare) {
         LOG_BLE("ERROR: Blocking tare operation failed or timed out\n");
     } else {
+        // Persist the new zero so it survives a reboot (user-initiated tare only)
+        save_tare_offset();
+
         // Clear buffer after tare completes for clean measurements
         raw_filter.clear_all_samples();
         raw_filter.reset_display_filter();
@@ -579,6 +582,26 @@ void WeightSensor::load_calibration() {
         cal_factor = USER_DEFAULT_CALIBRATION_FACTOR;
         LOG_BLE("Using default calibration factor: %.2f\n", USER_DEFAULT_CALIBRATION_FACTOR);
     }
+}
+
+void WeightSensor::save_tare_offset() {
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    return;
+#endif
+    if (prefs) {
+        prefs->putInt("hx_tare", tare_offset);
+        LOG_BLE("Saved tare offset to NVS: %ld\n", (long)tare_offset);
+    }
+}
+
+int32_t WeightSensor::get_saved_tare_offset() {
+#if DEBUG_ENABLE_LOADCELL_MOCK
+    return 0;
+#endif
+    if (prefs && prefs->isKey("hx_tare")) {
+        return prefs->getInt("hx_tare", 0);
+    }
+    return 0;
 }
 
 void WeightSensor::clear_calibration_data() {
