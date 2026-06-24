@@ -33,6 +33,7 @@ BLEAdvertising* BLEDevice::s_advertising   = nullptr;
 std::string     BLEDevice::s_device_name;
 uint16_t        BLEDevice::s_requested_mtu = 517;
 bool            BLEDevice::s_initialized   = false;
+bool            BLEDevice::s_host_started  = false;
 
 // =============================================================================
 // Internal helpers
@@ -316,22 +317,26 @@ void BLEService::start() {
     m_svc_defs[0].characteristics = m_chr_defs.data();
     // Terminator (index 1) already zeroed.
 
-    int rc = ble_gatts_add_svcs(m_svc_defs.data());
+    // Register this service with NimBLE BEFORE the host task is started. The
+    // canonical NimBLE flow (see ESP-IDF bleprph example) is:
+    //   ble_gatts_count_cfg(svcs) + ble_gatts_add_svcs(svcs)  -- before host start
+    //   ...then the host calls ble_gatts_start() itself on sync.
+    // Calling ble_gatts_start() manually after the host had already synced (the
+    // old approach) corrupted the attribute table once more than one service was
+    // present, crashing in ble_gatts_start. BLEDevice defers the host start until
+    // after every service has registered (BLEDevice::ensure_host_started()).
+    int rc = ble_gatts_count_cfg(m_svc_defs.data());
+    if (rc != 0) {
+        ESP_LOGE(TAG, "ble_gatts_count_cfg failed: %d (svc=%s)", rc, m_uuid.toString().c_str());
+        return;
+    }
+    rc = ble_gatts_add_svcs(m_svc_defs.data());
     if (rc != 0) {
         ESP_LOGE(TAG, "ble_gatts_add_svcs failed: %d (svc=%s)", rc, m_uuid.toString().c_str());
         return;
     }
 
-    // After adding services the attribute handles become valid only once the
-    // GATT server is (re-)started.  ble_gatts_start() is called here to commit
-    // the newly added service into the attribute database.
-    rc = ble_gatts_start();
-    if (rc != 0 && rc != BLE_HS_EALREADY) {
-        ESP_LOGE(TAG, "ble_gatts_start failed: %d", rc);
-        return;
-    }
-
-    ESP_LOGI(TAG, "BLEService started: %s (%zu chars)", m_uuid.toString().c_str(), n);
+    ESP_LOGI(TAG, "BLEService registered: %s (%zu chars)", m_uuid.toString().c_str(), n);
     m_started = true;
 }
 
@@ -364,6 +369,11 @@ void BLEAdvertising::setScanResponseData(const BLEAdvertisementData& data) {
 }
 
 void BLEAdvertising::start() {
+    // Start the NimBLE host on the first advertise (after all services have been
+    // registered). The host registers the services and starts the GATT server on
+    // sync; advertising/GAP calls below require a synced host.
+    BLEDevice::ensure_host_started();
+
     // Build advertising data fields.
     struct ble_hs_adv_fields fields;
     memset(&fields, 0, sizeof(fields));
@@ -485,10 +495,6 @@ void BLEServer::setConnId(uint16_t h) {
 
     s_device_name = name;
 
-    // Create a one-shot semaphore that ble_on_sync() will post.
-    s_sync_sem = xSemaphoreCreateBinary();
-    assert(s_sync_sem != nullptr);
-
     // Initialise the NimBLE port (registers IDF BT controller).
     int rc = nimble_port_init();
     if (rc != 0) {
@@ -510,19 +516,37 @@ void BLEServer::setConnId(uint16_t h) {
     ble_hs_cfg.sync_cb  = ble_on_sync;
     ble_hs_cfg.reset_cb = ble_on_reset;
 
-    // Start NimBLE host task.
+    // NOTE: the NimBLE host task is NOT started here. Application services must
+    // be registered (ble_gatts_count_cfg/add_svcs via BLEService::start) BEFORE
+    // the host runs, because the host calls ble_gatts_start() itself on sync.
+    // BLEDevice::ensure_host_started() starts the host on the first advertise,
+    // after all services have registered.
+    s_initialized = true;
+    ESP_LOGI(TAG, "BLEDevice::init() complete (host start deferred), name='%s'", name.c_str());
+}
+
+/*static*/ void BLEDevice::ensure_host_started() {
+    if (s_host_started) {
+        return;
+    }
+
+    // One-shot semaphore posted by ble_on_sync().
+    s_sync_sem = xSemaphoreCreateBinary();
+    assert(s_sync_sem != nullptr);
+
+    // Start the NimBLE host task. On sync the host registers all services that
+    // were added before this point and starts the GATT server automatically.
     nimble_port_freertos_init(ble_host_task);
 
     // Block until the stack is synced (typically <500 ms).
     if (xSemaphoreTake(s_sync_sem, pdMS_TO_TICKS(5000)) != pdTRUE) {
-        ESP_LOGE(TAG, "BLEDevice::init() timed out waiting for NimBLE sync");
+        ESP_LOGE(TAG, "ensure_host_started() timed out waiting for NimBLE sync");
     }
 
     vSemaphoreDelete(s_sync_sem);
     s_sync_sem = nullptr;
-
-    s_initialized = true;
-    ESP_LOGI(TAG, "BLEDevice::init() complete, device name='%s'", name.c_str());
+    s_host_started = true;
+    ESP_LOGI(TAG, "NimBLE host started");
 }
 
 /*static*/ void BLEDevice::on_stack_synced() {
