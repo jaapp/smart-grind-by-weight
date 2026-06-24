@@ -192,6 +192,11 @@ public:
     void load_calibration();
     void clear_calibration_data();
 
+    // Tare offset persistence (NVS) - survives reboot so the scale returns
+    // near zero instead of showing the raw load-cell reading
+    void save_tare_offset();
+    int32_t get_saved_tare_offset();
+
     // Calibration flag (for diagnostics)
     bool is_calibrated() const;
     void set_calibrated(bool calibrated);

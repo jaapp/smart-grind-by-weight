@@ -110,8 +110,13 @@ public:
     OTAScreen ota_screen;
     OtaUpdateFailedScreen ota_update_failed_screen;
 
+    // Home-screen swipe tab indices (ready_screen tabview order)
+    static constexpr int kMenuTabIndex = 3;   // "MENU" tab
+    static constexpr int kScaleTabIndex = 4;  // "Scale" tab (swipe past MENU)
+    static constexpr int kHomeTabCount = 5;   // Single, Double, Custom, MENU, Scale
+
     ~UIManager();
-    void init(HardwareManager* hw_mgr, StateMachine* sm, 
+    void init(HardwareManager* hw_mgr, StateMachine* sm,
               ProfileController* pc, GrindController* gc, BluetoothManager* bluetooth);
     void update();
     void switch_to_state(UIState new_state);

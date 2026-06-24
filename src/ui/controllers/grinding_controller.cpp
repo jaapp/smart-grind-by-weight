@@ -12,6 +12,10 @@
 
 GrindingUIController* GrindingUIController::instance_ = nullptr;
 
+// Vertical offset of the bottom action button(s) from the screen bottom.
+// Raised to leave the very bottom edge free for the page-indicator dots.
+static constexpr int kButtonBottomY = -34;
+
 GrindingUIController::GrindingUIController(UIManager* manager)
     : ui_manager_(manager) {
     instance_ = this;
@@ -24,7 +28,7 @@ void GrindingUIController::build_controls() {
 
     grind_button_ = lv_btn_create(lv_scr_act());
     lv_obj_set_size(grind_button_, 100, 100);
-    lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, -10);
+    lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, kButtonBottomY);
     lv_obj_set_style_radius(grind_button_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_PRIMARY), 0);
     lv_obj_set_style_border_width(grind_button_, 0, 0);
@@ -296,6 +300,19 @@ void GrindingUIController::update_grind_button_icon() {
         return;
     }
 
+    // On the Scale home tab the in-page GRIND button handles grinding, so hide
+    // the persistent bottom button. Restore it on any other READY tab.
+    if (ui_manager_->state_machine->is_state(UIState::READY)) {
+        if (ui_manager_->current_tab == UIManager::kScaleTabIndex) {
+            lv_obj_add_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
+            if (pulse_button_) {
+                lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
+            }
+            return;
+        }
+        lv_obj_clear_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
+    }
+
     if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
         // During purge confirm, show STOP icon (user can cancel the grind)
         lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
@@ -341,9 +358,9 @@ void GrindingUIController::update_button_layout() {
 
     if (in_purge_confirm || should_show_pulse) {
         // Dual button layout: left button at -60, right button at +60
-        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, -10);
+        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, kButtonBottomY);
         if (pulse_button_) {
-            lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, -10);
+            lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, kButtonBottomY);
             lv_obj_clear_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
 
             if (in_purge_confirm) {
@@ -368,7 +385,7 @@ void GrindingUIController::update_button_layout() {
         }
     } else {
         // Single button layout: centered at 0
-        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, 0, kButtonBottomY);
         if (pulse_button_) {
             lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
         }

@@ -4,13 +4,30 @@
 #include <lvgl.h>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"
+#include "../../logging/grind_logging.h"
+#include "../components/ui_operations.h"
 #include "../event_bridge_lvgl.h"
 #include "../ui_manager.h"
+
+// Hard safety cap: stop a held manual grind after this long even if the
+// button is still pressed (or a release event was missed).
+static constexpr uint32_t kManualGrindMaxMs = 10000;
 
 ReadyUIController::ReadyUIController(UIManager* manager)
     : ui_manager_(manager) {}
 
-void ReadyUIController::update() {}
+void ReadyUIController::update() {
+    if (!ui_manager_) {
+        return;
+    }
+    // Drive the live weight readout while the Scale tab is showing
+    if (ui_manager_->current_tab == UIManager::kScaleTabIndex &&
+        ui_manager_->state_machine->is_state(UIState::READY)) {
+        auto* hw = ui_manager_->get_hardware_manager();
+        auto* sensor = hw ? hw->get_weight_sensor() : nullptr;
+        ui_manager_->ready_screen.update_scale_weight(sensor ? sensor->get_display_weight() : 0.0f);
+    }
+}
 
 void ReadyUIController::refresh_profiles() {
     if (!ui_manager_ || !ui_manager_->profile_controller) {
@@ -34,6 +51,13 @@ void ReadyUIController::handle_tab_change(int tab) {
         ui_manager_->profile_controller->set_current_profile(tab);
         refresh_profiles();
     }
+
+    // Leaving the Scale tab must always stop a held manual grind
+    if (tab != UIManager::kScaleTabIndex) {
+        stop_manual_grind();
+    }
+
+    ui_manager_->ready_screen.update_page_dots(tab);
 
     if (ui_manager_->grinding_controller_) {
         ui_manager_->grinding_controller_->update_grind_button_icon();
@@ -147,6 +171,107 @@ void ReadyUIController::register_events() {
     EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::PROFILE_LONG_PRESS,
                                       [this](lv_event_t*) { handle_profile_long_press(); });
 
+    EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::SCALE_TARE,
+                                      [this](lv_event_t*) { handle_scale_tare(); });
+
+    EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::SCALE_GRIND,
+                                      [this](lv_event_t* e) { handle_scale_grind(e); });
+
     ui_manager_->ready_screen.set_profile_long_press_handler(EventBridgeLVGL::profile_long_press_handler);
 
+}
+
+void ReadyUIController::handle_scale_tare() {
+    if (!ui_manager_) {
+        return;
+    }
+    auto* hardware = ui_manager_->get_hardware_manager();
+    if (!hardware) {
+        return;
+    }
+
+    // Never tare while the motor is running
+    stop_manual_grind();
+
+    UIOperations::execute_tare(hardware, [this]() {
+        if (!ui_manager_) {
+            return;
+        }
+        auto* sensor = ui_manager_->get_hardware_manager()->get_weight_sensor();
+        ui_manager_->ready_screen.update_scale_weight(sensor ? sensor->get_display_weight() : 0.0f);
+    });
+}
+
+void ReadyUIController::handle_scale_grind(lv_event_t* e) {
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED) {
+        start_manual_grind();
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        stop_manual_grind();
+    }
+}
+
+void ReadyUIController::start_manual_grind() {
+    if (!ui_manager_ || manual_grind_active_) {
+        return;
+    }
+    // Only grind from the Scale tab in the READY state
+    if (!ui_manager_->state_machine->is_state(UIState::READY) ||
+        ui_manager_->current_tab != UIManager::kScaleTabIndex) {
+        return;
+    }
+
+    auto* hardware = ui_manager_->get_hardware_manager();
+    auto* grinder = hardware ? hardware->get_grinder() : nullptr;
+    if (!grinder) {
+        return;
+    }
+
+    manual_grind_active_ = true;
+    grinder->start();
+    ui_manager_->set_background_active(true);
+
+    if (manual_grind_timeout_timer_) {
+        lv_timer_del(manual_grind_timeout_timer_);
+    }
+    manual_grind_timeout_timer_ = lv_timer_create(manual_grind_timeout_cb, kManualGrindMaxMs, this);
+    if (manual_grind_timeout_timer_) {
+        lv_timer_set_repeat_count(manual_grind_timeout_timer_, 1);
+    }
+
+    LOG_BLE("[%lums MANUAL_GRIND] Started (hold-to-grind)\n", millis());
+}
+
+void ReadyUIController::stop_manual_grind() {
+    if (manual_grind_timeout_timer_) {
+        lv_timer_del(manual_grind_timeout_timer_);
+        manual_grind_timeout_timer_ = nullptr;
+    }
+
+    if (!manual_grind_active_) {
+        return;
+    }
+    manual_grind_active_ = false;
+
+    auto* hardware = ui_manager_ ? ui_manager_->get_hardware_manager() : nullptr;
+    auto* grinder = hardware ? hardware->get_grinder() : nullptr;
+    if (grinder) {
+        grinder->stop();
+    }
+    if (ui_manager_) {
+        ui_manager_->set_background_active(false);
+    }
+
+    LOG_BLE("[%lums MANUAL_GRIND] Stopped\n", millis());
+}
+
+void ReadyUIController::manual_grind_timeout_cb(lv_timer_t* timer) {
+    auto* self = static_cast<ReadyUIController*>(lv_timer_get_user_data(timer));
+    if (!self) {
+        return;
+    }
+    // One-shot timer: LVGL deletes it after this callback, so drop our handle first
+    self->manual_grind_timeout_timer_ = nullptr;
+    LOG_BLE("[%lums MANUAL_GRIND] Safety auto-stop (%lums cap reached)\n", millis(), (unsigned long)kManualGrindMaxMs);
+    self->stop_manual_grind();
 }

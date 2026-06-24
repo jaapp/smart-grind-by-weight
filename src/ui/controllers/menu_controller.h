@@ -15,8 +15,6 @@ public:
     void handle_reset();
     void handle_purge();
     void handle_motor_test();
-    void handle_scale_open();
-    void handle_scale_tare();
     void handle_autotune();
     void handle_back();
     void handle_refresh_stats();
