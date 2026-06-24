@@ -25,10 +25,12 @@ public:
     bool lock(uint32_t timeout_ms = portMAX_DELAY);
     void unlock();
 
+    // Accessed by DMA ISR callback (on_color_trans_done)
+    lv_display_t*             lvgl_display  = nullptr;
+
 private:
     esp_lcd_panel_handle_t    panel_handle  = nullptr;
     esp_lcd_panel_io_handle_t io_handle     = nullptr;
-    lv_display_t*             lvgl_display  = nullptr;
     lv_indev_t*               lvgl_input    = nullptr;
     lv_color_t*               draw_buf1     = nullptr;
     lv_color_t*               draw_buf2     = nullptr;
@@ -40,11 +42,6 @@ private:
     uint32_t screen_width  = HW_DISPLAY_WIDTH_PX;
     uint32_t screen_height = HW_DISPLAY_HEIGHT_PX;
     bool     initialized   = false;
-
-    // Flush-done callback: called by esp_lcd DMA completion ISR.
-    static bool on_color_trans_done(esp_lcd_panel_io_handle_t io,
-                                    esp_lcd_panel_io_event_data_t* edata,
-                                    void* user_ctx);
 
     // LVGL callbacks
     static void     lvgl_flush_cb(lv_display_t* disp, const lv_area_t* area,
