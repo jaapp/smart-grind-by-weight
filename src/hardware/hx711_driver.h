@@ -32,6 +32,11 @@ private:
     unsigned long conversion_start_time;
     unsigned long conversion_time;
     float estimated_sample_rate_sps;
+
+    // Runtime disconnect detection: a healthy HX711 releases DOUT HIGH after
+    // each read until the next conversion. If the line stays LOW (pulldown
+    // holding a disconnected input), count it as a stuck read.
+    uint8_t consecutive_stuck_reads;
     
     // HX711-specific timing constants
     static const uint8_t SCK_DELAY = 1;           // Microsecond delay after SCK toggle
@@ -60,6 +65,7 @@ public:
     int32_t get_raw_data() const override;
 
     bool validate_hardware() override;
+    bool is_disconnected() const override { return consecutive_stuck_reads >= HW_LOADCELL_STUCK_LOW_LIMIT; }
 
     // HX711-specific capabilities
     bool supports_temperature_sensor() const override { return false; }

@@ -59,3 +59,8 @@ CONFIG_HEAP_TRACING_DEST_STANDALONE=y
 
 # --- Compiler / optimization ---
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# --- LVGL ---
+# Use the project's hand-maintained include/lv_conf.h instead of Kconfig
+# (required for custom fonts, PSRAM allocator, RGB565 color depth, etc.)
+CONFIG_LV_CONF_SKIP=n

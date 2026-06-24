@@ -1,8 +1,11 @@
 ## IDF Component Manager manifest for the main (src/) component.
-## LVGL is handled by PlatformIO's library manager (.pio/libdeps).
 
 dependencies:
   idf: ">=5.1.0"
+
+  # LVGL graphics library (9.x, direct integration — no esp_lvgl_port)
+  lvgl/lvgl:
+    version: "^9.0.0"
 
   # LittleFS filesystem (not bundled in ESP-IDF 5.x core)
   joltwallet/littlefs:
