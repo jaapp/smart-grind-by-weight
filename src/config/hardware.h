@@ -47,6 +47,7 @@
 // Runtime fault detection & auto-recovery
 #define HW_LOADCELL_RUNTIME_TIMEOUT_MS 2000                                   // No valid sample for this long (healthy chip streams at 10 SPS) = runtime fault
 #define HW_LOADCELL_RECOVERY_INTERVAL_MS 5000                                 // Minimum spacing between automatic HX711 re-init attempts while faulted
+#define HW_LOADCELL_STUCK_LOW_LIMIT 5                                         // Consecutive reads with DOUT never released HIGH = chip disconnected (pulldown holds line LOW)
 
 //------------------------------------------------------------------------------
 // DISPLAY SPECIFICATIONS  

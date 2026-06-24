@@ -711,6 +711,19 @@ bool WeightSensor::sample_and_feed_filter() {
     // Non-blocking check for available ADC data
     if (data_waiting_async()) {
         update_async();
+
+        // Detect a chip removed at runtime: with DOUT held LOW by the input
+        // pulldown, the driver reports "ready" forever and would otherwise feed
+        // a stream of fabricated samples (masking the loss). Flag the fault so
+        // WeightSamplingTask runs its recovery, and skip feeding garbage.
+        if (adc_driver->is_disconnected()) {
+            if (get_hardware_fault() == HardwareFault::NONE) {
+                set_hardware_fault(HardwareFault::NOT_CONNECTED);
+                LOG_BLE("WeightSensor: HX711 DOUT stuck LOW - chip disconnected at runtime\n");
+            }
+            return false;
+        }
+
         int32_t raw_adc = get_raw_adc_data();  // Get raw ADC data from driver
         uint32_t timestamp = millis();
         

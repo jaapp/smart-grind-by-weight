@@ -18,10 +18,11 @@
  * adapted from the original implementation for ESP32-S3 integration.
  */
 
-HX711Driver::HX711Driver(uint8_t sck_pin, uint8_t dout_pin) 
-    : sck_pin(sck_pin), dout_pin(dout_pin), gain(1), last_raw_data(0), 
+HX711Driver::HX711Driver(uint8_t sck_pin, uint8_t dout_pin)
+    : sck_pin(sck_pin), dout_pin(dout_pin), gain(1), last_raw_data(0),
       data_ready_flag(false), conversion_start_time(0), conversion_time(0),
-      estimated_sample_rate_sps(HW_LOADCELL_SAMPLE_RATE_SPS) {
+      estimated_sample_rate_sps(HW_LOADCELL_SAMPLE_RATE_SPS),
+      consecutive_stuck_reads(0) {
 }
 
 bool HX711Driver::begin() {
@@ -29,6 +30,9 @@ bool HX711Driver::begin() {
 }
 
 bool HX711Driver::begin(uint8_t gain_value) {
+    // Clear any stale runtime-disconnect state from a prior session
+    consecutive_stuck_reads = 0;
+
     // Ensure GPIO pins are properly configured for ESP32-S3
     // GPIO 2 is a strapping pin that needs explicit configuration
     gpio_reset_pin((gpio_num_t)sck_pin);
@@ -169,6 +173,21 @@ void HX711Driver::conversion_24bit() {
     
     last_raw_data = (int32_t)raw_data;  // Explicit cast to int32_t for consistency
     data_ready_flag = true;
+
+    // Runtime disconnect detection: a real HX711 releases DOUT HIGH after the
+    // read until the next conversion is ready (~100ms at 10 SPS). If the line
+    // is still LOW here, the chip is likely gone and the input pulldown is
+    // holding DOUT LOW — which would otherwise read as "always ready" and feed
+    // a stream of fabricated samples. Count consecutive stuck reads so the
+    // sampling task can flag a fault and trigger recovery.
+    delayMicroseconds(10);
+    if (digitalRead(dout_pin) == LOW) {
+        if (consecutive_stuck_reads < HW_LOADCELL_STUCK_LOW_LIMIT) {
+            consecutive_stuck_reads++;
+        }
+    } else {
+        consecutive_stuck_reads = 0;
+    }
 }
 
 int32_t HX711Driver::get_raw_data() const {

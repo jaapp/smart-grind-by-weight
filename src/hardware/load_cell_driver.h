@@ -26,6 +26,11 @@ public:
 
     virtual bool validate_hardware() = 0;
 
+    // Returns true once the driver is confident the chip has been physically
+    // disconnected at runtime. Default false for drivers that can't detect it
+    // (e.g. the simulation mock).
+    virtual bool is_disconnected() const { return false; }
+
     virtual bool supports_temperature_sensor() const = 0;
     virtual float get_temperature() const = 0;
     virtual uint32_t get_max_sample_rate() const = 0;
