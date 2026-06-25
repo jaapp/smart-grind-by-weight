@@ -51,7 +51,7 @@ private:
     // Runtime fault detection & auto-recovery
     uint32_t last_valid_sample_ms;     // Timestamp of the most recent successful sample
     uint32_t last_recovery_attempt_ms; // Timestamp of the most recent re-init attempt while faulted
-    bool previously_faulted_ = false;  // Edge tracking: clear the tare offset once when comms are lost
+    bool boot_tare_requested_ = false; // One-shot: zero the scale once after boot
     
     // Static instance for task callback
     static WeightSamplingTask* instance;

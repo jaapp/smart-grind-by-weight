@@ -153,6 +153,14 @@ void WeightSamplingTask::task_impl() {
         // Core sampling operations (extracted from RealtimeController)
         if (sample_and_feed_weight_sensor()) {
             last_valid_sample_ms = cycle_start_time;
+
+            // One-shot boot tare: zero the (assumed empty) scale once samples are
+            // flowing, so it starts near zero instead of the raw load-cell reading.
+            if (!boot_tare_requested_ && weight_sensor) {
+                weight_sensor->tareNoDelay();
+                boot_tare_requested_ = true;
+                LOG_BLE("WeightSamplingTask: boot tare requested (zeroing empty scale)\n");
+            }
         }
 
         // Detect a chip that has stopped responding and retry it automatically
@@ -216,10 +224,8 @@ bool WeightSamplingTask::initialize_hx711_hardware() {
     float saved_cal_factor = weight_sensor->get_saved_calibration_factor();
     weight_sensor->set_calibration_factor(saved_cal_factor);
 
-    // Restore the last user tare so the scale starts near zero instead of
-    // showing the raw load-cell reading (offset persists across reboots in NVS)
-    weight_sensor->set_zero_offset(weight_sensor->get_saved_tare_offset());
-
+    // Note: the scale is zeroed by a one-shot boot tare once sampling starts
+    // (see task_impl), so it begins near zero without persisting an offset.
 
     // Hardware stabilization - wait for hardware to be ready
     LOG_BLE("  Waiting for WeightSensor hardware stabilization...\n");
@@ -394,15 +400,9 @@ void WeightSamplingTask::monitor_and_recover_hardware() {
 
     const uint32_t now = millis();
 
-    // Clear the tare offset exactly once when comms are lost: a stale zero is
-    // meaningless after the chip drops out (the global tare otherwise persists
-    // across screens until reboot or an explicit re-tare).
-    const bool faulted_now = weight_sensor->has_hardware_fault();
-    if (faulted_now && !previously_faulted_) {
-        weight_sensor->set_zero_offset(0);
-        LOG_BLE("WeightSamplingTask: HX711 comms lost - tare offset cleared\n");
-    }
-    previously_faulted_ = faulted_now;
+    // Note: the tare offset is intentionally preserved across a comms loss. It
+    // persists in NVS and is reloaded on recovery/boot, so the scale returns to
+    // its last zero rather than the raw reading.
 
     if (weight_sensor->has_hardware_fault()) {
         // A fault is active - retry the chip on a fixed cadence, but never while a

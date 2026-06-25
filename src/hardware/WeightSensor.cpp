@@ -44,6 +44,7 @@ WeightSensor::WeightSensor() {
     tareStatus = false;
     tareTimeoutFlag = false;
     tareTimeOut = 0;
+    initial_tare_done_ = false;
     
     // Initialize stable reading diagnostic tracking
     not_settled_start_time = 0;
@@ -250,9 +251,6 @@ void WeightSensor::tare() {
     if (doTare) {
         LOG_BLE("ERROR: Blocking tare operation failed or timed out\n");
     } else {
-        // Persist the new zero so it survives a reboot (user-initiated tare only)
-        save_tare_offset();
-
         // Clear buffer after tare completes for clean measurements
         raw_filter.clear_all_samples();
         raw_filter.reset_display_filter();
@@ -417,6 +415,11 @@ float WeightSensor::get_weight_low_latency() const {
 }
 
 float WeightSensor::get_display_weight() {
+    // Until the first (boot) tare completes, suppress the raw reading so the
+    // un-tared ~full-scale value never flashes on screen.
+    if (!initial_tare_done_) {
+        return 0.0f;
+    }
     float weight = raw_to_weight(raw_filter.get_display_raw());
     // Clamp tiny values around zero to prevent -0.0g display
     if (weight > -0.05f && weight < 0.05f) {
@@ -584,26 +587,6 @@ void WeightSensor::load_calibration() {
     }
 }
 
-void WeightSensor::save_tare_offset() {
-#if DEBUG_ENABLE_LOADCELL_MOCK
-    return;
-#endif
-    if (prefs) {
-        prefs->putInt("hx_tare", tare_offset);
-        LOG_BLE("Saved tare offset to NVS: %ld\n", (long)tare_offset);
-    }
-}
-
-int32_t WeightSensor::get_saved_tare_offset() {
-#if DEBUG_ENABLE_LOADCELL_MOCK
-    return 0;
-#endif
-    if (prefs && prefs->isKey("hx_tare")) {
-        return prefs->getInt("hx_tare", 0);
-    }
-    return 0;
-}
-
 void WeightSensor::clear_calibration_data() {
 #if DEBUG_ENABLE_LOADCELL_MOCK
     cal_factor = DEBUG_MOCK_CAL_FACTOR;
@@ -766,6 +749,7 @@ bool WeightSensor::sample_and_feed_filter() {
                     tareTimes = 0;
                     doTare = 0;
                     tareStatus = 1;
+                    initial_tare_done_ = true;  // first zero established; allow display
                 }
             }
             
