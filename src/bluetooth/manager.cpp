@@ -340,21 +340,40 @@ void BluetoothManager::disable() {
 
 void BluetoothManager::handle() {
     if (!ble_enabled) return;
-    
+
+    // Reconcile the cached connection flag with the real GAP state. A failed or
+    // aborted connection can skip the onDisconnect callback, otherwise leaving
+    // device_connected stuck true (timeout never resumes, advertising never restarts).
+    if (ble_server) {
+        bool really_connected = ble_server->isConnected();
+        if (device_connected && !really_connected) {
+            last_disconnect_time = millis();  // resync timeout from now
+        }
+        device_connected = really_connected;
+    }
+
     // Only check timeout when no client is connected
     if (!device_connected) {
         unsigned long disconnected_elapsed = millis() - last_disconnect_time;
-        
+
         if (disconnected_elapsed > timeout_ms) {
             log("Bluetooth: Timeout reached (%lu minutes disconnected), disabling BLE\n", timeout_ms / 60000);
             disable();
             return;
         }
+
+        // Advertising watchdog: NimBLE stops advertising when a connection begins,
+        // so a connection that fails before a clean disconnect can leave the radio
+        // silent. Restart advertising whenever we are enabled, idle, and not advertising.
+        if (!BLEDevice::isAdvertising()) {
+            log("Bluetooth: advertising was stopped - restarting\n");
+            start_advertising();
+        }
     } else {
         // While connected, constantly reset timeout to default for UI display
         timeout_ms = BLE_AUTO_DISABLE_TIMEOUT_MS;
     }
-    
+
     // Handle data export updates
     update_data_export();
     process_sessions_info_updates();

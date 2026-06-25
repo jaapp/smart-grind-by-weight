@@ -231,6 +231,7 @@ public:
     void         disconnect();
 
     uint16_t     getConnId() const { return m_conn_handle; }
+    bool         isConnected() const { return m_conn_handle != BLE_HS_CONN_HANDLE_NONE; }
     void         setConnId(uint16_t h);
 
     std::vector<BLEService*>& getServices() { return m_services; }
@@ -264,6 +265,9 @@ public:
     static BLEAdvertising* getAdvertising();
     static void            startAdvertising();
     static void            stopAdvertising();
+
+    // True while the GAP layer is actively advertising (NimBLE-backed)
+    static bool            isAdvertising() { return ble_gap_adv_active() != 0; }
 
     // Optional MTU request (best-effort; client may ignore it).
     static void setMTU(uint16_t mtu);
