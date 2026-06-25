@@ -610,5 +610,9 @@ void BLEServer::setConnId(uint16_t h) {
     s_advertising = nullptr;
 
     s_initialized = false;
+    // Must reset so a later re-enable (e.g. from Settings) actually restarts the
+    // NimBLE host task. Otherwise ensure_host_started() short-circuits and the
+    // device advertises but cannot service GATT connections until a reboot.
+    s_host_started = false;
     ESP_LOGI(TAG, "BLEDevice::deinit() complete");
 }
