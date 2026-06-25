@@ -166,6 +166,12 @@ void ReadyScreen::create_page_dots() {
     // Lowest element on the screen, mirroring the status indicators at the top
     lv_obj_align(page_dots_container, LV_ALIGN_BOTTOM_MID, 0, -3);
     lv_obj_clear_flag(page_dots_container, LV_OBJ_FLAG_SCROLLABLE);
+    // Opaque (black) background so a repaint fully clears the strip - prevents
+    // stale-pixel artifacts from the dots floating over the animating tabview.
+    // Invisible against the black screen background.
+    lv_obj_set_style_bg_opa(page_dots_container, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(page_dots_container, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
+    lv_obj_set_style_pad_all(page_dots_container, 4, 0);
     lv_obj_set_layout(page_dots_container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(page_dots_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(page_dots_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -193,6 +199,12 @@ void ReadyScreen::update_page_dots(int active_index) {
         lv_obj_set_style_bg_color(page_dots[i],
                                   lv_color_hex(active ? THEME_COLOR_TEXT_PRIMARY : THEME_COLOR_NEUTRAL), 0);
         lv_obj_set_style_bg_opa(page_dots[i], active ? LV_OPA_COVER : LV_OPA_50, 0);
+        lv_obj_invalidate(page_dots[i]);
+    }
+    // Repaint the whole row (overlay on the active screen) so the edge dots don't
+    // leave stale pixels when the tabview animates underneath them.
+    if (page_dots_container) {
+        lv_obj_invalidate(page_dots_container);
     }
 }
 
