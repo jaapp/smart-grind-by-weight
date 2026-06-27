@@ -1009,7 +1009,11 @@ void MenuScreen::update_grinder_purge_amount_label(float amount_g) {
         float clamped_amount = amount_g;
         if (clamped_amount < GRIND_PURGE_AMOUNT_MIN_G) clamped_amount = GRIND_PURGE_AMOUNT_MIN_G;
         if (clamped_amount > GRIND_PURGE_AMOUNT_MAX_G) clamped_amount = GRIND_PURGE_AMOUNT_MAX_G;
-        snprintf(buffer, sizeof(buffer), "Amount: %.1fg", clamped_amount);
+        if (clamped_amount < GRIND_PURGE_DISABLED_THRESHOLD_G) {
+            snprintf(buffer, sizeof(buffer), "Amount: Off");
+        } else {
+            snprintf(buffer, sizeof(buffer), "Amount: %.1fg", clamped_amount);
+        }
         lv_label_set_text(grinder_purge_amount_label, buffer);
     }
 }

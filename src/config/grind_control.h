@@ -19,8 +19,9 @@ enum class GrinderPurgeMode {
 // Grinder saturation defaults and ranges
 #define GRIND_PURGE_MODE_DEFAULT static_cast<int>(GrinderPurgeMode::PURGE)
 #define GRIND_PURGE_AMOUNT_DEFAULT_G 1.0f
-#define GRIND_PURGE_AMOUNT_MIN_G 0.1f
+#define GRIND_PURGE_AMOUNT_MIN_G 0.0f                                      // 0g = purge disabled (skips PRIME entirely, no pre-grind pause)
 #define GRIND_PURGE_AMOUNT_MAX_G 2.5f
+#define GRIND_PURGE_DISABLED_THRESHOLD_G 0.05f                            // Purge amounts below this are treated as "off"
 
 // Grind freshness tracking
 #define GRIND_FRESHNESS_DEFAULT_HOURS 8.0f
@@ -33,12 +34,22 @@ enum class GrinderPurgeMode {
 #define GRIND_TIMEOUT_SEC 60                                              // Maximum time for grind operation
 #define GRIND_MAX_PULSE_ATTEMPTS 10                                       // Maximum pulse corrections before stopping
 
+// Pulse corrections after the predictive grind. Set to 1 to top off toward the
+// target with short pulses (needs a scale that settles between pulses). Set to 0
+// to skip pulses entirely and land on the predictive motor-stop alone - faster,
+// and robust on a noisy load cell that never settles cleanly. With pulses off,
+// dial in the landing weight with GRIND_LATENCY_TO_COAST_RATIO below.
+#define GRIND_ENABLE_PULSE_CORRECTIONS 0
+
 // Flow rate detection
 #define GRIND_FLOW_DETECTION_THRESHOLD_GPS 0.5f                           // Minimum coffee flow rate to establish first grinds reachinig the cup = latency
 
-// Undershoot strategy - determine when to stop grinding during the predictive phase
+// Undershoot strategy - determine when to stop grinding during the predictive phase.
+// The motor stops early by (latency * RATIO * flow_rate) grams to account for coffee
+// still in flight/coasting. THIS IS THE OVERSHOOT TUNING DIAL: lower it to grind
+// longer (land heavier, fix undershoot), raise it to grind less (land lighter).
 #define GRIND_UNDERSHOOT_TARGET_G 1.0f                                    // Default conservative undershoot target
-#define GRIND_LATENCY_TO_COAST_RATIO 1.0f                                 // Ratio of expected coast time to measured latency (e.g., 0.8 = 80%)
+#define GRIND_LATENCY_TO_COAST_RATIO 0.5f                                 // Coast estimate as a fraction of measured latency; tune to land on target
 
 // Prime phase behavior
 #define GRIND_PRIME_TARGET_WEIGHT_G 1.0f                                   // Amount of coffee delivered during chute priming
@@ -48,7 +59,7 @@ enum class GrinderPurgeMode {
 // SCALE CALIBRATION AND SETTLING
 //------------------------------------------------------------------------------
 // Tare and settling behavior  
-#define GRIND_SCALE_SETTLING_TOLERANCE_G 0.010f                           // Maximum standard deviation for settled reading. Used to determine if scale is settled. Increase value if you have a noisy load cell.
+#define GRIND_SCALE_SETTLING_TOLERANCE_G 0.030f                           // Maximum standard deviation for settled reading. Used to determine if scale is settled. Increase value if you have a noisy load cell.
 
 //------------------------------------------------------------------------------
 // TIME MODE PULSE SETTINGS

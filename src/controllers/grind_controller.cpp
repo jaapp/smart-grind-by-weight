@@ -362,8 +362,14 @@ void GrindController::update() {
                 time_grind_start_ms = loop_data.now;
                 if (mode == GrindMode::TIME) {
                     switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+                } else if (grinder_purge_amount_g_for_session < GRIND_PURGE_DISABLED_THRESHOLD_G) {
+                    // Purge disabled (0g): skip PRIME/PRIME_SETTLING and the purge
+                    // popup entirely - go straight to the predictive grind, no pause.
+                    flow_start_confirmed = false;
+                    grind_latency_ms = 0;
+                    switch_phase(GrindPhase::PREDICTIVE, loop_data);
                 } else {
-                    // Always run chute operation for weight mode
+                    // Run chute purge/prime to saturate the grinder
                     switch_phase(GrindPhase::PRIME, loop_data);
                 }
             }
