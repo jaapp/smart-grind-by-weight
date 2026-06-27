@@ -87,6 +87,7 @@ The platform dependency is automatically handled by PlatformIO via the `platform
 **Build production firmware:**
 ```bash
 python3 tools/grinder.py build
+# Equivalent: platformio run -e waveshare-esp32s3-touch-amoled-164
 ```
 
 **Build debug firmware:**
