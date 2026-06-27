@@ -177,6 +177,10 @@ private:
     // so a single noisy sample can't abort the grind.
     unsigned long negative_weight_since_ms_ = 0;
 
+    // Time-mode manual top-off: true while the user holds the PULSE button so the
+    // motor runs continuously (hold-to-grind), like the Scale page.
+    bool manual_pulse_active_ = false;
+
     DiagnosticsController* diagnostics_controller_ = nullptr;
 
     // Motor response latency - runtime configurable
@@ -209,8 +213,10 @@ public:
     void update(); // Core 0 main control method - runs at fixed RTOS interval
     
     // Time mode pulse functionality
-    void start_additional_pulse(); // Start an additional 100ms pulse in time mode
-    bool can_pulse() const; // Check if additional pulses are allowed
+    void start_additional_pulse(); // Begin a manual hold-to-grind top-off in time mode (press)
+    void stop_additional_pulse();  // End the manual hold-to-grind top-off (release)
+    bool can_pulse() const; // Check if a manual top-off can be started
+    bool is_additional_pulse_active() const { return phase == GrindPhase::TIME_ADDITIONAL_PULSE; }
     int get_additional_pulse_count() const { return additional_pulse_count; }
     
     // UI event system

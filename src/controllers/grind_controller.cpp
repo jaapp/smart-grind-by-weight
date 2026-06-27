@@ -136,6 +136,7 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     start_time = millis();
     pulse_attempts = 0;
     negative_weight_since_ms_ = 0;
+    manual_pulse_active_ = false;
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
     timeout_pause_start = 0;
     timeout_offset_ms = 0;
@@ -482,15 +483,26 @@ void GrindController::update() {
             break;
             
         case GrindPhase::TIME_ADDITIONAL_PULSE:
-            // Wait for the pulse to finish AND the scale to settle, then re-capture
+            // Manual hold-to-grind top-off: the motor runs while the user holds the
+            // PULSE button. Live weight updates on the completion screen via progress
+            // events (this phase is excluded from the UI's grinding-state switch, so
+            // the completion screen stays up rather than flickering to the grind view).
+            if (manual_pulse_active_) {
+                // Safety cap so a missed release can't grind forever
+                if (loop_data.now - phase_start_time >= GRIND_MANUAL_PULSE_MAX_MS) {
+                    manual_pulse_active_ = false;
+                    if (grinder) grinder->stop();
+                    queue_log_message("[CONTROLLER] Manual top-off safety cap reached\n");
+                }
+                break;  // Keep grinding while held
+            }
+
+            // Released: once the motor is stopped and the scale settles, re-capture
             // the final weight so the completion screen reflects the extra grounds.
-            // We stay in this phase while settling (TIME_ADDITIONAL_PULSE is excluded
-            // from the UI's grinding-state switch), so the completion screen keeps
-            // showing instead of flickering back to the grinding view.
-            if (grinder && grinder->is_pulse_complete() &&
+            if (grinder && !grinder->is_grinding() &&
                 weight_sensor && weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS)) {
                 final_weight = weight_sensor->get_weight_high_latency();
-                LOG_BLE("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n",
+                LOG_BLE("[%lums CONTROLLER] Manual top-off #%d done, weight: %.2fg\n",
                         millis(), additional_pulse_count, final_weight);
 
                 // Return to completed phase with the updated weight
@@ -1075,39 +1087,53 @@ void GrindController::start_additional_pulse() {
     if (!can_pulse()) {
         return;
     }
-    
+
     if (!grinder) {
         LOG_BLE("ERROR: Cannot pulse - grinder not available\n");
         return;
     }
-    
+
     additional_pulse_count++;
 
     // Update statistics for time mode pulse
     statistics_manager.update_time_pulse();
 
-    // Reset timeout timer to prevent timeout during additional pulses
+    // Reset timeout timer to prevent timeout while the user holds to grind
     start_time = millis();
+    manual_pulse_active_ = true;
 
-    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums) - timeout timer reset\n",
-            millis(), additional_pulse_count, (unsigned long)pulse_duration_ms);
+    LOG_BLE("[%lums CONTROLLER] Manual top-off #%d started (hold-to-grind)\n",
+            millis(), additional_pulse_count);
 
     // Transition to additional pulse phase (without loop_data since this is a manual action)
     GrindLoopData empty_loop_data = {};
     empty_loop_data.now = millis();
     switch_phase(GrindPhase::TIME_ADDITIONAL_PULSE, empty_loop_data);
 
-    // Start the pulse
-    grinder->start_pulse_rmt(pulse_duration_ms);
-    
+    // Run the motor continuously while held (stopped on release or the safety cap)
+    grinder->start();
+
     // Notify mock driver for weight simulation (if mock is active)
 #if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
-    MockHX711Driver::notify_pulse(pulse_duration_ms);
+    MockHX711Driver::notify_grinder_start();
 #endif
 }
 
+void GrindController::stop_additional_pulse() {
+    if (phase != GrindPhase::TIME_ADDITIONAL_PULSE) {
+        return;
+    }
+
+    manual_pulse_active_ = false;
+    if (grinder) {
+        grinder->stop();  // Phase handler will settle, re-measure, then return to COMPLETED
+    }
+
+    LOG_BLE("[%lums CONTROLLER] Manual top-off released - settling\n", millis());
+}
+
 bool GrindController::can_pulse() const {
-    // Only allow pulses in time mode when grind is completed and not in pulse phase
+    // Only allow starting a top-off in time mode when the grind is completed
     return mode == GrindMode::TIME &&
            phase == GrindPhase::COMPLETED;
 }

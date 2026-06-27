@@ -71,7 +71,8 @@ enum class GrinderPurgeMode {
 //------------------------------------------------------------------------------
 // TIME MODE PULSE SETTINGS
 //------------------------------------------------------------------------------
-#define GRIND_TIME_PULSE_DURATION_MS 100                                        // Duration of additional pulses in time mode (milliseconds)
+#define GRIND_TIME_PULSE_DURATION_MS 100                                        // Legacy fixed-pulse duration (time mode top-off is now hold-to-grind)
+#define GRIND_MANUAL_PULSE_MAX_MS 10000                                         // Safety cap: max continuous hold-to-grind time for a time-mode top-off
 
 
 
