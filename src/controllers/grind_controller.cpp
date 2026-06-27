@@ -346,20 +346,21 @@ void GrindController::update() {
             break;
             
         case GrindPhase::TARE_CONFIRM:
-            // Check if tare is complete
+            // Proceed as soon as the tare offset is locked. The zero is already
+            // captured from a smoothed window inside the tare, so we don't wait
+            // for the scale to settle here (matching the manual TARE button).
+            // The old settle gate didn't improve the zero - it only delayed the
+            // grind, stalling for seconds when starting on a freshly placed cup.
             if (!weight_sensor->is_tare_in_progress()) {
-                // Double confirm weights are settled
-                if (weight_sensor->is_settled()) {
-                    if (!grinder->is_grinding()) {
-                        grinder->start();  // Ensure motor is running
-                    }
-                    time_grind_start_ms = loop_data.now;
-                    if (mode == GrindMode::TIME) {
-                        switch_phase(GrindPhase::TIME_GRINDING, loop_data);
-                    } else {
-                        // Always run chute operation for weight mode
-                        switch_phase(GrindPhase::PRIME, loop_data);
-                    }
+                if (!grinder->is_grinding()) {
+                    grinder->start();  // Ensure motor is running
+                }
+                time_grind_start_ms = loop_data.now;
+                if (mode == GrindMode::TIME) {
+                    switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+                } else {
+                    // Always run chute operation for weight mode
+                    switch_phase(GrindPhase::PRIME, loop_data);
                 }
             }
             break;
@@ -470,12 +471,18 @@ void GrindController::update() {
             break;
             
         case GrindPhase::TIME_ADDITIONAL_PULSE:
-            // Check for additional pulse completion
-            if (grinder && grinder->is_pulse_complete()) {
-                LOG_BLE("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n", 
-                        millis(), additional_pulse_count, weight_sensor ? weight_sensor->get_display_weight() : 0.0f);
-                
-                // Return to completed phase
+            // Wait for the pulse to finish AND the scale to settle, then re-capture
+            // the final weight so the completion screen reflects the extra grounds.
+            // We stay in this phase while settling (TIME_ADDITIONAL_PULSE is excluded
+            // from the UI's grinding-state switch), so the completion screen keeps
+            // showing instead of flickering back to the grinding view.
+            if (grinder && grinder->is_pulse_complete() &&
+                weight_sensor && weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS)) {
+                final_weight = weight_sensor->get_weight_high_latency();
+                LOG_BLE("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n",
+                        millis(), additional_pulse_count, final_weight);
+
+                // Return to completed phase with the updated weight
                 switch_phase(GrindPhase::COMPLETED, loop_data);
             }
             break;
