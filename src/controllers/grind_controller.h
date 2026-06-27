@@ -172,6 +172,11 @@ private:
     float last_mechanical_weight_ = 0.0f;
     bool mechanical_monitor_initialized_ = false;
 
+    // Negative-weight failsafe: timestamp the net weight first dropped below the
+    // threshold (0 = currently non-negative). Used to require a sustained reading
+    // so a single noisy sample can't abort the grind.
+    unsigned long negative_weight_since_ms_ = 0;
+
     DiagnosticsController* diagnostics_controller_ = nullptr;
 
     // Motor response latency - runtime configurable

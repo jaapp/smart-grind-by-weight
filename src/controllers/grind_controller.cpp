@@ -135,6 +135,7 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
 
     start_time = millis();
     pulse_attempts = 0;
+    negative_weight_since_ms_ = 0;
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
     timeout_pause_start = 0;
     timeout_offset_ms = 0;
@@ -565,14 +566,29 @@ void GrindController::update() {
     // Emit progress update events every cycle for responsive UI
     emit_progress_update(loop_data);
 
-    // Check for negative weight failsafe after TARE_CONFIRM phase during active grinding
-    // Only check after motor has settled to avoid false positives from startup transients
-    if (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
-        phase != GrindPhase::IDLE && phase != GrindPhase::INITIALIZING &&
-        phase != GrindPhase::SETUP && phase != GrindPhase::TARING &&
-        phase != GrindPhase::TARE_CONFIRM &&
-        grinder->is_motor_settled() &&
-        loop_data.current_weight < -1.0f) {
+    // Check for negative weight failsafe after TARE_CONFIRM phase during active grinding.
+    // Only check after the motor has settled to avoid startup transients, and require the
+    // reading to STAY negative for the sustain window - a single noisy sample on a noisy
+    // load cell (no purge cushion to hold the baseline up) must not abort the grind, but a
+    // removed cup reads negative continuously.
+    bool neg_failsafe_phase = (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
+                               phase != GrindPhase::IDLE && phase != GrindPhase::INITIALIZING &&
+                               phase != GrindPhase::SETUP && phase != GrindPhase::TARING &&
+                               phase != GrindPhase::TARE_CONFIRM);
+
+    if (neg_failsafe_phase && grinder->is_motor_settled() &&
+        loop_data.current_weight < GRIND_NEGATIVE_WEIGHT_FAILSAFE_G) {
+        if (negative_weight_since_ms_ == 0) {
+            negative_weight_since_ms_ = loop_data.now;  // Start of a negative excursion
+        }
+    } else {
+        negative_weight_since_ms_ = 0;  // Recovered (or in an excluded phase) - reset
+    }
+
+    bool negative_weight_sustained = (negative_weight_since_ms_ != 0) &&
+        (loop_data.now - negative_weight_since_ms_ >= GRIND_NEGATIVE_WEIGHT_FAILSAFE_SUSTAIN_MS);
+
+    if (negative_weight_sustained) {
         timeout_phase = phase;
         grinder->stop();
         last_session_result_ = GrindSessionResult::ERROR;

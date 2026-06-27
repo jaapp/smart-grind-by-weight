@@ -32,6 +32,13 @@ enum class GrinderPurgeMode {
 // Main accuracy and timeout settings
 #define GRIND_ACCURACY_TOLERANCE_G 0.03f                                  // Final target accuracy tolerance
 #define GRIND_TIMEOUT_SEC 60                                              // Maximum time for grind operation
+
+// Negative-weight failsafe: aborts the grind when net weight goes (and stays)
+// negative - e.g. the cup was removed mid-grind. The reading must stay below the
+// threshold for the sustain window, so a single noisy/vibration sample on a noisy
+// load cell can't false-trigger (especially with the purge cushion turned off).
+#define GRIND_NEGATIVE_WEIGHT_FAILSAFE_G -1.0f                            // Net weight that counts as "negative"
+#define GRIND_NEGATIVE_WEIGHT_FAILSAFE_SUSTAIN_MS 500                     // Must persist this long before aborting
 #define GRIND_MAX_PULSE_ATTEMPTS 10                                       // Maximum pulse corrections before stopping
 
 // Pulse corrections after the predictive grind. Set to 1 to top off toward the
