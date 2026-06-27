@@ -106,11 +106,11 @@ enum class GrinderPurgeMode {
 #define GRIND_TARE_SAMPLE_WINDOW_MS 500                                           // Time window for tare sampling
 #define GRIND_TARE_TIMEOUT_MS 3000                                                // Maximum tare completion time
 
-// Set to 1 to wait for the scale to settle after taring before the grind starts
-// (cleaner on calm setups). Set to 0 to start grinding the moment the tare offset
-// is locked - faster, and avoids multi-second stalls on a noisy load cell. The
-// tare zero accuracy is identical either way; this only gates how long we wait.
-#define GRIND_TARE_WAIT_FOR_SETTLE 0
+// Wait up to this long for the scale to settle BEFORE locking the tare zero, so a
+// still-creeping baseline (e.g. just after a cup is placed) doesn't bias the zero
+// and make the net weight drift negative during the grind. Bounded so a noisy load
+// cell that never fully settles still tares promptly. Set to 0 to tare immediately.
+#define GRIND_TARE_PRE_SETTLE_MAX_MS 1500
 #define GRIND_CALIBRATION_SAMPLE_WINDOW_MS 800                                    // Time window for calibration sampling  
 #define GRIND_CALIBRATION_TIMEOUT_MS 2000                                         // Maximum calibration completion time
 

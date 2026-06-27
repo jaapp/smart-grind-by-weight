@@ -180,6 +180,9 @@ private:
     // Time-mode manual top-off: true while the user holds the PULSE button so the
     // motor runs continuously (hold-to-grind), like the Scale page.
     bool manual_pulse_active_ = false;
+    // Timestamp the motor stopped after a top-off, to bound the post-release settle
+    // wait so a noisy scale that never settles can't get stuck in the pulse phase.
+    unsigned long pulse_settle_start_ms_ = 0;
 
     DiagnosticsController* diagnostics_controller_ = nullptr;
 

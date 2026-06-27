@@ -219,8 +219,14 @@ void GrindController::user_tare_request() {
 void GrindController::return_to_idle() {
     // This is called by the UI to acknowledge a completed or timed-out grind
     // and return the controller to the IDLE state.
-    if (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) {
+    if (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT ||
+        phase == GrindPhase::TIME_ADDITIONAL_PULSE) {
         LOG_BLE("[%lums CONTROLLER] UI acknowledged completion/timeout, returning to IDLE.\n", millis());
+        // If acknowledged mid-top-off, make sure the motor is stopped first.
+        manual_pulse_active_ = false;
+        if (grinder) {
+            grinder->stop();
+        }
         time_grind_start_ms = 0;
         target_time_ms = 0;
         grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(GRIND_PURGE_MODE_DEFAULT);
@@ -340,24 +346,27 @@ void GrindController::update() {
             break;
         }
             
-        case GrindPhase::TARING:
-            if (weight_sensor->start_nonblocking_tare()) {
+        case GrindPhase::TARING: {
+            // Let the scale settle before locking the tare zero. The zero is captured
+            // at the end of the tare from a smoothed window, so a baseline that is
+            // still creeping (just after a cup is placed) would bias it and make the
+            // net weight drift negative through the grind. Bounded so a noisy cell
+            // that never fully settles still tares promptly.
+            bool ready_to_tare = (GRIND_TARE_PRE_SETTLE_MAX_MS == 0) ||
+                                 weight_sensor->is_settled() ||
+                                 (loop_data.now - phase_start_time) >= GRIND_TARE_PRE_SETTLE_MAX_MS;
+            if (ready_to_tare && weight_sensor->start_nonblocking_tare()) {
                 LOG_LOADCELL_DEBUG("Non-blocking tare started\n");
                 switch_phase(GrindPhase::TARE_CONFIRM, loop_data);
             }
             break;
+        }
             
         case GrindPhase::TARE_CONFIRM:
-            // Proceed once the tare offset is locked. The zero is already captured
-            // from a smoothed window inside the tare, so the optional settle gate
-            // below doesn't improve the zero - it only delays the grind, and stalls
-            // for seconds on a noisy load cell. With GRIND_TARE_WAIT_FOR_SETTLE off,
-            // taring proceeds immediately (matching the manual TARE button).
-            if (!weight_sensor->is_tare_in_progress()
-#if GRIND_TARE_WAIT_FOR_SETTLE
-                && weight_sensor->is_settled()  // Double confirm weights are settled
-#endif
-            ) {
+            // Proceed as soon as the tare offset is locked. We already waited for the
+            // scale to settle BEFORE taring (in TARING), so the zero is good and there
+            // is no need to wait again here - that would only delay the grind.
+            if (!weight_sensor->is_tare_in_progress()) {
                 if (!grinder->is_grinding()) {
                     grinder->start();  // Ensure motor is running
                 }
@@ -499,14 +508,22 @@ void GrindController::update() {
 
             // Released: once the motor is stopped and the scale settles, re-capture
             // the final weight so the completion screen reflects the extra grounds.
-            if (grinder && !grinder->is_grinding() &&
-                weight_sensor && weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS)) {
-                final_weight = weight_sensor->get_weight_high_latency();
-                LOG_BLE("[%lums CONTROLLER] Manual top-off #%d done, weight: %.2fg\n",
-                        millis(), additional_pulse_count, final_weight);
+            // Bounded by the settling timeout so a noisy scale that never settles
+            // still completes instead of leaving us stuck in this phase.
+            if (grinder && !grinder->is_grinding() && weight_sensor) {
+                if (pulse_settle_start_ms_ == 0) {
+                    pulse_settle_start_ms_ = loop_data.now;
+                }
+                bool settled = weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+                bool settle_timed_out = (loop_data.now - pulse_settle_start_ms_) >= GRIND_SCALE_SETTLING_TIMEOUT_MS;
+                if (settled || settle_timed_out) {
+                    final_weight = weight_sensor->get_weight_high_latency();
+                    LOG_BLE("[%lums CONTROLLER] Manual top-off #%d done, weight: %.2fg\n",
+                            millis(), additional_pulse_count, final_weight);
 
-                // Return to completed phase with the updated weight
-                switch_phase(GrindPhase::COMPLETED, loop_data);
+                    // Return to completed phase with the updated weight
+                    switch_phase(GrindPhase::COMPLETED, loop_data);
+                }
             }
             break;
             
@@ -1101,6 +1118,7 @@ void GrindController::start_additional_pulse() {
     // Reset timeout timer to prevent timeout while the user holds to grind
     start_time = millis();
     manual_pulse_active_ = true;
+    pulse_settle_start_ms_ = 0;
 
     LOG_BLE("[%lums CONTROLLER] Manual top-off #%d started (hold-to-grind)\n",
             millis(), additional_pulse_count);
