@@ -346,12 +346,16 @@ void GrindController::update() {
             break;
             
         case GrindPhase::TARE_CONFIRM:
-            // Proceed as soon as the tare offset is locked. The zero is already
-            // captured from a smoothed window inside the tare, so we don't wait
-            // for the scale to settle here (matching the manual TARE button).
-            // The old settle gate didn't improve the zero - it only delayed the
-            // grind, stalling for seconds when starting on a freshly placed cup.
-            if (!weight_sensor->is_tare_in_progress()) {
+            // Proceed once the tare offset is locked. The zero is already captured
+            // from a smoothed window inside the tare, so the optional settle gate
+            // below doesn't improve the zero - it only delays the grind, and stalls
+            // for seconds on a noisy load cell. With GRIND_TARE_WAIT_FOR_SETTLE off,
+            // taring proceeds immediately (matching the manual TARE button).
+            if (!weight_sensor->is_tare_in_progress()
+#if GRIND_TARE_WAIT_FOR_SETTLE
+                && weight_sensor->is_settled()  // Double confirm weights are settled
+#endif
+            ) {
                 if (!grinder->is_grinding()) {
                     grinder->start();  // Ensure motor is running
                 }

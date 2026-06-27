@@ -86,6 +86,12 @@ enum class GrinderPurgeMode {
 // Tare and calibration timing (hardware sample rate dependent)
 #define GRIND_TARE_SAMPLE_WINDOW_MS 500                                           // Time window for tare sampling
 #define GRIND_TARE_TIMEOUT_MS 3000                                                // Maximum tare completion time
+
+// Set to 1 to wait for the scale to settle after taring before the grind starts
+// (cleaner on calm setups). Set to 0 to start grinding the moment the tare offset
+// is locked - faster, and avoids multi-second stalls on a noisy load cell. The
+// tare zero accuracy is identical either way; this only gates how long we wait.
+#define GRIND_TARE_WAIT_FOR_SETTLE 0
 #define GRIND_CALIBRATION_SAMPLE_WINDOW_MS 800                                    // Time window for calibration sampling  
 #define GRIND_CALIBRATION_TIMEOUT_MS 2000                                         // Maximum calibration completion time
 
