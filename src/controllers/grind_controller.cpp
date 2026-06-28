@@ -323,19 +323,15 @@ void GrindController::update() {
             break;
             
         case GrindPhase::SETUP: {
-            // Snapshot pre-tare weight so we can log the initial Cup state
             float pre_tare_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
-
-            // Start logging immediately (synchronous PSRAM setup only)
             grind_logger.start_grind_session(session_descriptor, pre_tare_weight);
-
-            // Initialize logging event for upcoming TARING phase
-            memset(&event_in_progress, 0, sizeof(GrindEvent));
-            if (session_descriptor.mode == GrindMode::TIME) {
-                event_in_progress.event_flags |= GRIND_EVENT_FLAG_TIME_MODE;
+            if (mode == GrindMode::TIME) {
+                if (!grinder->is_grinding()) grinder->start();
+                time_grind_start_ms = loop_data.now;
+                switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+            } else {
+                switch_phase(GrindPhase::TARING, loop_data);
             }
-
-            switch_phase(GrindPhase::TARING, loop_data);
             break;
         }
             
