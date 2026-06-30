@@ -238,8 +238,17 @@ void GrindingScreenChart::update_tare_display() {
 }
 
 void GrindingScreenChart::update_progress(int percent) {
-    // Progress is now visualized through the chart data
-    // This method is kept for compatibility but chart updates happen via add_chart_data_point
+    if (time_mode && target_time_seconds > 0.0f) {
+        // Show elapsed time in current value display instead of sensor weight
+        lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
+        if (current_span) {
+            float elapsed_s = (percent / 100.0f) * target_time_seconds;
+            char elapsed_text[16];
+            snprintf(elapsed_text, sizeof(elapsed_text), "%.1fs", elapsed_s);
+            lv_span_set_text(current_span, elapsed_text);
+            lv_spangroup_refresh(weight_spangroup);
+        }
+    }
 }
 
 void GrindingScreenChart::add_chart_data_point(float current_weight, float flow_rate, uint32_t current_time_ms) {

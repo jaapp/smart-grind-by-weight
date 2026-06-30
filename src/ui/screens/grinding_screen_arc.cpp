@@ -57,6 +57,7 @@ void GrindingScreenArc::create() {
 
     visible = false;
     time_mode = false;
+    target_time_seconds_ = 0.0f;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -88,6 +89,7 @@ void GrindingScreenArc::update_target_weight_text(const char* text) {
 }
 
 void GrindingScreenArc::update_target_time(float seconds) {
+    target_time_seconds_ = seconds;
     char target_text[32];
     snprintf(target_text, sizeof(target_text), "Time: %.1fs", seconds);
     lv_label_set_text(target_label, target_text);
@@ -106,6 +108,13 @@ void GrindingScreenArc::update_tare_display() {
 
 void GrindingScreenArc::update_progress(int percent) {
     lv_arc_set_value(progress_arc, percent);
+    if (time_mode && target_time_seconds_ > 0.0f) {
+        // Show elapsed time in center instead of sensor weight
+        float elapsed_s = (percent / 100.0f) * target_time_seconds_;
+        char elapsed_text[16];
+        snprintf(elapsed_text, sizeof(elapsed_text), "%.1fs", elapsed_s);
+        lv_label_set_text(weight_label, elapsed_text);
+    }
 }
 
 void GrindingScreenArc::set_time_mode(bool enabled) {

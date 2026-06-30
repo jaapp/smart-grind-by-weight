@@ -139,6 +139,9 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
     timeout_pause_start = 0;
     timeout_offset_ms = 0;
+    grind_paused_ = false;
+    pause_start_ms_ = 0;
+    total_pause_ms_ = 0;
     last_session_result_ = GrindSessionResult::UNKNOWN;
     // Load cell now runs at constant high speed - no mode switching needed
     
@@ -281,6 +284,33 @@ void GrindController::continue_from_purge() {
     }
     time_grind_start_ms = millis();
     switch_phase(GrindPhase::PREDICTIVE);  // No loop_data needed for phase transition
+}
+
+void GrindController::pause_grind() {
+    if (phase != GrindPhase::TIME_GRINDING || grind_paused_) return;
+
+    grind_paused_ = true;
+    pause_start_ms_ = millis();
+    timeout_pause_start = pause_start_ms_;
+
+    if (grinder) grinder->stop();
+
+    LOG_BLE("[%lums CONTROLLER] Time mode grind paused\n", millis());
+}
+
+void GrindController::resume_grind() {
+    if (phase != GrindPhase::TIME_GRINDING || !grind_paused_) return;
+
+    uint32_t pause_duration = millis() - pause_start_ms_;
+    total_pause_ms_ += pause_duration;
+    timeout_offset_ms += pause_duration;
+    timeout_pause_start = 0;
+    grind_paused_ = false;
+
+    if (grinder) grinder->start();
+
+    LOG_BLE("[%lums CONTROLLER] Time mode grind resumed (paused %lums, total paused %lums)\n",
+            millis(), (unsigned long)pause_duration, (unsigned long)total_pause_ms_);
 }
 
 void GrindController::update() {
@@ -794,9 +824,11 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
 
 
 bool GrindController::check_timeout() const {
-    // Calculate elapsed time excluding paused states (like PURGE_CONFIRM)
+    // Calculate elapsed time excluding paused states (PURGE_CONFIRM and TIME mode pause)
     unsigned long elapsed_ms = millis() - start_time;
-    unsigned long active_time_ms = elapsed_ms - timeout_offset_ms;
+    unsigned long current_pause_ms = (grind_paused_ && pause_start_ms_ > 0)
+                                   ? (millis() - pause_start_ms_) : 0;
+    unsigned long active_time_ms = elapsed_ms - timeout_offset_ms - current_pause_ms;
     return active_time_ms >= (GRIND_TIMEOUT_SEC * 1000);
 }
 
