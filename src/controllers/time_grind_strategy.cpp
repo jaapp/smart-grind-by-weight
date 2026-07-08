@@ -27,13 +27,17 @@ bool TimeGrindStrategy::update(const GrindSessionDescriptor& session,
                 controller->time_grind_start_ms = loop_data.now;
             }
 
+            if (controller->grind_paused_) {
+                return true;
+            }
+
             if (controller->target_time_ms == 0) {
                 controller->grinder->stop();
                 controller->switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
                 return true;
             }
 
-            unsigned long elapsed = loop_data.now - controller->time_grind_start_ms;
+            unsigned long elapsed = loop_data.now - controller->time_grind_start_ms - controller->total_pause_ms_;
             if (elapsed >= controller->target_time_ms) {
                 controller->grinder->stop();
                 controller->switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
@@ -61,7 +65,9 @@ int TimeGrindStrategy::progress_percent(const GrindSessionDescriptor& session,
         return 0;
     }
 
-    unsigned long elapsed = millis() - controller.time_grind_start_ms;
+    unsigned long current_pause_ms = (controller.grind_paused_ && controller.pause_start_ms_ > 0)
+                                   ? (millis() - controller.pause_start_ms_) : 0;
+    unsigned long elapsed = millis() - controller.time_grind_start_ms - controller.total_pause_ms_ - current_pause_ms;
     if (elapsed >= session.target_time_ms) {
         return 100;
     }

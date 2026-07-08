@@ -123,7 +123,7 @@ public:
     bool getTareStatus();                 // Exact HX711_ADC method
     
     // Legacy wrapper methods for compatibility
-    bool start_nonblocking_tare() { tareNoDelay(); return true; }
+    bool start_nonblocking_tare() { if (!has_hardware_fault()) { tareNoDelay(); } return true; }
     bool is_tare_in_progress() const { return doTare; }
     
     // Calibration

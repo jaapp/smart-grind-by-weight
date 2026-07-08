@@ -109,28 +109,29 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
 }
 
 void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grind_mode) {
-    LOG_BLE("[%lums CONTROLLER] start_grind() called with target=%.1fg, time=%lums, mode=%s\n",
-            millis(), target, (unsigned long)time_ms, grind_mode == GrindMode::TIME ? "TIME" : "WEIGHT");
-    if (!weight_sensor || !grinder) return;
-    if (weight_sensor->has_hardware_fault()) {
-        LOG_BLE("ERROR: Cannot start grind - load cell hardware fault detected (%d)\n",
-                static_cast<int>(weight_sensor->get_hardware_fault()));
-        return;
-    }
-    
     target_weight = target;
     target_time_ms = time_ms;
     mode = grind_mode;
-
-    // Read grinder purge settings from preferences (always run for weight mode)
-    grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(GRIND_PURGE_MODE_DEFAULT);
-    grinder_purge_amount_g_for_session = GRIND_PURGE_AMOUNT_DEFAULT_G;
-    if (preferences) {
-        int purge_mode_int = preferences->getInt(PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
-        grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(purge_mode_int);
-        float configured_amount = preferences->getFloat(PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
-        configured_amount = std::clamp(configured_amount, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
-        grinder_purge_amount_g_for_session = configured_amount;
+    LOG_BLE("[%lums CONTROLLER] start_grind() called with target=%.1fg, time=%lums, mode=%s\n",
+            millis(), target, (unsigned long)time_ms, grind_mode == GrindMode::TIME ? "TIME" : "WEIGHT");
+    if (!grinder) return;
+    if (mode == GrindMode::WEIGHT) {
+        if (!weight_sensor) return;
+        if (weight_sensor->has_hardware_fault()) {
+            LOG_BLE("ERROR: Cannot start grind - load cell hardware fault detected (%d)\n",
+                    static_cast<int>(weight_sensor->get_hardware_fault()));
+            return;
+        }
+        // Read grinder purge settings from preferences (weight mode only)
+        grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(GRIND_PURGE_MODE_DEFAULT);
+        grinder_purge_amount_g_for_session = GRIND_PURGE_AMOUNT_DEFAULT_G;
+        if (preferences) {
+            int purge_mode_int = preferences->getInt(PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
+            grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(purge_mode_int);
+            float configured_amount = preferences->getFloat(PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
+            configured_amount = std::clamp(configured_amount, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
+            grinder_purge_amount_g_for_session = configured_amount;
+        }
     }
 
     start_time = millis();
@@ -138,6 +139,9 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
     timeout_pause_start = 0;
     timeout_offset_ms = 0;
+    grind_paused_ = false;
+    pause_start_ms_ = 0;
+    total_pause_ms_ = 0;
     last_session_result_ = GrindSessionResult::UNKNOWN;
     // Load cell now runs at constant high speed - no mode switching needed
     
@@ -282,6 +286,33 @@ void GrindController::continue_from_purge() {
     switch_phase(GrindPhase::PREDICTIVE);  // No loop_data needed for phase transition
 }
 
+void GrindController::pause_grind() {
+    if (phase != GrindPhase::TIME_GRINDING || grind_paused_) return;
+
+    grind_paused_ = true;
+    pause_start_ms_ = millis();
+    timeout_pause_start = pause_start_ms_;
+
+    if (grinder) grinder->stop();
+
+    LOG_BLE("[%lums CONTROLLER] Time mode grind paused\n", millis());
+}
+
+void GrindController::resume_grind() {
+    if (phase != GrindPhase::TIME_GRINDING || !grind_paused_) return;
+
+    uint32_t pause_duration = millis() - pause_start_ms_;
+    total_pause_ms_ += pause_duration;
+    timeout_offset_ms += pause_duration;
+    timeout_pause_start = 0;
+    grind_paused_ = false;
+
+    if (grinder) grinder->start();
+
+    LOG_BLE("[%lums CONTROLLER] Time mode grind resumed (paused %lums, total paused %lums)\n",
+            millis(), (unsigned long)pause_duration, (unsigned long)total_pause_ms_);
+}
+
 void GrindController::update() {
     if (!is_active()) return;
     
@@ -322,19 +353,15 @@ void GrindController::update() {
             break;
             
         case GrindPhase::SETUP: {
-            // Snapshot pre-tare weight so we can log the initial Cup state
             float pre_tare_weight = weight_sensor ? weight_sensor->get_weight_low_latency() : 0.0f;
-
-            // Start logging immediately (synchronous PSRAM setup only)
             grind_logger.start_grind_session(session_descriptor, pre_tare_weight);
-
-            // Initialize logging event for upcoming TARING phase
-            memset(&event_in_progress, 0, sizeof(GrindEvent));
-            if (session_descriptor.mode == GrindMode::TIME) {
-                event_in_progress.event_flags |= GRIND_EVENT_FLAG_TIME_MODE;
+            if (mode == GrindMode::TIME) {
+                if (!grinder->is_grinding()) grinder->start();
+                time_grind_start_ms = loop_data.now;
+                switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+            } else {
+                switch_phase(GrindPhase::TARING, loop_data);
             }
-
-            switch_phase(GrindPhase::TARING, loop_data);
             break;
         }
             
@@ -550,7 +577,8 @@ void GrindController::update() {
 
     // Check for negative weight failsafe after TARE_CONFIRM phase during active grinding
     // Only check after motor has settled to avoid false positives from startup transients
-    if (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
+    if (mode == GrindMode::WEIGHT &&
+        phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
         phase != GrindPhase::IDLE && phase != GrindPhase::INITIALIZING &&
         phase != GrindPhase::SETUP && phase != GrindPhase::TARING &&
         phase != GrindPhase::TARE_CONFIRM &&
@@ -796,9 +824,11 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
 
 
 bool GrindController::check_timeout() const {
-    // Calculate elapsed time excluding paused states (like PURGE_CONFIRM)
+    // Calculate elapsed time excluding paused states (PURGE_CONFIRM and TIME mode pause)
     unsigned long elapsed_ms = millis() - start_time;
-    unsigned long active_time_ms = elapsed_ms - timeout_offset_ms;
+    unsigned long current_pause_ms = (grind_paused_ && pause_start_ms_ > 0)
+                                   ? (millis() - pause_start_ms_) : 0;
+    unsigned long active_time_ms = elapsed_ms - timeout_offset_ms - current_pause_ms;
     return active_time_ms >= (GRIND_TIMEOUT_SEC * 1000);
 }
 

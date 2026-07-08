@@ -82,11 +82,12 @@ void setup() {
 
     // Check calibration status to determine initial screen
     bool is_calibrated = hardware_manager.get_weight_sensor()->is_calibrated();
+    GrindMode boot_grind_mode = profile_controller.get_grind_mode();
 
     if (ota_failed) {
         LOG_BLE("BOOT: Starting in OTA failure state for expected build %s\n", failed_ota_build.c_str());
         state_machine.init(UIState::OTA_UPDATE_FAILED);
-    } else if (!is_calibrated) {
+    } else if (!is_calibrated && boot_grind_mode != GrindMode::TIME) {
         LOG_BLE("BOOT: Device not calibrated - starting in CALIBRATION state\n");
         state_machine.init(UIState::CALIBRATION);
     } else {

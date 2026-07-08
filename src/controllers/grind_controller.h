@@ -140,6 +140,11 @@ private:
     QueueHandle_t ui_event_queue;
     
     bool control_loop_paused_;      // Indicates control loop is suspended (e.g., purge confirmation)
+
+    // Time mode pause state
+    bool grind_paused_;
+    uint32_t pause_start_ms_;
+    uint32_t total_pause_ms_;
     
     // Flash operation queue - thread-safe Core 0 → Core 1 communication
     QueueHandle_t flash_op_queue;
@@ -207,6 +212,11 @@ public:
     void start_additional_pulse(); // Start an additional 100ms pulse in time mode
     bool can_pulse() const; // Check if additional pulses are allowed
     int get_additional_pulse_count() const { return additional_pulse_count; }
+
+    // Time mode pause/resume
+    void pause_grind();
+    void resume_grind();
+    bool is_grind_paused() const { return grind_paused_; }
     
     // UI event system
     void set_ui_event_callback(void (*callback)(const GrindEventData&));
@@ -225,6 +235,7 @@ public:
     
     bool is_active() const;
     bool is_control_loop_paused() const { return control_loop_paused_; }
+    GrindPhase get_phase() const { return phase; }
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
     static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
@@ -284,10 +295,9 @@ private:
     // Internal state methods (moved from public to prevent polling)
     bool show_taring_text() const { return phase == GrindPhase::INITIALIZING || phase == GrindPhase::SETUP || phase == GrindPhase::TARING || phase == GrindPhase::TARE_CONFIRM; }
     bool is_completed() const { return phase == GrindPhase::COMPLETED; }
-    bool is_timeout() const { return phase == GrindPhase::TIMEOUT; } 
+    bool is_timeout() const { return phase == GrindPhase::TIMEOUT; }
     int get_progress_percent() const;
     float get_grind_time() const;
-    GrindPhase get_phase() const { return phase; }
     GrindPhase get_timeout_phase() const { return timeout_phase; }
     const char* get_phase_name(GrindPhase p = static_cast<GrindPhase>(-1)) const;
 

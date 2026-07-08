@@ -12,6 +12,7 @@ private:
     lv_obj_t* progress_arc;
     bool visible;
     bool time_mode;
+    float target_time_seconds_;
 
 public:
     void create() override;
