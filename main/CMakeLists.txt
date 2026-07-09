@@ -1,10 +1,9 @@
 # Application "main" component.
 #
-# The source tree physically lives in ../src (preserved from the PlatformIO
-# layout). We register it here as the IDF "main" component so it is always
-# force-linked and automatically depends on every other component (IDF special-
-# cases the component named "main"). Managed dependencies are declared in the
-# adjacent idf_component.yml.
+# The source tree lives in ../src. We register it here as the IDF "main"
+# component so it is always force-linked and automatically depends on every
+# other component (IDF special-cases the component named "main"). Managed
+# dependencies are declared in the adjacent idf_component.yml.
 FILE(GLOB_RECURSE app_sources ${CMAKE_SOURCE_DIR}/src/*.c ${CMAKE_SOURCE_DIR}/src/*.cpp)
 
 idf_component_register(
@@ -20,12 +19,11 @@ idf_component_register(
 # other component (IDF built-ins, managed deps, and local delta/detools).
 # Listing REQUIRES here would override that and drop built-ins like esp_timer.
 
-# Preserve the old platformio.ini build_flags for the application sources only.
-# PlatformIO compiled the app with -Wall but NOT -Werror; native IDF adds bare
-# -Werror. GCC only lets you carve out exceptions per-category (a blanket
-# -Wno-error does not undo it), so keep these pre-existing, benign warnings
-# non-fatal for the app sources — matching the prior build without churning
-# working code. IDF framework components keep -Werror.
+# The app sources are built with -Wall but keep a few pre-existing, benign
+# warnings non-fatal (native IDF adds a bare -Werror). GCC only lets you carve
+# out exceptions per-category (a blanket -Wno-error does not undo it), so list
+# them explicitly here rather than churning working code. IDF framework
+# components keep -Werror.
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -Ofast
     -Wall
@@ -37,3 +35,34 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wno-error=switch
     -Wno-error=format
 )
+
+# ---------------------------------------------------------------------------
+# Boot splash asset: auto-regenerate from the source PNG.
+#
+# assets/boot_logo.png is the source of truth. Whenever it (or the converter)
+# changes, regenerate src/ui/assets/boot_logo.c before compiling so the flashed
+# splash always matches the PNG - drop in a new logo and rebuild, no manual step.
+#
+# Only wired up when tools/venv exists (created by tools/grinder.py, and where
+# Pillow/pypng live). A fresh checkout without the venv simply compiles the
+# committed boot_logo.c as-is, so the build never depends on Python tooling.
+# ---------------------------------------------------------------------------
+set(BOOT_LOGO_PNG    ${CMAKE_SOURCE_DIR}/assets/boot_logo.png)
+set(BOOT_LOGO_C      ${CMAKE_SOURCE_DIR}/src/ui/assets/boot_logo.c)
+set(BOOT_LOGO_SCRIPT ${CMAKE_SOURCE_DIR}/tools/convert_logo.py)
+set(BOOT_LOGO_VENV_PY ${CMAKE_SOURCE_DIR}/tools/venv/bin/python)
+
+if(EXISTS ${BOOT_LOGO_VENV_PY} AND EXISTS ${BOOT_LOGO_PNG})
+    add_custom_command(
+        OUTPUT ${BOOT_LOGO_C}
+        COMMAND ${BOOT_LOGO_VENV_PY} ${BOOT_LOGO_SCRIPT}
+                --input ${BOOT_LOGO_PNG}
+                --output-dir ${CMAKE_SOURCE_DIR}/src/ui/assets
+                --name boot_logo
+        DEPENDS ${BOOT_LOGO_PNG} ${BOOT_LOGO_SCRIPT}
+        COMMENT "Regenerating boot splash asset from boot_logo.png"
+        VERBATIM
+    )
+    add_custom_target(gen_boot_logo DEPENDS ${BOOT_LOGO_C})
+    add_dependencies(${COMPONENT_LIB} gen_boot_logo)
+endif()

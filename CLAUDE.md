@@ -36,10 +36,22 @@ python3 tools/grinder.py analyze
 - **GrindController**: 9-phase state machine with predictive flow control, 10 pulse corrections, mechanical instability detection, and time mode additional pulses
 - **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered), calibration flag, noise diagnostics; a one-shot boot tare zeroes the (empty) scale at startup so it begins near zero, and the display is suppressed (shows 0.0) until that first tare completes so the raw reading never flashes
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
-- **UIManager**: 7 screens with LVGL integration; READY screen is a swipe tabview — Single / Double / Custom / MENU / **Scale** (5 tabs, iOS-style page-indicator dots pinned to the bottom edge); menu page surfaces quick Tools (Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
-- **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
+- **UIManager**: 8 screens with LVGL integration (including the boot splash); READY screen is a swipe tabview — Single / Double / Custom / MENU / **Scale** (5 tabs, iOS-style page-indicator dots pinned to the bottom edge); menu page surfaces quick Tools (Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
+- **StateMachine**: Central state coordination (BOOT → READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
+
+**Boot Splash:**
+- On boot the device starts in `UIState::BOOT` showing a centered logo on an opaque black screen (`src/ui/screens/boot_screen.*`). The panel initializes dark (`0x51 = 0x00` in `DisplayManager::init()`); `init()` then restores brightness synchronously at the end, so the display can never be left dark if the UI task fails to run.
+- `UIManager::update_boot_sequence()` (UI render task) holds the logo while background init runs (gated on `weight_sampling_task.is_hardware_ready()`, min ~1.2s, hard cap ~6s), then fades it out and calls `finish_boot()` → `switch_to_state(post_boot_state)` (READY / CALIBRATION / OTA_UPDATE_FAILED, chosen in `main.cpp`). The splash objects are freed after handoff.
+- **Logo asset**: `assets/boot_logo.png` is the source of truth; `src/ui/assets/boot_logo.c` (LVGL RGB565A8) is generated from it. `main/CMakeLists.txt` **auto-regenerates** it via `tools/convert_logo.py` whenever the PNG (or script) changes, when `tools/venv` exists. Default max width 200px, height scaled to aspect, EXIF auto-orient. Logo placement offset: `USER_BOOT_LOGO_OFFSET_X/Y` (0,0 = centered).
+
+**Display / Screensaver:** Configurable through Menu → Display page
+- **Brightness**: Normal brightness slider (min 15%).
+- **Screensaver mode**: Radio buttons for **Dim** (drops to the dimmed-brightness slider value) or **Off** (backlight fully to 0). The dimmed-brightness slider greys out in Off mode.
+- **Sleep after**: Timeout slider with discrete steps (15s, 30s, 1/2/5/10/15/30 min, **Never**); steps live in `screensaver_timeout_steps.h`. "Never" disables the screensaver.
+- **Behavior**: `ScreenTimeoutController` caches the timeout/mode (refreshed on change via `UIManager::refresh_screensaver_settings()`, never polling NVS per tick) and engages the screensaver after inactivity; touch/weight activity restores normal brightness. Never engages during grinding.
+- **Preferences** (NVS namespace `brightness`): `normal` (float 0-1), `screensaver` (float 0-1), `ss_mode` (int: 0=Dim, 1=Off, default 0), `ss_timeout` (int ms, default 300000; 0 = Never).
 
 **Grind Phases:**
 - Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PRIME, PRIME_SETTLING, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
@@ -110,7 +122,8 @@ python3 tools/grinder.py analyze
 - Use the src/config/constants.h aggregation file to include constants / settings - dont refer to config files directly.
 - When new features have been added and tested always update the docs as well
 - when making a commit, only focus on the end result not the process we went through to get to the end result
-- **All active firmware development is on the `feat/grinder-enhancements` branch**, not main. Main only has documentation. Always check out the right branch before building or flashing.
+- **The build is native ESP-IDF only — there is no PlatformIO.** `main` is the active, IDF-based development branch; branch off it for new work. There is **no `platformio.ini`**, and the entry point is `app_main()` (not Arduino `setup()`/`loop()`). Before starting work, confirm you are on an IDF branch: `git ls-files platformio.ini` must return nothing and `src/main.cpp` must define `app_main()`.
+- ⚠️ **Do NOT build on or branch from `feat/grinder-enhancements`** (or any branch containing a `platformio.ini`). That is the deprecated pre-IDF PlatformIO tree; PRs opened against it will not build under ESP-IDF. If a feature was written there, re-apply it onto `main` (see the boot-splash port for a worked example).
 
 ## Memory Architecture
 

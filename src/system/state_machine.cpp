@@ -15,6 +15,7 @@ void StateMachine::transition_to(UIState new_state) {
 
 const char* StateMachine::get_state_name(UIState state) const {
     switch (state) {
+        case UIState::BOOT: return "BOOT";
         case UIState::READY: return "READY";
         case UIState::GRINDING: return "GRINDING";
         case UIState::GRIND_COMPLETE: return "GRIND_COMPLETE";

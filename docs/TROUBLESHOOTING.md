@@ -4,8 +4,7 @@
 
 - [Motor Does Not Start](#motor-does-not-start)
 - [HX711 Not Detected / Wrong Sample Rate](#hx711-not-detected--wrong-sample-rate)
-- [Unknown board ID 'esp32-s3-devkitc-1'](#unknown-board-id-esp32-s3-devkitc-1)
-- [PlatformIO Project Initialization Issues](#platformio-project-initialization-issues)
+- [Build Fails or `idf.py` Not Found](#build-fails-or-idfpy-not-found)
 - [Grind Timeout Screen](#grind-timeout-screen)
 - [Unreliable Pulse Corrections](#unreliable-pulse-corrections)
 - [Getting Diagnostic Reports](#getting-diagnostic-reports)
@@ -74,73 +73,34 @@ If wires were reversed, swap them so Pin 3 connects to GPIO 18. The Waveshare bo
 - **SAMPLE_RATE_INVALID:** Ensure the HX711 `RATE` pin is tied to GND for 10 SPS; a floating/high pin forces 80 SPS and will now block startup.
 - After correcting hardware, reboot the scale. The diagnostic clears automatically when healthy samples are detected.
 
-## Unknown board ID 'esp32-s3-devkitc-1'
+## Build Fails or `idf.py` Not Found
 
-**Applies to:** Windows development environments using PlatformIO with ESP32-S3 boards.
+**Applies to:** Building the firmware locally.
 
 ### Symptoms
-- `platformio run` fails with `UnknownBoard: Unknown board ID 'esp32-s3-devkitc-1'`.
-- `pio boards espressif32 | findstr "esp32-s3"` shows the board, suggesting it exists in the registry.
+- `idf.py: command not found`, or `tools/grinder.py build` reports the IDF environment is missing.
+- CMake errors about missing components on a fresh checkout.
 
 ### Root Cause
-The local PlatformIO `espressif32` platform package was pinned to an older release (e.g. 3.1.0 from 2021) that predates ESP32-S3 board definitions. The registry lookup reports current boards, but the outdated local package lacks the corresponding JSON definition.
+Firmware is built with a standalone **ESP-IDF** install (v5.4.x). The IDF environment must be sourced, and managed components must be resolved on the first build.
 
 ### Resolution
-1. Update the global `espressif32` platform package so it includes ESP32-S3 board definitions:
-   ```powershell
-   C:\Users\<user>\.platformio\penv\Scripts\platformio.exe pkg install -g -p platformio/espressif32@^6.8.0
+1. Install ESP-IDF v5.4.x (at `~/esp/esp-idf` or on `IDF_PATH`) and source it:
+   ```bash
+   . ~/esp/esp-idf/export.sh
    ```
-   *(Alternatively, run `pio platform update espressif32`.)*
-2. Re-run the build:
-   ```powershell
-   C:\Users\<user>\.platformio\penv\Scripts\platformio.exe run
+2. Build (the IDF component manager fetches managed components on the first run):
+   ```bash
+   idf.py build            # or: python3 tools/grinder.py build
    ```
-3. Optional: Pin the desired platform version in `platformio.ini` to ensure consistency across machines:
-   ```ini
-   [env:waveshare-esp32s3-touch-amoled-164]
-   platform = platformio/espressif32@^6.8.0
+3. If the build state is inconsistent, clean and rebuild:
+   ```bash
+   idf.py fullclean && idf.py build   # or: python3 tools/grinder.py clean
    ```
 
 ### Notes
-- The warning `Ignore unknown configuration option 'monitor_options'` also disappears once PlatformIO core and platform packages are current.
-- If multiple PlatformIO installations are present, ensure you are updating the instance used for the project.
-
----
-
-## PlatformIO Project Initialization Issues
-
-**Applies to:** General PlatformIO project setup issues, especially when using PlatformIO (as this project uses the pioarduino fork as a platform).
-
-### Symptoms
-- `Error: Could not find one of 'package.json' manifest files in the package`
-- PlatformIO fails to initialize the project properly
-- Vague platform-related errors during project setup
-
-### Root Cause
-The use of the pioarduino platform fork can sometimes cause PlatformIO's cache or project state to become inconsistent, leading to initialization failures.
-
-### Resolution
-1. **Close VS Code completely**
-2. **Delete the PlatformIO cache folder:**
-   ```bash
-   # On Windows
-   rmdir /s "%USERPROFILE%\.platformio"
-   
-   # On macOS/Linux  
-   rm -rf ~/.platformio
-   ```
-3. **Restart VS Code**
-4. **Reopen the project** - PlatformIO will reinitialize and download the correct platform packages
-5. **Perform a clean build** - Use PlatformIO's "Clean" then "Build" to ensure a fresh compilation
-
-### Alternative (Less Nuclear)
-If you want to try a less aggressive approach first:
-1. Close VS Code
-2. Delete only the platforms cache: `~/.platformio/platforms/` (or `%USERPROFILE%\.platformio\platforms\` on Windows)
-3. Restart VS Code and reopen project
-4. Perform a clean build in PlatformIO
-
-**Note:** This issue is specific to the pioarduino platform fork usage and the way PlatformIO handles custom platform URLs.
+- `sdkconfig` is generated and git-ignored — edit `sdkconfig.defaults`, not `sdkconfig`.
+- If OTA leaves the screen broken, recover over USB: `idf.py -p /dev/tty.usbmodemXXXX flash`.
 
 ---
 

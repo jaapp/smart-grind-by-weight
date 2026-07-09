@@ -6,7 +6,26 @@
 #include "screens/calibration_screen.h"
 #include "../logging/grind_logging.h"
 #include "../controllers/grind_mode_traits.h"
+#include "../tasks/weight_sampling_task.h"
 #include <utility>
+
+// Boot splash timing
+static constexpr uint32_t kBootFadeOutMs = 350;     // logo opacity -> 0 before handoff
+static constexpr uint32_t kBootMinVisibleMs = 1200; // keep the logo up at least this long
+static constexpr uint32_t kBootMaxMs = 6000;        // hard cap so a faulty load cell can't hang boot
+
+// lv_anim exec callback: fade the logo opacity
+static void boot_logo_opa_anim_cb(void* var, int32_t value) {
+    lv_obj_set_style_opa(static_cast<lv_obj_t*>(var), static_cast<lv_opa_t>(value), LV_PART_MAIN);
+}
+
+// lv_anim ready callback: hand off from the splash to the real screen
+static void boot_fade_out_ready_cb(lv_anim_t* /*a*/) {
+    if (UIManager* mgr = UIManager::get_instance()) {
+        mgr->finish_boot();
+    }
+}
+
 // Static instance pointer for grind event callbacks
 UIManager* UIManager::instance = nullptr;
 
@@ -43,18 +62,22 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     register_controller_events();
 
     refresh_auto_action_settings();
+    refresh_screensaver_settings();
 
     if (grind_controller) {
         grind_controller->set_diagnostics_controller(diagnostics_controller_.get());
     }
-    
-    // Set initial brightness from preferences
-    float initial_brightness = USER_SCREEN_BRIGHTNESS_NORMAL;
-    if (menu_controller_) {
-        initial_brightness = menu_controller_->get_normal_brightness();
+
+    // Backlight stays off (set during display init) until the boot splash fades it in.
+    // If we somehow did not start in the BOOT state, restore normal brightness directly.
+    if (!state_machine->is_state(UIState::BOOT)) {
+        float initial_brightness = USER_SCREEN_BRIGHTNESS_NORMAL;
+        if (menu_controller_) {
+            initial_brightness = menu_controller_->get_normal_brightness();
+        }
+        hardware_manager->get_display()->set_brightness(initial_brightness);
     }
-    hardware_manager->get_display()->set_brightness(initial_brightness);
-    
+
     // Register grind event callback
     grind_controller->set_ui_event_callback(GrindingUIController::dispatch_event);
     
@@ -74,6 +97,7 @@ void UIManager::create_ui() {
     lv_obj_add_style(lv_scr_act(), &style_screen, 0);
 
     // Create all screens
+    boot_screen.create();
     ready_screen.create();
     edit_screen.create();
     grinding_screen.init(hardware_manager->get_preferences());
@@ -100,6 +124,7 @@ void UIManager::create_ui() {
     }
     
     // Set up initial state
+    boot_screen.hide();
     ready_screen.hide();
     edit_screen.hide();
     grinding_screen.hide();
@@ -116,6 +141,12 @@ void UIManager::create_ui() {
 
 void UIManager::update() {
     if (!initialized) return;
+
+    // While the boot splash is up, run only the boot sequence (fade in, hold, fade out).
+    if (state_machine->is_state(UIState::BOOT)) {
+        update_boot_sequence();
+        return;
+    }
 
     // Update diagnostics controller
     if (diagnostics_controller_) {
@@ -182,6 +213,63 @@ void UIManager::update() {
     }
 }
 
+void UIManager::update_boot_sequence() {
+    const uint32_t now = millis();
+    if (boot_start_ms_ == 0) {
+        boot_start_ms_ = now;
+    }
+
+    // The backlight is brought up synchronously in DisplayManager::init(), so the splash is
+    // already visible by the time we get here. This routine only holds the logo until background
+    // init is ready (or a hard timeout), then fades it out and hands off to the real screen.
+    if (!boot_fade_out_started_) {
+        const uint32_t elapsed = now - boot_start_ms_;
+        const bool hw_ready = weight_sampling_task.is_hardware_ready();
+        const bool ready_to_advance = (hw_ready && elapsed >= kBootMinVisibleMs) ||
+                                      (elapsed >= kBootMaxMs);
+
+        if (ready_to_advance) {
+            boot_fade_out_started_ = true;
+            boot_fade_out_start_ms_ = now;
+            lv_obj_t* logo = boot_screen.get_logo();
+            if (logo) {
+                lv_anim_t a;
+                lv_anim_init(&a);
+                lv_anim_set_var(&a, logo);
+                lv_anim_set_exec_cb(&a, boot_logo_opa_anim_cb);
+                lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_TRANSP);
+                lv_anim_set_duration(&a, kBootFadeOutMs);
+                lv_anim_set_ready_cb(&a, boot_fade_out_ready_cb);
+                lv_anim_start(&a);
+            } else {
+                finish_boot();
+            }
+        }
+        return;
+    }
+
+    // Safety net: if the fade-out animation never fires its ready callback (e.g. the LVGL timer
+    // stalls), force the handoff so the device can never get stuck on the splash screen.
+    if (now - boot_fade_out_start_ms_ >= kBootFadeOutMs + 250) {
+        finish_boot();
+    }
+}
+
+void UIManager::finish_boot() {
+    LOG_BLE("[%lums BOOT] Splash complete - showing %s\n", millis(),
+            state_machine->get_state_name(post_boot_state_));
+    switch_to_state(post_boot_state_);
+
+    // Apply the user's configured brightness now that the splash has handed off (init brought the
+    // panel up at the default level so it was visible during the splash).
+    if (hardware_manager && hardware_manager->get_display() && menu_controller_) {
+        hardware_manager->get_display()->set_brightness(menu_controller_->get_normal_brightness());
+    }
+
+    // Splash is done and the real screen is up - reclaim the splash objects' heap.
+    boot_screen.destroy();
+}
+
 void UIManager::switch_to_state(UIState new_state) {
     // Any state change must stop a held manual grind (safety net for missed releases)
     if (ready_controller_) {
@@ -191,6 +279,7 @@ void UIManager::switch_to_state(UIState new_state) {
     state_machine->transition_to(new_state);
 
     // Hide all screens before showing the requested one
+    boot_screen.hide();
     ready_screen.hide();
     edit_screen.hide();
     grinding_screen.hide();
@@ -203,6 +292,10 @@ void UIManager::switch_to_state(UIState new_state) {
     ota_update_failed_screen.hide();
 
     switch (new_state) {
+        case UIState::BOOT:
+            boot_screen.show();
+            break;
+
         case UIState::READY:
             ready_screen.show();
             ready_screen.set_active_tab(current_tab);
@@ -376,6 +469,12 @@ void UIManager::refresh_auto_action_settings() {
     uint32_t now = millis();
     auto_actions_.last_auto_start_ms = now;
     auto_actions_.last_auto_return_ms = now;
+}
+
+void UIManager::refresh_screensaver_settings() {
+    if (screen_timeout_controller_) {
+        screen_timeout_controller_->refresh_settings();
+    }
 }
 
 void UIManager::update_auto_actions() {

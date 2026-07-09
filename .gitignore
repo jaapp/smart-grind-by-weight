@@ -3,7 +3,6 @@
 build/
 sdkconfig
 sdkconfig.old
-.pio
 .vscode/
 
 # Generated build info

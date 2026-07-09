@@ -10,9 +10,26 @@ ScreenTimeoutController::ScreenTimeoutController(UIManager* manager)
 
 void ScreenTimeoutController::register_events() {}
 
+void ScreenTimeoutController::refresh_settings() {
+    if (ui_manager_ && ui_manager_->menu_controller_) {
+        timeout_ms_ = ui_manager_->menu_controller_->get_screensaver_timeout_ms();
+        mode_ = ui_manager_->menu_controller_->get_screensaver_mode();
+    } else {
+        timeout_ms_ = USER_SCREEN_AUTO_DIM_TIMEOUT_MS;
+        mode_ = USER_SCREEN_SAVER_MODE_DEFAULT;
+    }
+    settings_loaded_ = true;
+}
+
 void ScreenTimeoutController::update() {
     if (!ui_manager_) {
         return;
+    }
+
+    // Load the cached settings once; thereafter update() stays off NVS. The menu handlers call
+    // refresh_settings() when the user changes the timeout or mode.
+    if (!settings_loaded_) {
+        refresh_settings();
     }
 
     auto* hardware = ui_manager_->hardware_manager;
@@ -32,11 +49,20 @@ void ScreenTimeoutController::update() {
 
     if (ui_manager_->state_machine && ui_manager_->state_machine->is_state(UIState::GRINDING)) {
         if (screen_dimmed_) {
-            float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
-            if (ui_manager_->menu_controller_) {
-                normal = ui_manager_->menu_controller_->get_normal_brightness();
-            }
-            display->set_brightness(normal);
+            display->set_brightness(get_normal_brightness());
+            screen_dimmed_ = false;
+        }
+        return;
+    }
+
+    // Resolve the user-configured screensaver timeout and behaviour (Dim vs Off) from cache.
+    uint32_t timeout_ms = timeout_ms_;
+    int mode = mode_;
+
+    // "Never" disables the screensaver entirely; make sure the panel is restored.
+    if (timeout_ms == USER_SCREEN_SAVER_TIMEOUT_NEVER_MS) {
+        if (screen_dimmed_) {
+            display->set_brightness(get_normal_brightness());
             screen_dimmed_ = false;
         }
         return;
@@ -45,24 +71,34 @@ void ScreenTimeoutController::update() {
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
     auto* sensor = hardware->get_weight_sensor();
     bool recent_weight_activity = sensor &&
-                                  sensor->weight_range_exceeds(USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
+                                  sensor->weight_range_exceeds(timeout_ms,
                                                                USER_WEIGHT_ACTIVITY_THRESHOLD_G);
 
-    bool should_dim = (ms_since_touch >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS) && !recent_weight_activity;
+    bool should_dim = (ms_since_touch >= timeout_ms) && !recent_weight_activity;
 
     if (should_dim && !screen_dimmed_) {
-        float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;
-        if (ui_manager_->menu_controller_) {
-            dimmed = ui_manager_->menu_controller_->get_screensaver_brightness();
-        }
-        display->set_brightness(dimmed);
+        // Off mode fully powers down the panel; Dim mode drops to the configured brightness.
+        float target = (mode == USER_SCREEN_SAVER_MODE_OFF)
+                           ? 0.0f
+                           : get_screensaver_brightness();
+        display->set_brightness(target);
         screen_dimmed_ = true;
     } else if (!should_dim && screen_dimmed_) {
-        float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
-        if (ui_manager_->menu_controller_) {
-            normal = ui_manager_->menu_controller_->get_normal_brightness();
-        }
-        display->set_brightness(normal);
+        display->set_brightness(get_normal_brightness());
         screen_dimmed_ = false;
     }
+}
+
+float ScreenTimeoutController::get_normal_brightness() const {
+    if (ui_manager_ && ui_manager_->menu_controller_) {
+        return ui_manager_->menu_controller_->get_normal_brightness();
+    }
+    return USER_SCREEN_BRIGHTNESS_NORMAL;
+}
+
+float ScreenTimeoutController::get_screensaver_brightness() const {
+    if (ui_manager_ && ui_manager_->menu_controller_) {
+        return ui_manager_->menu_controller_->get_screensaver_brightness();
+    }
+    return USER_SCREEN_BRIGHTNESS_DIMMED;
 }
