@@ -52,6 +52,8 @@ This is a fork of [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-g
 
 **Full details** → See **[docs/FORK_IMPROVEMENTS.md](docs/FORK_IMPROVEMENTS.md)** for the complete write-up.
 
+> **⚠️ Not OTA-compatible with the upstream project.** This fork's firmware is a native ESP-IDF build with its own bootloader and partition images. If your device is running upstream (jaapp) firmware — or you're switching back — you must do a **full USB flash** (bootloader + partition table + app); a BLE OTA across the fork boundary will not boot. After the initial USB flash, BLE OTA works normally within this fork.
+
 ---
 
 ## ✨ Features

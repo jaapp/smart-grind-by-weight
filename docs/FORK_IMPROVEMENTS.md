@@ -151,4 +151,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for the full setup.
 
 Upstream's excellent delta OTA (the uploader asks the device which build it's running, computes a binary diff against the archived image for that build in `firmware_cache/build_NNN.bin`, and sends only the difference) survived the build-system migration intact: firmware discovery now points at the ESP-IDF `build/` output, and `python3 tools/grinder.py build-upload` remains the one-command development loop.
 
+**Not OTA-compatible with upstream:** because this fork is a native ESP-IDF build (different bootloader and build lineage than upstream's Arduino/PlatformIO firmware), you cannot BLE-OTA between upstream firmware and this fork in either direction — the app image would be paired with the wrong bootloader. Migrate with a full USB flash (bootloader + partition table + app, offsets in the release notes); BLE OTA then works normally within the fork.
+
 One base-matching rule to know: the delta's source check requires the device's flash to byte-match the cached archive. Flashing directly with `idf.py flash` does **not** increment the build number or archive the image, so after a direct USB flash the next delta OTA would fail its source check and roll back. Either build through `python3 tools/grinder.py build` (which increments and archives), or run the next update with `upload --force-full`.
