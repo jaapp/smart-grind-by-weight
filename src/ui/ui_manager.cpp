@@ -272,6 +272,18 @@ void UIManager::update_boot_sequence() {
     }
 }
 
+// Fade the splash's black cover out over the freshly shown post-boot screen, so the
+// home screen fades in instead of popping. Reclaims the splash heap when done.
+static void boot_cover_opa_anim_cb(void* var, int32_t value) {
+    lv_obj_set_style_bg_opa(static_cast<lv_obj_t*>(var), static_cast<lv_opa_t>(value), LV_PART_MAIN);
+}
+
+static void boot_cover_fade_done_cb(lv_anim_t* /*a*/) {
+    if (UIManager* mgr = UIManager::get_instance()) {
+        mgr->boot_screen.destroy();
+    }
+}
+
 void UIManager::finish_boot() {
     LOG_BLE("[%lums BOOT] Splash complete - showing %s\n", millis(),
             state_machine->get_state_name(post_boot_state_));
@@ -283,8 +295,27 @@ void UIManager::finish_boot() {
         hardware_manager->get_display()->set_brightness(menu_controller_->get_normal_brightness());
     }
 
-    // Splash is done and the real screen is up - reclaim the splash objects' heap.
-    boot_screen.destroy();
+    // Home-screen fade-in: re-show the splash's (now logo-less) black cover on top of
+    // everything and fade it to transparent, revealing the new screen underneath.
+    lv_obj_t* cover = boot_screen.get_screen();
+    if (cover) {
+        if (lv_obj_t* logo = boot_screen.get_logo()) {
+            lv_obj_set_style_opa(logo, LV_OPA_TRANSP, LV_PART_MAIN);  // ensure logo stays gone
+        }
+        lv_obj_clear_flag(cover, LV_OBJ_FLAG_HIDDEN);  // switch_to_state hid it
+        lv_obj_move_foreground(cover);                 // above the nav bar too
+
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, cover);
+        lv_anim_set_exec_cb(&a, boot_cover_opa_anim_cb);
+        lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_TRANSP);
+        lv_anim_set_duration(&a, kBootFadeOutMs);
+        lv_anim_set_ready_cb(&a, boot_cover_fade_done_cb);
+        lv_anim_start(&a);
+    } else {
+        boot_screen.destroy();
+    }
 }
 
 void UIManager::switch_to_state(UIState new_state) {
