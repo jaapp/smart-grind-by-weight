@@ -72,6 +72,11 @@ void GrindingUIController::register_events() {
         }, LV_EVENT_CLICKED, this);
     }
 
+    // The READY tabs' in-page action buttons (play / settings gear) dispatch through
+    // the event bridge; route them to the same grind-button logic as the floater.
+    EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::GRIND_BUTTON,
+                                      [this](lv_event_t*) { handle_grind_button(); });
+
     if (pulse_button_) {
         lv_obj_add_event_cb(pulse_button_, [](lv_event_t* e) {
             if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
@@ -300,17 +305,14 @@ void GrindingUIController::update_grind_button_icon() {
         return;
     }
 
-    // On the Scale home tab the in-page GRIND button handles grinding, so hide
-    // the persistent bottom button. Restore it on any other READY tab.
+    // In READY every tab carries its own in-page action button (sliding with the
+    // swipe), so the persistent floater is never shown there.
     if (ui_manager_->state_machine->is_state(UIState::READY)) {
-        if (ui_manager_->current_tab == UIManager::kScaleTabIndex) {
-            lv_obj_add_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
-            if (pulse_button_) {
-                lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
-            }
-            return;
+        lv_obj_add_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
+        if (pulse_button_) {
+            lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
         }
-        lv_obj_clear_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
+        return;
     }
 
     if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
@@ -330,9 +332,6 @@ void GrindingUIController::update_grind_button_icon() {
     } else if (ui_manager_->state_machine->is_state(UIState::GRIND_TIMEOUT)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_CLOSE);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_WARNING), 0);
-    } else if (ui_manager_->state_machine->is_state(UIState::READY) && ui_manager_->current_tab == 3) {
-        lv_img_set_src(grind_icon_, LV_SYMBOL_SETTINGS);
-        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
     } else {
         lv_img_set_src(grind_icon_, LV_SYMBOL_PLAY);
         lv_obj_set_style_bg_color(grind_button_,
@@ -593,7 +592,9 @@ void GrindingUIController::enter_ready_state() {
         return;
     }
 
-    lv_obj_clear_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
+    // READY tabs carry their own in-page action buttons (play/gear/TARE+GRIND) that
+    // slide with the swipe, so the persistent floater stays hidden until a grind runs.
+    lv_obj_add_flag(grind_button_, LV_OBJ_FLAG_HIDDEN);
     if (pulse_button_) {
         lv_obj_add_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
     }

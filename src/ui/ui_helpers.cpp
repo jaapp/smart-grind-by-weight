@@ -320,3 +320,10 @@ int radio_button_group_get_selection(lv_obj_t* group) {
     RadioButtonGroupData* data = (RadioButtonGroupData*)lv_obj_get_user_data(group);
     return (data && data->buttons) ? data->selected_index : -1;
 }
+
+void layout_below_menubar(lv_obj_t* screen) {
+    if (!screen) return;
+    // Reserve the top strip for the global menubar. Set (not add) pad_top so the inset
+    // is exactly the bar height regardless of the screen's existing top padding.
+    lv_obj_set_style_pad_top(screen, UI_MENUBAR_HEIGHT_PX, 0);
+}

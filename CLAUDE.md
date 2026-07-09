@@ -43,15 +43,16 @@ python3 tools/grinder.py analyze
 
 **Boot Splash:**
 - On boot the device starts in `UIState::BOOT` showing a centered logo on an opaque black screen (`src/ui/screens/boot_screen.*`). The panel initializes dark (`0x51 = 0x00` in `DisplayManager::init()`); `init()` then restores brightness synchronously at the end, so the display can never be left dark if the UI task fails to run.
-- `UIManager::update_boot_sequence()` (UI render task) holds the logo while background init runs (gated on `weight_sampling_task.is_hardware_ready()`, min ~1.2s, hard cap ~6s), then fades it out and calls `finish_boot()` → `switch_to_state(post_boot_state)` (READY / CALIBRATION / OTA_UPDATE_FAILED, chosen in `main.cpp`). The splash objects are freed after handoff.
+- `UIManager::update_boot_sequence()` (UI render task) fades the logo in (~400ms), holds it while background init runs (gated on `weight_sampling_task.is_hardware_ready()`, min ~1.2s, hard cap ~6s), then fades it out (~350ms) and calls `finish_boot()` → `switch_to_state(post_boot_state)` (READY / CALIBRATION / OTA_UPDATE_FAILED, chosen in `main.cpp`). The splash objects are freed after handoff.
 - **Logo asset**: `assets/boot_logo.png` is the source of truth; `src/ui/assets/boot_logo.c` (LVGL RGB565A8) is generated from it. `main/CMakeLists.txt` **auto-regenerates** it via `tools/convert_logo.py` whenever the PNG (or script) changes, when `tools/venv` exists. Default max width 200px, height scaled to aspect, EXIF auto-orient. Logo placement offset: `USER_BOOT_LOGO_OFFSET_X/Y` (0,0 = centered).
 
-**Display / Screensaver:** Configurable through Menu → Display page
+**Display / Screensaver:** Configurable through Menu → Display page — two-stage screensaver
 - **Brightness**: Normal brightness slider (min 15%).
-- **Screensaver mode**: Radio buttons for **Dim** (drops to the dimmed-brightness slider value) or **Off** (backlight fully to 0). The dimmed-brightness slider greys out in Off mode.
-- **Sleep after**: Timeout slider with discrete steps (15s, 30s, 1/2/5/10/15/30 min, **Never**); steps live in `screensaver_timeout_steps.h`. "Never" disables the screensaver.
-- **Behavior**: `ScreenTimeoutController` caches the timeout/mode (refreshed on change via `UIManager::refresh_screensaver_settings()`, never polling NVS per tick) and engages the screensaver after inactivity; touch/weight activity restores normal brightness. Never engages during grinding.
-- **Preferences** (NVS namespace `brightness`): `normal` (float 0-1), `screensaver` (float 0-1), `ss_mode` (int: 0=Dim, 1=Off, default 0), `ss_timeout` (int ms, default 300000; 0 = Never).
+- **Screensaver style**: Radio buttons for **Dim** (dims the current screen) or **Logo** (boot logo centered on opaque black, at the dimmed brightness). Style applies to stage 1.
+- **Dim after / Off after**: Two timeout sliders with discrete steps (15s, 30s, 1/2/5/10/15/30 min, **Never**); steps live in `screensaver_timeout_steps.h`. Stage 1 (dim/logo) at "Dim after" (default 1 min); stage 2 (backlight fully off) at "Off after" (default 5 min). "Never" disables that stage.
+- **Behavior**: `ScreenTimeoutController` caches the timeouts/mode (refreshed on change via `UIManager::refresh_screensaver_settings()`, never polling NVS per tick) and steps ACTIVE → DIMMED → OFF on inactivity; touch/weight activity restores normal brightness and deletes the logo overlay (created lazily on engage). Never engages during grinding.
+- **Preferences** (NVS namespace `brightness`): `normal` (float 0-1), `screensaver` (float 0-1), `ss_mode` (int: 0=Dim, 1=Logo, default 0), `ss_timeout` (int ms, dim stage, default 60000; 0 = Never), `ss_off_to` (int ms, off stage, default 300000; 0 = Never).
+- **Warning**: weight-activity checks call `weight_range_exceeds(window)` per UI tick — the underlying ring-buffer min/max MUST stay allocation-free (see `circular_buffer_math.cpp`; a window-sized `alloca` here previously overflowed the UI task stack and crashed the device after minutes of uptime).
 
 **Grind Phases:**
 - Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PRIME, PRIME_SETTLING, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
@@ -154,3 +155,4 @@ Native **ESP-IDF** (idf.py) — PlatformIO has been removed. `tools/grinder.py` 
 - Entry point: `app_main()` in `src/main.cpp`. The IDF "main" component is `main/CMakeLists.txt`, which globs the `src/` tree, force-links it (`WHOLE_ARCHIVE`, needed for LVGL's custom PSRAM allocator), and auto-requires all components. Managed deps live in `main/idf_component.yml`.
 - Project-wide include path and LVGL `*_INCLUDE_SIMPLE` defines are set in the root `CMakeLists.txt`; the custom partition table is wired via `sdkconfig.defaults` (`CONFIG_PARTITION_TABLE_CUSTOM`).
 - `sdkconfig` is generated and git-ignored; edit `sdkconfig.defaults` instead.
+- **Delta OTA base gotcha**: BLE OTA computes a delta patch against `firmware_cache/build_NNN.bin` for the build number the device reports. Flashing over USB with plain `idf.py flash` does NOT increment the build number or archive the image, so the device's real partition bytes diverge from the cached archive — the next delta OTA will fail its source check and roll back. After any direct `idf.py flash`, either build via `python3 tools/grinder.py build` (increments + archives) or run the next OTA with `upload --force-full`.

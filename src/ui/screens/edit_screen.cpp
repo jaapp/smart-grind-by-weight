@@ -12,6 +12,7 @@ void EditScreen::create() {
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_ver(screen, 6, 0);
     lv_obj_set_style_pad_hor(screen, 0, 0);
+    layout_below_menubar(screen);
 
     // Set up flex layout (column)
     lv_obj_set_layout(screen, LV_LAYOUT_FLEX);
@@ -19,11 +20,15 @@ void EditScreen::create() {
     lv_obj_set_flex_align(screen, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
 
-    create_dual_button_row(screen, &save_btn, &cancel_btn, LV_SYMBOL_OK, LV_SYMBOL_CLOSE, lv_color_hex(THEME_COLOR_SUCCESS), lv_color_hex(THEME_COLOR_NEUTRAL), 80, &lv_font_montserrat_32);
+    // Profile name + target at the top; +/- to adjust; a single Save button at the
+    // bottom. CANCEL is the global nav-bar back arrow (reverts and returns home).
+    cancel_btn = nullptr;
 
     create_profile_label(screen, &profile_label, &weight_label);
 
     create_dual_button_row(screen, &minus_btn, &plus_btn, LV_SYMBOL_MINUS, LV_SYMBOL_PLUS, lv_color_hex(THEME_COLOR_PRIMARY), lv_color_hex(THEME_COLOR_PRIMARY), 100, &lv_font_montserrat_32);
+
+    save_btn = create_button(screen, LV_SYMBOL_OK, lv_color_hex(THEME_COLOR_SUCCESS), 260, 80, &lv_font_montserrat_32);
 
     visible = false;
     mode = GrindMode::WEIGHT;

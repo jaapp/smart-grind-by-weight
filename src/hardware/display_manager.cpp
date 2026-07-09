@@ -172,6 +172,26 @@ void DisplayManager::init()
     // Some CO5300 modules need gap=22, but the Waveshare 1.64" uses gap=0.
     esp_lcd_panel_set_gap(panel_handle, 20, 0);
 
+    // Clear the whole panel to black BEFORE brightness is restored at the end of
+    // init(). The panel GRAM powers up with random contents (shows as green bands),
+    // and LVGL's first frame doesn't flush until the UI task starts — without this
+    // the garbage would be visible the moment the backlight comes up. lvgl_display
+    // is still null here, so the DMA-done callback is a no-op for these writes.
+    {
+        constexpr int kClearBandRows = 40;
+        const size_t band_bytes = (size_t)HW_DISPLAY_WIDTH_PX * kClearBandRows * sizeof(uint16_t);
+        uint16_t* black = static_cast<uint16_t*>(heap_caps_calloc(1, band_bytes, MALLOC_CAP_DMA));
+        if (black) {
+            for (int y = 0; y < HW_DISPLAY_HEIGHT_PX; y += kClearBandRows) {
+                int band_end = y + kClearBandRows;
+                if (band_end > HW_DISPLAY_HEIGHT_PX) band_end = HW_DISPLAY_HEIGHT_PX;
+                esp_lcd_panel_draw_bitmap(panel_handle, 0, y, HW_DISPLAY_WIDTH_PX, band_end, black);
+            }
+            vTaskDelay(pdMS_TO_TICKS(30));  // let the queued DMA writes drain before freeing
+            heap_caps_free(black);
+        }
+    }
+
     // ------------------------------------------------------------------
     // 4. LVGL init + thread-safety mutex
     // ------------------------------------------------------------------

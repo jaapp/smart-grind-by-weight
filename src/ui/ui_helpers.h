@@ -43,3 +43,9 @@ lv_obj_t* create_radio_button_group(
 // Radio button group utility functions
 void radio_button_group_set_selection(lv_obj_t* group, int selected_index);
 int radio_button_group_get_selection(lv_obj_t* group);
+
+// Inset a screen root's content below the global top menubar by adding a top pad of
+// UI_MENUBAR_HEIGHT_PX. LVGL aligns TOP-anchored and flex children inside the content
+// area, so this shifts everything down clear of the bar while leaving BOTTOM-anchored
+// rows in place. Call once during a screen's root setup (non-immersive screens only).
+void layout_below_menubar(lv_obj_t* screen);

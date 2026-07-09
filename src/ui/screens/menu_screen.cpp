@@ -1,6 +1,7 @@
 #include "menu_screen.h"
 #include "arduino_compat.h"
 #include <algorithm>
+#include "../ui_helpers.h"
 #include "../../config/constants.h"
 #include "../../logging/grind_logging.h"
 #include "../../system/statistics_manager.h"
@@ -39,6 +40,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
+    layout_below_menubar(screen);
 
     visible = false;
     grinder_purge_mode_radio_group = nullptr;
@@ -49,6 +51,8 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     screensaver_mode_radio_group = nullptr;
     screensaver_timeout_slider = nullptr;
     screensaver_timeout_label = nullptr;
+    screensaver_off_timeout_slider = nullptr;
+    screensaver_off_timeout_label = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 
     // Create menu UI immediately at boot for instant access
@@ -71,56 +75,18 @@ void MenuScreen::create_menu_ui() {
     lv_menu_set_mode_root_back_button(menu, LV_MENU_ROOT_BACK_BUTTON_ENABLED);
     lv_obj_add_event_cb(menu, back_event_handler, LV_EVENT_CLICKED, menu);
 
-    // Get header and set up flex layout
+    // The global navigation bar owns the back arrow + page title, so collapse lv_menu's
+    // native header to zero height. A hidden flag alone doesn't stick — lv_menu re-shows
+    // the header on every page load — but a zero-height style survives that. The header
+    // stays functional: its label tracks the current page (mirrored into the nav bar)
+    // and its back button drives sub-page navigation via go_back().
     lv_obj_t* header = lv_menu_get_main_header(menu);
-    lv_obj_set_layout(header, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_coord_t title_base_height = lv_font_get_line_height(&lv_font_montserrat_36);
-    lv_coord_t title_target_height = (title_base_height * 3) / 2; // ~50% taller
-    lv_coord_t title_padding = (title_target_height - title_base_height) / 2;
-    lv_obj_set_style_min_height(header, title_target_height, 0);
-    lv_obj_set_style_pad_top(header, title_padding, 0);
-    lv_obj_set_style_pad_bottom(header, title_padding, 0);
-
-    // Get the header label — constrain width and enable horizontal scroll for long titles
-    lv_obj_t* header_label = lv_obj_get_child(header, -1);
-    if (header_label) {
-        lv_obj_set_style_text_align(header_label, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_set_style_text_font(header_label, &lv_font_montserrat_36, 0);
-        lv_obj_set_style_text_color(header_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-        lv_obj_set_style_min_height(header_label, title_target_height, 0);
-        lv_obj_set_style_pad_top(header_label, title_padding, 0);
-        lv_obj_set_style_pad_bottom(header_label, title_padding, 0);
-
-        // Let the label fill remaining space between back arrow and spacer
-        lv_obj_set_flex_grow(header_label, 1);
-        // Long titles scroll horizontally instead of overflowing
-        lv_label_set_long_mode(header_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_obj_set_style_anim_duration(header_label, 5000, LV_PART_MAIN);
-    }
-    // Get and style the back chevron — add solid background so scrolling title doesn't show through
-    lv_obj_t* back_chevron = lv_menu_get_main_header_back_button(menu);
-    lv_obj_set_style_text_font(back_chevron, &lv_font_montserrat_32, 0);
-    lv_obj_set_ext_click_area(back_chevron, 200);
-    lv_obj_set_style_text_color(back_chevron, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_style_min_height(back_chevron, title_target_height, 0);
-    lv_obj_set_style_pad_top(back_chevron, title_padding, 0);
-    lv_obj_set_style_pad_bottom(back_chevron, title_padding, 0);
-    lv_obj_set_style_bg_color(back_chevron, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
-    lv_obj_set_style_bg_opa(back_chevron, LV_OPA_COVER, 0);
-
-    // Force layout update to get proper chevron dimensions
-    lv_obj_update_layout(header);
-
-    // Create spacer using chevron's actual size
-    // Spacer is used to center name of the page name in the header
-    lv_obj_t* spacer = lv_obj_create(header);
-    lv_obj_set_size(spacer, lv_obj_get_width(back_chevron), lv_obj_get_height(back_chevron));
-    lv_obj_set_style_bg_color(spacer, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
-    lv_obj_set_style_bg_opa(spacer, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(spacer, 0, 0);
-    lv_obj_clear_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
+    menu_header_label_ = lv_obj_get_child(header, -1);
+    menu_back_button_ = lv_menu_get_main_header_back_button(menu);
+    lv_obj_set_style_min_height(header, 0, 0);
+    lv_obj_set_style_pad_all(header, 0, 0);
+    lv_obj_set_height(header, 0);
+    lv_obj_add_flag(header, LV_OBJ_FLAG_HIDDEN);
 
     // Create main page last
     lv_obj_t* main_page = lv_menu_page_create(menu, "Menu");
@@ -372,11 +338,12 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
 
     create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
 
-    // Screensaver section: behaviour (Dim/Off), dimmed brightness, and inactivity timeout
+    // Screensaver section: style (Dim / boot Logo), dimmed brightness, and two-stage
+    // timeouts — dim first, then display fully off.
     create_separator(parent, "Screensaver");
-    create_description_label(parent, "Dim the display or turn it fully off after a period of inactivity.");
+    create_description_label(parent, "Dim the display (or show the logo), then turn it off after longer inactivity.");
 
-    const char* screensaver_modes[] = {"Dim", "Off"};
+    const char* screensaver_modes[] = {"Dim", "Logo"};
     screensaver_mode_radio_group = create_radio_button_group(
         parent,
         screensaver_modes,
@@ -389,8 +356,10 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
     );
 
     create_slider_row(parent, "Dimmed", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
-    // "Sleep after" timeout slider uses 9 discrete positions (0-8) mapped to kScreensaverTimeoutStepsMs
-    create_slider_row(parent, "Sleep after", &screensaver_timeout_label, &screensaver_timeout_slider,
+    // Timeout sliders use discrete positions (0..count-1) mapped to kScreensaverTimeoutStepsMs
+    create_slider_row(parent, "Dim after", &screensaver_timeout_label, &screensaver_timeout_slider,
+                     lv_color_hex(THEME_COLOR_ACCENT), 0, kScreensaverTimeoutStepCount - 1);
+    create_slider_row(parent, "Off after", &screensaver_off_timeout_label, &screensaver_off_timeout_slider,
                      lv_color_hex(THEME_COLOR_ACCENT), 0, kScreensaverTimeoutStepCount - 1);
 
     // Register events for the sliders (done here because widgets are created lazily)
@@ -413,6 +382,12 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
         lv_obj_add_event_cb(screensaver_timeout_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_TIMEOUT_SLIDER_RELEASED)));
     }
+    if (screensaver_off_timeout_slider) {
+        lv_obj_add_event_cb(screensaver_off_timeout_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_OFF_TIMEOUT_SLIDER)));
+        lv_obj_add_event_cb(screensaver_off_timeout_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_OFF_TIMEOUT_SLIDER_RELEASED)));
+    }
 }
 
 
@@ -428,7 +403,7 @@ static void grinder_purge_mode_callback(int selected_index, void* user_data) {
     EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::GRINDER_PURGE_MODE_RADIO_BUTTON, nullptr);
 }
 
-// Callback for screensaver mode (Dim/Off) radio button selection
+// Callback for screensaver style (Dim/Logo) radio button selection
 static void screensaver_mode_callback(int selected_index, void* user_data) {
     // Trigger the event system instead of handling directly
     EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SCREENSAVER_MODE_RADIO_BUTTON, nullptr);
@@ -703,6 +678,22 @@ void MenuScreen::hide() {
     LOG_BLE("[%lums MENU] Menu screen hidden successfully\n", millis());
 }
 
+const char* MenuScreen::get_current_title() const {
+    if (menu_header_label_) {
+        const char* title = lv_label_get_text(menu_header_label_);
+        if (title && title[0] != '\0') return title;
+    }
+    return "Menu";
+}
+
+void MenuScreen::go_back() {
+    // Replicate a tap on lv_menu's (hidden) back button: pops one sub-page, or at the
+    // root fires MENU_BACK via back_event_handler → returns to READY.
+    if (menu_back_button_) {
+        lv_obj_send_event(menu_back_button_, LV_EVENT_CLICKED, nullptr);
+    }
+}
+
 void MenuScreen::update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap) {
     if (!visible) return;
 
@@ -954,36 +945,29 @@ void MenuScreen::update_brightness_labels(int normal_percent, int screensaver_pe
     }
 }
 
+// Shared "<prefix>: 15s / 5 min / Never" label formatting for the timeout sliders
+static void format_screensaver_timeout_text(char* buffer, size_t size, const char* prefix, uint32_t timeout_ms) {
+    if (timeout_ms == USER_SCREEN_SAVER_TIMEOUT_NEVER_MS) {
+        snprintf(buffer, size, "%s: Never", prefix);
+    } else if (timeout_ms < 60000) {
+        snprintf(buffer, size, "%s: %lus", prefix, static_cast<unsigned long>(timeout_ms / 1000));
+    } else {
+        snprintf(buffer, size, "%s: %lu min", prefix, static_cast<unsigned long>(timeout_ms / 60000));
+    }
+}
+
 void MenuScreen::update_screensaver_timeout_label(uint32_t timeout_ms) {
     if (!screensaver_timeout_label) return;
-
     char buffer[32];
-    if (timeout_ms == USER_SCREEN_SAVER_TIMEOUT_NEVER_MS) {
-        snprintf(buffer, sizeof(buffer), "Sleep after: Never");
-    } else if (timeout_ms < 60000) {
-        snprintf(buffer, sizeof(buffer), "Sleep after: %lus",
-                 static_cast<unsigned long>(timeout_ms / 1000));
-    } else {
-        snprintf(buffer, sizeof(buffer), "Sleep after: %lu min",
-                 static_cast<unsigned long>(timeout_ms / 60000));
-    }
+    format_screensaver_timeout_text(buffer, sizeof(buffer), "Dim after", timeout_ms);
     lv_label_set_text(screensaver_timeout_label, buffer);
 }
 
-void MenuScreen::apply_screensaver_mode_ui(int mode) {
-    // The dimmed-brightness slider is only meaningful when the screensaver dims (not off).
-    if (!brightness_screensaver_slider) return;
-
-    bool dim_mode = (mode != USER_SCREEN_SAVER_MODE_OFF);
-    if (dim_mode) {
-        lv_obj_clear_state(brightness_screensaver_slider, LV_STATE_DISABLED);
-        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_COVER, LV_PART_INDICATOR);
-    } else {
-        lv_obj_add_state(brightness_screensaver_slider, LV_STATE_DISABLED);
-        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_50, LV_PART_MAIN);
-        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_50, LV_PART_INDICATOR);
-    }
+void MenuScreen::update_screensaver_off_timeout_label(uint32_t timeout_ms) {
+    if (!screensaver_off_timeout_label) return;
+    char buffer[32];
+    format_screensaver_timeout_text(buffer, sizeof(buffer), "Off after", timeout_ms);
+    lv_label_set_text(screensaver_off_timeout_label, buffer);
 }
 
 void MenuScreen::update_screensaver_settings() {
@@ -991,25 +975,32 @@ void MenuScreen::update_screensaver_settings() {
 
     Preferences prefs;
     prefs.begin("brightness", false); // writable so the namespace is created on first use
-    int32_t timeout_ms = prefs.getInt("ss_timeout", static_cast<int32_t>(USER_SCREEN_AUTO_DIM_TIMEOUT_MS));
+    int32_t dim_ms = prefs.getInt("ss_timeout", static_cast<int32_t>(USER_SCREEN_DIM_TIMEOUT_MS));
+    int32_t off_ms = prefs.getInt("ss_off_to", static_cast<int32_t>(USER_SCREEN_OFF_TIMEOUT_MS));
     int mode = prefs.getInt("ss_mode", USER_SCREEN_SAVER_MODE_DEFAULT);
     prefs.end();
 
-    if (timeout_ms < 0) timeout_ms = static_cast<int32_t>(USER_SCREEN_AUTO_DIM_TIMEOUT_MS);
-    if (mode != USER_SCREEN_SAVER_MODE_OFF) mode = USER_SCREEN_SAVER_MODE_DIM;
+    if (dim_ms < 0) dim_ms = static_cast<int32_t>(USER_SCREEN_DIM_TIMEOUT_MS);
+    if (off_ms < 0) off_ms = static_cast<int32_t>(USER_SCREEN_OFF_TIMEOUT_MS);
+    if (mode != USER_SCREEN_SAVER_MODE_LOGO) mode = USER_SCREEN_SAVER_MODE_DIM;
 
-    // Map the stored timeout to the nearest slider index
-    int slider_index = screensaver_timeout_ms_to_index(static_cast<uint32_t>(timeout_ms));
+    // Map the stored timeouts to the nearest slider indices
+    int dim_index = screensaver_timeout_ms_to_index(static_cast<uint32_t>(dim_ms));
+    int off_index = screensaver_timeout_ms_to_index(static_cast<uint32_t>(off_ms));
 
     if (screensaver_timeout_slider) {
-        lv_slider_set_value(screensaver_timeout_slider, slider_index, LV_ANIM_OFF);
+        lv_slider_set_value(screensaver_timeout_slider, dim_index, LV_ANIM_OFF);
     }
-    update_screensaver_timeout_label(kScreensaverTimeoutStepsMs[slider_index]);
+    update_screensaver_timeout_label(kScreensaverTimeoutStepsMs[dim_index]);
+
+    if (screensaver_off_timeout_slider) {
+        lv_slider_set_value(screensaver_off_timeout_slider, off_index, LV_ANIM_OFF);
+    }
+    update_screensaver_off_timeout_label(kScreensaverTimeoutStepsMs[off_index]);
 
     if (screensaver_mode_radio_group) {
         radio_button_group_set_selection(screensaver_mode_radio_group, mode);
     }
-    apply_screensaver_mode_ui(mode);
 }
 
 void MenuScreen::update_grinder_purge_amount_label(float amount_g) {

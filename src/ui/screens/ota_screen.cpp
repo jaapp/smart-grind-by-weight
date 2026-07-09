@@ -1,5 +1,6 @@
 #include "ota_screen.h"
 #include "arduino_compat.h"
+#include "../ui_helpers.h"
 #include "../../config/constants.h"
 
 void OTAScreen::create() {
@@ -9,10 +10,14 @@ void OTAScreen::create() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 20, 0);
+    layout_below_menubar(screen);
 
     // Disable touch input for the entire screen to lock it during operations
     lv_obj_add_flag(screen, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_CLICKABLE);
+    // Status-only screen: never scroll (the menubar inset makes the centered content
+    // overflow slightly, which would otherwise draw a scrollbar on the right edge)
+    lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
     // Use flex layout for centering
     lv_obj_set_layout(screen, LV_LAYOUT_FLEX);

@@ -37,12 +37,15 @@ public:
     void handle_brightness_screensaver_slider_released();
     void handle_screensaver_timeout_slider();
     void handle_screensaver_timeout_slider_released();
+    void handle_screensaver_off_timeout_slider();
+    void handle_screensaver_off_timeout_slider_released();
     void handle_screensaver_mode_radio_button();
 
     float get_normal_brightness() const;
     float get_screensaver_brightness() const;
-    uint32_t get_screensaver_timeout_ms() const;
-    int get_screensaver_mode() const;
+    uint32_t get_screensaver_timeout_ms() const;      // stage 1: dim timeout
+    uint32_t get_screensaver_off_timeout_ms() const;  // stage 2: display-off timeout
+    int get_screensaver_mode() const;                 // stage-1 style: DIM or LOGO
 
 private:
     UIManager* ui_manager_;

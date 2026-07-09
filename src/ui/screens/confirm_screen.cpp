@@ -10,6 +10,7 @@ void ConfirmScreen::create() {
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_ver(screen, 6, 0);
     lv_obj_set_style_pad_hor(screen, 0, 0);
+    layout_below_menubar(screen);
     lv_obj_set_style_pad_gap(screen, 5, 0);
     
     // Set up flex layout (column)
@@ -49,9 +50,11 @@ void ConfirmScreen::create() {
     lv_obj_update_layout(message_container);
     lv_obj_scroll_to_y(message_container, 0, LV_ANIM_OFF);  // Scroll to top
 
-    create_dual_button_row(screen, &confirm_button, &cancel_button, "Confirm", "Cancel", lv_color_hex(THEME_COLOR_SUCCESS));
+    // Single confirm button; CANCEL is the global nav-bar back arrow (runs on_cancel_).
+    cancel_button = nullptr;
+    cancel_button_label = nullptr;
+    confirm_button = create_button(screen, "Confirm", lv_color_hex(THEME_COLOR_SUCCESS), 260, 80);
     confirm_button_label = lv_obj_get_child(confirm_button, -1);
-    cancel_button_label = lv_obj_get_child(cancel_button, -1);
     
     visible = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -71,9 +74,9 @@ void ConfirmScreen::show(const char* title, const char* message,
     lv_label_set_text(confirm_button_label, confirm_text);
     lv_obj_set_style_bg_color(confirm_button, confirm_color, 0);
     
-    // Set cancel button
-    lv_label_set_text(cancel_button_label, cancel_text);
-    
+    // Cancel is the nav-bar back arrow now; keep the arg for API compatibility.
+    (void)cancel_text;
+
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = true;
 }

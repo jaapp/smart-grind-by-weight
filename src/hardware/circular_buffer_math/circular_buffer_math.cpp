@@ -128,7 +128,7 @@ int32_t CircularBufferMath::apply_outlier_rejection(const int32_t* samples, int 
 int CircularBufferMath::calculate_max_samples_for_window(uint32_t window_ms) const {
     // Estimate max samples
     int estimated_samples = (window_ms * HW_LOADCELL_SAMPLE_RATE_SPS) / 1000 + 10; // +10 for safety margin
-    
+
     // Cap at reasonable limits
     if (estimated_samples > (int)samples_count) {
         estimated_samples = samples_count;
@@ -136,7 +136,16 @@ int CircularBufferMath::calculate_max_samples_for_window(uint32_t window_ms) con
     if (estimated_samples > MAX_BUFFER_SIZE) {
         estimated_samples = MAX_BUFFER_SIZE;
     }
-    
+
+    // Hard stack-safety cap: every caller of this function alloca()s the result
+    // onto its task stack (6-8KB stacks). All legitimate windowed-math callers use
+    // short windows (<= ~2.5s ≈ 35 samples); anything needing more must iterate the
+    // ring in place (see get_min_raw/get_max_raw) instead of copying.
+    constexpr int kMaxStackSamples = 256;
+    if (estimated_samples > kMaxStackSamples) {
+        estimated_samples = kMaxStackSamples;
+    }
+
     return estimated_samples;
 }
 
@@ -475,40 +484,52 @@ bool CircularBufferMath::raw_flowrate_is_stable(uint32_t window_ms) const {
     return abs(current_flow - recent_flow) <= threshold;
 }
 
+// Min/max walk the ring buffer in place — NO window-sized copy. The previous
+// implementation alloca'd the whole window onto the caller's stack; with the
+// screensaver's 5-minute activity window running on the 8KB UI task stack, the
+// alloca grew with the sample count (~11/s) until it overflowed the stack and
+// sprayed raw samples over return addresses (double-exception crash after
+// ~1-3 minutes of uptime). Never alloca window-sized arrays.
 int32_t CircularBufferMath::get_min_raw(uint32_t window_ms) const {
-    int max_samples = calculate_max_samples_for_window(window_ms);
-    if (max_samples == 0) return 0;
-    
-    int32_t* samples = (int32_t*)alloca(max_samples * sizeof(int32_t));
-    int actual_samples = get_samples_in_window(window_ms, samples);
-    
-    if (actual_samples == 0) return 0;
-    
-    int32_t min_val = samples[0];
-    for (int i = 1; i < actual_samples; i++) {
-        if (samples[i] < min_val) {
-            min_val = samples[i];
+    if (samples_count == 0) return 0;
+
+    uint32_t window_start = millis() - window_ms;
+    int32_t min_val = 0;
+    bool found = false;
+
+    for (int i = 0; i < samples_count; i++) {
+        uint16_t index = (write_index - 1 - i + MAX_BUFFER_SIZE) % MAX_BUFFER_SIZE;
+        if (circular_buffer[index].timestamp_ms < window_start) {
+            break; // Samples are time-ordered; everything older is out of window
+        }
+        int32_t v = circular_buffer[index].raw_value;
+        if (!found || v < min_val) {
+            min_val = v;
+            found = true;
         }
     }
-    return min_val;
+    return found ? min_val : 0;
 }
 
 int32_t CircularBufferMath::get_max_raw(uint32_t window_ms) const {
-    int max_samples = calculate_max_samples_for_window(window_ms);
-    if (max_samples == 0) return 0;
-    
-    int32_t* samples = (int32_t*)alloca(max_samples * sizeof(int32_t));
-    int actual_samples = get_samples_in_window(window_ms, samples);
-    
-    if (actual_samples == 0) return 0;
-    
-    int32_t max_val = samples[0];
-    for (int i = 1; i < actual_samples; i++) {
-        if (samples[i] > max_val) {
-            max_val = samples[i];
+    if (samples_count == 0) return 0;
+
+    uint32_t window_start = millis() - window_ms;
+    int32_t max_val = 0;
+    bool found = false;
+
+    for (int i = 0; i < samples_count; i++) {
+        uint16_t index = (write_index - 1 - i + MAX_BUFFER_SIZE) % MAX_BUFFER_SIZE;
+        if (circular_buffer[index].timestamp_ms < window_start) {
+            break; // Samples are time-ordered; everything older is out of window
+        }
+        int32_t v = circular_buffer[index].raw_value;
+        if (!found || v > max_val) {
+            max_val = v;
+            found = true;
         }
     }
-    return max_val;
+    return found ? max_val : 0;
 }
 
 void CircularBufferMath::reset_display_filter() {

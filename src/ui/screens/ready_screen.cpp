@@ -5,13 +5,35 @@
 #include "../event_bridge_lvgl.h"
 #include "../ui_helpers.h"
 
+// Circular action button matching the main grind/pulse buttons (defined below)
+static lv_obj_t* create_round_button(lv_obj_t* parent, const char* text, uint32_t color_hex);
+
+// Bottom-anchor an action button inside a flex-column tab page: a growing spacer
+// pushes it down so it slides with the page content during swipes.
+static lv_obj_t* add_tab_action_button(lv_obj_t* parent, const char* symbol, uint32_t color_hex,
+                                       EventBridgeLVGL::EventType event) {
+    lv_obj_t* spacer = lv_obj_create(parent);
+    lv_obj_remove_style_all(spacer);
+    lv_obj_set_width(spacer, LV_PCT(100));
+    lv_obj_set_flex_grow(spacer, 1);
+
+    lv_obj_t* btn = create_round_button(parent, symbol, color_hex);
+    lv_obj_add_event_cb(btn, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                        reinterpret_cast<void*>(static_cast<intptr_t>(event)));
+    return btn;
+}
+
 void ReadyScreen::create() {
     screen = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(screen, LV_PCT(100), LV_PCT(80));
+    // Full height (below the nav bar) so in-tab action buttons sit near the bottom of
+    // the panel; a bottom pad keeps them clear of the page-indicator dots.
+    lv_obj_set_size(screen, LV_PCT(100), LV_PCT(100));
     lv_obj_align(screen, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
+    lv_obj_set_style_pad_bottom(screen, 22, 0);
+    layout_below_menubar(screen);
     lv_obj_add_flag(screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // Create tabview
@@ -63,16 +85,29 @@ void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(parent, 0, 0);
+    lv_obj_set_style_pad_bottom(parent, 16, 0);
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Top spacer mirrors the bottom one so the labels stay centered above the button
+    lv_obj_t* top_spacer = lv_obj_create(parent);
+    lv_obj_remove_style_all(top_spacer);
+    lv_obj_set_width(top_spacer, LV_PCT(100));
+    lv_obj_set_flex_grow(top_spacer, 1);
 
     lv_obj_t* name_label;
     (void)create_profile_label(parent, &name_label, &weight_labels[profile_index]);
     lv_label_set_text(name_label, profile_name);
     lv_obj_add_flag(name_label, LV_OBJ_FLAG_CLICKABLE);
-    
+
     char weight_text[16];
     snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
     lv_label_set_text(weight_labels[profile_index], weight_text);
     lv_obj_add_flag(weight_labels[profile_index], LV_OBJ_FLAG_CLICKABLE);
+
+    // In-tab grind button — slides with the page instead of floating over it
+    profile_action_buttons[profile_index] =
+        add_tab_action_button(parent, LV_SYMBOL_PLAY, THEME_COLOR_PRIMARY,
+                              EventBridgeLVGL::EventType::GRIND_BUTTON);
 }
 
 void ReadyScreen::create_menu_page(lv_obj_t* parent) {
@@ -80,6 +115,14 @@ void ReadyScreen::create_menu_page(lv_obj_t* parent) {
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(parent, 20, 0);
+    lv_obj_set_style_pad_bottom(parent, 16, 0);
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Top spacer mirrors the bottom one so the label stays centered above the button
+    lv_obj_t* top_spacer = lv_obj_create(parent);
+    lv_obj_remove_style_all(top_spacer);
+    lv_obj_set_width(top_spacer, LV_PCT(100));
+    lv_obj_set_flex_grow(top_spacer, 1);
 
     // Info label
     lv_obj_t* info_label = lv_label_create(parent);
@@ -87,6 +130,12 @@ void ReadyScreen::create_menu_page(lv_obj_t* parent) {
     lv_obj_set_style_text_font(info_label, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);
+
+    // In-tab settings button — opens the Settings menu (GRIND_BUTTON handler routes
+    // tab 3 to UIState::MENU), sliding with the page like every other tab action
+    menu_action_button =
+        add_tab_action_button(parent, LV_SYMBOL_SETTINGS, THEME_COLOR_NEUTRAL,
+                              EventBridgeLVGL::EventType::GRIND_BUTTON);
 }
 
 // Circular action button matching the main grind/pulse buttons
@@ -235,11 +284,17 @@ void ReadyScreen::hide() {
 }
 
 void ReadyScreen::update_profile_values(const float values[3], GrindMode mode) {
+    // Grind buttons are color-coded by mode, matching the old floater (blue = time)
+    lv_color_t action_color = lv_color_hex(mode == GrindMode::TIME ? THEME_COLOR_ACCENT
+                                                                   : THEME_COLOR_PRIMARY);
     for (int i = 0; i < 3; i++) {
         if (weight_labels[i]) {
             char text[24];
             format_ready_value(text, sizeof(text), mode, values[i]);
             lv_label_set_text(weight_labels[i], text);
+        }
+        if (profile_action_buttons[i]) {
+            lv_obj_set_style_bg_color(profile_action_buttons[i], action_color, 0);
         }
     }
 }

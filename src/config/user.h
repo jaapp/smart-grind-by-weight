@@ -46,16 +46,19 @@
 //------------------------------------------------------------------------------
 // SCREEN AUTO-DIMMING / SCREENSAVER
 //------------------------------------------------------------------------------
-#define USER_SCREEN_AUTO_DIM_TIMEOUT_MS 300000                                 // Default inactivity timeout before the screensaver engages
+// Two-stage screensaver: after the dim timeout the display dims (plain dim or the
+// boot logo on black, per mode); after the off timeout the backlight turns fully off.
+#define USER_SCREEN_DIM_TIMEOUT_MS 60000                                       // Default inactivity before stage 1 (dim / logo)
+#define USER_SCREEN_OFF_TIMEOUT_MS 300000                                      // Default inactivity before stage 2 (display off)
 #define USER_SCREEN_BRIGHTNESS_NORMAL 1.0f                                     // Normal screen brightness
 #define USER_SCREEN_BRIGHTNESS_DIMMED 0.35f                                    // Dimmed screen brightness
 #define USER_WEIGHT_ACTIVITY_THRESHOLD_G 1.0f                                  // Weight change threshold for screen timeout reset (grams)
 
-// Screensaver behaviour: dim the backlight or turn the panel fully off
-#define USER_SCREEN_SAVER_MODE_DIM 0                                           // Screensaver dims to the configured brightness
-#define USER_SCREEN_SAVER_MODE_OFF 1                                           // Screensaver turns the display fully off
-#define USER_SCREEN_SAVER_MODE_DEFAULT USER_SCREEN_SAVER_MODE_DIM             // Default screensaver behaviour
-#define USER_SCREEN_SAVER_TIMEOUT_NEVER_MS 0                                   // Sentinel timeout meaning "never sleep"
+// Stage-1 screensaver style: plain dim, or the boot logo centered on black
+#define USER_SCREEN_SAVER_MODE_DIM 0                                           // Dim the current screen to the configured brightness
+#define USER_SCREEN_SAVER_MODE_LOGO 1                                          // Show the boot logo on black (at dimmed brightness)
+#define USER_SCREEN_SAVER_MODE_DEFAULT USER_SCREEN_SAVER_MODE_DIM             // Default screensaver style
+#define USER_SCREEN_SAVER_TIMEOUT_NEVER_MS 0                                   // Sentinel timeout meaning "never"
 
 //------------------------------------------------------------------------------
 // BOOT SPLASH

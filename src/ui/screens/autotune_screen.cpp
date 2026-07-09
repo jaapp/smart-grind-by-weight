@@ -12,6 +12,7 @@ void AutoTuneScreen::create() {
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
     lv_obj_set_style_pad_ver(screen, 6, 0);
+    layout_below_menubar(screen);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
 
@@ -77,14 +78,12 @@ void AutoTuneScreen::create() {
     lv_obj_set_style_text_align(previous_latency_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(previous_latency_label, LV_ALIGN_TOP_MID, 0, 80);
 
-    // Buttons
-    button_row = create_dual_button_row(screen, &cancel_button, &ok_button,
-                                        LV_SYMBOL_CLOSE, LV_SYMBOL_OK,
-                                        lv_color_hex(0x888888), lv_color_hex(THEME_COLOR_SUCCESS),
-                                        80, &lv_font_montserrat_32);
-    lv_obj_set_width(button_row, 280);
-    lv_obj_align(button_row, LV_ALIGN_BOTTOM_MID, 0, -10);
-    lv_obj_clear_flag(button_row, LV_OBJ_FLAG_SCROLLABLE);
+    // Single OK button (shown on the result screens). During the console/run state the
+    // global nav-bar back arrow cancels the tune, so no bottom button is shown then.
+    button_row = nullptr;
+    cancel_button = nullptr;
+    ok_button = create_button(screen, LV_SYMBOL_OK, lv_color_hex(THEME_COLOR_SUCCESS), 260, 80, &lv_font_montserrat_32);
+    lv_obj_align(ok_button, LV_ALIGN_BOTTOM_MID, 0, -10);
 
     visible = false;
     current_state = AutoTuneScreenState::CONSOLE;
@@ -107,10 +106,8 @@ void AutoTuneScreen::show_console_screen() {
     // Clear console
     lv_textarea_set_text(console_textarea, "");
 
-    // Show console elements
+    // Show console elements. No bottom button while running — back arrow cancels.
     lv_obj_clear_flag(console_container, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(button_row, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(cancel_button, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ok_button, LV_OBJ_FLAG_HIDDEN);
 
     // Hide result screen
@@ -125,10 +122,8 @@ void AutoTuneScreen::show_success_screen(float new_latency_ms, float previous_la
     // Hide console screen
     lv_obj_add_flag(console_container, LV_OBJ_FLAG_HIDDEN);
 
-    // Show result elements
+    // Show result elements + the OK button.
     lv_obj_clear_flag(result_container, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(button_row, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(cancel_button, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(ok_button, LV_OBJ_FLAG_HIDDEN);
 
     lv_label_set_text(title_label, "Tune\nComplete!");
@@ -151,10 +146,8 @@ void AutoTuneScreen::show_failure_screen(const char* error_message) {
     // Hide console screen
     lv_obj_add_flag(console_container, LV_OBJ_FLAG_HIDDEN);
 
-    // Show result elements
+    // Show result elements + the OK button.
     lv_obj_clear_flag(result_container, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(button_row, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(cancel_button, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(ok_button, LV_OBJ_FLAG_HIDDEN);
 
     lv_label_set_text(title_label, "Tune\nFailed");
