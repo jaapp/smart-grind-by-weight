@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/e20ce3e2-417e-4a3b-bb48-05591fce9418
 </td>
 <td width="50%">
 
-[<img src="media/smart-grind-by-weight-render.PNG" alt="Smart Grind-by-Weight Modification" width="100%">](media/smart-grind-by-weight-render.PNG)
+[<img src="3d_files/Eureka%20Mignon%20Neo/Renders/neo-full-assembly.png" alt="Smart Grind-by-Weight — Eureka Mignon Neo with portafilter-mounted base" width="100%">](3d_files/Eureka%20Mignon%20Neo/Renders/neo-full-assembly.png)
 
 </td>
 </tr>
@@ -47,6 +47,7 @@ This is a fork of [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-g
 - **Dialog-style calibration** — guided step-by-step flow with one clear button per step
 - **BLE reliability** — OTA GATT registration order fixed, Bluetooth re-enable works without a reboot, and an advertising watchdog recovers dropped connections
 - **Hardware resilience & options** — runtime HX711 fault detection/recovery, active-low motor relay support, 180° screen rotation
+- **Eureka Mignon Neo model set** — redesigned **portafilter-mounted base** (grind straight into the basket), cantilevered scale platform, new screen mount, and a 15° tilt base → see [docs/NEO_3D_MODELS.md](docs/NEO_3D_MODELS.md)
 
 **Full details** → See **[docs/FORK_IMPROVEMENTS.md](docs/FORK_IMPROVEMENTS.md)** for the complete write-up.
 
@@ -101,6 +102,8 @@ flowchart LR
 The firmware builds with **native ESP-IDF** (`python3 tools/grinder.py build`, or `idf.py` directly) — there is no PlatformIO. If you want to modify the code or contribute to development, see **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** for build instructions.
 
 **Design Files:** The complete Fusion 360 design is available at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for modification and adaptation to other grinder models.
+
+**Eureka Mignon Neo — portafilter-mounted base:** This fork adds a redesigned model set for the Mignon Neo: the portafilter docks directly on the scale under the chute (grounds land straight in the basket — no cup, no transfer), with a cantilevered scale platform, a new screen mount, and a 15° tilt base. STLs, STEP source, and renders are in `3d_files/Eureka Mignon Neo/` — full part list in **[docs/NEO_3D_MODELS.md](docs/NEO_3D_MODELS.md)**.
 
 ---
 
