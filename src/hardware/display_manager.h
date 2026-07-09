@@ -27,6 +27,9 @@ public:
 
     // Accessed by DMA ISR callback (on_color_trans_done)
     lv_display_t*             lvgl_display  = nullptr;
+    // Chunked full-frame flush: DMA transactions still in flight for the current
+    // LVGL flush; the last one to complete signals lv_display_flush_ready.
+    volatile int              pending_flush_chunks = 0;
 
 private:
     esp_lcd_panel_handle_t    panel_handle  = nullptr;

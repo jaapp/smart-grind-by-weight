@@ -52,9 +52,13 @@ static bool on_color_trans_done(esp_lcd_panel_io_handle_t /*io*/,
                                 esp_lcd_panel_io_event_data_t* /*edata*/,
                                 void* user_ctx)
 {
+    // Fires once per queued chunk (ISR context). The flush is complete — and LVGL's
+    // buffer reusable — only when the LAST chunk of the frame has been transferred.
     DisplayManager* self = static_cast<DisplayManager*>(user_ctx);
     if (self && self->lvgl_display) {
-        lv_display_flush_ready(self->lvgl_display);
+        if (__atomic_sub_fetch(&self->pending_flush_chunks, 1, __ATOMIC_ACQ_REL) <= 0) {
+            lv_display_flush_ready(self->lvgl_display);
+        }
     }
     return false;
 }
@@ -94,9 +98,11 @@ void DisplayManager::init()
     buscfg.data1_io_num   = HW_DISPLAY_D1_PIN;
     buscfg.data2_io_num   = HW_DISPLAY_D2_PIN;
     buscfg.data3_io_num   = HW_DISPLAY_D3_PIN;
-    // Sized for a full-frame transfer: flushing the whole frame as ONE DMA burst
-    // (instead of 80-row bands) minimizes visible tearing — see draw buffer setup.
-    buscfg.max_transfer_sz = HW_DISPLAY_WIDTH_PX * HW_DISPLAY_HEIGHT_PX * sizeof(uint16_t);
+    // 80 rows per SPI transaction — the known-good size for this bus/driver path.
+    // (A single full-frame transaction exceeds the S3's SPI transfer limit and
+    // silently fails; full frames are instead flushed as queued 80-row chunks —
+    // see lvgl_flush_cb.)
+    buscfg.max_transfer_sz = HW_DISPLAY_WIDTH_PX * 80 * sizeof(uint16_t);
 
     esp_err_t err = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
@@ -343,10 +349,39 @@ void DisplayManager::lvgl_flush_cb(lv_display_t* disp,
         return;
     }
 
-    esp_lcd_panel_draw_bitmap(g_display_manager->panel_handle,
-                              area->x1, area->y1,
-                              area->x2 + 1, area->y2 + 1,
-                              px_map);
+    // ANTI-TEARING: the frame is rendered in full (full-frame draw buffers), then
+    // written to the panel as back-to-back QUEUED 80-row DMA chunks. Unlike the old
+    // banded PARTIAL mode there are no multi-ms render gaps between the writes, so
+    // the whole frame streams to the panel in one ~6-7ms pass — a single potential
+    // seam per refresh instead of one per band. flush_ready fires from the DMA-done
+    // ISR when the last chunk completes (see on_color_trans_done).
+    constexpr int32_t kChunkRows = 80;  // matches the bus max_transfer_sz
+    const int32_t width = area->x2 - area->x1 + 1;
+    const int32_t total_rows = area->y2 - area->y1 + 1;
+    const int32_t num_chunks = (total_rows + kChunkRows - 1) / kChunkRows;
+
+    __atomic_store_n(&g_display_manager->pending_flush_chunks, num_chunks, __ATOMIC_RELEASE);
+
+    for (int32_t y = area->y1; y <= area->y2; y += kChunkRows) {
+        int32_t y_end = y + kChunkRows - 1;
+        if (y_end > area->y2) y_end = area->y2;
+
+        esp_err_t err = esp_lcd_panel_draw_bitmap(g_display_manager->panel_handle,
+                                                  area->x1, y,
+                                                  area->x2 + 1, y_end + 1,
+                                                  px_map);
+        px_map += (size_t)width * (y_end - y + 1) * sizeof(uint16_t);
+
+        if (err != ESP_OK) {
+            // The chunk was never queued, so its DMA callback will never fire —
+            // account for it here so the flush can still complete (a silent
+            // draw_bitmap failure previously wedged LVGL in wait_for_flushing).
+            ESP_LOGE(TAG, "draw_bitmap failed: %s", esp_err_to_name(err));
+            if (__atomic_sub_fetch(&g_display_manager->pending_flush_chunks, 1, __ATOMIC_ACQ_REL) <= 0) {
+                lv_display_flush_ready(disp);
+            }
+        }
+    }
 }
 
 void DisplayManager::lvgl_rounder_cb(lv_event_t* e)

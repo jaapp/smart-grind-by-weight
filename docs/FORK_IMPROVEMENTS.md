@@ -1,6 +1,6 @@
 # Fork Improvements
 
-This fork builds on the excellent [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) project and adds a substantial round of usability, stability, and tooling improvements on top of it. Everything below ships in firmware **v2.2.1**.
+This fork builds on the excellent [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) project and adds a substantial round of usability, stability, and tooling improvements on top of it. Everything below ships in firmware **v2.3.0**.
 
 The changes fall into six themes:
 
