@@ -106,7 +106,7 @@ The firmware builds with **native ESP-IDF** (`python3 tools/grinder.py build`, o
 
 **Design Files:** The complete Fusion 360 design is available at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for modification and adaptation to other grinder models.
 
-**Eureka Mignon Neo — portafilter-mounted base:** This fork adds a redesigned model set for the Mignon Neo: the portafilter docks directly on the scale under the chute (grounds land straight in the basket — no cup, no transfer), with a cantilevered scale platform, a new screen mount, and a 15° tilt base. STLs, STEP source, and renders are in `3d_files/Eureka Mignon Neo/` — full part list in **[docs/NEO_3D_MODELS.md](docs/NEO_3D_MODELS.md)**.
+**Eureka Mignon Neo — portafilter-mounted base:** This fork adds a redesigned model set for the Mignon Neo: the portafilter docks directly on the scale under the chute (grounds land straight in the basket — no cup, no transfer), with a cantilevered scale platform, a new screen mount, and a 15° tilt base. STLs, STEP source, and renders are in `3d_files/Eureka Mignon Neo/` — full part list in **[docs/NEO_3D_MODELS.md](docs/NEO_3D_MODELS.md)**. Based on [“Grinder Scale — Eureka Mignon Mod” by Karsten on MakerWorld](https://makerworld.com/en/models/2027665-grinder-scale-eureka-mignon-mod?from=search#profileId-2388986), heavily modified.
 
 ---
 
@@ -130,6 +130,7 @@ This project was inspired by and builds upon the excellent work of:
 
 - **[openGBW](https://github.com/jb-xyz/openGBW)** by jb-xyz - Open source grind-by-weight system
 - **[Coffee Grinder Smart Scale](https://besson.co/projects/coffee-grinder-smart-scale)** by Besson - Smart scale integration concepts
+- **[Grinder Scale — Eureka Mignon Mod](https://makerworld.com/en/models/2027665-grinder-scale-eureka-mignon-mod?from=search#profileId-2388986)** by Karsten on MakerWorld - original 3D scale-base design that the Mignon Neo model set is heavily modified from
 
 ---
 

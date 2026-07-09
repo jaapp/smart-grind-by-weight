@@ -2,7 +2,7 @@
 
 This fork adds a complete, redesigned 3D model set for the **Eureka Mignon Neo**, replacing the original cup-holder-style scale base with a **portafilter-mounted base**: the portafilter docks directly onto the scale platform under the chute, so grounds are weighed straight into the basket — no cup, no transfer, no mess.
 
-All files live in [`3d_files/Eureka Mignon Neo/`](../3d_files/Eureka%20Mignon%20Neo/).
+All files live in [`3d_files/Eureka Mignon Neo/`](../3d_files/Eureka%20Mignon%20Neo/). The scale-base design is based on [“Grinder Scale — Eureka Mignon Mod” by Karsten on MakerWorld](https://makerworld.com/en/models/2027665-grinder-scale-eureka-mignon-mod?from=search#profileId-2388986), heavily modified for this project (portafilter cradle, cantilevered platform, screen mount system, and tilt base).
 
 [<img src="../3d_files/Eureka%20Mignon%20Neo/Renders/neo-full-assembly.png" alt="Full assembly — portafilter docked on the scale base" width="70%">](../3d_files/Eureka%20Mignon%20Neo/Renders/neo-full-assembly.png)
 
@@ -48,3 +48,7 @@ The original design weighed a cup (or dosing cup) sitting on a cup-holder platfo
 ## Electronics
 
 Wiring and firmware are unchanged from the main project — see the [main README](../README.md) and [DEVELOPMENT.md](DEVELOPMENT.md). The load cell and HX711 amplifier mount inside the scale base; route the load-cell wires away from mains/motor wiring and strain-relieve the connector (a noisy or intermittent load cell degrades settling-based features — the Tune Pulses screen's live noise readout will tell you how clean your install is).
+
+## Credits
+
+The scale-base design is based on [“Grinder Scale — Eureka Mignon Mod” by Karsten on MakerWorld](https://makerworld.com/en/models/2027665-grinder-scale-eureka-mignon-mod?from=search#profileId-2388986), heavily modified for this project (portafilter cradle, cantilevered platform, screen mount system, and tilt base).
