@@ -144,3 +144,13 @@ In this project, that's most obvious when at state management - it's a bit clutt
 **Having issues?** → See **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** for common problems and solutions.
 
 **Changelog & Updates** → See **[Releases](https://github.com/jaapp/smart-grind-by-weight/releases)** for version history and updates.
+
+---
+
+## ⚖️ Trademark Disclaimer
+
+"Eureka", the Eureka 1920 shield logo, and model names such as "Mignon" are trademarks of **Conti Valerio S.r.l. (Eureka), Florence, Italy**. This is an independent, unofficial, open-source project with **no affiliation with, endorsement by, or sponsorship from Eureka**. Eureka's name and model names are used only to describe which grinders this modification is compatible with. All trademarks remain the property of their respective owners.
+
+This project modifies your grinder's electronics; doing so may void your warranty. Proceed at your own risk.
+
+**Custom boot logo:** the repository ships a neutral boot logo. To use your own artwork locally, replace `assets/boot_logo.png` with any PNG (it is auto-converted at build time) — keep personal artwork out of commits.
