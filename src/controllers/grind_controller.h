@@ -177,6 +177,9 @@ private:
     // so a single noisy sample can't abort the grind.
     unsigned long negative_weight_since_ms_ = 0;
 
+    // Pulse corrections on/off for the current session (see PREF_KEY_PULSE_CORRECTIONS)
+    bool pulse_corrections_for_session_ = (GRIND_PULSE_CORRECTIONS_DEFAULT != 0);
+
     // Time-mode manual top-off: true while the user holds the PULSE button so the
     // motor runs continuously (hold-to-grind), like the Scale page.
     bool manual_pulse_active_ = false;
@@ -246,6 +249,11 @@ public:
     static constexpr const char* PREF_KEY_GRINDER_AMOUNT_G = "grinder_amount_g";
     static constexpr const char* PREF_KEY_GRIND_FRESHNESS_HOURS = "freshness_hrs";
     static constexpr const char* PREF_KEY_LAST_GRIND_RUNTIME = "last_grind_ms";
+    static constexpr const char* PREF_KEY_PULSE_CORRECTIONS = "pulse_corr";
+
+    // Runtime pulse-corrections setting (Menu -> Grind Settings -> Corrections),
+    // sampled from preferences at grind start like the purge settings.
+    bool pulse_corrections_enabled() const { return pulse_corrections_for_session_; }
     GrindMode get_mode() const { return mode; }
     const GrindSessionDescriptor& get_session_descriptor() const { return session_descriptor; }
     

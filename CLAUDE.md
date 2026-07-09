@@ -81,6 +81,7 @@ python3 tools/grinder.py analyze
 - **Mode Selection**: Radio buttons for Weight/Time mode selection
 - **Swipe Gestures Toggle**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
 - **Automation**: Start on Cup and Return on Removal toggles
+- **Corrections**: "Pulses" toggle — runtime enable/disable of post-predictive pulse corrections (pref `pulse_corr` in the "grinder" namespace, sampled at grind start; default off — see `GRIND_PULSE_CORRECTIONS_DEFAULT`)
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `swipe.enabled` (boolean), `grind_mode` (0=Weight, 1=Time), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 - **Behavior**: Swipe gestures only work when enabled; direct mode selection always works

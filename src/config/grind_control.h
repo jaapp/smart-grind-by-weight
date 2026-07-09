@@ -41,12 +41,13 @@ enum class GrinderPurgeMode {
 #define GRIND_NEGATIVE_WEIGHT_FAILSAFE_SUSTAIN_MS 500                     // Must persist this long before aborting
 #define GRIND_MAX_PULSE_ATTEMPTS 10                                       // Maximum pulse corrections before stopping
 
-// Pulse corrections after the predictive grind. Set to 1 to top off toward the
-// target with short pulses (needs a scale that settles between pulses). Set to 0
-// to skip pulses entirely and land on the predictive motor-stop alone - faster,
-// and robust on a noisy load cell that never settles cleanly. With pulses off,
-// dial in the landing weight with GRIND_LATENCY_TO_COAST_RATIO below.
-#define GRIND_ENABLE_PULSE_CORRECTIONS 0
+// Pulse corrections after the predictive grind (DEFAULT for the runtime toggle in
+// Menu -> Grind Settings -> Corrections). Enabled: top off toward the target with
+// short pulses (needs a scale that settles between pulses). Disabled: land on the
+// predictive motor-stop alone - faster, and robust on a noisy load cell that never
+// settles cleanly. With pulses off, dial in the landing weight with
+// GRIND_LATENCY_TO_COAST_RATIO below.
+#define GRIND_PULSE_CORRECTIONS_DEFAULT 0
 
 // Flow rate detection
 #define GRIND_FLOW_DETECTION_THRESHOLD_GPS 0.5f                           // Minimum coffee flow rate to establish first grinds reachinig the cup = latency

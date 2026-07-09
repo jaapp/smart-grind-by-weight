@@ -131,6 +131,8 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
         float configured_amount = preferences->getFloat(PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         configured_amount = std::clamp(configured_amount, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
         grinder_purge_amount_g_for_session = configured_amount;
+        pulse_corrections_for_session_ = preferences->getBool(PREF_KEY_PULSE_CORRECTIONS,
+                                                              GRIND_PULSE_CORRECTIONS_DEFAULT != 0);
     }
 
     start_time = millis();

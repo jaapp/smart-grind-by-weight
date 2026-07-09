@@ -45,6 +45,7 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::LOGGING_TOGGLE, [this](lv_event_t*) { handle_logging_toggle(); });
 
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
+    EventBridgeLVGL::register_handler(ET::PULSE_CORRECTIONS_TOGGLE, [this](lv_event_t*) { handle_pulse_corrections_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
@@ -344,6 +345,23 @@ void MenuUIController::handle_auto_return_toggle() {
     }
 
     LOG_DEBUG_PRINTLN(enabled ? "Auto return on cup removal enabled" : "Auto return on cup removal disabled");
+}
+
+void MenuUIController::handle_pulse_corrections_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->menu_screen.get_pulse_corrections_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    auto* hardware = ui_manager_->get_hardware_manager();
+    Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+    if (prefs) {
+        prefs->putBool(GrindController::PREF_KEY_PULSE_CORRECTIONS, enabled);
+    }
+
+    LOG_DEBUG_PRINTLN(enabled ? "Pulse corrections: enabled" : "Pulse corrections: disabled");
 }
 
 void MenuUIController::handle_grinder_purge_mode_radio_button() {
