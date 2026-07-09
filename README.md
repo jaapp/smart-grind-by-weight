@@ -32,6 +32,26 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 
 ---
 
+## 🔱 What's different in this fork
+
+This is a fork of [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) with a round of stability, usability, and tooling improvements on top (firmware v2.2.1):
+
+- **Native ESP-IDF 5.4 build** — PlatformIO removed; Espressif `esp_lcd_sh8601` display driver, IDF component manager, and CI/web-installer updated to match
+- **Global navigation bar** — persistent back arrow, screen title, and Bluetooth/warning status icons on every screen, with a unified single-action-button screen layout
+- **Scale tab** — live weight readout with explicit TARE and hold-to-grind GRIND buttons for manual top-offs; iOS-style page dots on the home tabview, with per-tab action buttons that slide with the swipe
+- **Boot splash & faster boot** — logo splash auto-generated from a PNG at build time; the weight task starts early so HX711 bring-up overlaps BLE/UI init
+- **Boot tare** — the scale zeroes itself on the first valid sample after startup, no persisted offset needed
+- **Two-stage screensaver** — dim (or show the logo) after one timeout, turn the display fully off after a second, each configurable from 15s to 30min or Never
+- **Major stability fix** — resolved a UI-task stack overflow (window-sized `alloca` in the load-cell ring-buffer math) that crashed the device after 1–3 minutes of uptime
+- **Pulse autotune fixed** — time-based RMT pulse completion replaces a `digitalRead` on an output-only pin that hung PRIMING forever; the tune screen now shows a live weight/noise readout and real failure reasons
+- **Dialog-style calibration** — guided step-by-step flow with one clear button per step
+- **BLE reliability** — OTA GATT registration order fixed, Bluetooth re-enable works without a reboot, and an advertising watchdog recovers dropped connections
+- **Hardware resilience & options** — runtime HX711 fault detection/recovery, active-low motor relay support, 180° screen rotation
+
+**Full details** → See **[docs/FORK_IMPROVEMENTS.md](docs/FORK_IMPROVEMENTS.md)** for the complete write-up.
+
+---
+
 ## ✨ Features
 
 - **User-friendly interface** with 3 profiles: Single, Double, Custom
@@ -78,7 +98,7 @@ flowchart LR
 
 ### For Developers - Building from Source
 
-If you want to modify the code or contribute to development, see **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** for build instructions.
+The firmware builds with **native ESP-IDF** (`python3 tools/grinder.py build`, or `idf.py` directly) — there is no PlatformIO. If you want to modify the code or contribute to development, see **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** for build instructions.
 
 **Design Files:** The complete Fusion 360 design is available at `3d_files/smart-grind-by-weight. Eureka Mignon.f3z` for modification and adaptation to other grinder models.
 

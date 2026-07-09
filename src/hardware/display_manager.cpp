@@ -94,7 +94,9 @@ void DisplayManager::init()
     buscfg.data1_io_num   = HW_DISPLAY_D1_PIN;
     buscfg.data2_io_num   = HW_DISPLAY_D2_PIN;
     buscfg.data3_io_num   = HW_DISPLAY_D3_PIN;
-    buscfg.max_transfer_sz = HW_DISPLAY_WIDTH_PX * 80 * sizeof(uint16_t);
+    // Sized for a full-frame transfer: flushing the whole frame as ONE DMA burst
+    // (instead of 80-row bands) minimizes visible tearing — see draw buffer setup.
+    buscfg.max_transfer_sz = HW_DISPLAY_WIDTH_PX * HW_DISPLAY_HEIGHT_PX * sizeof(uint16_t);
 
     esp_err_t err = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
@@ -205,31 +207,44 @@ void DisplayManager::init()
     }
 
     // ------------------------------------------------------------------
-    // 5. Allocate LVGL draw buffers (double-buffered, 40 rows each)
+    // 5. Allocate LVGL draw buffers (double-buffered)
+    //
+    // ANTI-TEARING: the board does not route the panel's TE (tearing effect)
+    // line to any GPIO, so flushes can't be vsync-locked. The next best thing
+    // is minimizing write passes per frame: with FULL-FRAME buffers a refresh
+    // is a single top-to-bottom DMA burst (~6.4ms at 80MHz QSPI, well inside
+    // the panel's ~16.7ms self-refresh) instead of up to six 80-row bands,
+    // each of whose seams can tear against the panel scan-out. Buffers live
+    // in PSRAM (already the primary path; the S3's GDMA reads it fine).
     // ------------------------------------------------------------------
-    const size_t buf_pixels = HW_DISPLAY_WIDTH_PX * 80;  // 80 rows per buffer — fewer DMA round-trips
-    const size_t buf_bytes  = buf_pixels * sizeof(lv_color_t);
+    size_t buf_rows   = HW_DISPLAY_HEIGHT_PX;  // full frame
+    size_t buf_pixels = HW_DISPLAY_WIDTH_PX * buf_rows;
+    size_t buf_bytes  = buf_pixels * sizeof(lv_color_t);
 
     draw_buf1 = static_cast<lv_color_t*>(
         heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN, buf_bytes,
                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (!draw_buf1) {
+    if (draw_buf1) {
+        draw_buf2 = static_cast<lv_color_t*>(
+            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN, buf_bytes,
+                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    } else {
+        // No PSRAM headroom for full frames: fall back to 80-row bands from
+        // internal RAM (the pre-full-frame behaviour).
+        ESP_LOGW(TAG, "Full-frame draw buffers unavailable; falling back to 80-row bands");
+        buf_rows   = 80;
+        buf_pixels = HW_DISPLAY_WIDTH_PX * buf_rows;
+        buf_bytes  = buf_pixels * sizeof(lv_color_t);
         draw_buf1 = static_cast<lv_color_t*>(
+            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN, buf_bytes,
+                                    MALLOC_CAP_8BIT));
+        draw_buf2 = static_cast<lv_color_t*>(
             heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN, buf_bytes,
                                     MALLOC_CAP_8BIT));
     }
     if (!draw_buf1) {
         ESP_LOGE(TAG, "Failed to allocate draw_buf1");
         return;
-    }
-
-    draw_buf2 = static_cast<lv_color_t*>(
-        heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN, buf_bytes,
-                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (!draw_buf2) {
-        draw_buf2 = static_cast<lv_color_t*>(
-            heap_caps_aligned_alloc(LV_DRAW_BUF_ALIGN, buf_bytes,
-                                    MALLOC_CAP_8BIT));
     }
     if (!draw_buf2) {
         ESP_LOGW(TAG, "Failed to allocate draw_buf2; running single-buffered");
@@ -270,7 +285,7 @@ void DisplayManager::init()
     ESP_LOGI(TAG, "Display init complete (%" PRIu32 "x%" PRIu32 ") | %s | 80MHz QSPI | %zu-row bufs",
              screen_width, screen_height,
              draw_buf2 ? "double-buffered" : "SINGLE-buffered",
-             (size_t)80);
+             buf_rows);
 
     // The panel initialized dark (0x51 = 0x00 above) to hide the power-on render artifact behind
     // the boot splash. Bring it up to a visible level here, synchronously, instead of relying on
