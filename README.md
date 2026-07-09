@@ -34,7 +34,7 @@ The Smart Grind-by-Weight is a user-friendly, touch interface-driven, highly acc
 
 ## 🔱 What's different in this fork
 
-This is a fork of [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) with a round of stability, usability, and tooling improvements on top (firmware v2.3.0):
+This is a fork of [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) with a round of stability, usability, and tooling improvements on top (firmware v2.4.0):
 
 - **Native ESP-IDF 5.4 build** — PlatformIO removed; Espressif `esp_lcd_sh8601` display driver, IDF component manager, and CI/web-installer updated to match
 - **Global navigation bar** — persistent back arrow, screen title, and Bluetooth/warning status icons on every screen, with a unified single-action-button screen layout
@@ -47,6 +47,7 @@ This is a fork of [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-g
 - **Dialog-style calibration** — guided step-by-step flow with one clear button per step
 - **BLE reliability** — OTA GATT registration order fixed, Bluetooth re-enable works without a reboot, and an advertising watchdog recovers dropped connections
 - **Hardware resilience & options** — runtime HX711 fault detection/recovery, active-low motor relay support, 180° screen rotation
+- **Grind tuning** — pulse-free predictive grind path with an overshoot dial, runtime **Pulses** toggle in Grind Settings, faster tare with a pre-settle gate, sustained negative-weight failsafe, and hold-to-grind time-mode top-offs
 - **Eureka Mignon Neo model set** — redesigned **portafilter-mounted base** (grind straight into the basket), cantilevered scale platform, new screen mount, and a 15° tilt base → see [docs/NEO_3D_MODELS.md](docs/NEO_3D_MODELS.md)
 
 **Full details** → See **[docs/FORK_IMPROVEMENTS.md](docs/FORK_IMPROVEMENTS.md)** for the complete write-up.

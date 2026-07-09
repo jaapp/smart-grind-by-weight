@@ -1,6 +1,6 @@
 # Fork Improvements
 
-This fork builds on the excellent [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) project and adds a substantial round of usability, stability, and tooling improvements on top of it. Everything below ships in firmware **v2.3.0**.
+This fork builds on the excellent [jaapp/smart-grind-by-weight](https://github.com/jaapp/smart-grind-by-weight) project and adds a substantial round of usability, stability, and tooling improvements on top of it. Everything below ships in firmware **v2.4.0**.
 
 The changes fall into six themes:
 
@@ -109,6 +109,10 @@ While autotune runs you now get:
 - A live **"Scale X.XXg +/-X.XXXg"** readout — the same 500 ms standard deviation the settling gate checks, colored green when the scale is settleable and orange when it's too noisy.
 - A status headline tracking the phase: *Priming*, *Testing Xms*, *Verifying*.
 - On failure, a result screen that shows the **actual failure reason** with a quantitative hint, plus the noise reading frozen at the moment of failure — so "it failed" becomes "the scale was reading ±0.04 g and the gate needs ±0.02 g; fix your vibration problem."
+
+### Pulse-free grinding with a runtime toggle
+
+The predictive grind can now land on the motor-stop alone (no correction pulses) — faster, and robust on load cells that never settle cleanly between pulses. It's a runtime setting (Menu → Grind Settings → **Corrections → Pulses**, default off), with `GRIND_LATENCY_TO_COAST_RATIO` as the overshoot tuning dial. Also included: a faster grind-mode tare with a pre-settle gate, a sustained negative-weight failsafe (a single noisy sample can't abort a grind), and time-mode top-offs as hold-to-grind.
 
 ### Hardware adaptability
 
