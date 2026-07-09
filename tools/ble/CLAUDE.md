@@ -168,7 +168,7 @@ struct GrindMeasurement {
 ## Development Workflow
 
 1. **Modify structs** in `grind_logging.h`
-2. **Build and flash** firmware: `pio run --target upload`
+2. **Build and flash** firmware: `python3 tools/grinder.py build-upload` (BLE OTA), or `idf.py -p PORT flash` over USB
 3. **PURGE HISTORY** via ESP32 developer screen  
 4. **Perform test grind** to generate fresh data
 5. **Trigger BLE export** - review struct debug output

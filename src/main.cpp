@@ -159,19 +159,24 @@ extern "C" void app_main() {
 
     bool is_calibrated = hardware_manager.get_weight_sensor()->is_calibrated();
 
+    // Determine the screen to show once the boot splash finishes; the device always boots
+    // into the BOOT splash state first while hardware/background init runs.
+    UIState post_boot_state;
     if (ota_failed) {
-        LOG_BLE("BOOT: Starting in OTA failure state for expected build %s\n",
+        LOG_BLE("BOOT: Post-boot state OTA failure for expected build %s\n",
                 failed_ota_build.c_str());
-        state_machine.init(UIState::OTA_UPDATE_FAILED);
+        post_boot_state = UIState::OTA_UPDATE_FAILED;
     } else if (!is_calibrated) {
-        LOG_BLE("BOOT: Device not calibrated - starting in CALIBRATION state\n");
-        state_machine.init(UIState::CALIBRATION);
+        LOG_BLE("BOOT: Device not calibrated - post-boot state CALIBRATION\n");
+        post_boot_state = UIState::CALIBRATION;
     } else {
-        state_machine.init(UIState::READY);
+        post_boot_state = UIState::READY;
     }
+    state_machine.init(UIState::BOOT);
 
     ui_manager.init(&hardware_manager, &state_machine, &profile_controller,
                     &grind_controller, &bluetooth_manager);
+    ui_manager.set_post_boot_state(post_boot_state);
 
     if (ota_failed) {
         if (auto* ota = ui_manager.get_ota_data_export_controller()) {

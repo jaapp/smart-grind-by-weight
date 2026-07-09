@@ -1,6 +1,7 @@
 #pragma once
 
 enum class UIState {
+    BOOT,
     READY,
     GRINDING,
     GRIND_COMPLETE,

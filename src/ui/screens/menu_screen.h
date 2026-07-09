@@ -53,6 +53,9 @@ private:
     lv_obj_t* brightness_screensaver_slider;
     lv_obj_t* brightness_normal_label;
     lv_obj_t* brightness_screensaver_label;
+    lv_obj_t* screensaver_mode_radio_group;
+    lv_obj_t* screensaver_timeout_slider;
+    lv_obj_t* screensaver_timeout_label;
     lv_obj_t* purge_button;
     lv_obj_t* reset_button;
     
@@ -103,6 +106,9 @@ public:
     void refresh_statistics(bool show_overlay = true);
     void update_brightness_labels(int normal_percent = -1, int screensaver_percent = -1); // Use negative value to leave unchanged
     void update_brightness_sliders();
+    void update_screensaver_settings();
+    void update_screensaver_timeout_label(uint32_t timeout_ms);
+    void apply_screensaver_mode_ui(int mode);
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
     void update_grind_mode_toggles();
@@ -125,6 +131,8 @@ public:
     lv_obj_t* get_diag_reset_button() const { return diag_reset_button; }
     lv_obj_t* get_brightness_normal_slider() const { return brightness_normal_slider; }
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
+    lv_obj_t* get_screensaver_mode_radio_group() const { return screensaver_mode_radio_group; }
+    lv_obj_t* get_screensaver_timeout_slider() const { return screensaver_timeout_slider; }
     lv_obj_t* get_grind_mode_radio_group() const { return grind_mode_radio_group; }
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }

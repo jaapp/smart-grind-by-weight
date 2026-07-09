@@ -44,12 +44,26 @@
 #define USER_DEFAULT_CALIBRATION_FACTOR -7050.0f                               // Default load cell calibration factor
 
 //------------------------------------------------------------------------------
-// SCREEN AUTO-DIMMING
+// SCREEN AUTO-DIMMING / SCREENSAVER
 //------------------------------------------------------------------------------
-#define USER_SCREEN_AUTO_DIM_TIMEOUT_MS 300000                                 // Time before screen dims due to inactivity
+#define USER_SCREEN_AUTO_DIM_TIMEOUT_MS 300000                                 // Default inactivity timeout before the screensaver engages
 #define USER_SCREEN_BRIGHTNESS_NORMAL 1.0f                                     // Normal screen brightness
 #define USER_SCREEN_BRIGHTNESS_DIMMED 0.35f                                    // Dimmed screen brightness
 #define USER_WEIGHT_ACTIVITY_THRESHOLD_G 1.0f                                  // Weight change threshold for screen timeout reset (grams)
+
+// Screensaver behaviour: dim the backlight or turn the panel fully off
+#define USER_SCREEN_SAVER_MODE_DIM 0                                           // Screensaver dims to the configured brightness
+#define USER_SCREEN_SAVER_MODE_OFF 1                                           // Screensaver turns the display fully off
+#define USER_SCREEN_SAVER_MODE_DEFAULT USER_SCREEN_SAVER_MODE_DIM             // Default screensaver behaviour
+#define USER_SCREEN_SAVER_TIMEOUT_NEVER_MS 0                                   // Sentinel timeout meaning "never sleep"
+
+//------------------------------------------------------------------------------
+// BOOT SPLASH
+//------------------------------------------------------------------------------
+// Placement of the boot logo relative to screen center (pixels). Positive X moves
+// right, positive Y moves down. Default 0,0 = centered.
+#define USER_BOOT_LOGO_OFFSET_X 0
+#define USER_BOOT_LOGO_OFFSET_Y 0
 
 //------------------------------------------------------------------------------
 // AUTO ACTIONS

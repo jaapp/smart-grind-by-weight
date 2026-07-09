@@ -19,6 +19,7 @@
 #include "../ui_helpers.h"
 #include "../ui_manager.h"
 #include "../screens/menu_screen.h"
+#include "../screens/screensaver_timeout_steps.h"
 
 MenuUIController::MenuUIController(UIManager* manager)
     : ui_manager_(manager) {}
@@ -57,6 +58,9 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER, [this](lv_event_t*) { handle_brightness_screensaver_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_TIMEOUT_SLIDER, [this](lv_event_t*) { handle_screensaver_timeout_slider(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_TIMEOUT_SLIDER_RELEASED, [this](lv_event_t*) { handle_screensaver_timeout_slider_released(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_screensaver_mode_radio_button(); });
 
     // Note: Event registration for menu widgets is done in the page creation functions
     // (menu_screen.cpp) because the menu is created lazily and destroyed on hide.
@@ -514,6 +518,67 @@ void MenuUIController::handle_brightness_screensaver_slider_released() {
     LOG_DEBUG_PRINTF("Touch released - restored normal brightness to %.2f\n", normal);
 }
 
+void MenuUIController::handle_screensaver_timeout_slider() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_screensaver_timeout_slider();
+    if (!slider) return;
+
+    int index = lv_slider_get_value(slider);
+    if (index < 0) index = 0;
+    if (index >= kScreensaverTimeoutStepCount) index = kScreensaverTimeoutStepCount - 1;
+
+    // Live label feedback while dragging (no persistence until release)
+    ui_manager_->menu_screen.update_screensaver_timeout_label(kScreensaverTimeoutStepsMs[index]);
+}
+
+void MenuUIController::handle_screensaver_timeout_slider_released() {
+    if (!ui_manager_) return;
+
+    auto* slider = ui_manager_->menu_screen.get_screensaver_timeout_slider();
+    if (!slider) return;
+
+    int index = lv_slider_get_value(slider);
+    if (index < 0) index = 0;
+    if (index >= kScreensaverTimeoutStepCount) index = kScreensaverTimeoutStepCount - 1;
+
+    uint32_t timeout_ms = kScreensaverTimeoutStepsMs[index];
+
+    Preferences prefs;
+    prefs.begin("brightness", false);
+    prefs.putInt("ss_timeout", static_cast<int32_t>(timeout_ms));
+    prefs.end();
+
+    ui_manager_->menu_screen.update_screensaver_timeout_label(timeout_ms);
+    ui_manager_->refresh_screensaver_settings();
+    LOG_DEBUG_PRINTF("Screensaver timeout set to %lu ms\n", static_cast<unsigned long>(timeout_ms));
+}
+
+void MenuUIController::handle_screensaver_mode_radio_button() {
+    if (!ui_manager_) return;
+
+    auto* radio_group = ui_manager_->menu_screen.get_screensaver_mode_radio_group();
+    if (!radio_group) return;
+
+    int selected_index = radio_button_group_get_selection(radio_group);
+    if (selected_index < 0) return;
+
+    int mode = (selected_index == USER_SCREEN_SAVER_MODE_OFF) ? USER_SCREEN_SAVER_MODE_OFF
+                                                              : USER_SCREEN_SAVER_MODE_DIM;
+
+    Preferences prefs;
+    prefs.begin("brightness", false);
+    prefs.putInt("ss_mode", mode);
+    prefs.end();
+
+    // The dimmed-brightness slider only matters in Dim mode
+    ui_manager_->menu_screen.apply_screensaver_mode_ui(mode);
+    ui_manager_->refresh_screensaver_settings();
+
+    LOG_DEBUG_PRINTLN(mode == USER_SCREEN_SAVER_MODE_OFF ? "Screensaver mode: Off (display off)"
+                                                         : "Screensaver mode: Dim");
+}
+
 void MenuUIController::perform_factory_reset() {
     if (!ui_manager_) return;
 
@@ -612,6 +677,28 @@ float MenuUIController::get_screensaver_brightness() const {
         brightness = 0.15f;
     }
     return brightness;
+}
+
+uint32_t MenuUIController::get_screensaver_timeout_ms() const {
+    Preferences prefs;
+    prefs.begin("brightness", true);
+    int32_t timeout_ms = prefs.getInt("ss_timeout", static_cast<int32_t>(USER_SCREEN_AUTO_DIM_TIMEOUT_MS));
+    prefs.end();
+
+    if (timeout_ms < 0) {
+        timeout_ms = static_cast<int32_t>(USER_SCREEN_AUTO_DIM_TIMEOUT_MS);
+    }
+    return static_cast<uint32_t>(timeout_ms);
+}
+
+int MenuUIController::get_screensaver_mode() const {
+    Preferences prefs;
+    prefs.begin("brightness", true);
+    int mode = prefs.getInt("ss_mode", USER_SCREEN_SAVER_MODE_DEFAULT);
+    prefs.end();
+
+    return (mode == USER_SCREEN_SAVER_MODE_OFF) ? USER_SCREEN_SAVER_MODE_OFF
+                                                : USER_SCREEN_SAVER_MODE_DIM;
 }
 
 void MenuUIController::stop_motor_timer() {

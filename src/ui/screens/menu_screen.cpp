@@ -9,6 +9,11 @@
 #include "../event_bridge_lvgl.h"
 #include "../../config/logging.h"
 #include "../components/blocking_overlay.h"
+#include "screensaver_timeout_steps.h"
+
+// Forward declaration; defined alongside the other radio-group callbacks below but referenced
+// earlier by create_display_page().
+static void screensaver_mode_callback(int selected_index, void* user_data);
 
 static void back_event_handler(lv_event_t * e)
 {
@@ -41,6 +46,9 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grinder_purge_amount_label = nullptr;
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
+    screensaver_mode_radio_group = nullptr;
+    screensaver_timeout_slider = nullptr;
+    screensaver_timeout_label = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 
     // Create menu UI immediately at boot for instant access
@@ -363,7 +371,27 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
     create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
-    create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
+
+    // Screensaver section: behaviour (Dim/Off), dimmed brightness, and inactivity timeout
+    create_separator(parent, "Screensaver");
+    create_description_label(parent, "Dim the display or turn it fully off after a period of inactivity.");
+
+    const char* screensaver_modes[] = {"Dim", "Off"};
+    screensaver_mode_radio_group = create_radio_button_group(
+        parent,
+        screensaver_modes,
+        2,
+        LV_FLEX_FLOW_ROW,
+        USER_SCREEN_SAVER_MODE_DEFAULT,
+        135, 100,  // Width, Height
+        screensaver_mode_callback,
+        this
+    );
+
+    create_slider_row(parent, "Dimmed", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
+    // "Sleep after" timeout slider uses 9 discrete positions (0-8) mapped to kScreensaverTimeoutStepsMs
+    create_slider_row(parent, "Sleep after", &screensaver_timeout_label, &screensaver_timeout_slider,
+                     lv_color_hex(THEME_COLOR_ACCENT), 0, kScreensaverTimeoutStepCount - 1);
 
     // Register events for the sliders (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
@@ -379,6 +407,12 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
         lv_obj_add_event_cb(brightness_screensaver_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED)));
     }
+    if (screensaver_timeout_slider) {
+        lv_obj_add_event_cb(screensaver_timeout_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_TIMEOUT_SLIDER)));
+        lv_obj_add_event_cb(screensaver_timeout_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_RELEASED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_TIMEOUT_SLIDER_RELEASED)));
+    }
 }
 
 
@@ -392,6 +426,12 @@ static void grind_mode_callback(int selected_index, void* user_data) {
 static void grinder_purge_mode_callback(int selected_index, void* user_data) {
     // Trigger the event system instead of handling directly
     EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::GRINDER_PURGE_MODE_RADIO_BUTTON, nullptr);
+}
+
+// Callback for screensaver mode (Dim/Off) radio button selection
+static void screensaver_mode_callback(int selected_index, void* user_data) {
+    // Trigger the event system instead of handling directly
+    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SCREENSAVER_MODE_RADIO_BUTTON, nullptr);
 }
 
 void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
@@ -641,6 +681,7 @@ void MenuScreen::show() {
     visible = true;
     update_ble_status();
     update_brightness_sliders();
+    update_screensaver_settings();
     update_bluetooth_startup_toggle();
     update_logging_toggle();
     update_grind_mode_toggles();
@@ -911,6 +952,64 @@ void MenuScreen::update_brightness_labels(int normal_percent, int screensaver_pe
         snprintf(screensaver_text, sizeof(screensaver_text), "Dimmed: %d%%", screensaver_percent);
         lv_label_set_text(brightness_screensaver_label, screensaver_text);
     }
+}
+
+void MenuScreen::update_screensaver_timeout_label(uint32_t timeout_ms) {
+    if (!screensaver_timeout_label) return;
+
+    char buffer[32];
+    if (timeout_ms == USER_SCREEN_SAVER_TIMEOUT_NEVER_MS) {
+        snprintf(buffer, sizeof(buffer), "Sleep after: Never");
+    } else if (timeout_ms < 60000) {
+        snprintf(buffer, sizeof(buffer), "Sleep after: %lus",
+                 static_cast<unsigned long>(timeout_ms / 1000));
+    } else {
+        snprintf(buffer, sizeof(buffer), "Sleep after: %lu min",
+                 static_cast<unsigned long>(timeout_ms / 60000));
+    }
+    lv_label_set_text(screensaver_timeout_label, buffer);
+}
+
+void MenuScreen::apply_screensaver_mode_ui(int mode) {
+    // The dimmed-brightness slider is only meaningful when the screensaver dims (not off).
+    if (!brightness_screensaver_slider) return;
+
+    bool dim_mode = (mode != USER_SCREEN_SAVER_MODE_OFF);
+    if (dim_mode) {
+        lv_obj_clear_state(brightness_screensaver_slider, LV_STATE_DISABLED);
+        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_COVER, LV_PART_INDICATOR);
+    } else {
+        lv_obj_add_state(brightness_screensaver_slider, LV_STATE_DISABLED);
+        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_50, LV_PART_MAIN);
+        lv_obj_set_style_opa(brightness_screensaver_slider, LV_OPA_50, LV_PART_INDICATOR);
+    }
+}
+
+void MenuScreen::update_screensaver_settings() {
+    if (!screensaver_mode_radio_group && !screensaver_timeout_slider) return;
+
+    Preferences prefs;
+    prefs.begin("brightness", false); // writable so the namespace is created on first use
+    int32_t timeout_ms = prefs.getInt("ss_timeout", static_cast<int32_t>(USER_SCREEN_AUTO_DIM_TIMEOUT_MS));
+    int mode = prefs.getInt("ss_mode", USER_SCREEN_SAVER_MODE_DEFAULT);
+    prefs.end();
+
+    if (timeout_ms < 0) timeout_ms = static_cast<int32_t>(USER_SCREEN_AUTO_DIM_TIMEOUT_MS);
+    if (mode != USER_SCREEN_SAVER_MODE_OFF) mode = USER_SCREEN_SAVER_MODE_DIM;
+
+    // Map the stored timeout to the nearest slider index
+    int slider_index = screensaver_timeout_ms_to_index(static_cast<uint32_t>(timeout_ms));
+
+    if (screensaver_timeout_slider) {
+        lv_slider_set_value(screensaver_timeout_slider, slider_index, LV_ANIM_OFF);
+    }
+    update_screensaver_timeout_label(kScreensaverTimeoutStepsMs[slider_index]);
+
+    if (screensaver_mode_radio_group) {
+        radio_button_group_set_selection(screensaver_mode_radio_group, mode);
+    }
+    apply_screensaver_mode_ui(mode);
 }
 
 void MenuScreen::update_grinder_purge_amount_label(float amount_g) {

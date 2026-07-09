@@ -41,7 +41,7 @@ static const sh8601_lcd_init_cmd_t co5300_init_cmds[] = {
     {0x63, (uint8_t[]){0xFF}, 1, 0},                               // HBM brightness max
     // CASET/RASET omitted — draw_bitmap sets them per-frame with correct gap offset
     {0x29, (uint8_t[]){0x00}, 0, 0},                               // Display ON
-    {0x51, (uint8_t[]){0xD0}, 1, 0},                               // Normal brightness
+    {0x51, (uint8_t[]){0x00}, 1, 0},                               // Start dark; init() restores brightness after setup so the power-on render artifact stays hidden behind the boot splash
     {0x58, (uint8_t[]){0x00}, 1, 0},                               // Contrast enhancement OFF
 };
 
@@ -251,6 +251,13 @@ void DisplayManager::init()
              screen_width, screen_height,
              draw_buf2 ? "double-buffered" : "SINGLE-buffered",
              (size_t)80);
+
+    // The panel initialized dark (0x51 = 0x00 above) to hide the power-on render artifact behind
+    // the boot splash. Bring it up to a visible level here, synchronously, instead of relying on
+    // an animation that runs later in the UI task - this guarantees the display can never be left
+    // dark if that task or animation fails to run. UIManager applies the user's configured
+    // brightness once the splash hands off.
+    set_brightness(USER_SCREEN_BRIGHTNESS_NORMAL);
 }
 
 // ---------------------------------------------------------------------------

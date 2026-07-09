@@ -23,27 +23,29 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-    
-      - name: Install PlatformIO
+
+      - name: Generate build info header
         run: |
-          pip install platformio
-    
-      - name: Build firmware
-        run: |
-          # Use platformio directly like local development to ensure identical build
-          # Install dependencies first to ensure exact versions
-          pio pkg install
-          pio run -e waveshare-esp32s3-touch-amoled-164
-        
+          # Writes include/git_info.h (build number, commit, branch) so the
+          # firmware embeds identical build metadata to a local build.
+          python3 tools/build-scripts/pre_build.py --header
+
+      - name: Build firmware (ESP-IDF)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: release-v5.4
+          target: esp32s3
+          command: idf.py build
+
       - name: Prepare release artifacts
         run: |
           mkdir -p release-artifacts
           VERSION=${{ github.ref_name }}
 
-          # Copy firmware binaries with versioned names
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin release-artifacts/smart-grind-by-weight-${VERSION}.bin
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/bootloader.bin release-artifacts/smart-grind-by-weight-${VERSION}-bootloader.bin
-          cp .pio/build/waveshare-esp32s3-touch-amoled-164/partitions.bin release-artifacts/smart-grind-by-weight-${VERSION}-partitions.bin
+          # Copy firmware binaries with versioned names (native ESP-IDF build/ layout)
+          cp build/smart-grind-by-weight.bin release-artifacts/smart-grind-by-weight-${VERSION}.bin
+          cp build/bootloader/bootloader.bin release-artifacts/smart-grind-by-weight-${VERSION}-bootloader.bin
+          cp build/partition_table/partition-table.bin release-artifacts/smart-grind-by-weight-${VERSION}-partitions.bin
 
           # Create blank 8KB NVS partition file (0xe000 to 0x10000)
           dd if=/dev/zero of=release-artifacts/blank_8KB.bin bs=8192 count=1
@@ -84,7 +86,7 @@ jobs:
                   },
                   {
                     "path": "smart-grind-by-weight-${VERSION}.bin",
-                    "offset": 3276800
+                    "offset": 131072
                   }
                 ]
               }

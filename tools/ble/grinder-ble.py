@@ -158,27 +158,22 @@ class GrinderBLETool:
     
     @staticmethod
     def find_firmware_file() -> Optional[str]:
+        # Native ESP-IDF build output. (grinder.py normally passes an explicit
+        # path; this is the fallback when grinder-ble.py is invoked directly.)
         project_root = Path(__file__).parent.parent.parent
-        build_dirs = [
-            project_root / ".pio" / "build" / "waveshare-esp32s3-touch-amoled-164",
-            project_root / ".pio" / "build" / "native",
-        ]
-        
-        for build_dir in build_dirs:
-            firmware_path = build_dir / "firmware.bin"
-            if firmware_path.exists():
-                self.safe_print(f"[INFO] Auto-detected firmware: {firmware_path}")
-                return str(firmware_path)
-        
-        pio_build_dir = project_root / ".pio" / "build"
-        if pio_build_dir.exists():
-            for env_dir in pio_build_dir.iterdir():
-                if env_dir.is_dir():
-                    firmware_path = env_dir / "firmware.bin"
-                    if firmware_path.exists():
-                        self.safe_print(f"[INFO] Auto-detected firmware: {firmware_path}")
-                        return str(firmware_path)
-        
+        built = project_root / "build" / "smart-grind-by-weight.bin"
+        if built.exists():
+            print(f"[INFO] Auto-detected firmware: {built}")
+            return str(built)
+
+        # Fall back to the most recent archived build in firmware_cache/.
+        cache_dir = project_root / "firmware_cache"
+        if cache_dir.exists():
+            cached = sorted(cache_dir.glob("build_*.bin"), key=lambda f: f.stat().st_mtime)
+            if cached:
+                print(f"[INFO] Auto-detected firmware: {cached[-1]}")
+                return str(cached[-1])
+
         return None
     
     def _update_status(self, message: str):
@@ -350,31 +345,25 @@ class GrinderBLETool:
         return firmware_file if firmware_file.exists() else None
 
     def _get_firmware_build_number(self, firmware_path: str) -> Optional[str]:
-        """Extract build number from git_info.h in project directory."""
+        """Extract build number from the project's include/git_info.h.
+
+        Firmware lives under <project>/build/ (native ESP-IDF); walk up from the
+        firmware file until we find include/git_info.h so this works regardless of
+        where the build output sits.
+        """
         try:
-            # Firmware path: .pio/build/waveshare-esp32s3-touch-amoled-164/firmware.bin
-            # Project dir should be 3 levels up from firmware.bin
-            firmware_file = Path(firmware_path)
-            if ".pio" in firmware_file.parts:
-                # Find project root by going up until we find .pio, then up one more level
-                current = firmware_file.parent
-                while current.name != ".pio" and current.parent != current:
-                    current = current.parent
-                if current.name == ".pio":
-                    project_dir = current.parent
-                    # Try both possible locations for git_info.h
-                    git_info_paths = [
-                        project_dir / "include" / "git_info.h",
-                        project_dir / "src" / "config" / "git_info.h"
-                    ]
-                    for git_info_path in git_info_paths:
-                        if git_info_path.exists():
-                            with open(git_info_path, 'r') as f:
-                                content = f.read()
-                                import re
-                                match = re.search(r'#define BUILD_NUMBER (\d+)', content)
-                                if match:
-                                    return match.group(1)
+            import re
+            current = Path(firmware_path).resolve().parent
+            while True:
+                git_info_path = current / "include" / "git_info.h"
+                if git_info_path.exists():
+                    content = git_info_path.read_text()
+                    match = re.search(r'#define BUILD_NUMBER (\d+)', content)
+                    if match:
+                        return match.group(1)
+                if current.parent == current:
+                    break
+                current = current.parent
         except Exception:
             pass
         return None

@@ -5,6 +5,7 @@
 #include <memory>
 #include "components/blocking_overlay.h"
 #include "components/ui_operations.h"
+#include "screens/boot_screen.h"
 #include "screens/ready_screen.h"
 #include "screens/edit_screen.h"
 #include "screens/grinding_screen.h"
@@ -99,6 +100,7 @@ private:
     std::unique_ptr<DiagnosticsController> diagnostics_controller_;
 
 public:
+    BootScreen boot_screen;
     ReadyScreen ready_screen;
     EditScreen edit_screen;
     GrindingScreen grinding_screen;
@@ -139,11 +141,27 @@ public:
     
     void set_background_active(bool active);
     void refresh_auto_action_settings();
-    
+    // Reload the screensaver timeout/mode cache in ScreenTimeoutController (called when the
+    // user changes these settings so the change takes effect without polling NVS each tick).
+    void refresh_screensaver_settings();
+
+    // Boot splash: the real screen to show once initialization completes
+    void set_post_boot_state(UIState state) { post_boot_state_ = state; }
+    // Called by the boot fade-out animation when the splash is finished
+    void finish_boot();
 
 private:
     void create_ui();
     void update_auto_actions();
+
+    // Boot splash sequence (runs in the UI task while background init completes)
+    void update_boot_sequence();
+
+    // Boot splash state
+    UIState post_boot_state_ = UIState::READY;
+    uint32_t boot_start_ms_ = 0;
+    bool boot_fade_out_started_ = false;
+    uint32_t boot_fade_out_start_ms_ = 0;
     
     // State-specific update methods
 

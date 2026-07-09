@@ -28,38 +28,29 @@ This guide is for developers who want to build the Smart Grind-by-Weight firmwar
    python3 tools/grinder.py install
    ```
 
-This automatically creates a virtual environment and installs all required dependencies including PlatformIO.
+This creates a Python virtual environment (`tools/venv`) with the BLE, analysis, and asset-conversion dependencies. Firmware itself is built with a standalone **ESP-IDF** install (see below) — not PlatformIO.
 
 ---
 
-## 🔧 Build Targets
+## 🔧 Build Variants
 
-The project has three build targets:
+The firmware is a single ESP-IDF build. Behaviour is toggled with `DEBUG_*` macros in `src/config/` rather than separate build presets:
 
-### Production Target: `waveshare-esp32s3-touch-amoled-164`
+### Production (default)
 - **Use case:** Real hardware with load cell and grinder connected
 - **Hardware:** Full ESP32-S3 + HX711 + load cell + grinder motor relay
-- **Features:** All functionality enabled
-- **Optimizations:** `-Ofast` optimization level for performance
+- **Features:** All functionality enabled, `-Ofast` optimization
 
-### Debug Target: `waveshare-esp32s3-touch-amoled-164-debug`
+### Debug
 - **Use case:** Development and debugging with real hardware
-- **Hardware:** Full ESP32-S3 + HX711 + load cell + grinder motor relay
-- **Features:**
-  - All functionality enabled
-  - Debug symbols included
-  - 2-second UI serial delay for easier debugging
-  - Serial monitor filters to suppress harmless touch driver errors
+- **Enable via:** `DEBUG_*` macros in `src/config/` (e.g. UI serial delay, touch-driver error suppression)
 
-### Mock/Development Target: `waveshare-esp32s3-touch-amoled-164-mock`
+### Mock/Development
 - **Use cases:**
-  - Development without connected load cell or grinder
-  - Testing with device installed in grinder without wasting beans or taxing the motor
-- **Hardware:** Can run on just the ESP32-S3 Waveshare board (without HX711 or grinder) OR with full hardware installed
-- **Features:**
-  - Simulated load cell readings (green background indicates mock HX711 driver is active)
-  - Mock grinder motor (visual indicator instead of relay activation)
-  - Debug features enabled
+  - Development without a connected load cell or grinder
+  - Testing in the grinder without wasting beans or taxing the motor
+- **Hardware:** Runs on a bare ESP32-S3 Waveshare board, or with full hardware installed
+- **Enable via:** `DEBUG_ENABLE_LOADCELL_MOCK` (simulated readings, green background) and the mock grinder macro in `src/config/`
 
 **Mock mode benefits:**
 - Develop UI changes without affecting the actual grinder
@@ -71,32 +62,25 @@ The project has three build targets:
 
 ## 🚀 Building & Flashing
 
-### Development Platform
+### Build System
 
-This project uses the **pioarduino ESP32 platform** (a community fork) instead of the standard Espressif ESP32 platform. This ensures proper support for the Waveshare ESP32-S3 AMOLED display.
+Firmware is built with native **ESP-IDF** (`idf.py`). `tools/grinder.py` wraps `idf.py` for `build`/`clean` and keeps the BLE-OTA `upload`/`export`/`report` flows.
 
-**Platform Details:**
-- **Platform**: [pioarduino/platform-espressif32](https://github.com/pioarduino/platform-espressif32) (stable release)
-- **Framework**: Arduino ESP32 Core 3.x
-- **Target**: ESP32-S3 with AMOLED touch display
+**Prerequisites:**
+- A standalone ESP-IDF install (v5.4.x). Either export it on `IDF_PATH` or install it at `~/esp/esp-idf`.
+- Target chip: **ESP32-S3** with the Waveshare AMOLED touch display.
 
-The platform dependency is automatically handled by PlatformIO via the `platformio.ini` configuration.
+`sdkconfig` is generated from `sdkconfig.defaults` and git-ignored — edit `sdkconfig.defaults`, never `sdkconfig` directly. The custom partition table (`partitions.csv`) is wired via `sdkconfig.defaults`.
+
+Mock/debug behaviour (simulated load cell, extra logging) is controlled by the `DEBUG_*` macros in `src/config/` rather than by separate build presets.
 
 ### Build Commands
 
-**Build production firmware:**
+**Build firmware:**
 ```bash
 python3 tools/grinder.py build
-```
-
-**Build debug firmware:**
-```bash
-python3 tools/venv/bin/python -m platformio run -e waveshare-esp32s3-touch-amoled-164-debug
-```
-
-**Build mock/development firmware:**
-```bash
-python3 tools/venv/bin/python -m platformio run -e waveshare-esp32s3-touch-amoled-164-mock
+# or, from an ESP-IDF prompt:
+idf.py build
 ```
 
 **Clean build artifacts:**
@@ -106,18 +90,11 @@ python3 tools/grinder.py clean
 
 ### Initial USB Flashing
 
-For the first-time setup or when BLE isn't working:
+For first-time setup or when BLE isn't working, flash directly over USB from an ESP-IDF prompt:
 
 ```bash
-# Build and upload via USB (production)
-python3 tools/grinder.py build
-python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164
-
-# Or for debug target
-python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164-debug
-
-# Or for mock target
-python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164-mock
+. ~/esp/esp-idf/export.sh
+idf.py -p /dev/tty.usbmodemXXXX flash
 ```
 
 ### BLE OTA Updates (After Initial Setup)
@@ -154,8 +131,8 @@ For maintainers creating releases, see **[RELEASES.md](RELEASES.md)** for detail
 ### Serial Monitor
 
 ```bash
-# Monitor serial output via PlatformIO
-python3 tools/venv/bin/python -m platformio device monitor
+# Monitor USB serial output (from an ESP-IDF prompt)
+idf.py -p /dev/tty.usbmodemXXXX monitor
 ```
 
 ### BLE Debug Monitoring
