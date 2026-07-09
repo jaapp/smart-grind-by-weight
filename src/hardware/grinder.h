@@ -23,6 +23,7 @@ private:
 
     // Motor settling tracking
     unsigned long motor_start_time;
+    uint32_t pulse_duration_ms = 0;  // Requested RMT pulse length (for time-based completion)
 
     // Background indicator state (always compiled in)
     bool background_active;

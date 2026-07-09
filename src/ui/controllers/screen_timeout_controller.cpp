@@ -106,19 +106,33 @@ void ScreenTimeoutController::apply_stage(Stage stage, DisplayManager* display) 
     stage_ = stage;
 }
 
+// Screensaver engage animation timing: fade the screen to dark, then slowly
+// bring the logo up once it's dark.
+static constexpr uint32_t kSaverFadeToDarkMs = 500;
+static constexpr uint32_t kSaverLogoFadeInMs = 1200;
+
+static void saver_bg_opa_anim_cb(void* var, int32_t value) {
+    lv_obj_set_style_bg_opa(static_cast<lv_obj_t*>(var), static_cast<lv_opa_t>(value), LV_PART_MAIN);
+}
+
+static void saver_logo_opa_anim_cb(void* var, int32_t value) {
+    lv_obj_set_style_opa(static_cast<lv_obj_t*>(var), static_cast<lv_opa_t>(value), LV_PART_MAIN);
+}
+
 void ScreenTimeoutController::show_logo_overlay() {
     if (saver_screen_) {
         return;
     }
 
-    // Opaque black cover with the boot logo centered — same look as the splash.
-    // Not clickable, so the wake tap passes through to the UI beneath (matching the
+    // Black cover with the boot logo centered — same look as the splash. Starts
+    // transparent and fades to dark; the logo then fades in slowly on top. Not
+    // clickable, so the wake tap passes through to the UI beneath (matching the
     // plain-dim behaviour).
     saver_screen_ = lv_obj_create(lv_scr_act());
     lv_obj_set_size(saver_screen_, LV_PCT(100), LV_PCT(100));
     lv_obj_align(saver_screen_, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_color(saver_screen_, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
-    lv_obj_set_style_bg_opa(saver_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_opa(saver_screen_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(saver_screen_, 0, 0);
     lv_obj_set_style_pad_all(saver_screen_, 0, 0);
     lv_obj_clear_flag(saver_screen_, LV_OBJ_FLAG_SCROLLABLE);
@@ -127,9 +141,29 @@ void ScreenTimeoutController::show_logo_overlay() {
     lv_obj_t* logo = lv_image_create(saver_screen_);
     lv_image_set_src(logo, &boot_logo);
     lv_obj_center(logo);
+    lv_obj_set_style_opa(logo, LV_OPA_TRANSP, LV_PART_MAIN);
 
     // Above every screen and the nav bar.
     lv_obj_move_foreground(saver_screen_);
+
+    // Stage the fades: screen -> dark, then logo in. Deleting the overlay on wake
+    // also removes any running animations on it and its children.
+    lv_anim_t fade_dark;
+    lv_anim_init(&fade_dark);
+    lv_anim_set_var(&fade_dark, saver_screen_);
+    lv_anim_set_exec_cb(&fade_dark, saver_bg_opa_anim_cb);
+    lv_anim_set_values(&fade_dark, LV_OPA_TRANSP, LV_OPA_COVER);
+    lv_anim_set_duration(&fade_dark, kSaverFadeToDarkMs);
+    lv_anim_start(&fade_dark);
+
+    lv_anim_t fade_logo;
+    lv_anim_init(&fade_logo);
+    lv_anim_set_var(&fade_logo, logo);
+    lv_anim_set_exec_cb(&fade_logo, saver_logo_opa_anim_cb);
+    lv_anim_set_values(&fade_logo, LV_OPA_TRANSP, LV_OPA_COVER);
+    lv_anim_set_duration(&fade_logo, kSaverLogoFadeInMs);
+    lv_anim_set_delay(&fade_logo, kSaverFadeToDarkMs);
+    lv_anim_start(&fade_logo);
 }
 
 void ScreenTimeoutController::hide_logo_overlay() {

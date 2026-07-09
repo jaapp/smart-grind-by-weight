@@ -67,6 +67,7 @@ public:
     bool start_task();
     void stop_task();
     bool is_running() const { return task_running; }
+    TaskHandle_t get_task_handle() const { return task_handle; }
     bool is_hardware_ready() const { return hardware_initialized && hardware_validation_passed; }
     
     // Performance monitoring

@@ -9,10 +9,12 @@
 #include "../tasks/weight_sampling_task.h"
 #include <utility>
 
-// Boot splash timing
-static constexpr uint32_t kBootFadeInMs = 400;      // logo opacity 0 -> full on first tick
-static constexpr uint32_t kBootFadeOutMs = 350;     // logo opacity -> 0 before handoff
-static constexpr uint32_t kBootMinVisibleMs = 1200; // keep the logo up at least this long
+// Boot splash timing. There is no artificial hold: the splash stays up only as
+// long as hardware init actually takes (min = just enough for the fade-in), so
+// boot is as fast as the scale allows.
+static constexpr uint32_t kBootFadeInMs = 300;      // logo opacity 0 -> full on first tick
+static constexpr uint32_t kBootFadeOutMs = 250;     // logo opacity -> 0 before handoff
+static constexpr uint32_t kBootMinVisibleMs = 300;  // just cover the fade-in
 static constexpr uint32_t kBootMaxMs = 6000;        // hard cap so a faulty load cell can't hang boot
 
 // lv_anim exec callback: fade the logo opacity
