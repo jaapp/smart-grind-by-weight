@@ -30,5 +30,6 @@ failed_session_*.bin
 # Git worktrees
 .worktrees/
 
-# Local (uncommitted) boot logo override — see README trademark note
+# Local (uncommitted) boot logo + product identity overrides — see README trademark note
 assets/*.local.png
+src/config/*.local.h

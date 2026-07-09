@@ -14,9 +14,21 @@
 #define GIT_COMMIT_AUTHOR "unknown"
 #endif
 
-// Product identity (shown on the About page)
+// Product identity (shown on the About page). A local, uncommitted override can be
+// placed in src/config/product_identity.local.h (gitignored) defining PRODUCT_NAME
+// and/or PRODUCT_MODEL — handy for personalizing your own device without committing
+// third-party branding to the repo.
+#if defined(__has_include)
+#  if __has_include("product_identity.local.h")
+#    include "product_identity.local.h"
+#  endif
+#endif
+#ifndef PRODUCT_NAME
 #define PRODUCT_NAME "Neo GBW"                                                // Product/device name
-#define PRODUCT_MODEL "for Eureka Mignon Filtro"                                           // Hardware model this build targets
+#endif
+#ifndef PRODUCT_MODEL
+#define PRODUCT_MODEL "for Eureka Mignon Filtro"                              // Hardware model this build targets
+#endif
 #define ORIGINAL_AUTHOR_CREDIT "Based on smart-grind-by-weight by jaapp; grind-by-weight concept from openGBW by jb-xyz"
 
 inline const char* get_git_commit_id() {
