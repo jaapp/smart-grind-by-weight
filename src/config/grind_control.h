@@ -19,8 +19,9 @@ enum class GrinderPurgeMode {
 // Grinder saturation defaults and ranges
 #define GRIND_PURGE_MODE_DEFAULT static_cast<int>(GrinderPurgeMode::PURGE)
 #define GRIND_PURGE_AMOUNT_DEFAULT_G 1.0f
-#define GRIND_PURGE_AMOUNT_MIN_G 0.1f
+#define GRIND_PURGE_AMOUNT_MIN_G 0.0f                                      // 0g = purge disabled (skips PRIME entirely, no pre-grind pause)
 #define GRIND_PURGE_AMOUNT_MAX_G 2.5f
+#define GRIND_PURGE_DISABLED_THRESHOLD_G 0.05f                            // Purge amounts below this are treated as "off"
 
 // Grind freshness tracking
 #define GRIND_FRESHNESS_DEFAULT_HOURS 8.0f
@@ -31,14 +32,32 @@ enum class GrinderPurgeMode {
 // Main accuracy and timeout settings
 #define GRIND_ACCURACY_TOLERANCE_G 0.03f                                  // Final target accuracy tolerance
 #define GRIND_TIMEOUT_SEC 60                                              // Maximum time for grind operation
+
+// Negative-weight failsafe: aborts the grind when net weight goes (and stays)
+// negative - e.g. the cup was removed mid-grind. The reading must stay below the
+// threshold for the sustain window, so a single noisy/vibration sample on a noisy
+// load cell can't false-trigger (especially with the purge cushion turned off).
+#define GRIND_NEGATIVE_WEIGHT_FAILSAFE_G -1.0f                            // Net weight that counts as "negative"
+#define GRIND_NEGATIVE_WEIGHT_FAILSAFE_SUSTAIN_MS 500                     // Must persist this long before aborting
 #define GRIND_MAX_PULSE_ATTEMPTS 10                                       // Maximum pulse corrections before stopping
+
+// Pulse corrections after the predictive grind (DEFAULT for the runtime toggle in
+// Menu -> Grind Settings -> Corrections). Enabled: top off toward the target with
+// short pulses (needs a scale that settles between pulses). Disabled: land on the
+// predictive motor-stop alone - faster, and robust on a noisy load cell that never
+// settles cleanly. With pulses off, dial in the landing weight with
+// GRIND_LATENCY_TO_COAST_RATIO below.
+#define GRIND_PULSE_CORRECTIONS_DEFAULT 0
 
 // Flow rate detection
 #define GRIND_FLOW_DETECTION_THRESHOLD_GPS 0.5f                           // Minimum coffee flow rate to establish first grinds reachinig the cup = latency
 
-// Undershoot strategy - determine when to stop grinding during the predictive phase
+// Undershoot strategy - determine when to stop grinding during the predictive phase.
+// The motor stops early by (latency * RATIO * flow_rate) grams to account for coffee
+// still in flight/coasting. THIS IS THE OVERSHOOT TUNING DIAL: lower it to grind
+// longer (land heavier, fix undershoot), raise it to grind less (land lighter).
 #define GRIND_UNDERSHOOT_TARGET_G 1.0f                                    // Default conservative undershoot target
-#define GRIND_LATENCY_TO_COAST_RATIO 1.0f                                 // Ratio of expected coast time to measured latency (e.g., 0.8 = 80%)
+#define GRIND_LATENCY_TO_COAST_RATIO 0.5f                                 // Coast estimate as a fraction of measured latency; tune to land on target
 
 // Prime phase behavior
 #define GRIND_PRIME_TARGET_WEIGHT_G 1.0f                                   // Amount of coffee delivered during chute priming
@@ -48,12 +67,13 @@ enum class GrinderPurgeMode {
 // SCALE CALIBRATION AND SETTLING
 //------------------------------------------------------------------------------
 // Tare and settling behavior  
-#define GRIND_SCALE_SETTLING_TOLERANCE_G 0.010f                           // Maximum standard deviation for settled reading. Used to determine if scale is settled. Increase value if you have a noisy load cell.
+#define GRIND_SCALE_SETTLING_TOLERANCE_G 0.030f                           // Maximum standard deviation for settled reading. Used to determine if scale is settled. Increase value if you have a noisy load cell.
 
 //------------------------------------------------------------------------------
 // TIME MODE PULSE SETTINGS
 //------------------------------------------------------------------------------
-#define GRIND_TIME_PULSE_DURATION_MS 100                                        // Duration of additional pulses in time mode (milliseconds)
+#define GRIND_TIME_PULSE_DURATION_MS 100                                        // Legacy fixed-pulse duration (time mode top-off is now hold-to-grind)
+#define GRIND_MANUAL_PULSE_MAX_MS 10000                                         // Safety cap: max continuous hold-to-grind time for a time-mode top-off
 
 
 
@@ -86,6 +106,12 @@ enum class GrinderPurgeMode {
 // Tare and calibration timing (hardware sample rate dependent)
 #define GRIND_TARE_SAMPLE_WINDOW_MS 500                                           // Time window for tare sampling
 #define GRIND_TARE_TIMEOUT_MS 3000                                                // Maximum tare completion time
+
+// Wait up to this long for the scale to settle BEFORE locking the tare zero, so a
+// still-creeping baseline (e.g. just after a cup is placed) doesn't bias the zero
+// and make the net weight drift negative during the grind. Bounded so a noisy load
+// cell that never fully settles still tares promptly. Set to 0 to tare immediately.
+#define GRIND_TARE_PRE_SETTLE_MAX_MS 1500
 #define GRIND_CALIBRATION_SAMPLE_WINDOW_MS 800                                    // Time window for calibration sampling  
 #define GRIND_CALIBRATION_TIMEOUT_MS 2000                                         // Maximum calibration completion time
 

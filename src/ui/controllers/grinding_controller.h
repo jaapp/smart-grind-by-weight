@@ -18,7 +18,7 @@ public:
     void update(UIState current_state);
 
     void handle_grind_button();
-    void handle_pulse_button();
+    void handle_pulse_button_event(lv_event_code_t code);
     void handle_layout_toggle();
     void handle_purge_confirm_continue();
 

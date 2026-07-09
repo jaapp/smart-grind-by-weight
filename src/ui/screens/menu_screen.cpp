@@ -53,6 +53,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     screensaver_timeout_label = nullptr;
     screensaver_off_timeout_slider = nullptr;
     screensaver_off_timeout_label = nullptr;
+    pulse_corrections_toggle = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 
     // Create menu UI immediately at boot for instant access
@@ -453,6 +454,11 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
     create_toggle_row(parent, "Return", &auto_return_toggle);
 
+    // Pulse corrections section
+    create_separator(parent, "Corrections");
+    create_description_label(parent, "Top off with short pulses after the predictive grind. Needs a scale that settles cleanly; turn off on a noisy load cell.");
+    create_toggle_row(parent, "Pulses", &pulse_corrections_toggle);
+
     // Grinder Purging section
     create_separator(parent, "Purging");
     create_description_label(parent, "Decide what do do with the grinded coffee after the grinder is primed.");
@@ -493,6 +499,10 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_start_toggle) {
         lv_obj_add_event_cb(auto_start_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_START_TOGGLE)));
+    }
+    if (pulse_corrections_toggle) {
+        lv_obj_add_event_cb(pulse_corrections_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::PULSE_CORRECTIONS_TOGGLE)));
     }
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
@@ -1009,7 +1019,11 @@ void MenuScreen::update_grinder_purge_amount_label(float amount_g) {
         float clamped_amount = amount_g;
         if (clamped_amount < GRIND_PURGE_AMOUNT_MIN_G) clamped_amount = GRIND_PURGE_AMOUNT_MIN_G;
         if (clamped_amount > GRIND_PURGE_AMOUNT_MAX_G) clamped_amount = GRIND_PURGE_AMOUNT_MAX_G;
-        snprintf(buffer, sizeof(buffer), "Amount: %.1fg", clamped_amount);
+        if (clamped_amount < GRIND_PURGE_DISABLED_THRESHOLD_G) {
+            snprintf(buffer, sizeof(buffer), "Amount: Off");
+        } else {
+            snprintf(buffer, sizeof(buffer), "Amount: %.1fg", clamped_amount);
+        }
         lv_label_set_text(grinder_purge_amount_label, buffer);
     }
 }
@@ -1217,6 +1231,7 @@ void MenuScreen::update_grind_mode_toggles() {
     int mode_index = 0; // Default to Weight (index 0)
     int grinder_purge_mode_index = GRIND_PURGE_MODE_DEFAULT;  // Default to Purge
     float grinder_purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;  // Default to 1.0g
+    bool pulse_corrections = (GRIND_PULSE_CORRECTIONS_DEFAULT != 0);
     if (hardware_manager) {
         Preferences* main_prefs = hardware_manager->get_preferences();
         if (main_prefs) {
@@ -1224,6 +1239,16 @@ void MenuScreen::update_grind_mode_toggles() {
             mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
             grinder_purge_mode_index = main_prefs->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
             grinder_purge_amount_g = main_prefs->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
+            pulse_corrections = main_prefs->getBool(GrindController::PREF_KEY_PULSE_CORRECTIONS,
+                                                    GRIND_PULSE_CORRECTIONS_DEFAULT != 0);
+        }
+    }
+
+    if (pulse_corrections_toggle) {
+        if (pulse_corrections) {
+            lv_obj_add_state(pulse_corrections_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(pulse_corrections_toggle, LV_STATE_CHECKED);
         }
     }
 

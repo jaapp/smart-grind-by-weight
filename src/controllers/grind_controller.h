@@ -172,6 +172,21 @@ private:
     float last_mechanical_weight_ = 0.0f;
     bool mechanical_monitor_initialized_ = false;
 
+    // Negative-weight failsafe: timestamp the net weight first dropped below the
+    // threshold (0 = currently non-negative). Used to require a sustained reading
+    // so a single noisy sample can't abort the grind.
+    unsigned long negative_weight_since_ms_ = 0;
+
+    // Pulse corrections on/off for the current session (see PREF_KEY_PULSE_CORRECTIONS)
+    bool pulse_corrections_for_session_ = (GRIND_PULSE_CORRECTIONS_DEFAULT != 0);
+
+    // Time-mode manual top-off: true while the user holds the PULSE button so the
+    // motor runs continuously (hold-to-grind), like the Scale page.
+    bool manual_pulse_active_ = false;
+    // Timestamp the motor stopped after a top-off, to bound the post-release settle
+    // wait so a noisy scale that never settles can't get stuck in the pulse phase.
+    unsigned long pulse_settle_start_ms_ = 0;
+
     DiagnosticsController* diagnostics_controller_ = nullptr;
 
     // Motor response latency - runtime configurable
@@ -204,8 +219,10 @@ public:
     void update(); // Core 0 main control method - runs at fixed RTOS interval
     
     // Time mode pulse functionality
-    void start_additional_pulse(); // Start an additional 100ms pulse in time mode
-    bool can_pulse() const; // Check if additional pulses are allowed
+    void start_additional_pulse(); // Begin a manual hold-to-grind top-off in time mode (press)
+    void stop_additional_pulse();  // End the manual hold-to-grind top-off (release)
+    bool can_pulse() const; // Check if a manual top-off can be started
+    bool is_additional_pulse_active() const { return phase == GrindPhase::TIME_ADDITIONAL_PULSE; }
     int get_additional_pulse_count() const { return additional_pulse_count; }
     
     // UI event system
@@ -232,6 +249,11 @@ public:
     static constexpr const char* PREF_KEY_GRINDER_AMOUNT_G = "grinder_amount_g";
     static constexpr const char* PREF_KEY_GRIND_FRESHNESS_HOURS = "freshness_hrs";
     static constexpr const char* PREF_KEY_LAST_GRIND_RUNTIME = "last_grind_ms";
+    static constexpr const char* PREF_KEY_PULSE_CORRECTIONS = "pulse_corr";
+
+    // Runtime pulse-corrections setting (Menu -> Grind Settings -> Corrections),
+    // sampled from preferences at grind start like the purge settings.
+    bool pulse_corrections_enabled() const { return pulse_corrections_for_session_; }
     GrindMode get_mode() const { return mode; }
     const GrindSessionDescriptor& get_session_descriptor() const { return session_descriptor; }
     

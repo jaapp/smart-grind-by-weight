@@ -113,8 +113,13 @@ void WeightGrindStrategy::run_predictive_phase(GrindController& controller,
         loop_data.current_weight >= (controller.target_weight - controller.motor_stop_target_weight)) {
         controller.grinder->stop();
         controller.predictive_end_weight = loop_data.current_weight;
-        controller.pulse_flow_rate = controller.weight_sensor->get_flow_rate_95th_percentile(2500);
-        controller.switch_phase(GrindPhase::PULSE_SETTLING, loop_data);
+        if (controller.pulse_corrections_enabled()) {
+            controller.pulse_flow_rate = controller.weight_sensor->get_flow_rate_95th_percentile(2500);
+            controller.switch_phase(GrindPhase::PULSE_SETTLING, loop_data);
+        } else {
+            // Pulse corrections disabled: land on the predictive stop alone.
+            controller.switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
+        }
     }
 }
 

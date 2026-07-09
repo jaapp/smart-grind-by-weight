@@ -78,15 +78,14 @@ void GrindingUIController::register_events() {
                                       [this](lv_event_t*) { handle_grind_button(); });
 
     if (pulse_button_) {
+        // LV_EVENT_ALL: a tap drives PURGE_CONFIRM (CLICKED), while time-mode top-off
+        // is hold-to-grind, driven by PRESSED / RELEASED / PRESS_LOST.
         lv_obj_add_event_cb(pulse_button_, [](lv_event_t* e) {
-            if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
-                return;
-            }
             auto* controller = static_cast<GrindingUIController*>(lv_event_get_user_data(e));
             if (controller) {
-                controller->handle_pulse_button();
+                controller->handle_pulse_button_event(lv_event_get_code(e));
             }
-        }, LV_EVENT_CLICKED, this);
+        }, LV_EVENT_ALL, this);
     }
 
     if (lv_obj_t* arc = ui_manager_->grinding_screen.get_arc_screen_obj()) {
@@ -237,24 +236,32 @@ void GrindingUIController::handle_grind_button() {
     }
 }
 
-void GrindingUIController::handle_pulse_button() {
+void GrindingUIController::handle_pulse_button_event(lv_event_code_t code) {
     if (!ui_manager_ || !ui_manager_->grind_controller) {
         return;
     }
 
-    // Check if we're in PURGE_CONFIRM phase - pulse button acts as CONTINUE
+    // PURGE_CONFIRM: the button acts as CONTINUE on a tap (click)
     if (ui_manager_->purge_confirm_screen.is_visible()) {
-        handle_purge_confirm_continue();
+        if (code == LV_EVENT_CLICKED) {
+            handle_purge_confirm_continue();
+        }
         return;
     }
 
-    // Normal time mode pulse behavior
-    if (ui_manager_->grind_controller->can_pulse()) {
-        LOG_BLE("[UIManager] Pulse button clicked - requesting additional pulse\n");
-        ui_manager_->grind_controller->start_additional_pulse();
-        reset_grind_complete_timer();
-    } else {
-        LOG_BLE("[UIManager] Pulse button clicked but pulsing not allowed\n");
+    // Time-mode top-off: hold-to-grind. Run the motor while the button is held.
+    if (code == LV_EVENT_PRESSED) {
+        if (ui_manager_->grind_controller->can_pulse()) {
+            LOG_BLE("[UIManager] Top-off hold started\n");
+            ui_manager_->grind_controller->start_additional_pulse();
+            reset_grind_complete_timer();
+        }
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        if (ui_manager_->grind_controller->is_additional_pulse_active()) {
+            LOG_BLE("[UIManager] Top-off hold released\n");
+            ui_manager_->grind_controller->stop_additional_pulse();
+            reset_grind_complete_timer();
+        }
     }
 }
 
@@ -368,8 +375,11 @@ void GrindingUIController::update_button_layout() {
                 lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
-            } else if (ui_manager_->grind_controller && ui_manager_->grind_controller->can_pulse()) {
-                // Time mode pulse: enable/disable based on can_pulse()
+            } else if (ui_manager_->grind_controller &&
+                       (ui_manager_->grind_controller->can_pulse() ||
+                        ui_manager_->grind_controller->is_additional_pulse_active())) {
+                // Time mode top-off: enabled when a top-off can start, and kept
+                // enabled while actively holding to grind (so the hold isn't dropped)
                 lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
                 lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);

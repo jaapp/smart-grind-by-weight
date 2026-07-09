@@ -131,10 +131,14 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
         float configured_amount = preferences->getFloat(PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         configured_amount = std::clamp(configured_amount, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
         grinder_purge_amount_g_for_session = configured_amount;
+        pulse_corrections_for_session_ = preferences->getBool(PREF_KEY_PULSE_CORRECTIONS,
+                                                              GRIND_PULSE_CORRECTIONS_DEFAULT != 0);
     }
 
     start_time = millis();
     pulse_attempts = 0;
+    negative_weight_since_ms_ = 0;
+    manual_pulse_active_ = false;
     timeout_phase = GrindPhase::IDLE; // Initialize timeout phase
     timeout_pause_start = 0;
     timeout_offset_ms = 0;
@@ -217,8 +221,14 @@ void GrindController::user_tare_request() {
 void GrindController::return_to_idle() {
     // This is called by the UI to acknowledge a completed or timed-out grind
     // and return the controller to the IDLE state.
-    if (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT) {
+    if (phase == GrindPhase::COMPLETED || phase == GrindPhase::TIMEOUT ||
+        phase == GrindPhase::TIME_ADDITIONAL_PULSE) {
         LOG_BLE("[%lums CONTROLLER] UI acknowledged completion/timeout, returning to IDLE.\n", millis());
+        // If acknowledged mid-top-off, make sure the motor is stopped first.
+        manual_pulse_active_ = false;
+        if (grinder) {
+            grinder->stop();
+        }
         time_grind_start_ms = 0;
         target_time_ms = 0;
         grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(GRIND_PURGE_MODE_DEFAULT);
@@ -338,28 +348,42 @@ void GrindController::update() {
             break;
         }
             
-        case GrindPhase::TARING:
-            if (weight_sensor->start_nonblocking_tare()) {
+        case GrindPhase::TARING: {
+            // Let the scale settle before locking the tare zero. The zero is captured
+            // at the end of the tare from a smoothed window, so a baseline that is
+            // still creeping (just after a cup is placed) would bias it and make the
+            // net weight drift negative through the grind. Bounded so a noisy cell
+            // that never fully settles still tares promptly.
+            bool ready_to_tare = (GRIND_TARE_PRE_SETTLE_MAX_MS == 0) ||
+                                 weight_sensor->is_settled() ||
+                                 (loop_data.now - phase_start_time) >= GRIND_TARE_PRE_SETTLE_MAX_MS;
+            if (ready_to_tare && weight_sensor->start_nonblocking_tare()) {
                 LOG_LOADCELL_DEBUG("Non-blocking tare started\n");
                 switch_phase(GrindPhase::TARE_CONFIRM, loop_data);
             }
             break;
+        }
             
         case GrindPhase::TARE_CONFIRM:
-            // Check if tare is complete
+            // Proceed as soon as the tare offset is locked. We already waited for the
+            // scale to settle BEFORE taring (in TARING), so the zero is good and there
+            // is no need to wait again here - that would only delay the grind.
             if (!weight_sensor->is_tare_in_progress()) {
-                // Double confirm weights are settled
-                if (weight_sensor->is_settled()) {
-                    if (!grinder->is_grinding()) {
-                        grinder->start();  // Ensure motor is running
-                    }
-                    time_grind_start_ms = loop_data.now;
-                    if (mode == GrindMode::TIME) {
-                        switch_phase(GrindPhase::TIME_GRINDING, loop_data);
-                    } else {
-                        // Always run chute operation for weight mode
-                        switch_phase(GrindPhase::PRIME, loop_data);
-                    }
+                if (!grinder->is_grinding()) {
+                    grinder->start();  // Ensure motor is running
+                }
+                time_grind_start_ms = loop_data.now;
+                if (mode == GrindMode::TIME) {
+                    switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+                } else if (grinder_purge_amount_g_for_session < GRIND_PURGE_DISABLED_THRESHOLD_G) {
+                    // Purge disabled (0g): skip PRIME/PRIME_SETTLING and the purge
+                    // popup entirely - go straight to the predictive grind, no pause.
+                    flow_start_confirmed = false;
+                    grind_latency_ms = 0;
+                    switch_phase(GrindPhase::PREDICTIVE, loop_data);
+                } else {
+                    // Run chute purge/prime to saturate the grinder
+                    switch_phase(GrindPhase::PRIME, loop_data);
                 }
             }
             break;
@@ -470,13 +494,38 @@ void GrindController::update() {
             break;
             
         case GrindPhase::TIME_ADDITIONAL_PULSE:
-            // Check for additional pulse completion
-            if (grinder && grinder->is_pulse_complete()) {
-                LOG_BLE("[%lums CONTROLLER] Additional pulse #%d completed, weight: %.2fg\n", 
-                        millis(), additional_pulse_count, weight_sensor ? weight_sensor->get_display_weight() : 0.0f);
-                
-                // Return to completed phase
-                switch_phase(GrindPhase::COMPLETED, loop_data);
+            // Manual hold-to-grind top-off: the motor runs while the user holds the
+            // PULSE button. Live weight updates on the completion screen via progress
+            // events (this phase is excluded from the UI's grinding-state switch, so
+            // the completion screen stays up rather than flickering to the grind view).
+            if (manual_pulse_active_) {
+                // Safety cap so a missed release can't grind forever
+                if (loop_data.now - phase_start_time >= GRIND_MANUAL_PULSE_MAX_MS) {
+                    manual_pulse_active_ = false;
+                    if (grinder) grinder->stop();
+                    queue_log_message("[CONTROLLER] Manual top-off safety cap reached\n");
+                }
+                break;  // Keep grinding while held
+            }
+
+            // Released: once the motor is stopped and the scale settles, re-capture
+            // the final weight so the completion screen reflects the extra grounds.
+            // Bounded by the settling timeout so a noisy scale that never settles
+            // still completes instead of leaving us stuck in this phase.
+            if (grinder && !grinder->is_grinding() && weight_sensor) {
+                if (pulse_settle_start_ms_ == 0) {
+                    pulse_settle_start_ms_ = loop_data.now;
+                }
+                bool settled = weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+                bool settle_timed_out = (loop_data.now - pulse_settle_start_ms_) >= GRIND_SCALE_SETTLING_TIMEOUT_MS;
+                if (settled || settle_timed_out) {
+                    final_weight = weight_sensor->get_weight_high_latency();
+                    LOG_BLE("[%lums CONTROLLER] Manual top-off #%d done, weight: %.2fg\n",
+                            millis(), additional_pulse_count, final_weight);
+
+                    // Return to completed phase with the updated weight
+                    switch_phase(GrindPhase::COMPLETED, loop_data);
+                }
             }
             break;
             
@@ -548,14 +597,29 @@ void GrindController::update() {
     // Emit progress update events every cycle for responsive UI
     emit_progress_update(loop_data);
 
-    // Check for negative weight failsafe after TARE_CONFIRM phase during active grinding
-    // Only check after motor has settled to avoid false positives from startup transients
-    if (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
-        phase != GrindPhase::IDLE && phase != GrindPhase::INITIALIZING &&
-        phase != GrindPhase::SETUP && phase != GrindPhase::TARING &&
-        phase != GrindPhase::TARE_CONFIRM &&
-        grinder->is_motor_settled() &&
-        loop_data.current_weight < -1.0f) {
+    // Check for negative weight failsafe after TARE_CONFIRM phase during active grinding.
+    // Only check after the motor has settled to avoid startup transients, and require the
+    // reading to STAY negative for the sustain window - a single noisy sample on a noisy
+    // load cell (no purge cushion to hold the baseline up) must not abort the grind, but a
+    // removed cup reads negative continuously.
+    bool neg_failsafe_phase = (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
+                               phase != GrindPhase::IDLE && phase != GrindPhase::INITIALIZING &&
+                               phase != GrindPhase::SETUP && phase != GrindPhase::TARING &&
+                               phase != GrindPhase::TARE_CONFIRM);
+
+    if (neg_failsafe_phase && grinder->is_motor_settled() &&
+        loop_data.current_weight < GRIND_NEGATIVE_WEIGHT_FAILSAFE_G) {
+        if (negative_weight_since_ms_ == 0) {
+            negative_weight_since_ms_ = loop_data.now;  // Start of a negative excursion
+        }
+    } else {
+        negative_weight_since_ms_ = 0;  // Recovered (or in an excluded phase) - reset
+    }
+
+    bool negative_weight_sustained = (negative_weight_since_ms_ != 0) &&
+        (loop_data.now - negative_weight_since_ms_ >= GRIND_NEGATIVE_WEIGHT_FAILSAFE_SUSTAIN_MS);
+
+    if (negative_weight_sustained) {
         timeout_phase = phase;
         grinder->stop();
         last_session_result_ = GrindSessionResult::ERROR;
@@ -1042,39 +1106,54 @@ void GrindController::start_additional_pulse() {
     if (!can_pulse()) {
         return;
     }
-    
+
     if (!grinder) {
         LOG_BLE("ERROR: Cannot pulse - grinder not available\n");
         return;
     }
-    
+
     additional_pulse_count++;
 
     // Update statistics for time mode pulse
     statistics_manager.update_time_pulse();
 
-    // Reset timeout timer to prevent timeout during additional pulses
+    // Reset timeout timer to prevent timeout while the user holds to grind
     start_time = millis();
+    manual_pulse_active_ = true;
+    pulse_settle_start_ms_ = 0;
 
-    LOG_BLE("[%lums CONTROLLER] Starting additional pulse #%d (%lums) - timeout timer reset\n",
-            millis(), additional_pulse_count, (unsigned long)pulse_duration_ms);
+    LOG_BLE("[%lums CONTROLLER] Manual top-off #%d started (hold-to-grind)\n",
+            millis(), additional_pulse_count);
 
     // Transition to additional pulse phase (without loop_data since this is a manual action)
     GrindLoopData empty_loop_data = {};
     empty_loop_data.now = millis();
     switch_phase(GrindPhase::TIME_ADDITIONAL_PULSE, empty_loop_data);
 
-    // Start the pulse
-    grinder->start_pulse_rmt(pulse_duration_ms);
-    
+    // Run the motor continuously while held (stopped on release or the safety cap)
+    grinder->start();
+
     // Notify mock driver for weight simulation (if mock is active)
 #if defined(DEBUG_ENABLE_LOADCELL_MOCK) && (DEBUG_ENABLE_LOADCELL_MOCK != 0)
-    MockHX711Driver::notify_pulse(pulse_duration_ms);
+    MockHX711Driver::notify_grinder_start();
 #endif
 }
 
+void GrindController::stop_additional_pulse() {
+    if (phase != GrindPhase::TIME_ADDITIONAL_PULSE) {
+        return;
+    }
+
+    manual_pulse_active_ = false;
+    if (grinder) {
+        grinder->stop();  // Phase handler will settle, re-measure, then return to COMPLETED
+    }
+
+    LOG_BLE("[%lums CONTROLLER] Manual top-off released - settling\n", millis());
+}
+
 bool GrindController::can_pulse() const {
-    // Only allow pulses in time mode when grind is completed and not in pulse phase
+    // Only allow starting a top-off in time mode when the grind is completed
     return mode == GrindMode::TIME &&
            phase == GrindPhase::COMPLETED;
 }
