@@ -16,6 +16,7 @@ void PurgeConfirmScreen::create() {
     lv_obj_set_style_pad_left(screen, 0, 0);
     lv_obj_set_style_pad_right(screen, 0, 0);
     lv_obj_set_style_pad_gap(screen, 5, 0);
+    layout_below_menubar(screen);
 
     // Set up flex layout (column)
     lv_obj_set_layout(screen, LV_LAYOUT_FLEX);

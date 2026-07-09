@@ -9,9 +9,12 @@
 #include "../tasks/weight_sampling_task.h"
 #include <utility>
 
-// Boot splash timing
-static constexpr uint32_t kBootFadeOutMs = 350;     // logo opacity -> 0 before handoff
-static constexpr uint32_t kBootMinVisibleMs = 1200; // keep the logo up at least this long
+// Boot splash timing. There is no artificial hold: the splash stays up only as
+// long as hardware init actually takes (min = just enough for the fade-in), so
+// boot is as fast as the scale allows.
+static constexpr uint32_t kBootFadeInMs = 300;      // logo opacity 0 -> full on first tick
+static constexpr uint32_t kBootFadeOutMs = 250;     // logo opacity -> 0 before handoff
+static constexpr uint32_t kBootMinVisibleMs = 300;  // just cover the fade-in
 static constexpr uint32_t kBootMaxMs = 6000;        // hard cap so a faulty load cell can't hang boot
 
 // lv_anim exec callback: fade the logo opacity
@@ -178,6 +181,9 @@ void UIManager::update() {
             if (menu_controller_) {
                 menu_controller_->update();
             }
+            // Mirror the current Settings sub-page title into the nav bar (sub-page
+            // navigation is internal to lv_menu and has no state change to hook).
+            set_menubar_title(menu_screen.get_current_title());
             break;
             
         case UIState::CALIBRATION:
@@ -217,6 +223,17 @@ void UIManager::update_boot_sequence() {
     const uint32_t now = millis();
     if (boot_start_ms_ == 0) {
         boot_start_ms_ = now;
+
+        // Fade the logo in (it was created transparent), mirroring the fade-out.
+        if (lv_obj_t* logo = boot_screen.get_logo()) {
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, logo);
+            lv_anim_set_exec_cb(&a, boot_logo_opa_anim_cb);
+            lv_anim_set_values(&a, LV_OPA_TRANSP, LV_OPA_COVER);
+            lv_anim_set_duration(&a, kBootFadeInMs);
+            lv_anim_start(&a);
+        }
     }
 
     // The backlight is brought up synchronously in DisplayManager::init(), so the splash is
@@ -391,9 +408,72 @@ void UIManager::switch_to_state(UIState new_state) {
         grinding_controller_->on_state_changed(new_state);
         grinding_controller_->update_grind_button_icon();
     }
+
+    // Global navigation bar: title + back arrow + visibility for this state.
+    apply_menubar_for_state(new_state);
 }
 
-void UIManager::show_confirmation(const char* title, const char* message, 
+void UIManager::apply_menubar_for_state(UIState state) {
+    if (!status_indicator_controller_) return;
+
+    // Immersive states (boot splash + the grind cycle) hide the bar entirely.
+    bool immersive = (state == UIState::BOOT ||
+                      state == UIState::GRINDING ||
+                      state == UIState::GRIND_COMPLETE ||
+                      state == UIState::GRIND_TIMEOUT);
+    status_indicator_controller_->set_visible(!immersive);
+    if (immersive) return;
+
+    const char* title = "";
+    bool back = false;
+    switch (state) {
+        case UIState::EDIT:
+            title = profile_controller ? profile_controller->get_current_name() : "";
+            back = true;
+            break;
+        case UIState::MENU:         title = menu_screen.get_current_title(); back = true; break;
+        // Dialog-style screens show their own big on-screen headline, so the bar
+        // shows only the back arrow + icons (no duplicated title).
+        case UIState::CALIBRATION:  title = "";  back = true;  break;
+        case UIState::CONFIRM:      title = "";  back = true;  break;
+        case UIState::AUTOTUNING:   title = "";  back = true;  break;
+        case UIState::PURGE_CONFIRM:     title = "";  back = false; break;  // part of the grind cycle
+        case UIState::OTA_UPDATE:        title = "";  back = false; break;
+        case UIState::OTA_UPDATE_FAILED: title = "";  back = false; break;
+        case UIState::READY:
+        default:
+            title = "";  // home: icons only
+            back = false;
+            break;
+    }
+    status_indicator_controller_->set_title(title);
+    status_indicator_controller_->set_back_visible(back);
+    // Keep the bar on top of any screen that raised itself via move_foreground.
+    status_indicator_controller_->bring_to_front();
+}
+
+void UIManager::set_menubar_title(const char* title) {
+    if (status_indicator_controller_) {
+        status_indicator_controller_->set_title(title);
+    }
+}
+
+void UIManager::handle_menubar_back() {
+    if (!state_machine) return;
+    // The screens wire their own controls via direct lv_obj callbacks (not EventBridge),
+    // so call each controller's public cancel/back path directly — it runs the same
+    // cleanup + navigation the removed on-screen CANCEL button used to.
+    switch (state_machine->get_current_state()) {
+        case UIState::CALIBRATION: if (calibration_controller_) calibration_controller_->handle_cancel(); break;
+        case UIState::EDIT:        if (edit_controller_)       edit_controller_->handle_cancel(); break;
+        case UIState::CONFIRM:     if (confirm_controller_)    confirm_controller_->handle_cancel(); break;
+        case UIState::AUTOTUNING:  if (autotune_controller_)   autotune_controller_->handle_cancel(); break;
+        case UIState::MENU:        menu_screen.go_back(); break;
+        default:                   switch_to_state(UIState::READY); break;
+    }
+}
+
+void UIManager::show_confirmation(const char* title, const char* message,
                                  const char* confirm_text, lv_color_t confirm_color,
                                  std::function<void()> on_confirm,
                                  const char* cancel_text,
@@ -436,6 +516,10 @@ void UIManager::register_controller_events() {
     if (ota_data_export_controller_) ota_data_export_controller_->register_events();
     if (screen_timeout_controller_) screen_timeout_controller_->register_events();
     if (jog_adjust_controller_) jog_adjust_controller_->register_events();
+
+    // Global navigation bar back arrow → contextual back for the current screen.
+    EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::MENUBAR_BACK,
+                                      [this](lv_event_t*) { handle_menubar_back(); });
 }
 
 void UIManager::set_background_active(bool active) {

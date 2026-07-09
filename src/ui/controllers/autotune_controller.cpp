@@ -76,6 +76,14 @@ void AutoTuneUIController::update() {
         if (progress.has_new_message) {
             autotune_controller->clear_message_flag();
         }
+
+        // Live scale readout: current weight + the same 500ms noise std dev the
+        // settling gate uses, so the user can see WHY a tune stalls or fails.
+        if (auto* sensor = hw_manager->get_weight_sensor()) {
+            ui_manager_->autotune_screen.update_live_stats(
+                sensor->get_display_weight(),
+                sensor->get_standard_deviation_g(GRIND_SCALE_PRECISION_SETTLING_TIME_MS));
+        }
     }
 }
 

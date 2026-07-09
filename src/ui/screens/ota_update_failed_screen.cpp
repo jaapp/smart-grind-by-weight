@@ -1,5 +1,6 @@
 #include "ota_update_failed_screen.h"
 #include "arduino_compat.h"
+#include "../ui_helpers.h"
 #include "../../config/constants.h"
 #include "../../config/build_info.h"
 
@@ -10,6 +11,7 @@ void OtaUpdateFailedScreen::create() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 20, 0);
+    layout_below_menubar(screen);
 
     // Use flex layout for centering
     lv_obj_set_layout(screen, LV_LAYOUT_FLEX);

@@ -18,6 +18,8 @@ void BootScreen::create() {
     logo = lv_image_create(screen);
     lv_image_set_src(logo, &boot_logo);
     lv_obj_align(logo, LV_ALIGN_CENTER, USER_BOOT_LOGO_OFFSET_X, USER_BOOT_LOGO_OFFSET_Y);
+    // Start invisible; the boot sequence fades the logo in on its first tick
+    lv_obj_set_style_opa(logo, LV_OPA_TRANSP, LV_PART_MAIN);
 
     visible = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);

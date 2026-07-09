@@ -42,6 +42,10 @@
 // General layout
 #define THEME_CORNER_RADIUS_PX 20                                             // Standard UI element corner radius
 
+// Global menubar: persistent top bar (home button + status icons). Non-immersive
+// screens inset their content below it by this height (see layout_below_menubar()).
+#define UI_MENUBAR_HEIGHT_PX 44                                                // Height of the global top menubar
+
 //------------------------------------------------------------------------------
 // OPACITY VALUES
 //------------------------------------------------------------------------------

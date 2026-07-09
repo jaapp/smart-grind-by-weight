@@ -16,6 +16,8 @@ private:
     // Console screen elements
     lv_obj_t* console_container;
     lv_obj_t* console_textarea;
+    lv_obj_t* live_stats_label;   // live weight + noise readout while tuning
+    lv_obj_t* status_label;       // current activity (priming / testing Xms / verifying)
 
     // Result screen elements
     lv_obj_t* result_container;
@@ -42,6 +44,8 @@ public:
 
     void append_console_message(const char* message);
     void update_progress(const AutoTuneProgress& progress);
+    // Live scale readout on the console screen: current weight + noise (std dev)
+    void update_live_stats(float weight_g, float noise_std_dev_g);
 
     bool is_visible() const { return visible; }
     AutoTuneScreenState get_state() const { return current_state; }

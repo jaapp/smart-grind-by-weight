@@ -150,12 +150,20 @@ public:
     // Called by the boot fade-out animation when the splash is finished
     void finish_boot();
 
+    // Set the navigation bar title (for screens whose title changes in place, e.g.
+    // calibration steps / autotune result / confirm dialogs / menu sub-pages).
+    void set_menubar_title(const char* title);
+
 private:
     void create_ui();
     void update_auto_actions();
 
     // Boot splash sequence (runs in the UI task while background init completes)
     void update_boot_sequence();
+
+    // Navigation bar: apply per-state title/back/visibility; route the back arrow.
+    void apply_menubar_for_state(UIState state);
+    void handle_menubar_back();
 
     // Boot splash state
     UIState post_boot_state_ = UIState::READY;

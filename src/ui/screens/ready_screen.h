@@ -18,6 +18,9 @@ private:
     lv_obj_t* scale_weight_label;
     lv_obj_t* scale_tare_button;
     lv_obj_t* scale_grind_button;
+    // In-tab action buttons (slide with the swipe; replace the READY-state floater)
+    lv_obj_t* profile_action_buttons[3];
+    lv_obj_t* menu_action_button;
     lv_obj_t* page_dots_container;
     lv_obj_t* page_dots[kTabCount];
     bool visible;

@@ -132,12 +132,14 @@ void Grinder::start_pulse_rmt(uint32_t duration_ms) {
     pulse_active = true;
     grinding = true;
     motor_start_time = millis();
+    pulse_duration_ms = duration_ms;
     emit_background_change(true);
     return;
 #endif
     if (!initialized || !rmt_initialized) return;
 
     motor_start_time = millis();
+    pulse_duration_ms = duration_ms;
 
     // Clean up any existing encoder
     if (current_encoder) {
@@ -207,17 +209,19 @@ bool Grinder::is_pulse_complete() {
     return false;
 #endif
     if (!pulse_active) return true;
-    
-    // For simplicity, we'll use a transmission done callback approach
-    // Since RMT handles the pulse timing in hardware, we can check the GPIO state
-    // as a simple completion indicator (pulse done == pin returned to OFF level)
-    if (digitalRead(motor_pin) == MOTOR_OFF_PIN_LEVEL) {
+
+    // RMT times the pulse in hardware, so completion is deterministic from the
+    // requested duration. Do NOT read the pin back: on the native IDF build the
+    // RMT output pin has no input/loop-back path enabled, so digitalRead returns
+    // a constant — with an active-low motor that made pulses never read complete
+    // and hung the pulse autotune in PRIMING forever.
+    if (millis() - motor_start_time >= pulse_duration_ms + 2) {
         pulse_active = false;
         grinding = false;
         emit_background_change(false);
         return true;
     }
-    
+
     return false;
 }
 

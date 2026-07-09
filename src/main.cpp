@@ -146,6 +146,15 @@ extern "C" void app_main() {
     }
 
     hardware_manager.init();
+
+    // Start weight sampling as early as possible: the HX711 bring-up (power-up,
+    // first-sample wait, validation reads at 10 SPS) takes >1s and used to run
+    // AFTER BLE and the whole UI were initialized, serializing the slowest boot
+    // step last. Starting the task here lets it overlap the rest of boot; the
+    // TaskManager adopts the already-running task instead of re-creating it.
+    weight_sampling_task.init(hardware_manager.get_load_cell(), &grind_logger);
+    weight_sampling_task.start_task();
+
     profile_controller.init(hardware_manager.get_preferences());
     statistics_manager.init(hardware_manager.get_preferences());
     grind_controller.init(hardware_manager.get_load_cell(), hardware_manager.get_grinder(),
@@ -193,7 +202,7 @@ extern "C" void app_main() {
     bluetooth_manager.enable_during_bootup();
 
     LOG_BLE("[STARTUP] Initializing task module dependencies...\n");
-    weight_sampling_task.init(hardware_manager.get_load_cell(), &grind_logger);
+    // (weight_sampling_task was initialized + started early, right after hardware init)
     grind_control_task.init(&grind_controller, hardware_manager.get_load_cell(),
                             hardware_manager.get_grinder(), &grind_logger);
     LOG_BLE("Task module dependencies initialized\n");

@@ -54,8 +54,10 @@ private:
     lv_obj_t* brightness_normal_label;
     lv_obj_t* brightness_screensaver_label;
     lv_obj_t* screensaver_mode_radio_group;
-    lv_obj_t* screensaver_timeout_slider;
+    lv_obj_t* screensaver_timeout_slider;       // stage 1: dim-after
     lv_obj_t* screensaver_timeout_label;
+    lv_obj_t* screensaver_off_timeout_slider;   // stage 2: off-after
+    lv_obj_t* screensaver_off_timeout_label;
     lv_obj_t* purge_button;
     lv_obj_t* reset_button;
     
@@ -85,6 +87,11 @@ private:
     lv_obj_t* diag_info_label;
     lv_obj_t* diag_reset_button;
 
+    // lv_menu native header parts (header itself hidden; the global nav bar shows the
+    // page title + back arrow). Kept to mirror the title and drive back navigation.
+    lv_obj_t* menu_header_label_ = nullptr;
+    lv_obj_t* menu_back_button_ = nullptr;
+
     // Common elements
     bool visible;
 
@@ -100,6 +107,10 @@ public:
     void create(BluetoothManager* bluetooth, GrindController* grind_ctrl, GrindingScreen* grind_screen, class HardwareManager* hw_mgr, DiagnosticsController* diag_ctrl);
     void show();
     void hide();
+    // Nav-bar integration: current Settings page title (for the bar) and back navigation
+    // (pops one sub-page, or exits Settings → READY at the root).
+    const char* get_current_title() const;
+    void go_back();
     void update_info(const WeightSensor* weight_sensor, unsigned long uptime_ms, size_t free_heap);
     void update_diagnostics(WeightSensor* weight_sensor);
     void update_ble_status();
@@ -108,7 +119,7 @@ public:
     void update_brightness_sliders();
     void update_screensaver_settings();
     void update_screensaver_timeout_label(uint32_t timeout_ms);
-    void apply_screensaver_mode_ui(int mode);
+    void update_screensaver_off_timeout_label(uint32_t timeout_ms);
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
     void update_grind_mode_toggles();
@@ -133,6 +144,7 @@ public:
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
     lv_obj_t* get_screensaver_mode_radio_group() const { return screensaver_mode_radio_group; }
     lv_obj_t* get_screensaver_timeout_slider() const { return screensaver_timeout_slider; }
+    lv_obj_t* get_screensaver_off_timeout_slider() const { return screensaver_off_timeout_slider; }
     lv_obj_t* get_grind_mode_radio_group() const { return grind_mode_radio_group; }
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }

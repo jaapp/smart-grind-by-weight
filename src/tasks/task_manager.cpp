@@ -159,6 +159,16 @@ bool TaskManager::create_all_tasks() {
 }
 
 bool TaskManager::create_weight_sampling_task() {
+    // app_main starts the weight sampling task early (right after hardware init) so
+    // the slow HX711 bring-up overlaps BLE/UI initialization instead of running after
+    // it. If that happened, adopt the existing task instead of creating a duplicate.
+    extern WeightSamplingTask weight_sampling_task;
+    if (weight_sampling_task.is_running()) {
+        task_handles.weight_sampling_task = weight_sampling_task.get_task_handle();
+        LOG_BLE("✅ Weight Sampling Task adopted (started early for fast boot)\n");
+        return task_handles.weight_sampling_task != nullptr;
+    }
+
     BaseType_t result = xTaskCreatePinnedToCore(
         weight_sampling_task_wrapper,
         "WeightSampling",
