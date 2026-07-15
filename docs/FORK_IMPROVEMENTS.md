@@ -85,6 +85,8 @@ The fix: min/max now walk the ring buffer **in place** with zero allocation, and
 - **Re-enable after idle timeout**: turning Bluetooth back on from Settings used to leave the device advertising but unable to accept connections until a reboot (the host task was never restarted after deinit). Fixed.
 - **Advertising watchdog**: the Bluetooth manager reconciles its cached connection flag with the real GAP state and restarts advertising if BLE is enabled, idle, and silent — covering connections that drop without a clean disconnect callback.
 - Fixed crashes on BLE toggle, during report generation, and on mid-report disconnect.
+- **BLE lifecycle owned by the Bluetooth task**: the Settings toggle used to run the full NimBLE init/teardown on the UI render task, and every disable/enable cycle leaked the whole GATT tree on the internal heap — eventually the BT controller couldn't allocate its arena and a re-enable crashed the device. Enable/disable now go through a request queue drained by the Bluetooth task, the GATT tree is freed on deinit, and a failed stack init degrades to a log line with BLE left off instead of a reboot.
+- **OTA locked out while grinding**: an OTA start suspends the grind-control task, which mid-grind would have frozen the control loop with the motor running. The device now rejects OTA start commands unless the grind controller is fully idle.
 
 ### Hardware fault detection
 
@@ -114,6 +116,14 @@ While autotune runs you now get:
 
 The predictive grind can now land on the motor-stop alone (no correction pulses) — faster, and robust on load cells that never settle cleanly between pulses. It's a runtime setting (Menu → Grind Settings → **Corrections → Pulses**, default off), with `GRIND_LATENCY_TO_COAST_RATIO` as the overshoot tuning dial. Also included: a faster grind-mode tare with a pre-settle gate, a sustained negative-weight failsafe (a single noisy sample can't abort a grind), and time-mode top-offs as hold-to-grind.
 
+### Out-of-beans auto-pause
+
+If the flow rate averaged over 3 seconds stays near zero while the motor runs (weight mode), the hopper is empty — the grind **pauses instead of burning the timeout**: motor off, "Out of Beans" popup, red STOP to cancel or green PLAY to resume after refilling. The pause doesn't count against the grind timeout, the failsafes stay inert while you handle the hopper, and resuming re-learns motor latency while keeping the already-learned stop target so a nearly-finished grind still lands on weight. Starting on an empty hopper is caught the same way (~3 s instead of the full 60 s timeout). Tunables: `GRIND_HOPPER_EMPTY_FLOW_THRESHOLD_GPS`, `GRIND_HOPPER_EMPTY_SUSTAIN_MS`.
+
+### Full-session grind chart
+
+The "nerdy chart" grind view no longer slides old data off the left edge. The whole session is kept (10 Hz decimated, preallocated series) and the chart scrolls **horizontally** — it auto-follows the live edge while grinding, and you can swipe back through the entire session during pauses or after completion. Tap still toggles between the arc and chart layouts.
+
 ### Hardware adaptability
 
 - **Active-low motor relay support** for relay boards that switch on a low signal.
@@ -131,6 +141,10 @@ Instead of a single sleep timeout, the screensaver now steps down in two indepen
 2. **Off after** (default 5 min) — the backlight turns fully off.
 
 Both timeouts use discrete steps from 15 seconds to 30 minutes, plus **Never** to disable a stage. Any touch or weight activity restores the screen instantly, and the screensaver never engages while a grind is in progress. Settings are cached in RAM and refreshed on change, so nothing polls flash storage every UI tick.
+
+### Edge progress ring (Apple Watch style)
+
+Menu → Display → **Grind Progress** offers two styles for the arc grind view: the classic centered arc (**Standard**), or **Edge** — a ring that traces the outer border of the screen (rounded-rect path hugging the display edge) and sweeps clockwise from top-center as the grind progresses. The big weight readout stays centered either way, and the ring never intercepts touch.
 
 ---
 

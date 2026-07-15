@@ -37,6 +37,8 @@ python3 tools/grinder.py analyze
 - **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered), calibration flag, noise diagnostics; a one-shot boot tare zeroes the (empty) scale at startup so it begins near zero, and the display is suppressed (shows 0.0) until that first tare completes so the raw reading never flashes
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
 - **UIManager**: 8 screens with LVGL integration (including the boot splash); READY screen is a swipe tabview — Single / Double / Custom / MENU / **Scale** (5 tabs, iOS-style page-indicator dots pinned to the bottom edge); menu page surfaces quick Tools (Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
+- **BluetoothManager**: BLE enable/disable is owned by the **Bluetooth task** — the UI posts `request_enable()`/`request_disable()` to a lifecycle queue and polls `is_lifecycle_pending()`; never call `enable()`/`disable()` (NimBLE init/teardown) from the UI/LVGL task. OTA start commands are **rejected unless the grind controller is IDLE** (an OTA suspends the grind-control task, which mid-grind would freeze the loop with the motor on)
+- **Grind chart**: the chart grind layout keeps the full session history (10Hz decimated, preallocated 1024-point series) in a horizontally scrollable viewport that auto-follows live data; it never shifts data out, so the whole session is reviewable after completion
 - **StateMachine**: Central state coordination (BOOT → READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
@@ -48,6 +50,7 @@ python3 tools/grinder.py analyze
 
 **Display / Screensaver:** Configurable through Menu → Display page — two-stage screensaver
 - **Brightness**: Normal brightness slider (min 15%).
+- **Grind Progress style**: Radio buttons for **Standard** (centered arc) or **Edge** (Apple Watch style ring tracing the outer screen border, drawn by `src/ui/components/edge_progress_ring.*`; the centered weight readout stays, only the arc stroke goes invisible). Pref `prog_style` (int: 0=Standard, 1=Edge) in the "grinder" namespace, applied instantly. Applies to the arc grind layout only.
 - **Screensaver style**: Radio buttons for **Dim** (dims the current screen) or **Logo** (boot logo centered on opaque black, at the dimmed brightness). Style applies to stage 1.
 - **Dim after / Off after**: Two timeout sliders with discrete steps (15s, 30s, 1/2/5/10/15/30 min, **Never**); steps live in `screensaver_timeout_steps.h`. Stage 1 (dim/logo) at "Dim after" (default 1 min); stage 2 (backlight fully off) at "Off after" (default 5 min). "Never" disables that stage.
 - **Behavior**: `ScreenTimeoutController` caches the timeouts/mode (refreshed on change via `UIManager::refresh_screensaver_settings()`, never polling NVS per tick) and steps ACTIVE → DIMMED → OFF on inactivity; touch/weight activity restores normal brightness and deletes the logo overlay (created lazily on engage). Never engages during grinding.
@@ -58,7 +61,8 @@ python3 tools/grinder.py analyze
 - Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PRIME, PRIME_SETTLING, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
 - `TIME_ADDITIONAL_PULSE` - Dedicated phase for post-completion additional grinding pulses in time mode
 - `PURGE_CONFIRM` - Pauses after chute operation (in Purge mode) to allow user to discard grinds before continuing to main grind
-- **Timeout**: 30-second maximum from grind start (includes taring), auto-stops and requires user acknowledgment
+- `HOPPER_REFILL` - Out-of-beans pause: sustained near-zero flow (< `GRIND_HOPPER_EMPTY_FLOW_THRESHOLD_GPS` averaged over `GRIND_HOPPER_EMPTY_SUSTAIN_MS`) during PREDICTIVE stops the motor and shows an "Out of Beans" popup (STOP cancels, green PLAY resumes after refill). Paused like PURGE_CONFIRM: control loop suspended, logging off, pause excluded from the grind timeout; resume re-learns latency but keeps the learned motor-stop target
+- **Timeout**: 60-second maximum of active grind time (paused confirmation phases excluded), auto-stops and requires user acknowledgment
 
 **Grinder Purge/Prime:**
 - **Always runs** before weight-mode grinding to saturate the grinder for accurate latency detection
