@@ -17,6 +17,7 @@
 
 #include "ble_compat.h"
 #include <esp_log.h>
+#include <esp_heap_caps.h>
 #include <freertos/semphr.h>
 #include <cstdio>
 #include <cstring>
@@ -265,6 +266,13 @@ BLEService::BLEService(BLEUUID uuid)
     , m_started(false) {
 }
 
+BLEService::~BLEService() {
+    for (BLECharacteristic* chr : m_characteristics) {
+        delete chr;
+    }
+    m_characteristics.clear();
+}
+
 BLECharacteristic* BLEService::createCharacteristic(BLEUUID uuid, uint32_t properties) {
     auto* chr = new BLECharacteristic(uuid, properties);
     m_characteristics.push_back(chr);
@@ -278,6 +286,10 @@ void BLEService::start() {
     }
     if (m_characteristics.empty()) {
         ESP_LOGW(TAG, "BLEService::start() — no characteristics");
+        return;
+    }
+    if (!BLEDevice::isInitialized()) {
+        ESP_LOGE(TAG, "BLEService::start() — NimBLE port not initialized, skipping");
         return;
     }
 
@@ -372,7 +384,10 @@ void BLEAdvertising::start() {
     // Start the NimBLE host on the first advertise (after all services have been
     // registered). The host registers the services and starts the GATT server on
     // sync; advertising/GAP calls below require a synced host.
-    BLEDevice::ensure_host_started();
+    if (!BLEDevice::ensure_host_started()) {
+        ESP_LOGE(TAG, "advertising start aborted — NimBLE host not available");
+        return;
+    }
 
     // Build advertising data fields.
     struct ble_hs_adv_fields fields;
@@ -453,6 +468,15 @@ BLEServer::BLEServer()
     s_instance = this;
 }
 
+BLEServer::~BLEServer() {
+    // Without this, every disable/enable cycle leaked all services and
+    // characteristics on the internal heap until BT controller init failed.
+    for (BLEService* svc : m_services) {
+        delete svc;
+    }
+    m_services.clear();
+}
+
 BLEService* BLEServer::createService(BLEUUID uuid) {
     auto* svc = new BLEService(uuid);
     m_services.push_back(svc);
@@ -487,10 +511,10 @@ void BLEServer::setConnId(uint16_t h) {
 // BLEDevice implementation
 // =============================================================================
 
-/*static*/ void BLEDevice::init(const std::string& name) {
+/*static*/ bool BLEDevice::init(const std::string& name) {
     if (s_initialized) {
         ESP_LOGW(TAG, "BLEDevice::init() called again — ignored");
-        return;
+        return true;
     }
 
     s_device_name = name;
@@ -498,8 +522,9 @@ void BLEServer::setConnId(uint16_t h) {
     // Initialise the NimBLE port (registers IDF BT controller).
     int rc = nimble_port_init();
     if (rc != 0) {
-        ESP_LOGE(TAG, "nimble_port_init failed: %d", rc);
-        return;
+        ESP_LOGE(TAG, "nimble_port_init failed: %d (free internal heap: %u)",
+                 rc, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+        return false;
     }
 
     // Register standard GAP and GATT services.
@@ -523,30 +548,43 @@ void BLEServer::setConnId(uint16_t h) {
     // after all services have registered.
     s_initialized = true;
     ESP_LOGI(TAG, "BLEDevice::init() complete (host start deferred), name='%s'", name.c_str());
+    return true;
 }
 
-/*static*/ void BLEDevice::ensure_host_started() {
+/*static*/ bool BLEDevice::ensure_host_started() {
     if (s_host_started) {
-        return;
+        return true;
+    }
+
+    // Never start the host task on a port that failed to initialize - that is a
+    // guaranteed crash. The caller surfaces the failure instead.
+    if (!s_initialized) {
+        ESP_LOGE(TAG, "ensure_host_started() called without a successful init()");
+        return false;
     }
 
     // One-shot semaphore posted by ble_on_sync().
     s_sync_sem = xSemaphoreCreateBinary();
-    assert(s_sync_sem != nullptr);
+    if (!s_sync_sem) {
+        ESP_LOGE(TAG, "ensure_host_started() failed to allocate sync semaphore");
+        return false;
+    }
 
     // Start the NimBLE host task. On sync the host registers all services that
     // were added before this point and starts the GATT server automatically.
     nimble_port_freertos_init(ble_host_task);
 
     // Block until the stack is synced (typically <500 ms).
-    if (xSemaphoreTake(s_sync_sem, pdMS_TO_TICKS(5000)) != pdTRUE) {
+    bool synced = (xSemaphoreTake(s_sync_sem, pdMS_TO_TICKS(5000)) == pdTRUE);
+    if (!synced) {
         ESP_LOGE(TAG, "ensure_host_started() timed out waiting for NimBLE sync");
     }
 
     vSemaphoreDelete(s_sync_sem);
     s_sync_sem = nullptr;
-    s_host_started = true;
-    ESP_LOGI(TAG, "NimBLE host started");
+    s_host_started = true;  // The host task IS running either way; don't start it twice
+    ESP_LOGI(TAG, "NimBLE host started (synced=%d)", (int)synced);
+    return synced;
 }
 
 /*static*/ void BLEDevice::on_stack_synced() {

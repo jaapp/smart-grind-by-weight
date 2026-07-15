@@ -52,6 +52,12 @@ public:
 private:
     UIManager* ui_manager_;
     lv_timer_t* motor_timer_{};
+    lv_timer_t* ble_poll_timer_{};   // Polls for BLE lifecycle completion (runs on UI task)
+    uint32_t ble_poll_started_ms_{};
+
+    void start_ble_poll_timer();
+    void stop_ble_poll_timer();
+    static void static_ble_poll_timer_cb(lv_timer_t* timer);
 
     void perform_factory_reset();
     void execute_purge_operation();

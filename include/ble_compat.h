@@ -134,6 +134,7 @@ public:
 class BLEService {
 public:
     explicit BLEService(BLEUUID uuid);
+    ~BLEService();  // Deletes owned characteristics (freed on BLEDevice::deinit)
 
     BLECharacteristic* createCharacteristic(BLEUUID uuid, uint32_t properties);
     BLECharacteristic* createCharacteristic(const char* uuid, uint32_t properties) {
@@ -222,6 +223,7 @@ private:
 class BLEServer {
 public:
     BLEServer();
+    ~BLEServer();  // Deletes owned services (freed on BLEDevice::deinit)
 
     BLEService*  createService(BLEUUID uuid);
     BLEService*  createService(const char* uuid) { return createService(BLEUUID(uuid)); }
@@ -254,8 +256,13 @@ private:
 // =============================================================================
 class BLEDevice {
 public:
-    static void init(const std::string& name);
-    static void init(const char* name)      { init(std::string(name)); }
+    // Returns false if the NimBLE port could not be (re)initialized - e.g. after
+    // internal-heap exhaustion. Callers MUST bail out on failure; continuing to
+    // build services / start the host on a dead port crashes.
+    static bool init(const std::string& name);
+    static bool init(const char* name)      { return init(std::string(name)); }
+
+    static bool isInitialized() { return s_initialized; }
 
     // Create (or return existing) server singleton.
     static BLEServer*      createServer();
@@ -279,7 +286,8 @@ public:
 
     // Internal: starts the NimBLE host task once, after services are registered.
     // Called from BLEAdvertising::start() on the first advertise.
-    static void ensure_host_started();
+    // Returns false (without starting anything) if init() failed or timed out.
+    static bool ensure_host_started();
 
 private:
     static BLEServer*      s_server;

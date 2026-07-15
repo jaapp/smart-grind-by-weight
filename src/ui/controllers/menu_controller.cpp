@@ -215,24 +215,58 @@ void MenuUIController::handle_ble_toggle() {
     if (!ui_manager_ || !ui_manager_->bluetooth_manager) return;
 
     auto* ble = ui_manager_->bluetooth_manager;
-    if (ble->is_enabled()) {
-        ble->disable();
-        LOG_DEBUG_PRINTLN("Bluetooth disabled by user");
+    if (ble->is_lifecycle_pending()) {
+        // An enable/disable is already in flight - keep the toggle honest and wait
         ui_manager_->menu_screen.update_ble_status();
         return;
     }
 
-    auto completion = [this]() {
-        ui_manager_->menu_screen.update_ble_status();
-    };
-
-    auto operation = [ble]() {
-        ble->enable();
-        LOG_DEBUG_PRINTLN("Bluetooth enabled by user (30 minute timeout)");
-    };
-
+    // The BLE stack must never be initialized/torn down on the UI task (long
+    // blocking init, and NimBLE lifecycle isn't safe from LVGL context). Post the
+    // request to the Bluetooth task and poll for completion behind an overlay.
     auto& overlay = BlockingOperationOverlay::getInstance();
-    overlay.show_and_execute(BlockingOperation::BLE_ENABLING, operation, completion);
+    if (ble->is_enabled()) {
+        LOG_DEBUG_PRINTLN("Bluetooth disable requested by user");
+        overlay.show("DISABLING BLUETOOTH");
+        ble->request_disable();
+    } else {
+        LOG_DEBUG_PRINTLN("Bluetooth enable requested by user (30 minute timeout)");
+        overlay.show("ENABLING BLUETOOTH");
+        ble->request_enable();
+    }
+    start_ble_poll_timer();
+}
+
+void MenuUIController::start_ble_poll_timer() {
+    stop_ble_poll_timer();
+    ble_poll_started_ms_ = millis();
+    ble_poll_timer_ = lv_timer_create(static_ble_poll_timer_cb, 100, this);
+}
+
+void MenuUIController::stop_ble_poll_timer() {
+    if (ble_poll_timer_) {
+        lv_timer_del(ble_poll_timer_);
+        ble_poll_timer_ = nullptr;
+    }
+}
+
+void MenuUIController::static_ble_poll_timer_cb(lv_timer_t* timer) {
+    auto* self = static_cast<MenuUIController*>(lv_timer_get_user_data(timer));
+    if (!self || !self->ui_manager_ || !self->ui_manager_->bluetooth_manager) return;
+
+    auto* ble = self->ui_manager_->bluetooth_manager;
+    bool done = !ble->is_lifecycle_pending();
+    // Safety net: never leave the overlay stuck if the Bluetooth task stalls
+    bool timed_out = (millis() - self->ble_poll_started_ms_) > 15000;
+
+    if (done || timed_out) {
+        if (timed_out && !done) {
+            LOG_DEBUG_PRINTLN("WARNING: BLE lifecycle poll timed out");
+        }
+        BlockingOperationOverlay::getInstance().hide();
+        self->ui_manager_->menu_screen.update_ble_status();
+        self->stop_ble_poll_timer();
+    }
 }
 
 void MenuUIController::handle_ble_startup_toggle() {
