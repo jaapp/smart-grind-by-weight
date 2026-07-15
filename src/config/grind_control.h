@@ -41,6 +41,14 @@ enum class GrinderPurgeMode {
 #define GRIND_NEGATIVE_WEIGHT_FAILSAFE_SUSTAIN_MS 500                     // Must persist this long before aborting
 #define GRIND_MAX_PULSE_ATTEMPTS 10                                       // Maximum pulse corrections before stopping
 
+// Out-of-beans detection (weight mode, PREDICTIVE phase): if the flow rate averaged
+// over the sustain window stays below the threshold while the motor is running, the
+// hopper is considered empty. The grind pauses (motor off, timeout clock stopped) so
+// the user can refill and resume. The threshold sits well below any real grind flow
+// (1-2 g/s) but above what load-cell noise produces when averaged over the window.
+#define GRIND_HOPPER_EMPTY_FLOW_THRESHOLD_GPS 0.10f                       // Sustained flow below this = out of beans
+#define GRIND_HOPPER_EMPTY_SUSTAIN_MS 3000                                // Averaging window / detection delay
+
 // Pulse corrections after the predictive grind (DEFAULT for the runtime toggle in
 // Menu -> Grind Settings -> Corrections). Enabled: top off toward the target with
 // short pulses (needs a scale that settles between pulses). Disabled: land on the

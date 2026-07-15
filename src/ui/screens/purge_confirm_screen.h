@@ -14,7 +14,9 @@ public:
     void create();
     void show();
     void hide();
+    void set_title(const char* title);
     void set_message(const char* message);
+    void set_checkbox_visible(bool show_checkbox);
 
     bool is_visible() const { return visible; }
     bool is_checkbox_checked() const;

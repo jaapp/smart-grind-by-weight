@@ -292,6 +292,37 @@ void GrindController::continue_from_purge() {
     switch_phase(GrindPhase::PREDICTIVE);  // No loop_data needed for phase transition
 }
 
+void GrindController::resume_from_refill() {
+    // Called by UI when the user has refilled the hopper and pressed resume
+    if (phase != GrindPhase::HOPPER_REFILL) {
+        LOG_BLE("[%lums CONTROLLER] Warning: resume_from_refill() called in wrong phase: %s\n",
+                millis(), get_phase_name());
+        return;
+    }
+
+    LOG_BLE("[%lums CONTROLLER] User confirmed refill, resuming PREDICTIVE\n", millis());
+
+    // Exclude the time spent paused from the grind timeout (same as PURGE_CONFIRM)
+    if (timeout_pause_start > 0) {
+        unsigned long pause_duration = millis() - timeout_pause_start;
+        timeout_offset_ms += pause_duration;
+        LOG_BLE("[%lums CONTROLLER] Excluding %lums refill pause from timeout (total offset: %lums)\n",
+                millis(), pause_duration, timeout_offset_ms);
+        timeout_pause_start = 0;
+    }
+
+    // Re-learn motor latency on the fresh start; keep the already-learned
+    // motor-stop target so a nearly-finished grind still lands correctly.
+    flow_start_confirmed = false;
+    grind_latency_ms = 0;
+    negative_weight_since_ms_ = 0;  // Don't carry a stale pre-pause excursion into the failsafe
+
+    if (grinder) {
+        grinder->start();
+    }
+    switch_phase(GrindPhase::PREDICTIVE);  // No loop_data needed for phase transition
+}
+
 void GrindController::update() {
     if (!is_active()) return;
     
@@ -453,6 +484,12 @@ void GrindController::update() {
             // This phase waits for UI confirmation
             // The UI will call a method to acknowledge and continue to PREDICTIVE
             // For now, this case just holds the state
+            break;
+        }
+
+        case GrindPhase::HOPPER_REFILL: {
+            // Out of beans - motor stopped, waiting for the user to refill and
+            // press resume (control loop is paused, same as PURGE_CONFIRM)
             break;
         }
 
@@ -630,7 +667,8 @@ void GrindController::update() {
         switch_phase(GrindPhase::TIMEOUT, loop_data);
     }
     // Only check timeout during active grinding phases, not during completion states or user confirmation
-    else if (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT && phase != GrindPhase::PURGE_CONFIRM && check_timeout()) {
+    else if (phase != GrindPhase::COMPLETED && phase != GrindPhase::TIMEOUT &&
+             phase != GrindPhase::PURGE_CONFIRM && phase != GrindPhase::HOPPER_REFILL && check_timeout()) {
         timeout_phase = phase;
         grinder->stop();
         last_session_result_ = GrindSessionResult::TIMEOUT;
@@ -752,7 +790,8 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
     
     // Update phase state
     phase = new_phase;
-    control_loop_paused_ = (phase == GrindPhase::PURGE_CONFIRM);
+    control_loop_paused_ = (phase == GrindPhase::PURGE_CONFIRM ||
+                            phase == GrindPhase::HOPPER_REFILL);
     phase_start_time = now;
     
     // Reset loop counter for new phase
@@ -903,6 +942,7 @@ const char* GrindController::get_phase_name(GrindPhase p) const {
         case GrindPhase::PRIME: return "PRIME";
         case GrindPhase::PRIME_SETTLING: return "PRIME_SETTLING";
         case GrindPhase::PURGE_CONFIRM: return "PURGE_CONFIRM";
+        case GrindPhase::HOPPER_REFILL: return "REFILL";
         case GrindPhase::PREDICTIVE: return "PREDICTIVE";
         case GrindPhase::PULSE_DECISION: return "PULSE_DECISION";
         case GrindPhase::PULSE_EXECUTE: return "PULSE_EXECUTE";
@@ -1001,7 +1041,8 @@ bool GrindController::should_log_measurements() const {
         && phase != GrindPhase::SETUP
         && phase != GrindPhase::COMPLETED
         && phase != GrindPhase::TIMEOUT
-        && phase != GrindPhase::PURGE_CONFIRM;  // Don't log while waiting for user to confirm purge
+        && phase != GrindPhase::PURGE_CONFIRM   // Don't log while waiting for user to confirm purge
+        && phase != GrindPhase::HOPPER_REFILL;  // Don't log while paused for a hopper refill
 }
 
 void GrindController::process_queued_ui_events() {

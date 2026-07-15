@@ -84,6 +84,25 @@ void WeightGrindStrategy::run_predictive_phase(GrindController& controller,
         return;
     }
 
+    // Out-of-beans detection: the flow rate averaged over the sustain window staying
+    // near zero while the motor runs means the hopper is empty (or ran dry mid-grind).
+    // Pause so the user can refill and resume instead of burning the grind timeout.
+    // The phase-age guard keeps the window from reaching back before the motor started
+    // (and gives a fresh grace period after each resume, since resuming resets it).
+    if ((loop_data.now - controller.phase_start_time) >=
+            (GRIND_HOPPER_EMPTY_SUSTAIN_MS + GRIND_MOTOR_SETTLING_TIME_MS)) {
+        float sustained_flow = controller.weight_sensor->get_flow_rate(GRIND_HOPPER_EMPTY_SUSTAIN_MS);
+        if (sustained_flow < GRIND_HOPPER_EMPTY_FLOW_THRESHOLD_GPS) {
+            controller.grinder->stop();
+            controller.timeout_pause_start = loop_data.now;  // Stop the timeout clock while paused
+            controller.queue_log_message("--- HOPPER EMPTY: flow %.3fg/s < %.2fg/s for %dms - pausing for refill ---\n",
+                                         sustained_flow, GRIND_HOPPER_EMPTY_FLOW_THRESHOLD_GPS,
+                                         (int)GRIND_HOPPER_EMPTY_SUSTAIN_MS);
+            controller.switch_phase(GrindPhase::HOPPER_REFILL, loop_data);
+            return;
+        }
+    }
+
     if (!controller.flow_start_confirmed) {
         const uint32_t flow_detection_window_ms = 500;
         float current_flow_rate = controller.weight_sensor->get_flow_rate(flow_detection_window_ms);

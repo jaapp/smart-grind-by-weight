@@ -287,6 +287,15 @@ void GrindingUIController::handle_purge_confirm_continue() {
         return;
     }
 
+    // Hopper refill pause: the button acts as PLAY - restart the grind
+    if (ui_manager_->grind_controller->is_awaiting_refill()) {
+        LOG_BLE("[%lums REFILL] User resumed grind after hopper refill\n", millis());
+        ui_manager_->purge_confirm_screen.hide();
+        ui_manager_->switch_to_state(UIState::GRINDING);
+        ui_manager_->grind_controller->resume_from_refill();
+        return;
+    }
+
     // Check if "Keep purge grinds from now on" checkbox is checked
     if (ui_manager_->purge_confirm_screen.is_checkbox_checked()) {
         LOG_BLE("[%lums PURGE] User chose to keep grinds - switching to Prime mode\n", millis());
@@ -370,8 +379,11 @@ void GrindingUIController::update_button_layout() {
             lv_obj_clear_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
 
             if (in_purge_confirm) {
-                // Purge confirm: pulse button acts as CONTINUE (always enabled)
-                lv_img_set_src(pulse_icon_, LV_SYMBOL_OK);
+                // Grind paused: the button acts as CONTINUE (always enabled).
+                // Purge confirm shows OK; hopper refill shows PLAY (resume grinding).
+                bool awaiting_refill = ui_manager_->grind_controller &&
+                                       ui_manager_->grind_controller->is_awaiting_refill();
+                lv_img_set_src(pulse_icon_, awaiting_refill ? LV_SYMBOL_PLAY : LV_SYMBOL_OK);
                 lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
@@ -436,9 +448,12 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
         case UIGrindEvent::PHASE_CHANGED: {
             ui_manager_->current_mode = event_data.mode;
 
-            // Handle PURGE_CONFIRM phase specially - show purge confirmation popup
-            if (event_data.phase == GrindPhase::PURGE_CONFIRM) {
-                LOG_UI_DEBUG("[%lums UI_TRANSITION] Switching to PURGE_CONFIRM state\n", millis());
+            // Grind-paused phases (purge confirm / hopper refill) show the
+            // confirmation popup with the dual CANCEL + CONTINUE button layout
+            if (event_data.phase == GrindPhase::PURGE_CONFIRM ||
+                event_data.phase == GrindPhase::HOPPER_REFILL) {
+                LOG_UI_DEBUG("[%lums UI_TRANSITION] Switching to PURGE_CONFIRM state (%s)\n",
+                             millis(), event_data.phase_display_text);
                 ui_manager_->switch_to_state(UIState::PURGE_CONFIRM);
                 update_grind_button_icon();  // Update button icon to STOP and reposition for dual-button layout
             } else if (event_data.phase != GrindPhase::IDLE &&
@@ -478,7 +493,7 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
                     event_data.phase != GrindPhase::TARE_CONFIRM && event_data.phase != GrindPhase::INITIALIZING &&
                     event_data.phase != GrindPhase::SETUP && event_data.phase != GrindPhase::COMPLETED &&
                     event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE &&
-                    event_data.phase != GrindPhase::PURGE_CONFIRM) {
+                    event_data.phase != GrindPhase::PURGE_CONFIRM && event_data.phase != GrindPhase::HOPPER_REFILL) {
                     ui_manager_->grinding_screen.add_chart_data_point(event_data.current_weight, event_data.flow_rate, millis());
                 }
             }
@@ -498,7 +513,7 @@ void GrindingUIController::handle_grind_event(const GrindEventData& event_data) 
                     event_data.phase != GrindPhase::TARE_CONFIRM && event_data.phase != GrindPhase::INITIALIZING &&
                     event_data.phase != GrindPhase::SETUP && event_data.phase != GrindPhase::COMPLETED &&
                     event_data.phase != GrindPhase::TIMEOUT && event_data.phase != GrindPhase::TIME_ADDITIONAL_PULSE &&
-                    event_data.phase != GrindPhase::PURGE_CONFIRM) {
+                    event_data.phase != GrindPhase::PURGE_CONFIRM && event_data.phase != GrindPhase::HOPPER_REFILL) {
                     ui_manager_->grinding_screen.add_chart_data_point(event_data.current_weight, event_data.flow_rate, millis());
                 }
             }

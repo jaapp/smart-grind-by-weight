@@ -390,6 +390,16 @@ void UIManager::switch_to_state(UIState new_state) {
             break;
 
         case UIState::PURGE_CONFIRM: {
+            // This state hosts both grind-paused confirmations: purge (discard stale
+            // grinds) and hopper refill (out of beans). Pick content by grind phase.
+            if (grind_controller && grind_controller->is_awaiting_refill()) {
+                purge_confirm_screen.set_title("Out of Beans");
+                purge_confirm_screen.set_message("Refill the hopper, then press play to resume.");
+                purge_confirm_screen.set_checkbox_visible(false);
+                purge_confirm_screen.show();
+                break;
+            }
+
             // Calculate and set dynamic message based on elapsed time
             char message_buffer[128];
             if (grind_controller && hardware_manager) {
@@ -414,7 +424,9 @@ void UIManager::switch_to_state(UIState new_state) {
                          "Remove the purge grinds if desired.");
             }
 
+            purge_confirm_screen.set_title("Grinder Purged");
             purge_confirm_screen.set_message(message_buffer);
+            purge_confirm_screen.set_checkbox_visible(true);
             purge_confirm_screen.show();
             break;
         }

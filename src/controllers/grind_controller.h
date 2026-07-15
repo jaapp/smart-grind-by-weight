@@ -69,7 +69,8 @@ enum class GrindPhase {
     TIMEOUT,            // Grind timed out
     PRIME,              // Optional chute priming/purging grind
     PRIME_SETTLING,     // Settling after priming grind
-    PURGE_CONFIRM       // Waiting for user to confirm purge completion
+    PURGE_CONFIRM,      // Waiting for user to confirm purge completion
+    HOPPER_REFILL       // Out of beans - paused waiting for user to refill and resume
 };
 
 
@@ -216,6 +217,8 @@ public:
     void return_to_idle(); // Called by UI to acknowledge completion/timeout
     void stop_grind();
     void continue_from_purge(); // Called by UI to continue from PURGE_CONFIRM to PREDICTIVE
+    void resume_from_refill();  // Called by UI to resume from HOPPER_REFILL to PREDICTIVE
+    bool is_awaiting_refill() const { return phase == GrindPhase::HOPPER_REFILL; }
     void update(); // Core 0 main control method - runs at fixed RTOS interval
     
     // Time mode pulse functionality

@@ -93,8 +93,23 @@ bool PurgeConfirmScreen::is_checkbox_checked() const {
     return lv_obj_has_state(checkbox, LV_STATE_CHECKED);
 }
 
+void PurgeConfirmScreen::set_title(const char* title) {
+    if (title_label && title) {
+        lv_label_set_text(title_label, title);
+    }
+}
+
 void PurgeConfirmScreen::set_message(const char* message) {
     if (message_label && message) {
         lv_label_set_text(message_label, message);
+    }
+}
+
+void PurgeConfirmScreen::set_checkbox_visible(bool show_checkbox) {
+    if (!checkbox) return;
+    if (show_checkbox) {
+        lv_obj_clear_flag(checkbox, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(checkbox, LV_OBJ_FLAG_HIDDEN);
     }
 }
