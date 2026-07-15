@@ -10,8 +10,9 @@
 #include "ota_handler.h"
 #include "data_stream.h"
 
-// Forward declaration to avoid circular dependency
+// Forward declarations to avoid circular dependencies
 class UIManager;
+class GrindController;
 
 // Callback interface for UI status updates
 using UIStatusCallback = std::function<void(const char*)>;
@@ -104,6 +105,10 @@ private:
     
     // UI status callback
     UIStatusCallback ui_status_callback;
+
+    // For the OTA lockout: updates are only accepted while the grind controller
+    // is IDLE (an OTA mid-grind suspends the grind-control task with the motor on)
+    GrindController* grind_controller_ = nullptr;
     
     // Queue to marshal UI status messages to UI task context
     QueueHandle_t ui_status_queue;
@@ -231,6 +236,11 @@ public:
      * Set UI status callback
      */
     void set_ui_status_callback(UIStatusCallback callback);
+
+    /**
+     * Wire the grind controller so OTA can be locked out unless grinding is IDLE
+     */
+    void set_grind_controller(GrindController* controller) { grind_controller_ = controller; }
     
     /**
      * Update all system information characteristics

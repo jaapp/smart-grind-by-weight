@@ -755,6 +755,14 @@ void BluetoothManager::handle_ota_control_command(BLECharacteristic* characteris
     
     switch (command) {
         case BLE_OTA_CMD_START:
+            // OTA lockout: never accept an update unless the grind controller is
+            // IDLE. start_ota() suspends the grind-control task - mid-grind that
+            // would freeze the control loop with the motor running and no failsafes.
+            if (grind_controller_ && grind_controller_->is_active()) {
+                log("Bluetooth OTA: REJECTED - grind in progress, retry when idle\n");
+                set_ota_status(BLE_OTA_ERROR);
+                break;
+            }
             // New protocol: [CMD][patch_size:4][is_full_update:1][build_number_length:1][build_number:N]
             if (data.length() >= 6) {  // 1 + 4 + 1 bytes minimum (cmd + patch_size + full_update_flag)
                 uint32_t patch_size = *(uint32_t*)(data.c_str() + 1);

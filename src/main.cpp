@@ -162,6 +162,7 @@ extern "C" void app_main() {
     hardware_manager.set_grind_controller(&grind_controller);
 
     bluetooth_manager.init(hardware_manager.get_preferences());
+    bluetooth_manager.set_grind_controller(&grind_controller);
 
     std::string failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
     bool ota_failed = !failed_ota_build.empty();
