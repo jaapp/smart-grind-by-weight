@@ -60,6 +60,12 @@
 #define USER_SCREEN_SAVER_MODE_DEFAULT USER_SCREEN_SAVER_MODE_DIM             // Default screensaver style
 #define USER_SCREEN_SAVER_TIMEOUT_NEVER_MS 0                                   // Sentinel timeout meaning "never"
 
+// Grinding progress style (Menu -> Display): centered arc, or an Apple Watch style
+// ring tracing the outer edge of the screen. Preference key "prog_style" (grinder ns).
+#define USER_PROGRESS_STYLE_STANDARD 0                                         // Centered progress arc (default)
+#define USER_PROGRESS_STYLE_EDGE 1                                             // Border-tracing edge ring
+#define USER_PROGRESS_STYLE_DEFAULT USER_PROGRESS_STYLE_STANDARD
+
 //------------------------------------------------------------------------------
 // BOOT SPLASH
 //------------------------------------------------------------------------------

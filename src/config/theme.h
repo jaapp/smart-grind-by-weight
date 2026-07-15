@@ -37,7 +37,11 @@
 #define THEME_BUTTON_WIDTH_PX 120                                             // Standard button width
 
 // Progress and feedback elements
-#define THEME_PROGRESS_ARC_DIAMETER_PX 200                                    // Progress arc diameter
+#define THEME_PROGRESS_ARC_DIAMETER_PX 200                                    // Progress arc diameter (Standard style)
+
+// Edge progress ring (Apple Watch style border trace, see edge_progress_ring.cpp)
+#define THEME_EDGE_PROGRESS_THICKNESS_PX 12                                   // Stroke width of the border ring
+#define THEME_EDGE_PROGRESS_CORNER_RADIUS_PX 40                               // Corner radius of the border trace
 
 // General layout
 #define THEME_CORNER_RADIUS_PX 20                                             // Standard UI element corner radius

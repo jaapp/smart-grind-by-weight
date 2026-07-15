@@ -64,6 +64,7 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_OFF_TIMEOUT_SLIDER, [this](lv_event_t*) { handle_screensaver_off_timeout_slider(); });
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_OFF_TIMEOUT_SLIDER_RELEASED, [this](lv_event_t*) { handle_screensaver_off_timeout_slider_released(); });
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_screensaver_mode_radio_button(); });
+    EventBridgeLVGL::register_handler(ET::PROGRESS_STYLE_RADIO_BUTTON, [this](lv_event_t*) { handle_progress_style_radio_button(); });
 
     // Note: Event registration for menu widgets is done in the page creation functions
     // (menu_screen.cpp) because the menu is created lazily and destroyed on hide.
@@ -631,6 +632,32 @@ void MenuUIController::handle_screensaver_mode_radio_button() {
 
     LOG_DEBUG_PRINTLN(mode == USER_SCREEN_SAVER_MODE_LOGO ? "Screensaver mode: Logo"
                                                           : "Screensaver mode: Dim");
+}
+
+void MenuUIController::handle_progress_style_radio_button() {
+    if (!ui_manager_) return;
+
+    auto* radio_group = ui_manager_->menu_screen.get_progress_style_radio_group();
+    if (!radio_group) return;
+
+    int selected_index = radio_button_group_get_selection(radio_group);
+    if (selected_index < 0) return;
+
+    int style = (selected_index == USER_PROGRESS_STYLE_EDGE) ? USER_PROGRESS_STYLE_EDGE
+                                                             : USER_PROGRESS_STYLE_STANDARD;
+
+    // Same "grinder" namespace/instance that GrindingScreen reads at boot
+    auto* hardware = ui_manager_->get_hardware_manager();
+    Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+    if (prefs) {
+        prefs->putInt("prog_style", style);
+    }
+
+    // Apply immediately so the next grind uses the new style without a reboot
+    ui_manager_->grinding_screen.set_progress_style(style);
+
+    LOG_DEBUG_PRINTLN(style == USER_PROGRESS_STYLE_EDGE ? "Grind progress style: Edge"
+                                                        : "Grind progress style: Standard");
 }
 
 void MenuUIController::perform_factory_reset() {

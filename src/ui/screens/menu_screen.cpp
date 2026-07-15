@@ -15,6 +15,7 @@
 // Forward declaration; defined alongside the other radio-group callbacks below but referenced
 // earlier by create_display_page().
 static void screensaver_mode_callback(int selected_index, void* user_data);
+static void progress_style_callback(int selected_index, void* user_data);
 
 static void back_event_handler(lv_event_t * e)
 {
@@ -49,6 +50,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
     screensaver_mode_radio_group = nullptr;
+    progress_style_radio_group = nullptr;
     screensaver_timeout_slider = nullptr;
     screensaver_timeout_label = nullptr;
     screensaver_off_timeout_slider = nullptr;
@@ -339,6 +341,23 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
 
     create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
 
+    // Grinding progress style: centered arc, or an Apple Watch style ring that
+    // traces the outer edge of the screen.
+    create_separator(parent, "Grind Progress");
+    create_description_label(parent, "Standard centered arc, or a ring tracing the screen edge.");
+
+    const char* progress_styles[] = {"Standard", "Edge"};
+    progress_style_radio_group = create_radio_button_group(
+        parent,
+        progress_styles,
+        2,
+        LV_FLEX_FLOW_ROW,
+        USER_PROGRESS_STYLE_DEFAULT,
+        135, 100,  // Width, Height
+        progress_style_callback,
+        this
+    );
+
     // Screensaver section: style (Dim / boot Logo), dimmed brightness, and two-stage
     // timeouts — dim first, then display fully off.
     create_separator(parent, "Screensaver");
@@ -408,6 +427,12 @@ static void grinder_purge_mode_callback(int selected_index, void* user_data) {
 static void screensaver_mode_callback(int selected_index, void* user_data) {
     // Trigger the event system instead of handling directly
     EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SCREENSAVER_MODE_RADIO_BUTTON, nullptr);
+}
+
+// Callback for grinding progress style (Standard/Edge) radio button selection
+static void progress_style_callback(int selected_index, void* user_data) {
+    // Trigger the event system instead of handling directly
+    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::PROGRESS_STYLE_RADIO_BUTTON, nullptr);
 }
 
 void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
@@ -667,6 +692,7 @@ void MenuScreen::show() {
     update_ble_status();
     update_brightness_sliders();
     update_screensaver_settings();
+    update_progress_style_selection();
     update_bluetooth_startup_toggle();
     update_logging_toggle();
     update_grind_mode_toggles();
@@ -1011,6 +1037,18 @@ void MenuScreen::update_screensaver_settings() {
     if (screensaver_mode_radio_group) {
         radio_button_group_set_selection(screensaver_mode_radio_group, mode);
     }
+}
+
+void MenuScreen::update_progress_style_selection() {
+    if (!progress_style_radio_group) return;
+
+    Preferences prefs;
+    prefs.begin("grinder", false);
+    int style = prefs.getInt("prog_style", USER_PROGRESS_STYLE_DEFAULT);
+    prefs.end();
+
+    if (style != USER_PROGRESS_STYLE_EDGE) style = USER_PROGRESS_STYLE_STANDARD;
+    radio_button_group_set_selection(progress_style_radio_group, style);
 }
 
 void MenuScreen::update_grinder_purge_amount_label(float amount_g) {

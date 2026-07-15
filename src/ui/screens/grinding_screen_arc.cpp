@@ -55,19 +55,29 @@ void GrindingScreenArc::create() {
         lv_obj_clear_flag(lv_obj_get_child(screen, i), LV_OBJ_FLAG_CLICKABLE);
     }
 
+    // Edge progress ring lives directly on the root screen so it can trace the
+    // full display border (this container only covers the top 80%).
+    edge_ring.create(lv_scr_act());
+
     visible = false;
     time_mode = false;
+    progress_style = USER_PROGRESS_STYLE_DEFAULT;
+    apply_progress_style();
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
 void GrindingScreenArc::show() {
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = true;
+    if (progress_style == USER_PROGRESS_STYLE_EDGE) {
+        edge_ring.show();
+    }
 }
 
 void GrindingScreenArc::hide() {
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
     visible = false;
+    edge_ring.hide();
 }
 
 void GrindingScreenArc::update_profile_name(const char* name) {
@@ -102,12 +112,39 @@ void GrindingScreenArc::update_current_weight(float weight) {
 void GrindingScreenArc::update_tare_display() {
     lv_label_set_text(weight_label, "TARE");
     lv_arc_set_value(progress_arc, 0);  // Reset arc to 0 during taring
+    edge_ring.set_progress(0);
 }
 
 void GrindingScreenArc::update_progress(int percent) {
     lv_arc_set_value(progress_arc, percent);
+    edge_ring.set_progress(percent);
 }
 
 void GrindingScreenArc::set_time_mode(bool enabled) {
     time_mode = enabled;
+}
+
+void GrindingScreenArc::set_progress_style(int style) {
+    progress_style = (style == USER_PROGRESS_STYLE_EDGE) ? USER_PROGRESS_STYLE_EDGE
+                                                         : USER_PROGRESS_STYLE_STANDARD;
+    apply_progress_style();
+}
+
+void GrindingScreenArc::apply_progress_style() {
+    if (!progress_arc) return;
+
+    if (progress_style == USER_PROGRESS_STYLE_EDGE) {
+        // The centered arc widget stays (it holds the big weight label and keeps
+        // the layout identical) but its stroke goes invisible; progress renders
+        // on the border ring instead.
+        lv_obj_set_style_arc_opa(progress_arc, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(progress_arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+        if (visible) {
+            edge_ring.show();
+        }
+    } else {
+        lv_obj_set_style_arc_opa(progress_arc, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(progress_arc, LV_OPA_COVER, LV_PART_INDICATOR);
+        edge_ring.hide();
+    }
 }

@@ -41,6 +41,7 @@ public:
     void handle_screensaver_off_timeout_slider();
     void handle_screensaver_off_timeout_slider_released();
     void handle_screensaver_mode_radio_button();
+    void handle_progress_style_radio_button();
 
     float get_normal_brightness() const;
     float get_screensaver_brightness() const;
