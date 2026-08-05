@@ -17,7 +17,15 @@
 #define HW_TOUCH_I2C_ADDRESS 0x38                                              // I2C address of FT3168 touch controller
 
 // Display Controller (QSPI)
-#define HW_DISPLAY_CS_PIN 9                                                    // SPI chip select for display controller
+#ifndef HW_DISPLAY_VARIANT_V2
+#define HW_DISPLAY_VARIANT_V2 0                                               // V1 remains the default hardware target
+#endif
+
+#if HW_DISPLAY_VARIANT_V2
+#define HW_DISPLAY_CS_PIN 46                                                   // V2 PCB chip select for SH8601 display controller
+#else
+#define HW_DISPLAY_CS_PIN 9                                                    // V1 PCB chip select for CO5300 display controller
+#endif
 #define HW_DISPLAY_SCK_PIN 10                                                  // SPI clock for display controller
 #define HW_DISPLAY_D0_PIN 11                                                   // SPI data line 0 (QSPI mode)
 #define HW_DISPLAY_D1_PIN 12                                                   // SPI data line 1 (QSPI mode)
@@ -48,11 +56,16 @@
 //------------------------------------------------------------------------------
 #define HW_DISPLAY_WIDTH_PX 280                                                // LCD width in pixels
 #define HW_DISPLAY_HEIGHT_PX 456                                               // LCD height in pixels
-#define HW_DISPLAY_OFFSET_X_PX 0                                               // X offset for display positioning
 #define HW_DISPLAY_ROTATION_DEG 0                                              // Display rotation angle
+#if HW_DISPLAY_VARIANT_V2
+#define HW_DISPLAY_OFFSET_X_PX 20                                              // SH8601 framebuffer column offset
+#define HW_DISPLAY_QSPI_FREQUENCY_HZ 40000000                                  // Waveshare V2 reference QSPI clock
+#else
+#define HW_DISPLAY_OFFSET_X_PX 0                                               // V1 display positioning offset
 #define HW_DISPLAY_IPS_INVERT_X 180                                            // IPS X-axis inversion setting
 #define HW_DISPLAY_IPS_INVERT_Y 24                                             // IPS Y-axis inversion setting
 #define HW_DISPLAY_COLOR_ORDER 20                                              // Color channel ordering
+#endif
 #define HW_DISPLAY_MINIMAL_BRIGHTNESS_PERCENT 15                               // Minimum brightness percentage (to avoid too dim to see)
 
 //------------------------------------------------------------------------------

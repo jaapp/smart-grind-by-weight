@@ -49,7 +49,7 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
 
 > **Note:** All links are **for reference only** — sellers and items are **not personally verified** unless explicitly stated.
 
-- **[Waveshare ESP32-S3 1.64" AMOLED Touch Display](https://www.waveshare.com/esp32-s3-touch-amoled-1.64.htm)** — Main controller
+- **[Waveshare ESP32-S3 1.64" AMOLED Touch Display](https://www.waveshare.com/esp32-s3-touch-amoled-1.64.htm)** — Main controller. Waveshare has shipped incompatible V1 and V2 display revisions; confirm the revision before flashing.
 - **[HX711 ADC module](https://nl.aliexpress.com/item/1005006851380544.html)** — Load cell amplifier
 - **MAVIN or T70 load cell** (0.3 – 1 kg range) — Weight sensor
   ⚠️ Avoid cheap unshielded small load cells — accuracy will suffer
@@ -202,8 +202,16 @@ ESP32-S3 GND       →    Pin 4 (Ground)
 
 ## 🚀 Firmware Installation
 
+### Check the display revision first
+
+The 1.64-inch Waveshare board now exists in two firmware-incompatible revisions. V1 uses the original CO5300 display path; V2 uses an SH8601 controller, GPIO 46 chip select, and a 20-pixel framebuffer offset. Firmware built for the wrong revision can boot normally while the AMOLED remains completely black.
+
+If the board was supplied with V2 factory firmware, or Waveshare's [official V2 demo](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.64-v2) works while V1 firmware stays black, use the V2 build target. See the [black-display troubleshooting entry](TROUBLESHOOTING.md#display-stays-black-after-flashing-waveshare-164-v2) before wiring the grinder.
+
 ### 🌐 Web Flasher (Recommended)
 **[🔗 Open Web Flasher Tool](https://jaapp.github.io/smart-grind-by-weight)**
+
+Before flashing, verify that the selected image matches your V1 or V2 hardware revision. If the flasher does not yet list a V2 image, build the `waveshare-esp32s3-touch-amoled-164-v2` source target instead; flashing the V1 image to V2 produces a black screen.
 
 **Browser Compatibility:**
 - ✅ **Chrome** (Desktop & Android) - Full support
