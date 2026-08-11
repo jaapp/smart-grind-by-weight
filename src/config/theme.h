@@ -26,7 +26,7 @@
 
 // Per-mode grind button colors
 #define THEME_COLOR_MODE_WEIGHT 0x7EC8E3                                       // Weight pane button (powder blue)
-#define THEME_COLOR_MODE_TIME 0x800020                                         // Time pane button (burgundy)
+#define THEME_COLOR_MODE_TIME 0x5C1224                                         // Time pane button (wine burgundy)
 #define THEME_COLOR_MODE_MANUAL 0xF8DE7E                                       // Manual pane button (butter yellow)
 #define THEME_COLOR_MODE_ICON_DARK 0x1A1A1A                                    // Icon color on light mode buttons
 
