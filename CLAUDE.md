@@ -60,7 +60,7 @@ python3 tools/grinder.py analyze
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
 
-**Mode Carousel:** The ready screen's horizontal swipe selects the mode (Manual=0, Time=1, Weight=2, Menu=3; Weight is the default pane). Weight and Time each keep a single target (long-press to edit). The active pane persists across reboots (`active_tab`, Menu never persisted). Legacy per-profile preferences (`profile`, `weight0..2`, `time0..2`) migrate to `target_w`/`target_s` on first boot.
+**Mode Carousel:** The ready screen's horizontal swipe selects the mode (Manual=0, Time=1, Weight=2, Menu=3; Weight is the default pane). Grind button colors per pane: powder blue (Weight), burgundy (Time), butter yellow (Manual) - see `THEME_COLOR_MODE_*` in `src/config/theme.h`; light backgrounds use a dark icon glyph. Weight and Time each keep a single target (long-press to edit). The active pane persists across reboots (`active_tab`, Menu never persisted). Legacy per-profile preferences (`profile`, `weight0..2`, `time0..2`) migrate to `target_w`/`target_s` on first boot.
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
 - **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu)

@@ -309,17 +309,23 @@ void GrindingUIController::update_grind_button_icon() {
         return;
     }
 
+    // Light mode-button backgrounds need a dark glyph for contrast
+    uint32_t icon_color = THEME_COLOR_TEXT_PRIMARY;
+    uint32_t mode_color = ui_manager_->current_mode == GrindMode::TIME
+                              ? THEME_COLOR_MODE_TIME
+                              : THEME_COLOR_MODE_WEIGHT;
+    uint32_t mode_icon_color = ui_manager_->current_mode == GrindMode::TIME
+                                   ? THEME_COLOR_TEXT_PRIMARY
+                                   : THEME_COLOR_MODE_ICON_DARK;
+
     if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
         // During purge confirm, show STOP icon (user can cancel the grind)
         lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_ERROR), 0);
     } else if (ui_manager_->state_machine->is_state(UIState::GRINDING)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
-        lv_obj_set_style_bg_color(grind_button_,
-                                  ui_manager_->current_mode == GrindMode::TIME
-                                      ? lv_color_hex(THEME_COLOR_ACCENT)
-                                      : lv_color_hex(THEME_COLOR_PRIMARY),
-                                  0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(mode_color), 0);
+        icon_color = mode_icon_color;
     } else if (ui_manager_->state_machine->is_state(UIState::GRIND_COMPLETE)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_OK);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
@@ -333,15 +339,15 @@ void GrindingUIController::update_grind_button_icon() {
         bool manual_running = ui_manager_->manual_grind_controller_ &&
                               ui_manager_->manual_grind_controller_->is_running();
         lv_img_set_src(grind_icon_, manual_running ? LV_SYMBOL_STOP : LV_SYMBOL_PLAY);
-        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_WARNING), 0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_MODE_MANUAL), 0);
+        icon_color = THEME_COLOR_MODE_ICON_DARK;
     } else {
         lv_img_set_src(grind_icon_, LV_SYMBOL_PLAY);
-        lv_obj_set_style_bg_color(grind_button_,
-                                  ui_manager_->current_mode == GrindMode::TIME
-                                      ? lv_color_hex(THEME_COLOR_ACCENT)
-                                      : lv_color_hex(THEME_COLOR_PRIMARY),
-                                  0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(mode_color), 0);
+        icon_color = mode_icon_color;
     }
+
+    lv_obj_set_style_text_color(grind_icon_, lv_color_hex(icon_color), 0);
 
     update_button_layout();
 }

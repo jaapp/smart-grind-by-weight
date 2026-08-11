@@ -311,7 +311,7 @@ Each mode keeps a single target. The pane you leave active is restored after a r
 - **Tap** buttons and readouts
 - **Long press** on the Weight/Time target to edit it
 
-> **Color cues:** The GRIND button background turns **red** in weight mode, **blue** in time mode, and **orange** on the manual pane, so you always know which behaviour is armed.
+> **Color cues:** The GRIND button background turns **powder blue** in weight mode, **burgundy** in time mode, and **butter yellow** on the manual pane, so you always know which behaviour is armed.
 
 ### Manual Mode
 Swipe to the **Manual** pane for direct motor control:
@@ -345,7 +345,7 @@ These steps describe the default grind-by-weight workflow:
 
 > Optional automation (Menu → Grind Settings): enable the new auto-start toggle to begin grinding as soon as the scale sees ~50 g arrive (no tare needed); the system waits for the load cell to gather enough quiet samples before arming itself, then auto-return jumps back to Ready whenever that cup is lifted off again.
 
-Need the stock timed run? Swipe to the **Time** pane before you start; the GRIND button background turns blue to confirm time mode is active (red = weight).
+Need the stock timed run? Swipe to the **Time** pane before you start; the GRIND button background turns burgundy to confirm time mode is active (powder blue = weight).
 
 > **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
 
@@ -376,16 +376,16 @@ Main Screen (swipe left/right between mode panes)
 +-- Manual
 |   |-- Elapsed time (tap to reset)
 |   |-- Live weight (tap to tare)
-|   \-- START/STOP button (orange, 90 s safety cap)
+|   \-- START/STOP button (butter yellow, 90 s safety cap)
 |
 +-- Time
 |   |-- Target time (long press to edit)
-|   |-- GRIND button (blue)
+|   |-- GRIND button (burgundy)
 |   \-- Time mode completion: OK + PULSE buttons
 |
 +-- Weight
 |   |-- Target weight (long press to edit)
-|   \-- GRIND button (red)
+|   \-- GRIND button (powder blue)
 |
 \-- Menu (scrollable hub)
     |
