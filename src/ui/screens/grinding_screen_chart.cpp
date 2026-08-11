@@ -1,6 +1,7 @@
 #include "grinding_screen_chart.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
+#include "../ui_helpers.h"
 #include <lvgl.h>
 #include <widgets/span/lv_span.h>
 
@@ -113,6 +114,7 @@ void GrindingScreenChart::create() {
     }
 
     visible = false;
+    tare_pulse_active = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -204,6 +206,10 @@ void GrindingScreenChart::update_current_weight(float weight) {
     lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
     
     if (current_span && separator_span) {
+        if (tare_pulse_active) {
+            lv_style_set_text_color(lv_span_get_style(current_span), lv_color_hex(THEME_COLOR_TEXT_PRIMARY));
+            tare_pulse_active = false;
+        }
         lv_span_set_text(current_span, current_text);
         if (time_mode) {
             char time_text[48];
@@ -219,13 +225,15 @@ void GrindingScreenChart::update_current_weight(float weight) {
 void GrindingScreenChart::update_tare_display() {
     char target_text[16];
     snprintf(target_text, sizeof(target_text), " / " SYS_WEIGHT_DISPLAY_FORMAT, target_weight_value);
-    
+
     // Update spans for tare display
     lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
     lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-    
+
     if (current_span && separator_span) {
+        tare_pulse_active = true;
         lv_span_set_text(current_span, "TARE");
+        lv_style_set_text_color(lv_span_get_style(current_span), tare_pulse_color(millis()));
         if (time_mode) {
             char time_text[48];
             snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
