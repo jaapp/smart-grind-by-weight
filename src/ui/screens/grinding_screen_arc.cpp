@@ -37,7 +37,7 @@ void GrindingScreenArc::create() {
     lv_obj_set_size(progress_arc, THEME_PROGRESS_ARC_DIAMETER_PX, THEME_PROGRESS_ARC_DIAMETER_PX);
     lv_arc_set_range(progress_arc, 0, 100);
     lv_arc_set_value(progress_arc, 0);
-    lv_obj_set_style_arc_color(progress_arc, lv_color_hex(THEME_COLOR_PRIMARY), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(progress_arc, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(progress_arc, 12, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(progress_arc, lv_color_hex(0x333333), LV_PART_MAIN);
     lv_obj_set_style_arc_width(progress_arc, 12, LV_PART_MAIN);
