@@ -41,6 +41,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     scale_weight_label = nullptr;
     scale_tare_button = nullptr;
     scale_item = nullptr;
+    grind_fast_mode_toggle = nullptr;
     grinder_purge_mode_radio_group = nullptr;
     grinder_purge_amount_slider = nullptr;
     grinder_purge_amount_label = nullptr;
@@ -378,6 +379,11 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
     create_toggle_row(parent, "Return", &auto_return_toggle);
 
+    // Speed section
+    create_separator(parent, "Speed");
+    create_description_label(parent, "Grind faster with reduced accuracy: skips purging, shortens taring and settling, limits correction pulses.");
+    create_toggle_row(parent, "Fast", &grind_fast_mode_toggle);
+
     // Grinder Purging section
     create_separator(parent, "Purging");
     create_description_label(parent, "Decide what do do with the grinded coffee after the grinder is primed.");
@@ -418,6 +424,10 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
+    }
+    if (grind_fast_mode_toggle) {
+        lv_obj_add_event_cb(grind_fast_mode_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_FAST_MODE_TOGGLE)));
     }
     if (grinder_purge_amount_slider) {
         lv_obj_add_event_cb(grinder_purge_amount_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
@@ -1125,11 +1135,13 @@ void MenuScreen::update_scale_weight(float weight) {
 void MenuScreen::update_grind_settings() {
     int grinder_purge_mode_index = GRIND_PURGE_MODE_DEFAULT;  // Default to Purge
     float grinder_purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;  // Default to 1.0g
+    bool fast_mode_enabled = false;
     if (hardware_manager) {
         Preferences* main_prefs = hardware_manager->get_preferences();
         if (main_prefs) {
             grinder_purge_mode_index = main_prefs->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
             grinder_purge_amount_g = main_prefs->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
+            fast_mode_enabled = main_prefs->getBool(GrindController::PREF_KEY_FAST_MODE, false);
         }
     }
 
@@ -1153,6 +1165,14 @@ void MenuScreen::update_grind_settings() {
             lv_obj_add_state(auto_return_toggle, LV_STATE_CHECKED);
         } else {
             lv_obj_clear_state(auto_return_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    if (grind_fast_mode_toggle) {
+        if (fast_mode_enabled) {
+            lv_obj_add_state(grind_fast_mode_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(grind_fast_mode_toggle, LV_STATE_CHECKED);
         }
     }
 

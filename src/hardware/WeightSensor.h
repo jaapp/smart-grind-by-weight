@@ -64,6 +64,7 @@ private:
     static const uint8_t DATA_SET = 16 + 1 + 1;  // SAMPLES + IGN_HIGH_SAMPLE + IGN_LOW_SAMPLE
     bool doTare;
     uint8_t tareTimes;
+    uint8_t tare_sample_target;
     bool tareStatus;
     bool tareTimeoutFlag;
     unsigned long tareTimeOut;
@@ -125,6 +126,9 @@ public:
     // Legacy wrapper methods for compatibility
     bool start_nonblocking_tare() { tareNoDelay(); return true; }
     bool is_tare_in_progress() const { return doTare; }
+
+    // Fast mode reduces the tare sample count for quicker grind starts
+    void set_fast_tare(bool enabled) { tare_sample_target = enabled ? GRIND_FAST_TARE_SAMPLE_COUNT : DATA_SET; }
     
     // Calibration
     void calibrate(float known_weight);

@@ -125,17 +125,17 @@ void WeightGrindStrategy::run_pulse_decision_phase(GrindController& controller,
     }
 
     float settled_weight;
-    if (!controller.weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS, &settled_weight)) {
+    if (!controller.weight_sensor->check_settling_complete(controller.get_settling_window_ms(), &settled_weight)) {
         return;
     }
 
-    float conservative_target = controller.target_weight - GRIND_ACCURACY_TOLERANCE_G;
+    float conservative_target = controller.target_weight - controller.tolerance;
     float error = conservative_target - settled_weight;
 
     // coast_time_ms removed - was only used for logging pulse history
 
-    if (controller.target_weight - settled_weight < GRIND_ACCURACY_TOLERANCE_G ||
-        controller.pulse_attempts >= GRIND_MAX_PULSE_ATTEMPTS) {
+    if (controller.target_weight - settled_weight < controller.tolerance ||
+        controller.pulse_attempts >= controller.get_max_pulse_attempts()) {
         controller.switch_phase(GrindPhase::FINAL_SETTLING, loop_data);
         return;
     }

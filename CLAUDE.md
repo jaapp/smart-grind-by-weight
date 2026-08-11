@@ -64,8 +64,9 @@ python3 tools/grinder.py analyze
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
 - **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu)
+- **Fast Mode**: Speed-over-accuracy toggle (default: disabled). Skips PRIME/PURGE phases, shortens tare (6 samples vs 18) and settling windows (200ms vs 500ms), widens tolerance to 0.15g, caps pulse corrections at 3. Constants in `grind_control.h` (`GRIND_FAST_*`)
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
-- **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
+- **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `fast_mode` (boolean), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 
 **Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, screensaver style radio (Wave/Cat/Flower), and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_preview()`). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int 0=Wave, 1=Cat, 2=Flower). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
 

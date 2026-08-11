@@ -35,6 +35,7 @@ void GrindController::init(WeightSensor* lc, Grinder* gr, Preferences* prefs) {
     mode = GrindMode::WEIGHT;
     grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(GRIND_PURGE_MODE_DEFAULT);
     grinder_purge_amount_g_for_session = GRIND_PURGE_AMOUNT_DEFAULT_G;
+    fast_mode_for_session = false;
     last_error_message[0] = '\0';
     last_session_result_ = GrindSessionResult::UNKNOWN;
     control_loop_paused_ = false;
@@ -125,12 +126,23 @@ void GrindController::start_grind(float target, uint32_t time_ms, GrindMode grin
     // Read grinder purge settings from preferences (always run for weight mode)
     grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(GRIND_PURGE_MODE_DEFAULT);
     grinder_purge_amount_g_for_session = GRIND_PURGE_AMOUNT_DEFAULT_G;
+    fast_mode_for_session = false;
     if (preferences) {
         int purge_mode_int = preferences->getInt(PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
         grinder_purge_mode_for_session = static_cast<GrinderPurgeMode>(purge_mode_int);
         float configured_amount = preferences->getFloat(PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
         configured_amount = std::clamp(configured_amount, GRIND_PURGE_AMOUNT_MIN_G, GRIND_PURGE_AMOUNT_MAX_G);
         grinder_purge_amount_g_for_session = configured_amount;
+        fast_mode_for_session = preferences->getBool(PREF_KEY_FAST_MODE, false);
+    }
+
+    tolerance = fast_mode_for_session ? GRIND_FAST_ACCURACY_TOLERANCE_G : GRIND_ACCURACY_TOLERANCE_G;
+    if (weight_sensor) {
+        weight_sensor->set_fast_tare(fast_mode_for_session);
+    }
+    if (fast_mode_for_session) {
+        LOG_BLE("[%lums CONTROLLER] Fast mode active: no purge, short tare/settling, max %d pulse(s)\n",
+                millis(), GRIND_FAST_MAX_PULSE_ATTEMPTS);
     }
 
     start_time = millis();
@@ -349,15 +361,18 @@ void GrindController::update() {
             // Check if tare is complete
             if (!weight_sensor->is_tare_in_progress()) {
                 // Double confirm weights are settled
-                if (weight_sensor->is_settled()) {
+                if (weight_sensor->is_settled(get_settling_window_ms())) {
                     if (!grinder->is_grinding()) {
                         grinder->start();  // Ensure motor is running
                     }
                     time_grind_start_ms = loop_data.now;
                     if (mode == GrindMode::TIME) {
                         switch_phase(GrindPhase::TIME_GRINDING, loop_data);
+                    } else if (fast_mode_for_session) {
+                        // Fast mode skips chute saturation and grinds directly
+                        switch_phase(GrindPhase::PREDICTIVE, loop_data);
                     } else {
-                        // Always run chute operation for weight mode
+                        // Chute operation saturates the grinder for accurate latency detection
                         switch_phase(GrindPhase::PRIME, loop_data);
                     }
                 }
@@ -464,7 +479,7 @@ void GrindController::update() {
 
         case GrindPhase::FINAL_SETTLING:
             // Wait for weight to settle with precision settling window
-            if (weight_sensor->check_settling_complete(GRIND_SCALE_PRECISION_SETTLING_TIME_MS)) {
+            if (weight_sensor->check_settling_complete(get_settling_window_ms())) {
                 final_measurement(loop_data);
             }
             break;
@@ -751,7 +766,7 @@ void GrindController::switch_phase(GrindPhase new_phase, const GrindLoopData& lo
         if (mode == GrindMode::WEIGHT) {
             if (error > tolerance) {
                 session_result = GrindSessionResult::OVERSHOOT;
-            } else if (pulse_attempts >= GRIND_MAX_PULSE_ATTEMPTS && fabsf(error) > tolerance) {
+            } else if (pulse_attempts >= get_max_pulse_attempts() && fabsf(error) > tolerance) {
                 session_result = GrindSessionResult::MAX_PULSES;
             }
         }

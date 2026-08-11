@@ -41,6 +41,7 @@ WeightSensor::WeightSensor() {
     // Initialize tare state
     doTare = false;
     tareTimes = 0;
+    tare_sample_target = DATA_SET;
     tareStatus = false;
     tareTimeoutFlag = false;
     tareTimeOut = 0;
@@ -721,7 +722,7 @@ bool WeightSensor::sample_and_feed_filter() {
             
             // Tare logic (hardware-independent)
             if (doTare) {
-                if (tareTimes < DATA_SET) {
+                if (tareTimes < tare_sample_target) {
                     tareTimes++;
                 } else {
                     // Use CircularBufferMath smoothed data instead of original smoothedData()
