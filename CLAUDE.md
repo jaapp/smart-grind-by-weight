@@ -38,7 +38,7 @@ python3 tools/grinder.py analyze
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
 - **UIManager**: LVGL screens with a 4-pane ready carousel (Weight / Time / Manual / Menu, horizontal swipe = mode selection); menu page surfaces quick Tools (Scale view, Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
 - **ManualGrindUIController**: Drives the Manual pane - runs the grinder directly via `Grinder::start()/stop()` (no GrindController session, no grind logging), shows elapsed time (tap to reset) and live weight (tap to tare), auto-tares on pane entry, stops and resets on swipe-away or any state change, 90s safety cap (`USER_MANUAL_GRIND_MAX_RUNTIME_MS`), updates lifetime motor runtime
-- **ScreensaverOverlay**: Full-screen idle overlay on `lv_layer_top()` with three styles - Wave (brown dot-matrix ripple via custom draw callback), Cat (12 embedded JPEG frames looping at 8fps), Flower (single embedded JPEG); media decodes into PSRAM while visible; any press dismisses and is swallowed; assets regenerated with `tools/generate_screensaver_assets.py`
+- **ScreensaverOverlay**: Full-screen idle overlay on `lv_layer_top()` rendering a brown dot-matrix ripple (Wave) via a custom draw callback; any press dismisses and is swallowed
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
 **Update Intervals:** 20ms grind control, 25ms load cell (active), 16ms UI/hardware (60Hz)
@@ -68,7 +68,7 @@ python3 tools/grinder.py analyze
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `fast_mode` (boolean), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 
-**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, screensaver style radio (Wave/Cat/Flower), and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_preview()`). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int 0=Wave, 1=Cat, 2=Flower). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
+**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_preview()`). Preferences namespace `screensaver`: `enabled` (bool, default true). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color

@@ -1,22 +1,15 @@
 #pragma once
 #include <lvgl.h>
-#include "../assets/screensaver_assets.h"
+#include "../../config/constants.h"
 
-enum class ScreensaverStyle {
-    WAVE = 0,
-    CAT = 1,
-    FLOWER = 2,
-};
-
-// Full-screen idle overlay. Wave renders an animated dot-matrix ripple with a
-// custom draw callback; Cat and Flower show embedded JPEG media decoded into
-// PSRAM while the overlay is visible. Any press dismisses the overlay and is
-// swallowed before it reaches the widgets underneath.
+// Full-screen idle overlay rendering an animated dot-matrix ripple with a
+// custom draw callback. Any press dismisses the overlay and is swallowed
+// before it reaches the widgets underneath.
 
 class ScreensaverOverlay {
 public:
     void create();
-    void show(ScreensaverStyle style);
+    void show();
     void hide();
     bool is_visible() const { return visible_; }
 
@@ -28,33 +21,20 @@ private:
     static constexpr int kDotRows = 27;
     static constexpr int kShadeCount = 16;
     static constexpr int kGridOriginX =
-        (SCREENSAVER_MEDIA_WIDTH_PX - (kDotCols - 1) * kDotSpacingPx) / 2;
+        (HW_DISPLAY_WIDTH_PX - (kDotCols - 1) * kDotSpacingPx) / 2;
     static constexpr int kGridOriginY =
-        (SCREENSAVER_MEDIA_HEIGHT_PX - (kDotRows - 1) * kDotSpacingPx) / 2;
+        (HW_DISPLAY_HEIGHT_PX - (kDotRows - 1) * kDotSpacingPx) / 2;
 
     static void draw_cb(lv_event_t* e);
     static void pressed_cb(lv_event_t* e);
     static void tick_cb(lv_timer_t* timer);
 
     void draw_wave(lv_layer_t* layer);
-    void show_frame(int index);
-    bool decode_media(ScreensaverStyle style);
-    bool decode_jpeg(const uint8_t* data, uint32_t len, uint16_t* pixels);
-    void free_media();
 
     lv_obj_t* overlay_ = nullptr;
-    lv_obj_t* image_ = nullptr;
     lv_timer_t* timer_ = nullptr;
-    ScreensaverStyle style_ = ScreensaverStyle::WAVE;
     bool visible_ = false;
     float phase_ = 0.0f;
     uint16_t dot_distance_px_[kDotCols * kDotRows];
     lv_color_t shade_lut_[kShadeCount];
-    // The image widget always points at display_dsc_; frames are copied into
-    // its permanently allocated buffer so the widget never holds a stale pointer
-    uint16_t* display_pixels_ = nullptr;
-    lv_image_dsc_t display_dsc_ = {};
-    uint16_t* frame_pixels_[SCREENSAVER_CAT_FRAME_COUNT] = {};
-    int frame_count_ = 0;
-    int current_frame_ = 0;
 };

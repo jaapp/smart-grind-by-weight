@@ -54,7 +54,6 @@ private:
     lv_obj_t* brightness_normal_label;
     lv_obj_t* brightness_screensaver_label;
     lv_obj_t* screensaver_toggle;
-    lv_obj_t* screensaver_style_radio_group;
     lv_obj_t* screensaver_preview_button;
     lv_obj_t* purge_button;
     lv_obj_t* reset_button;
@@ -136,7 +135,6 @@ public:
     lv_obj_t* get_brightness_normal_slider() const { return brightness_normal_slider; }
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
     lv_obj_t* get_screensaver_toggle() const { return screensaver_toggle; }
-    lv_obj_t* get_screensaver_style_radio_group() const { return screensaver_style_radio_group; }
     lv_obj_t* get_grind_fast_mode_toggle() const { return grind_fast_mode_toggle; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }

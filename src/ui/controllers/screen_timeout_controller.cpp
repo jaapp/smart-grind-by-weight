@@ -23,16 +23,14 @@ void ScreenTimeoutController::start_screensaver_preview() {
     }
 
     float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;
-    ScreensaverStyle style = ScreensaverStyle::WAVE;
     if (ui_manager_->menu_controller_) {
         dimmed = ui_manager_->menu_controller_->get_screensaver_brightness();
-        style = ui_manager_->menu_controller_->get_screensaver_style();
     }
 
     display->set_brightness(dimmed);
     screen_dimmed_ = true;
     preview_active_ = true;
-    screensaver_->show(style);
+    screensaver_->show();
 }
 
 void ScreenTimeoutController::update() {
@@ -110,7 +108,7 @@ void ScreenTimeoutController::update() {
 
         if (screensaver_ && !ota_active && ui_manager_->menu_controller_ &&
             ui_manager_->menu_controller_->get_screensaver_enabled()) {
-            screensaver_->show(ui_manager_->menu_controller_->get_screensaver_style());
+            screensaver_->show();
         }
     } else if (!should_dim && screen_dimmed_) {
         float normal = USER_SCREEN_BRIGHTNESS_NORMAL;

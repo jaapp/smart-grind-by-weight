@@ -46,7 +46,6 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grinder_purge_amount_slider = nullptr;
     grinder_purge_amount_label = nullptr;
     screensaver_toggle = nullptr;
-    screensaver_style_radio_group = nullptr;
     screensaver_preview_button = nullptr;
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
@@ -297,11 +296,6 @@ void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
     }
 }
 
-// Callback for screensaver style radio button selection
-static void screensaver_style_callback(int selected_index, void* user_data) {
-    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SCREENSAVER_STYLE_RADIO_BUTTON, nullptr);
-}
-
 void MenuScreen::create_display_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
@@ -316,18 +310,6 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
     create_separator(parent, "Screensaver");
     create_description_label(parent, "Show an animation instead of only dimming when the screen is idle.");
     create_toggle_row(parent, "Enabled", &screensaver_toggle);
-
-    const char* screensaver_styles[] = {"Wave", "Cat", "Flower"};
-    screensaver_style_radio_group = create_radio_button_group(
-        parent,
-        screensaver_styles,
-        3,
-        LV_FLEX_FLOW_ROW,
-        0,  // Wave initially selected
-        -1, 80,  // Auto width, Height
-        screensaver_style_callback,
-        this
-    );
 
     screensaver_preview_button = create_button(parent, "Preview");
     lv_obj_set_style_margin_bottom(screensaver_preview_button, 10, 0);
@@ -898,7 +880,6 @@ void MenuScreen::update_screensaver_controls() {
     Preferences prefs;
     prefs.begin("screensaver", true); // read-only
     bool enabled = prefs.getBool("enabled", true);
-    int style = prefs.getInt("style", 0);
     prefs.end();
 
     if (screensaver_toggle) {
@@ -907,10 +888,6 @@ void MenuScreen::update_screensaver_controls() {
         } else {
             lv_obj_clear_state(screensaver_toggle, LV_STATE_CHECKED);
         }
-    }
-
-    if (screensaver_style_radio_group && style >= 0 && style <= 2) {
-        radio_button_group_set_selection(screensaver_style_radio_group, style);
     }
 }
 

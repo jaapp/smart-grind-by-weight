@@ -361,9 +361,9 @@ Need a simple live readout? Open **Menu → Scale** to jump into a full-screen w
 ### Screensaver
 After 5 minutes without touch or scale activity, the screen dims and an animated screensaver appears. Configure it in **Menu → Display**:
 - **Enabled toggle**: when off, the screen only dims like before
-- **Style**: **Wave** (a brown dot-matrix ripple expanding from the center), **Cat** (a looping video clip), or **Flower** (a still image)
-- **Preview**: starts the selected screensaver immediately; touch to dismiss
-- The screensaver brightness slider controls how dim the screen gets while it plays (it applies to all styles)
+- **Style**: a brown dot-matrix ripple expanding from the center of the screen
+- **Preview**: starts the screensaver immediately; touch to dismiss
+- The screensaver brightness slider controls how dim the screen gets while it plays
 
 Touching the screen wakes it instantly (the touch is swallowed, so nothing underneath gets pressed), and placing a cup or portafilter on the scale wakes it too. The screensaver never appears while grinding, during a manual run, or during an OTA update.
 
@@ -407,7 +407,6 @@ Main Screen (swipe left/right between mode panes)
     |   |   |-- Normal brightness slider
     |   |   |-- Screensaver brightness slider
     |   |   |-- Screensaver enabled toggle
-    |   |   |-- Screensaver style (Wave / Cat / Flower)
     |   |   \-- Screensaver preview button
     |   |
     |   \-- Grind Settings
