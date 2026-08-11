@@ -2,10 +2,11 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+// Mirrors the tab constants in ReadyScreen
 namespace {
-constexpr int kTabWeight = 0;
+constexpr int kTabManual = 0;
 constexpr int kTabTime = 1;
-constexpr int kTabManual = 2;
+constexpr int kTabWeight = 2;
 }
 
 void ProfileController::init(Preferences* prefs) {
@@ -72,12 +73,15 @@ void ProfileController::load_targets() {
     int stored_mode = preferences->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
     current_grind_mode = static_cast<GrindMode>(stored_mode);
 
-    active_tab = preferences->getInt("active_tab", static_cast<int>(current_grind_mode));
-    if (active_tab < kTabWeight || active_tab > kTabManual) {
+    int default_tab = (current_grind_mode == GrindMode::TIME) ? kTabTime : kTabWeight;
+    active_tab = preferences->getInt("active_tab", default_tab);
+    if (active_tab < kTabManual || active_tab > kTabWeight) {
         active_tab = kTabWeight;
     }
-    if (active_tab <= kTabTime) {
-        current_grind_mode = static_cast<GrindMode>(active_tab);
+    if (active_tab == kTabTime) {
+        current_grind_mode = GrindMode::TIME;
+    } else if (active_tab == kTabWeight) {
+        current_grind_mode = GrindMode::WEIGHT;
     }
 }
 
@@ -100,7 +104,7 @@ void ProfileController::update_current_time(float seconds) {
 
 void ProfileController::set_active_tab(int tab) {
     // The menu tab is transient; the device never boots into it.
-    if (tab < kTabWeight || tab > kTabManual || tab == active_tab) {
+    if (tab < kTabManual || tab > kTabWeight || tab == active_tab) {
         return;
     }
     active_tab = tab;

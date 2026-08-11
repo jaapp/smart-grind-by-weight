@@ -15,9 +15,11 @@ public:
 
     void register_events();
     void update();
+    void start_screensaver_preview();
 
 private:
     UIManager* ui_manager_;
     bool screen_dimmed_;
+    bool preview_active_ = false;
     std::unique_ptr<ScreensaverOverlay> screensaver_;
 };

@@ -55,6 +55,7 @@ private:
     lv_obj_t* brightness_screensaver_label;
     lv_obj_t* screensaver_toggle;
     lv_obj_t* screensaver_style_radio_group;
+    lv_obj_t* screensaver_preview_button;
     lv_obj_t* purge_button;
     lv_obj_t* reset_button;
     

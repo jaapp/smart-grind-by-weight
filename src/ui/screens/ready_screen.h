@@ -5,9 +5,10 @@
 
 class ReadyScreen {
 public:
-    static constexpr int TAB_WEIGHT = 0;  // == (int)GrindMode::WEIGHT
-    static constexpr int TAB_TIME = 1;    // == (int)GrindMode::TIME
-    static constexpr int TAB_MANUAL = 2;
+    // Mirrored by the tab constants in ProfileController
+    static constexpr int TAB_MANUAL = 0;
+    static constexpr int TAB_TIME = 1;
+    static constexpr int TAB_WEIGHT = 2;
     static constexpr int TAB_MENU = 3;
 
     void create();

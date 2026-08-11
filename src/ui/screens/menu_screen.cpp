@@ -46,6 +46,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grinder_purge_amount_label = nullptr;
     screensaver_toggle = nullptr;
     screensaver_style_radio_group = nullptr;
+    screensaver_preview_button = nullptr;
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -327,11 +328,18 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
         this
     );
 
+    screensaver_preview_button = create_button(parent, "Preview");
+    lv_obj_set_style_margin_bottom(screensaver_preview_button, 10, 0);
+
     // Register events for the sliders (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
     if (screensaver_toggle) {
         lv_obj_add_event_cb(screensaver_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_TOGGLE)));
+    }
+    if (screensaver_preview_button) {
+        lv_obj_add_event_cb(screensaver_preview_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_PREVIEW)));
     }
     if (brightness_normal_slider) {
         lv_obj_add_event_cb(brightness_normal_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,

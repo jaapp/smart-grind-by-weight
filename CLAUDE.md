@@ -60,14 +60,14 @@ python3 tools/grinder.py analyze
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
 
-**Mode Carousel:** The ready screen's horizontal swipe selects the mode (Weight=0, Time=1, Manual=2, Menu=3). Weight and Time each keep a single target (long-press to edit). The active pane persists across reboots (`active_tab`, Menu never persisted). Legacy per-profile preferences (`profile`, `weight0..2`, `time0..2`) migrate to `target_w`/`target_s` on first boot.
+**Mode Carousel:** The ready screen's horizontal swipe selects the mode (Manual=0, Time=1, Weight=2, Menu=3; Weight is the default pane). Weight and Time each keep a single target (long-press to edit). The active pane persists across reboots (`active_tab`, Menu never persisted). Legacy per-profile preferences (`profile`, `weight0..2`, `time0..2`) migrate to `target_w`/`target_s` on first boot.
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
 - **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu)
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 
-**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, and screensaver style radio (Wave/Cat/Flower). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int 0=Wave, 1=Cat, 2=Flower). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
+**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, screensaver style radio (Wave/Cat/Flower), and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_preview()`). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int 0=Wave, 1=Cat, 2=Flower). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color

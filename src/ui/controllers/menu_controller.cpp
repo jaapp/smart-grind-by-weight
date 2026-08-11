@@ -59,6 +59,7 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_TOGGLE, [this](lv_event_t*) { handle_screensaver_toggle(); });
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_STYLE_RADIO_BUTTON, [this](lv_event_t*) { handle_screensaver_style_radio_button(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_PREVIEW, [this](lv_event_t*) { handle_screensaver_preview(); });
 
     // Note: Event registration for menu widgets is done in the page creation functions
     // (menu_screen.cpp) because the menu is created lazily and destroyed on hide.
@@ -551,6 +552,11 @@ void MenuUIController::handle_screensaver_style_radio_button() {
     prefs.end();
 
     LOG_DEBUG_PRINTF("Screensaver style set to %d\n", selected_index);
+}
+
+void MenuUIController::handle_screensaver_preview() {
+    if (!ui_manager_ || !ui_manager_->screen_timeout_controller_) return;
+    ui_manager_->screen_timeout_controller_->start_screensaver_preview();
 }
 
 void MenuUIController::perform_factory_reset() {

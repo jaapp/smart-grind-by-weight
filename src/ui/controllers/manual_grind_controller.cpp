@@ -164,7 +164,7 @@ void ManualGrindUIController::refresh_readouts(bool force) {
         return;
     }
     if (sensor->is_tare_in_progress()) {
-        ui_manager_->ready_screen.update_manual_weight_text("--");
+        ui_manager_->ready_screen.update_manual_weight_text("TARE");
     } else {
         ui_manager_->ready_screen.update_manual_weight(sensor->get_display_weight());
     }

@@ -13,6 +13,28 @@ void ScreenTimeoutController::register_events() {
     screensaver_->create();
 }
 
+void ScreenTimeoutController::start_screensaver_preview() {
+    if (!screensaver_ || !ui_manager_ || !ui_manager_->hardware_manager) {
+        return;
+    }
+    auto* display = ui_manager_->hardware_manager->get_display();
+    if (!display) {
+        return;
+    }
+
+    float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;
+    ScreensaverStyle style = ScreensaverStyle::WAVE;
+    if (ui_manager_->menu_controller_) {
+        dimmed = ui_manager_->menu_controller_->get_screensaver_brightness();
+        style = ui_manager_->menu_controller_->get_screensaver_style();
+    }
+
+    display->set_brightness(dimmed);
+    screen_dimmed_ = true;
+    preview_active_ = true;
+    screensaver_->show(style);
+}
+
 void ScreenTimeoutController::update() {
     if (!ui_manager_) {
         return;
@@ -59,6 +81,14 @@ void ScreenTimeoutController::update() {
 
     if (screensaver_ && screensaver_->is_visible() && (motor_running || ota_active)) {
         screensaver_->hide();
+    }
+
+    // A preview holds the overlay regardless of idle state until a touch dismisses it
+    if (preview_active_) {
+        if (screensaver_ && screensaver_->is_visible()) {
+            return;
+        }
+        preview_active_ = false;
     }
 
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();

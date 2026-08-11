@@ -296,10 +296,10 @@ Access via **Menu → Diagnostics → Noise Floor**.
 ## 📱 Usage Guide
 
 ### Grind Modes
-The main screen is a swipe carousel with one pane per mode:
-- **Weight** (default): grinds to a target weight (default 18 g)
-- **Time**: grinds for a target duration (default 10 s)
+The main screen is a swipe carousel with one pane per mode, ordered left to right:
 - **Manual**: free-running motor with live elapsed time and weight readouts
+- **Time**: grinds for a target duration (default 10 s)
+- **Weight** (default): grinds to a target weight (default 18 g)
 - **Menu**: entry point to settings and tools
 
 Each mode keeps a single target. The pane you leave active is restored after a reboot.
@@ -307,7 +307,7 @@ Each mode keeps a single target. The pane you leave active is restored after a r
 > 💡 **Tip** – the target label always shows the active unit (`g` or `s`). Long-press to edit it.
 
 ### Navigation
-- **Swipe left/right** to move between the Weight, Time, Manual, and Menu panes
+- **Swipe left/right** to move between the Manual, Time, Weight, and Menu panes
 - **Tap** buttons and readouts
 - **Long press** on the Weight/Time target to edit it
 
@@ -361,7 +361,8 @@ Need a simple live readout? Open **Menu → Scale** to jump into a full-screen w
 After 5 minutes without touch or scale activity, the screen dims and an animated screensaver appears. Configure it in **Menu → Display**:
 - **Enabled toggle**: when off, the screen only dims like before
 - **Style**: **Wave** (a brown dot-matrix ripple expanding from the center), **Cat** (a looping video clip), or **Flower** (a still image)
-- The screensaver brightness slider controls how dim the screen gets while it plays
+- **Preview**: starts the selected screensaver immediately; touch to dismiss
+- The screensaver brightness slider controls how dim the screen gets while it plays (it applies to all styles)
 
 Touching the screen wakes it instantly (the touch is swallowed, so nothing underneath gets pressed), and placing a cup or portafilter on the scale wakes it too. The screensaver never appears while grinding, during a manual run, or during an OTA update.
 
@@ -372,19 +373,19 @@ Touching the screen wakes it instantly (the touch is swallowed, so nothing under
 ```
 Main Screen (swipe left/right between mode panes)
 |
-+-- Weight
-|   |-- Target weight (long press to edit)
-|   \-- GRIND button (red)
++-- Manual
+|   |-- Elapsed time (tap to reset)
+|   |-- Live weight (tap to tare)
+|   \-- START/STOP button (orange, 90 s safety cap)
 |
 +-- Time
 |   |-- Target time (long press to edit)
 |   |-- GRIND button (blue)
 |   \-- Time mode completion: OK + PULSE buttons
 |
-+-- Manual
-|   |-- Elapsed time (tap to reset)
-|   |-- Live weight (tap to tare)
-|   \-- START/STOP button (orange, 90 s safety cap)
++-- Weight
+|   |-- Target weight (long press to edit)
+|   \-- GRIND button (red)
 |
 \-- Menu (scrollable hub)
     |
@@ -405,7 +406,8 @@ Main Screen (swipe left/right between mode panes)
     |   |   |-- Normal brightness slider
     |   |   |-- Screensaver brightness slider
     |   |   |-- Screensaver enabled toggle
-    |   |   \-- Screensaver style (Wave / Cat / Flower)
+    |   |   |-- Screensaver style (Wave / Cat / Flower)
+    |   |   \-- Screensaver preview button
     |   |
     |   \-- Grind Settings
     |       |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)

@@ -25,15 +25,15 @@ void ReadyScreen::create() {
     lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
 
     // Add mode tabs
-    mode_tabs[TAB_WEIGHT] = lv_tabview_add_tab(tabview, "Weight");
-    mode_tabs[TAB_TIME] = lv_tabview_add_tab(tabview, "Time");
     mode_tabs[TAB_MANUAL] = lv_tabview_add_tab(tabview, "Manual");
+    mode_tabs[TAB_TIME] = lv_tabview_add_tab(tabview, "Time");
+    mode_tabs[TAB_WEIGHT] = lv_tabview_add_tab(tabview, "Weight");
     menu_tab = lv_tabview_add_tab(tabview, "MENU");
     mode_tabs[TAB_MENU] = menu_tab;
 
-    create_target_page(mode_tabs[TAB_WEIGHT], GrindMode::WEIGHT);
-    create_target_page(mode_tabs[TAB_TIME], GrindMode::TIME);
     create_manual_page(mode_tabs[TAB_MANUAL]);
+    create_target_page(mode_tabs[TAB_TIME], GrindMode::TIME);
+    create_target_page(mode_tabs[TAB_WEIGHT], GrindMode::WEIGHT);
     create_menu_page(menu_tab);
 
     visible = false;
@@ -112,13 +112,15 @@ void ReadyScreen::hide() {
 
 void ReadyScreen::update_target_values(float weight_g, float time_s) {
     char text[24];
-    if (target_labels[TAB_WEIGHT]) {
+    lv_obj_t* weight_label = target_labels[static_cast<int>(GrindMode::WEIGHT)];
+    if (weight_label) {
         format_ready_value(text, sizeof(text), GrindMode::WEIGHT, weight_g);
-        lv_label_set_text(target_labels[TAB_WEIGHT], text);
+        lv_label_set_text(weight_label, text);
     }
-    if (target_labels[TAB_TIME]) {
+    lv_obj_t* time_label = target_labels[static_cast<int>(GrindMode::TIME)];
+    if (time_label) {
         format_ready_value(text, sizeof(text), GrindMode::TIME, time_s);
-        lv_label_set_text(target_labels[TAB_TIME], text);
+        lv_label_set_text(time_label, text);
     }
 }
 

@@ -333,9 +333,7 @@ void GrindingUIController::update_grind_button_icon() {
         bool manual_running = ui_manager_->manual_grind_controller_ &&
                               ui_manager_->manual_grind_controller_->is_running();
         lv_img_set_src(grind_icon_, manual_running ? LV_SYMBOL_STOP : LV_SYMBOL_PLAY);
-        lv_obj_set_style_bg_color(grind_button_,
-                                  lv_color_hex(manual_running ? THEME_COLOR_ERROR : THEME_COLOR_WARNING),
-                                  0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_WARNING), 0);
     } else {
         lv_img_set_src(grind_icon_, LV_SYMBOL_PLAY);
         lv_obj_set_style_bg_color(grind_button_,

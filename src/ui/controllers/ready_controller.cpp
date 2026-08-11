@@ -36,8 +36,8 @@ void ReadyUIController::handle_tab_change(int tab) {
         }
     }
 
-    if (tab <= ReadyScreen::TAB_TIME) {
-        ui_manager_->current_mode = static_cast<GrindMode>(tab);
+    if (tab == ReadyScreen::TAB_WEIGHT || tab == ReadyScreen::TAB_TIME) {
+        ui_manager_->current_mode = (tab == ReadyScreen::TAB_TIME) ? GrindMode::TIME : GrindMode::WEIGHT;
         if (ui_manager_->profile_controller) {
             ui_manager_->profile_controller->set_grind_mode(ui_manager_->current_mode);
         }
@@ -60,7 +60,8 @@ void ReadyUIController::handle_target_long_press() {
     }
 
     if (!ui_manager_->state_machine->is_state(UIState::READY) ||
-        ui_manager_->current_tab > ReadyScreen::TAB_TIME) {
+        (ui_manager_->current_tab != ReadyScreen::TAB_WEIGHT &&
+         ui_manager_->current_tab != ReadyScreen::TAB_TIME)) {
         return;
     }
 

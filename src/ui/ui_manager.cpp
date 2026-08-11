@@ -401,7 +401,8 @@ void UIManager::update_auto_actions() {
     const uint32_t now = millis();
     const bool grinder_active = (grind_controller && grind_controller->is_active()) ||
                                 (manual_grind_controller_ && manual_grind_controller_->is_running());
-    const bool on_ready_tab = state_machine->is_state(UIState::READY) && current_tab <= ReadyScreen::TAB_TIME;
+    const bool on_ready_tab = state_machine->is_state(UIState::READY) &&
+                              (current_tab == ReadyScreen::TAB_WEIGHT || current_tab == ReadyScreen::TAB_TIME);
 
     if (auto_actions_.auto_start_enabled && on_ready_tab && !grinder_active && grinding_controller_) {
         auto* filter = sensor->get_raw_filter();
