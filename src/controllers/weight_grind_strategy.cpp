@@ -129,8 +129,12 @@ void WeightGrindStrategy::run_pulse_decision_phase(GrindController& controller,
         return;
     }
 
-    float conservative_target = controller.target_weight - controller.tolerance;
-    float error = conservative_target - settled_weight;
+    // Normal mode aims at the low edge of the tolerance band so a long pulse
+    // cannot overshoot; fast mode aims at the target itself and accepts the risk
+    float pulse_target = controller.is_fast_mode()
+                             ? controller.target_weight
+                             : controller.target_weight - controller.tolerance;
+    float error = pulse_target - settled_weight;
 
     // coast_time_ms removed - was only used for logging pulse history
 
