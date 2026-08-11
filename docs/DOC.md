@@ -326,7 +326,7 @@ Swipe to the **Manual** pane for direct motor control:
 Access **Menu → Grind Settings** to configure:
 - **Start on Cup**: Start the active mode automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
 - **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
-- **Fast Mode**: Trade accuracy for speed. Skips the purge/prime phase entirely, shortens the tare (6 samples instead of 18) and settling windows (200ms instead of 500ms), widens the target tolerance to ±0.15g, and allows at most 3 pulse corrections (instead of 10). Expect grinds to finish several seconds sooner, with more shot-to-shot variance and a higher chance of uncorrectable overshoot (default: disabled)
+- **Fast Mode**: Trade accuracy for speed. Skips the purge/prime phase entirely, shortens the tare (6 samples instead of 18) and settling windows (200ms instead of 500ms), widens the target tolerance to 0.1g (grinds are accepted up to 0.1g under target), and allows at most 3 pulse corrections (instead of 10). Expect grinds to finish several seconds sooner, with more shot-to-shot variance and a higher chance of uncorrectable overshoot (default: disabled)
 - **Purging** *(Advanced)*: Control how the grinder saturates itself before weight-mode grinding
   - **Prime mode**: Keeps the coffee used to saturate the grinder, continues immediately
   - **Purge mode** (default): Prompts you to discard stale grinds before continuing

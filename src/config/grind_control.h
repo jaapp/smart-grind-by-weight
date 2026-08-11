@@ -31,7 +31,7 @@ enum class GrinderPurgeMode {
 // Trades accuracy for speed: skips the purge/prime phase, shortens taring and
 // settling windows, widens the target tolerance, and limits pulse corrections.
 // Overshoot becomes more likely and cannot be corrected.
-#define GRIND_FAST_ACCURACY_TOLERANCE_G 0.15f                              // Relaxed target tolerance in fast mode
+#define GRIND_FAST_ACCURACY_TOLERANCE_G 0.10f                              // Relaxed target tolerance in fast mode
 #define GRIND_FAST_MAX_PULSE_ATTEMPTS 3                                    // Pulse correction cap in fast mode (vs 10 default)
 #define GRIND_FAST_SETTLING_TIME_MS 200                                    // Shortened settling window in fast mode
 #define GRIND_FAST_TARE_SAMPLE_COUNT 6                                     // Tare samples in fast mode (vs 18 default)
