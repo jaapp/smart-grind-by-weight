@@ -12,6 +12,7 @@ private:
     lv_obj_t* progress_arc;
     bool visible;
     bool time_mode;
+    bool tare_pulse_active;
 
 public:
     void create() override;

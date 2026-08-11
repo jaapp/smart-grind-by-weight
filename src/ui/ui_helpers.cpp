@@ -1,4 +1,5 @@
 #include "ui_helpers.h"
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -30,6 +31,13 @@ lv_obj_t* create_button(lv_obj_t* parent, const char* text, lv_color_t bg_color,
     lv_obj_center(label);
     
     return button;  
+}
+
+lv_color_t tare_pulse_color(uint32_t now_ms) {
+    float s = 0.5f + 0.5f * sinf(now_ms * (6.2831853f / 1000.0f));
+    return lv_color_mix(lv_color_hex(THEME_COLOR_TEXT_PRIMARY),
+                        lv_color_hex(THEME_COLOR_NEUTRAL),
+                        static_cast<uint8_t>(s * 255.0f));
 }
 
 void set_label_text_int(lv_obj_t* label, int32_t value, const char* unit) {
