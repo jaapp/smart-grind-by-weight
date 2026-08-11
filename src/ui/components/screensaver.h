@@ -32,18 +32,14 @@ private:
     static constexpr int kGridOriginY =
         (SCREENSAVER_MEDIA_HEIGHT_PX - (kDotRows - 1) * kDotSpacingPx) / 2;
 
-    struct DecodedFrame {
-        void* buffer = nullptr;
-        lv_image_dsc_t dsc = {};
-    };
-
     static void draw_cb(lv_event_t* e);
     static void pressed_cb(lv_event_t* e);
     static void tick_cb(lv_timer_t* timer);
 
     void draw_wave(lv_layer_t* layer);
+    void show_frame(int index);
     bool decode_media(ScreensaverStyle style);
-    bool decode_jpeg(const uint8_t* data, uint32_t len, DecodedFrame& frame);
+    bool decode_jpeg(const uint8_t* data, uint32_t len, uint16_t* pixels);
     void free_media();
 
     lv_obj_t* overlay_ = nullptr;
@@ -54,7 +50,11 @@ private:
     float phase_ = 0.0f;
     uint16_t dot_distance_px_[kDotCols * kDotRows];
     lv_color_t shade_lut_[kShadeCount];
-    DecodedFrame frames_[SCREENSAVER_CAT_FRAME_COUNT];
+    // The image widget always points at display_dsc_; frames are copied into
+    // its permanently allocated buffer so the widget never holds a stale pointer
+    uint16_t* display_pixels_ = nullptr;
+    lv_image_dsc_t display_dsc_ = {};
+    uint16_t* frame_pixels_[SCREENSAVER_CAT_FRAME_COUNT] = {};
     int frame_count_ = 0;
     int current_frame_ = 0;
 };

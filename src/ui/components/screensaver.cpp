@@ -41,13 +41,14 @@ size_t jpeg_input_cb(JDEC* jd, uint8_t* buffer, size_t length) {
 
 int jpeg_output_cb(JDEC* jd, void* bitmap, JRECT* rect) {
     auto* ctx = static_cast<JpegDecodeContext*>(jd->device);
-    const uint8_t* rgb = static_cast<const uint8_t*>(bitmap);
+    // LVGL's bundled TJpgDec emits B,G,R byte order (see mcu_output in tjpgd.c)
+    const uint8_t* bgr = static_cast<const uint8_t*>(bitmap);
     for (int y = rect->top; y <= rect->bottom; y++) {
         uint16_t* row = ctx->pixels + y * ctx->width + rect->left;
         for (int x = rect->left; x <= rect->right; x++) {
-            uint16_t r = *rgb++;
-            uint16_t g = *rgb++;
-            uint16_t b = *rgb++;
+            uint16_t b = *bgr++;
+            uint16_t g = *bgr++;
+            uint16_t r = *bgr++;
             *row++ = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
         }
     }
@@ -116,8 +117,8 @@ void ScreensaverOverlay::show(ScreensaverStyle style) {
     if (style_ == ScreensaverStyle::WAVE) {
         lv_obj_add_flag(image_, LV_OBJ_FLAG_HIDDEN);
     } else {
-        current_frame_ = 0;
-        lv_image_set_src(image_, &frames_[0].dsc);
+        show_frame(0);
+        lv_image_set_src(image_, &display_dsc_);
         lv_obj_clear_flag(image_, LV_OBJ_FLAG_HIDDEN);
     }
 
@@ -144,7 +145,7 @@ void ScreensaverOverlay::hide() {
         timer_ = nullptr;
     }
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
-    lv_image_set_src(image_, nullptr);
+    lv_obj_add_flag(image_, LV_OBJ_FLAG_HIDDEN);
     free_media();
 }
 
@@ -176,9 +177,17 @@ void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
         }
         lv_obj_invalidate(self->overlay_);
     } else if (self->style_ == ScreensaverStyle::CAT && self->frame_count_ > 0) {
-        self->current_frame_ = (self->current_frame_ + 1) % self->frame_count_;
-        lv_image_set_src(self->image_, &self->frames_[self->current_frame_].dsc);
+        self->show_frame((self->current_frame_ + 1) % self->frame_count_);
     }
+}
+
+void ScreensaverOverlay::show_frame(int index) {
+    if (!display_pixels_ || !frame_pixels_[index]) {
+        return;
+    }
+    current_frame_ = index;
+    memcpy(display_pixels_, frame_pixels_[index], display_dsc_.data_size);
+    lv_obj_invalidate(image_);
 }
 
 void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
@@ -216,16 +225,37 @@ void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
 bool ScreensaverOverlay::decode_media(ScreensaverStyle style) {
     free_media();
 
-    if (style == ScreensaverStyle::FLOWER) {
-        if (!decode_jpeg(screensaver_flower_jpg, screensaver_flower_jpg_len, frames_[0])) {
+    constexpr uint32_t kFrameBytes =
+        SCREENSAVER_MEDIA_WIDTH_PX * SCREENSAVER_MEDIA_HEIGHT_PX * 2;
+
+    // The display buffer outlives the media so the image widget's source
+    // stays valid even while hidden
+    if (!display_pixels_) {
+        display_pixels_ = static_cast<uint16_t*>(heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM));
+        if (!display_pixels_) {
             return false;
         }
-        frame_count_ = 1;
-        return true;
+        lv_memzero(&display_dsc_, sizeof(display_dsc_));
+        display_dsc_.header.magic = LV_IMAGE_HEADER_MAGIC;
+        display_dsc_.header.cf = LV_COLOR_FORMAT_RGB565;
+        display_dsc_.header.w = SCREENSAVER_MEDIA_WIDTH_PX;
+        display_dsc_.header.h = SCREENSAVER_MEDIA_HEIGHT_PX;
+        display_dsc_.header.stride = SCREENSAVER_MEDIA_WIDTH_PX * 2;
+        display_dsc_.data = reinterpret_cast<const uint8_t*>(display_pixels_);
+        display_dsc_.data_size = kFrameBytes;
     }
 
-    for (int i = 0; i < SCREENSAVER_CAT_FRAME_COUNT; i++) {
-        if (!decode_jpeg(screensaver_cat_frames[i], screensaver_cat_frame_lens[i], frames_[i])) {
+    int frames_needed = (style == ScreensaverStyle::FLOWER) ? 1 : SCREENSAVER_CAT_FRAME_COUNT;
+    for (int i = 0; i < frames_needed; i++) {
+        frame_pixels_[i] = static_cast<uint16_t*>(heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM));
+        if (!frame_pixels_[i]) {
+            return false;
+        }
+        const uint8_t* data = (style == ScreensaverStyle::FLOWER) ? screensaver_flower_jpg
+                                                                  : screensaver_cat_frames[i];
+        uint32_t len = (style == ScreensaverStyle::FLOWER) ? screensaver_flower_jpg_len
+                                                           : screensaver_cat_frame_lens[i];
+        if (!decode_jpeg(data, len, frame_pixels_[i])) {
             return false;
         }
         frame_count_ = i + 1;
@@ -233,55 +263,31 @@ bool ScreensaverOverlay::decode_media(ScreensaverStyle style) {
     return true;
 }
 
-bool ScreensaverOverlay::decode_jpeg(const uint8_t* data, uint32_t len, DecodedFrame& frame) {
+bool ScreensaverOverlay::decode_jpeg(const uint8_t* data, uint32_t len, uint16_t* pixels) {
     void* work_buffer = heap_caps_malloc(kJpegWorkBufferSize, MALLOC_CAP_INTERNAL);
     if (!work_buffer) {
         return false;
     }
 
-    JpegDecodeContext ctx = {data, len, 0, nullptr, 0};
+    JpegDecodeContext ctx = {data, len, 0, pixels, SCREENSAVER_MEDIA_WIDTH_PX};
     JDEC jd;
-    if (jd_prepare(&jd, jpeg_input_cb, work_buffer, kJpegWorkBufferSize, &ctx) != JDR_OK ||
-        jd.width != SCREENSAVER_MEDIA_WIDTH_PX || jd.height != SCREENSAVER_MEDIA_HEIGHT_PX) {
-        heap_caps_free(work_buffer);
-        return false;
+    JRESULT result = jd_prepare(&jd, jpeg_input_cb, work_buffer, kJpegWorkBufferSize, &ctx);
+    if (result == JDR_OK &&
+        jd.width == SCREENSAVER_MEDIA_WIDTH_PX && jd.height == SCREENSAVER_MEDIA_HEIGHT_PX) {
+        result = jd_decomp(&jd, jpeg_output_cb, 0);
+    } else if (result == JDR_OK) {
+        result = JDR_FMT1;
     }
-
-    uint32_t pixel_bytes = static_cast<uint32_t>(jd.width) * jd.height * 2;
-    frame.buffer = heap_caps_malloc(pixel_bytes, MALLOC_CAP_SPIRAM);
-    if (!frame.buffer) {
-        heap_caps_free(work_buffer);
-        return false;
-    }
-
-    ctx.pixels = static_cast<uint16_t*>(frame.buffer);
-    ctx.width = jd.width;
-    JRESULT result = jd_decomp(&jd, jpeg_output_cb, 0);
     heap_caps_free(work_buffer);
-    if (result != JDR_OK) {
-        heap_caps_free(frame.buffer);
-        frame.buffer = nullptr;
-        return false;
-    }
-
-    lv_memzero(&frame.dsc, sizeof(frame.dsc));
-    frame.dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    frame.dsc.header.cf = LV_COLOR_FORMAT_RGB565;
-    frame.dsc.header.w = jd.width;
-    frame.dsc.header.h = jd.height;
-    frame.dsc.header.stride = jd.width * 2;
-    frame.dsc.data = static_cast<const uint8_t*>(frame.buffer);
-    frame.dsc.data_size = pixel_bytes;
-    return true;
+    return result == JDR_OK;
 }
 
 void ScreensaverOverlay::free_media() {
     for (int i = 0; i < SCREENSAVER_CAT_FRAME_COUNT; i++) {
-        if (frames_[i].buffer) {
-            heap_caps_free(frames_[i].buffer);
-            frames_[i].buffer = nullptr;
+        if (frame_pixels_[i]) {
+            heap_caps_free(frame_pixels_[i]);
+            frame_pixels_[i] = nullptr;
         }
-        frames_[i].dsc = {};
     }
     frame_count_ = 0;
     current_frame_ = 0;
