@@ -130,9 +130,11 @@ void WeightGrindStrategy::run_pulse_decision_phase(GrindController& controller,
     }
 
     // Normal mode aims at the low edge of the tolerance band so a long pulse
-    // cannot overshoot; fast mode aims at the target itself and accepts the risk
+    // cannot overshoot; fast mode aims half a band low because pulses
+    // over-deliver by roughly that much (post-pulse chute dribble), which
+    // centers the results on the target
     float pulse_target = controller.is_fast_mode()
-                             ? controller.target_weight
+                             ? controller.target_weight - 0.5f * controller.tolerance
                              : controller.target_weight - controller.tolerance;
     float error = pulse_target - settled_weight;
 
