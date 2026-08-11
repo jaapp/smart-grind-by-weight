@@ -17,7 +17,7 @@ public:
     void update_target_values(float weight_g, float time_s);
     void update_manual_time(float elapsed_s);
     void update_manual_weight(float weight_g);
-    void update_manual_weight_text(const char* text);
+    void show_manual_tare_pulse(uint32_t now_ms);
     void reset_manual_readouts();
     void set_active_tab(int tab);
     void set_target_long_press_handler(lv_event_cb_t handler);
@@ -38,6 +38,7 @@ private:
     lv_obj_t* manual_weight_label;
     lv_obj_t* menu_tab;
     bool visible;
+    bool manual_tare_pulse_active;
 
     void create_target_page(lv_obj_t* parent, GrindMode mode);
     void create_manual_page(lv_obj_t* parent);

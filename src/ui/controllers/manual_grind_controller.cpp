@@ -52,6 +52,12 @@ void ManualGrindUIController::update() {
         }
     }
 
+    // The tare pulse animates every tick; the readouts only refresh at ~10Hz
+    auto* sensor = ui_manager_->hardware_manager->get_weight_sensor();
+    if (sensor && sensor->is_tare_in_progress()) {
+        ui_manager_->ready_screen.show_manual_tare_pulse(millis());
+    }
+
     refresh_readouts(false);
 }
 
@@ -160,12 +166,7 @@ void ManualGrindUIController::refresh_readouts(bool force) {
     ui_manager_->ready_screen.update_manual_time(elapsed_ms / 1000.0f);
 
     auto* sensor = ui_manager_->hardware_manager->get_weight_sensor();
-    if (!sensor) {
-        return;
-    }
-    if (sensor->is_tare_in_progress()) {
-        ui_manager_->ready_screen.update_manual_weight_text("TARE");
-    } else {
+    if (sensor && !sensor->is_tare_in_progress()) {
         ui_manager_->ready_screen.update_manual_weight(sensor->get_display_weight());
     }
 }

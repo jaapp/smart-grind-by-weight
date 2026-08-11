@@ -1,5 +1,6 @@
 #include "ready_screen.h"
 #include <Arduino.h>
+#include <cmath>
 #include "../../config/constants.h"
 #include "../../controllers/grind_mode_traits.h"
 #include "../ui_helpers.h"
@@ -37,6 +38,7 @@ void ReadyScreen::create() {
     create_menu_page(menu_tab);
 
     visible = false;
+    manual_tare_pulse_active = false;
 }
 
 void ReadyScreen::create_target_page(lv_obj_t* parent, GrindMode mode) {
@@ -136,18 +138,33 @@ void ReadyScreen::update_manual_time(float elapsed_s) {
 }
 
 void ReadyScreen::update_manual_weight(float weight_g) {
-    char text[24];
-    snprintf(text, sizeof(text), SYS_WEIGHT_DISPLAY_FORMAT, weight_g);
-    update_manual_weight_text(text);
-}
-
-void ReadyScreen::update_manual_weight_text(const char* text) {
-    if (!manual_weight_label || !text) {
+    if (!manual_weight_label) {
         return;
     }
+    if (manual_tare_pulse_active) {
+        lv_obj_set_style_text_color(manual_weight_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        manual_tare_pulse_active = false;
+    }
+    char text[24];
+    snprintf(text, sizeof(text), SYS_WEIGHT_DISPLAY_FORMAT, weight_g);
     if (strcmp(lv_label_get_text(manual_weight_label), text) != 0) {
         lv_label_set_text(manual_weight_label, text);
     }
+}
+
+void ReadyScreen::show_manual_tare_pulse(uint32_t now_ms) {
+    if (!manual_weight_label) {
+        return;
+    }
+    manual_tare_pulse_active = true;
+    if (strcmp(lv_label_get_text(manual_weight_label), "TARE") != 0) {
+        lv_label_set_text(manual_weight_label, "TARE");
+    }
+    float s = 0.5f + 0.5f * sinf(now_ms * (6.2831853f / 1000.0f));
+    lv_color_t color = lv_color_mix(lv_color_hex(THEME_COLOR_TEXT_PRIMARY),
+                                    lv_color_hex(THEME_COLOR_NEUTRAL),
+                                    static_cast<uint8_t>(s * 255.0f));
+    lv_obj_set_style_text_color(manual_weight_label, color, 0);
 }
 
 void ReadyScreen::reset_manual_readouts() {
