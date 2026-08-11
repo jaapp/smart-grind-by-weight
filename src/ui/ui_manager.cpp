@@ -26,7 +26,7 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     edit_target = 0.0f;
     original_target = 0.0f;
     calibration_weight = USER_CALIBRATION_REFERENCE_WEIGHT_G;
-    current_tab = profile_controller->get_current_profile();
+    current_tab = profile_controller->get_active_tab();
     current_mode = profile_controller->get_grind_mode();
     jog_timer = nullptr;
     // Initialize the unified overlay system
@@ -88,7 +88,7 @@ void UIManager::create_ui() {
     ota_update_failed_screen.create();
     
     if (ready_controller_) {
-        ready_controller_->refresh_profiles();
+        ready_controller_->refresh_targets();
     }
 
     if (grinding_controller_) {
@@ -162,7 +162,9 @@ void UIManager::update() {
             break;
 
         case UIState::READY:
-            // Ready state - no special handling needed
+            if (current_tab == ReadyScreen::TAB_MANUAL && manual_grind_controller_) {
+                manual_grind_controller_->update();
+            }
             break;
             
         default:
@@ -201,13 +203,16 @@ void UIManager::switch_to_state(UIState new_state) {
             ready_screen.set_active_tab(current_tab);
             grinding_screen.set_mode(current_mode);
             if (ready_controller_) {
-                ready_controller_->refresh_profiles();
+                ready_controller_->refresh_targets();
+            }
+            if (current_tab == ReadyScreen::TAB_MANUAL && manual_grind_controller_) {
+                manual_grind_controller_->on_enter();
             }
             break;
 
         case UIState::EDIT:
             edit_screen.show();
-            edit_screen.update_profile_name(profile_controller->get_current_name());
+            edit_screen.update_profile_name(get_grind_mode_traits(current_mode).upper_name);
             edit_screen.set_mode(current_mode);
             edit_screen.update_target(edit_target);
             break;
@@ -287,6 +292,10 @@ void UIManager::switch_to_state(UIState new_state) {
             break;
     }
 
+    if (manual_grind_controller_) {
+        manual_grind_controller_->on_state_changed(new_state);
+    }
+
     if (grinding_controller_) {
         grinding_controller_->on_state_changed(new_state);
         grinding_controller_->update_grind_button_icon();
@@ -316,6 +325,7 @@ void UIManager::init_controllers() {
     ota_data_export_controller_ = std::make_unique<OtaDataExportController>(this);
     screen_timeout_controller_ = std::make_unique<ScreenTimeoutController>(this);
     jog_adjust_controller_ = std::make_unique<JogAdjustController>(this);
+    manual_grind_controller_ = std::make_unique<ManualGrindUIController>(this);
     diagnostics_controller_ = std::make_unique<DiagnosticsController>();
 
     // Initialize diagnostics controller
@@ -336,6 +346,7 @@ void UIManager::register_controller_events() {
     if (ota_data_export_controller_) ota_data_export_controller_->register_events();
     if (screen_timeout_controller_) screen_timeout_controller_->register_events();
     if (jog_adjust_controller_) jog_adjust_controller_->register_events();
+    if (manual_grind_controller_) manual_grind_controller_->register_events();
 }
 
 void UIManager::set_background_active(bool active) {
@@ -366,6 +377,10 @@ void UIManager::refresh_auto_action_settings() {
     auto_actions_.auto_return_enabled = prefs.getBool("auto_return", false);
     prefs.end();
 
+    Preferences* main_prefs = hardware_manager ? hardware_manager->get_preferences() : nullptr;
+    auto_actions_.fast_mode_enabled =
+        main_prefs ? main_prefs->getBool(GrindController::PREF_KEY_FAST_MODE, false) : false;
+
     uint32_t now = millis();
     auto_actions_.last_auto_start_ms = now;
     auto_actions_.last_auto_return_ms = now;
@@ -388,8 +403,10 @@ void UIManager::update_auto_actions() {
     }
 
     const uint32_t now = millis();
-    const bool grinder_active = (grind_controller && grind_controller->is_active());
-    const bool on_ready_tab = state_machine->is_state(UIState::READY) && current_tab < 3;
+    const bool grinder_active = (grind_controller && grind_controller->is_active()) ||
+                                (manual_grind_controller_ && manual_grind_controller_->is_running());
+    const bool on_ready_tab = state_machine->is_state(UIState::READY) &&
+                              (current_tab == ReadyScreen::TAB_WEIGHT || current_tab == ReadyScreen::TAB_TIME);
 
     if (auto_actions_.auto_start_enabled && on_ready_tab && !grinder_active && grinding_controller_) {
         auto* filter = sensor->get_raw_filter();
@@ -404,7 +421,10 @@ void UIManager::update_auto_actions() {
 
             if (sensor->get_sample_count() >= kMinSamplesForWindow) {
                 // Check settled state first (cheap) to short-circuit expensive delta calculation
-                if (sensor->is_settled()) {
+                uint32_t settle_window_ms = auto_actions_.fast_mode_enabled
+                                                ? GRIND_FAST_SETTLING_TIME_MS
+                                                : GRIND_SCALE_PRECISION_SETTLING_TIME_MS;
+                if (sensor->is_settled(settle_window_ms)) {
                     float delta_g = 0.0f;
                     int samples_used = 0;
                     uint32_t span_ms = 0;

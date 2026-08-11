@@ -1,6 +1,7 @@
 #include "grinding_screen_arc.h"
 #include <Arduino.h>
 #include "../../config/constants.h"
+#include "../ui_helpers.h"
 
 void GrindingScreenArc::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -37,7 +38,7 @@ void GrindingScreenArc::create() {
     lv_obj_set_size(progress_arc, THEME_PROGRESS_ARC_DIAMETER_PX, THEME_PROGRESS_ARC_DIAMETER_PX);
     lv_arc_set_range(progress_arc, 0, 100);
     lv_arc_set_value(progress_arc, 0);
-    lv_obj_set_style_arc_color(progress_arc, lv_color_hex(THEME_COLOR_PRIMARY), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(progress_arc, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(progress_arc, 12, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(progress_arc, lv_color_hex(0x333333), LV_PART_MAIN);
     lv_obj_set_style_arc_width(progress_arc, 12, LV_PART_MAIN);
@@ -57,6 +58,7 @@ void GrindingScreenArc::create() {
 
     visible = false;
     time_mode = false;
+    tare_pulse_active = false;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -94,13 +96,19 @@ void GrindingScreenArc::update_target_time(float seconds) {
 }
 
 void GrindingScreenArc::update_current_weight(float weight) {
+    if (tare_pulse_active) {
+        lv_obj_set_style_text_color(weight_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        tare_pulse_active = false;
+    }
     char weight_text[16];
     snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
     lv_label_set_text(weight_label, weight_text);
 }
 
 void GrindingScreenArc::update_tare_display() {
+    tare_pulse_active = true;
     lv_label_set_text(weight_label, "TARE");
+    lv_obj_set_style_text_color(weight_label, tare_pulse_color(millis()), 0);
     lv_arc_set_value(progress_arc, 0);  // Reset arc to 0 during taring
 }
 

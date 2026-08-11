@@ -1181,22 +1181,14 @@ void BluetoothManager::generate_diagnostic_report() {
     // Section 4: Profiles (requires access to hardware manager's preferences)
     // This will be populated at runtime - for now show defaults
     snprintf(buf, sizeof(buf),
-        "[COMPILE-TIME PARAMETERS - PROFILES]\n"
-        "  USER_PROFILE_COUNT: %d\n"
-        "  USER_SINGLE_ESPRESSO_WEIGHT_G: %.1f\n"
-        "  USER_DOUBLE_ESPRESSO_WEIGHT_G: %.1f\n"
-        "  USER_CUSTOM_PROFILE_WEIGHT_G: %.1f\n"
-        "  USER_SINGLE_ESPRESSO_TIME_S: %.1f\n"
-        "  USER_DOUBLE_ESPRESSO_TIME_S: %.1f\n"
-        "  USER_CUSTOM_PROFILE_TIME_S: %.1f\n"
+        "[COMPILE-TIME PARAMETERS - TARGETS]\n"
+        "  USER_DEFAULT_TARGET_WEIGHT_G: %.1f\n"
+        "  USER_DEFAULT_TARGET_TIME_S: %.1f\n"
+        "  USER_MANUAL_GRIND_MAX_RUNTIME_MS: %d\n"
         "\n",
-        USER_PROFILE_COUNT,
-        USER_SINGLE_ESPRESSO_WEIGHT_G,
-        USER_DOUBLE_ESPRESSO_WEIGHT_G,
-        USER_CUSTOM_PROFILE_WEIGHT_G,
-        USER_SINGLE_ESPRESSO_TIME_S,
-        USER_DOUBLE_ESPRESSO_TIME_S,
-        USER_CUSTOM_PROFILE_TIME_S
+        USER_DEFAULT_TARGET_WEIGHT_G,
+        USER_DEFAULT_TARGET_TIME_S,
+        USER_MANUAL_GRIND_MAX_RUNTIME_MS
     );
     send_chunk(buf);
 

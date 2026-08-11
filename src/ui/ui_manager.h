@@ -22,6 +22,7 @@
 #include "controllers/edit_controller.h"
 #include "controllers/grinding_controller.h"
 #include "controllers/jog_adjust_controller.h"
+#include "controllers/manual_grind_controller.h"
 #include "controllers/ota_data_export_controller.h"
 #include "controllers/ready_controller.h"
 #include "controllers/screen_timeout_controller.h"
@@ -61,6 +62,7 @@ class UIManager {
     friend class OtaDataExportController;
     friend class ScreenTimeoutController;
     friend class JogAdjustController;
+    friend class ManualGrindUIController;
     
 private:
     HardwareManager* hardware_manager;
@@ -96,6 +98,7 @@ private:
     std::unique_ptr<OtaDataExportController> ota_data_export_controller_;
     std::unique_ptr<ScreenTimeoutController> screen_timeout_controller_;
     std::unique_ptr<JogAdjustController> jog_adjust_controller_;
+    std::unique_ptr<ManualGrindUIController> manual_grind_controller_;
     std::unique_ptr<DiagnosticsController> diagnostics_controller_;
 
 public:
@@ -148,6 +151,7 @@ private:
     struct AutoActionState {
         bool auto_start_enabled = false;
         bool auto_return_enabled = false;
+        bool fast_mode_enabled = false;
         uint32_t last_auto_start_ms = 0;
         uint32_t last_auto_return_ms = 0;
     } auto_actions_;

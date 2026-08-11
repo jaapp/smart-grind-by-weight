@@ -41,9 +41,12 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     scale_weight_label = nullptr;
     scale_tare_button = nullptr;
     scale_item = nullptr;
+    grind_fast_mode_toggle = nullptr;
     grinder_purge_mode_radio_group = nullptr;
     grinder_purge_amount_slider = nullptr;
     grinder_purge_amount_label = nullptr;
+    screensaver_toggle = nullptr;
+    screensaver_preview_button = nullptr;
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -304,8 +307,23 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
     create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
     create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
 
+    create_separator(parent, "Screensaver");
+    create_description_label(parent, "Show an animation instead of only dimming when the screen is idle.");
+    create_toggle_row(parent, "Enabled", &screensaver_toggle);
+
+    screensaver_preview_button = create_button(parent, "Preview");
+    lv_obj_set_style_margin_bottom(screensaver_preview_button, 10, 0);
+
     // Register events for the sliders (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
+    if (screensaver_toggle) {
+        lv_obj_add_event_cb(screensaver_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_TOGGLE)));
+    }
+    if (screensaver_preview_button) {
+        lv_obj_add_event_cb(screensaver_preview_button, EventBridgeLVGL::dispatch_event, LV_EVENT_CLICKED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_PREVIEW)));
+    }
     if (brightness_normal_slider) {
         lv_obj_add_event_cb(brightness_normal_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_NORMAL_SLIDER)));
@@ -320,12 +338,6 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
     }
 }
 
-
-// Callback for grind mode radio button selection
-static void grind_mode_callback(int selected_index, void* user_data) {
-    // Trigger the event system instead of handling directly
-    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::GRIND_MODE_RADIO_BUTTON, nullptr);
-}
 
 // Callback for grinder purge mode radio button selection
 static void grinder_purge_mode_callback(int selected_index, void* user_data) {
@@ -342,40 +354,17 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
 
-    // Mode Selection separator/label
-    create_separator(parent, "Mode Selection");
-
-    // Radio button group for grind mode selection at top
-    const char* grind_modes[] = {"Weight", "Time"};
-    grind_mode_radio_group = create_radio_button_group(
-        parent,
-        grind_modes,
-        2,
-        LV_FLEX_FLOW_ROW,
-        0,  // Weight initially selected
-        135, 100,  // Width, Height
-        grind_mode_callback,
-        this
-    );
-
-    // Descriptive label for swipe functionality
-    lv_obj_t* swipe_desc_label = lv_label_create(parent);
-    lv_label_set_text(swipe_desc_label, "Enable swiping vertically to switch between Weight/Time modes");
-    lv_obj_set_style_text_font(swipe_desc_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(swipe_desc_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_style_margin_bottom(swipe_desc_label, 10, 0);
-    lv_label_set_long_mode(swipe_desc_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(swipe_desc_label, 260);
-
-    // Swipe toggle using existing pattern
-    create_toggle_row(parent, "Swipe", &grind_mode_swipe_toggle);
-
     // Automatic actions section
     create_separator(parent, "Automation");
     create_description_label(parent, "Start the selected profile as soon as the cup lands on the scale.");
     create_toggle_row(parent, "Start", &auto_start_toggle);
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
     create_toggle_row(parent, "Return", &auto_return_toggle);
+
+    // Speed section
+    create_separator(parent, "Speed");
+    create_description_label(parent, "Grind faster with reduced accuracy: skips purging, shortens taring and settling, limits correction pulses.");
+    create_toggle_row(parent, "Fast", &grind_fast_mode_toggle);
 
     // Grinder Purging section
     create_separator(parent, "Purging");
@@ -410,10 +399,6 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Register events for the toggles (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
-    if (grind_mode_swipe_toggle) {
-        lv_obj_add_event_cb(grind_mode_swipe_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_MODE_SWIPE_TOGGLE)));
-    }
     if (auto_start_toggle) {
         lv_obj_add_event_cb(auto_start_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_START_TOGGLE)));
@@ -421,6 +406,10 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (auto_return_toggle) {
         lv_obj_add_event_cb(auto_return_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_RETURN_TOGGLE)));
+    }
+    if (grind_fast_mode_toggle) {
+        lv_obj_add_event_cb(grind_fast_mode_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_FAST_MODE_TOGGLE)));
     }
     if (grinder_purge_amount_slider) {
         lv_obj_add_event_cb(grinder_purge_amount_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
@@ -616,7 +605,8 @@ void MenuScreen::show() {
     update_brightness_sliders();
     update_bluetooth_startup_toggle();
     update_logging_toggle();
-    update_grind_mode_toggles();
+    update_grind_settings();
+    update_screensaver_controls();
 
     LOG_BLE("[%lums MENU] Menu screen shown successfully\n", millis());
 }
@@ -886,6 +876,21 @@ void MenuScreen::update_brightness_labels(int normal_percent, int screensaver_pe
     }
 }
 
+void MenuScreen::update_screensaver_controls() {
+    Preferences prefs;
+    prefs.begin("screensaver", true); // read-only
+    bool enabled = prefs.getBool("enabled", true);
+    prefs.end();
+
+    if (screensaver_toggle) {
+        if (enabled) {
+            lv_obj_add_state(screensaver_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(screensaver_toggle, LV_STATE_CHECKED);
+        }
+    }
+}
+
 void MenuScreen::update_grinder_purge_amount_label(float amount_g) {
     if (grinder_purge_amount_label) {
         char buffer[16];
@@ -1104,36 +1109,16 @@ void MenuScreen::update_scale_weight(float weight) {
     lv_label_set_text(scale_weight_label, buffer);
 }
 
-void MenuScreen::update_grind_mode_toggles() {
-    // Read swipe enabled from "swipe" namespace
-    Preferences swipe_prefs;
-    swipe_prefs.begin("swipe", true); // read-only
-    bool swipe_enabled = swipe_prefs.getBool("enabled", false);
-    swipe_prefs.end();
-
-    // Read current grind mode from main grinder preferences using hardware manager
-    int mode_index = 0; // Default to Weight (index 0)
+void MenuScreen::update_grind_settings() {
     int grinder_purge_mode_index = GRIND_PURGE_MODE_DEFAULT;  // Default to Purge
     float grinder_purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;  // Default to 1.0g
+    bool fast_mode_enabled = false;
     if (hardware_manager) {
         Preferences* main_prefs = hardware_manager->get_preferences();
         if (main_prefs) {
-            int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
-            mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
             grinder_purge_mode_index = main_prefs->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
             grinder_purge_amount_g = main_prefs->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
-        }
-    }
-
-    if (grind_mode_radio_group) {
-        radio_button_group_set_selection(grind_mode_radio_group, mode_index);
-    }
-
-    if (grind_mode_swipe_toggle) {
-        if (swipe_enabled) {
-            lv_obj_add_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
-        } else {
-            lv_obj_clear_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
+            fast_mode_enabled = main_prefs->getBool(GrindController::PREF_KEY_FAST_MODE, false);
         }
     }
 
@@ -1157,6 +1142,14 @@ void MenuScreen::update_grind_mode_toggles() {
             lv_obj_add_state(auto_return_toggle, LV_STATE_CHECKED);
         } else {
             lv_obj_clear_state(auto_return_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    if (grind_fast_mode_toggle) {
+        if (fast_mode_enabled) {
+            lv_obj_add_state(grind_fast_mode_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(grind_fast_mode_toggle, LV_STATE_CHECKED);
         }
     }
 

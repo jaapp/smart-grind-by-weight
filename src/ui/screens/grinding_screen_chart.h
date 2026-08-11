@@ -13,6 +13,7 @@ private:
     lv_chart_series_t* flow_rate_series;
     bool visible;
     bool time_mode;
+    bool tare_pulse_active;
     
     // Chart data management
     static const uint16_t MIN_CHART_POINTS = 32;

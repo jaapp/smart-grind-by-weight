@@ -101,6 +101,7 @@ private:
     GrindMode mode;
     GrinderPurgeMode grinder_purge_mode_for_session;
     float grinder_purge_amount_g_for_session;
+    bool fast_mode_for_session;
 
     // Timeout tracking
     GrindPhase timeout_phase;   // Phase when timeout occurred
@@ -228,6 +229,7 @@ public:
     float get_target_weight() const { return target_weight; }
     uint32_t get_target_time_ms() const { return target_time_ms; }
     static constexpr const char* PREF_KEY_PRIME_ENABLED = "prime_enabled";
+    static constexpr const char* PREF_KEY_FAST_MODE = "fast_mode";
     static constexpr const char* PREF_KEY_GRINDER_MODE = "grinder_mode";
     static constexpr const char* PREF_KEY_GRINDER_AMOUNT_G = "grinder_amount_g";
     static constexpr const char* PREF_KEY_GRIND_FRESHNESS_HOURS = "freshness_hrs";
@@ -256,6 +258,11 @@ public:
     void set_motor_response_latency(float value);
     float get_min_pulse_duration() const { return motor_response_latency_ms; }
     float get_max_pulse_duration() const { return motor_response_latency_ms + GRIND_MOTOR_MAX_PULSE_DURATION_MS; }
+
+    // Fast mode session accessors
+    bool is_fast_mode() const { return fast_mode_for_session; }
+    int get_max_pulse_attempts() const { return fast_mode_for_session ? GRIND_FAST_MAX_PULSE_ATTEMPTS : GRIND_MAX_PULSE_ATTEMPTS; }
+    uint32_t get_settling_window_ms() const { return fast_mode_for_session ? GRIND_FAST_SETTLING_TIME_MS : GRIND_SCALE_PRECISION_SETTLING_TIME_MS; }
     void load_motor_latency();
     void save_motor_latency(float value);
 

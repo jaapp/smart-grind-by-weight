@@ -24,8 +24,7 @@ public:
     void handle_ble_toggle();
     void handle_ble_startup_toggle();
     void handle_logging_toggle();
-    void handle_grind_mode_swipe_toggle();
-    void handle_grind_mode_radio_button();
+    void handle_grind_fast_mode_toggle();
     void handle_auto_start_toggle();
     void handle_auto_return_toggle();
     void handle_grinder_purge_mode_radio_button();
@@ -37,9 +36,12 @@ public:
     void handle_brightness_normal_slider_released();
     void handle_brightness_screensaver_slider();
     void handle_brightness_screensaver_slider_released();
+    void handle_screensaver_toggle();
+    void handle_screensaver_preview();
 
     float get_normal_brightness() const;
     float get_screensaver_brightness() const;
+    bool get_screensaver_enabled() const;
 
 private:
     UIManager* ui_manager_;

@@ -1,105 +1,114 @@
 #include "profile_controller.h"
 #include <Arduino.h>
-#include <string.h>
 #include <Preferences.h>
+
+// Mirrors the tab constants in ReadyScreen
+namespace {
+constexpr int kTabManual = 0;
+constexpr int kTabTime = 1;
+constexpr int kTabWeight = 2;
+}
 
 void ProfileController::init(Preferences* prefs) {
     preferences = prefs;
-    
-    // Initialize default profiles
-    strcpy(profiles[0].name, "SINGLE");
-    profiles[0].weight = USER_SINGLE_ESPRESSO_WEIGHT_G;
-    profiles[0].time_seconds = USER_SINGLE_ESPRESSO_TIME_S;
-    
-    strcpy(profiles[1].name, "DOUBLE");
-    profiles[1].weight = USER_DOUBLE_ESPRESSO_WEIGHT_G;
-    profiles[1].time_seconds = USER_DOUBLE_ESPRESSO_TIME_S;
-    
-    strcpy(profiles[2].name, "CUSTOM");
-    profiles[2].weight = USER_CUSTOM_PROFILE_WEIGHT_G;
-    profiles[2].time_seconds = USER_CUSTOM_PROFILE_TIME_S;
-    
-    // Initialize default grind mode
+
+    target_weight = USER_DEFAULT_TARGET_WEIGHT_G;
+    target_time_s = USER_DEFAULT_TARGET_TIME_S;
     current_grind_mode = GrindMode::WEIGHT;
-    
-    load_profiles();
+    active_tab = kTabWeight;
+
+    migrate_legacy_profiles();
+    load_targets();
 }
 
-void ProfileController::load_profiles() {
-    current_profile = preferences->getInt("profile", 1);
-    
-    profiles[0].weight = preferences->getFloat("weight0", USER_SINGLE_ESPRESSO_WEIGHT_G);
-    profiles[1].weight = preferences->getFloat("weight1", USER_DOUBLE_ESPRESSO_WEIGHT_G);
-    profiles[2].weight = preferences->getFloat("weight2", USER_CUSTOM_PROFILE_WEIGHT_G);
+void ProfileController::migrate_legacy_profiles() {
+    if (preferences->isKey("target_w")) {
+        return;
+    }
 
-    profiles[0].time_seconds = preferences->getFloat("time0", USER_SINGLE_ESPRESSO_TIME_S);
-    profiles[1].time_seconds = preferences->getFloat("time1", USER_DOUBLE_ESPRESSO_TIME_S);
-    profiles[2].time_seconds = preferences->getFloat("time2", USER_CUSTOM_PROFILE_TIME_S);
-    
-    // Load grind mode (default to WEIGHT if not set)
+    // Earlier firmware stored three profiles (weight0..2/time0..2) plus the
+    // selected index; carry the selected profile's targets over.
+    if (preferences->isKey("profile") || preferences->isKey("weight0")) {
+        int index = preferences->getInt("profile", 1);
+        if (index < 0 || index > 2) {
+            index = 1;
+        }
+
+        const float weight_defaults[3] = {USER_SINGLE_ESPRESSO_WEIGHT_G,
+                                          USER_DOUBLE_ESPRESSO_WEIGHT_G,
+                                          USER_CUSTOM_PROFILE_WEIGHT_G};
+        const float time_defaults[3] = {USER_SINGLE_ESPRESSO_TIME_S,
+                                        USER_DOUBLE_ESPRESSO_TIME_S,
+                                        USER_CUSTOM_PROFILE_TIME_S};
+
+        char key[12];
+        snprintf(key, sizeof(key), "weight%d", index);
+        float migrated_weight = preferences->getFloat(key, weight_defaults[index]);
+        snprintf(key, sizeof(key), "time%d", index);
+        float migrated_time = preferences->getFloat(key, time_defaults[index]);
+
+        preferences->putFloat("target_w", migrated_weight);
+        preferences->putFloat("target_s", migrated_time);
+
+        preferences->remove("profile");
+        for (int i = 0; i < 3; i++) {
+            snprintf(key, sizeof(key), "weight%d", i);
+            preferences->remove(key);
+            snprintf(key, sizeof(key), "time%d", i);
+            preferences->remove(key);
+        }
+
+        // The vertical-swipe mode toggle is gone; drop its namespace.
+        Preferences swipe_prefs;
+        swipe_prefs.begin("swipe", false);
+        swipe_prefs.clear();
+        swipe_prefs.end();
+    }
+}
+
+void ProfileController::load_targets() {
+    target_weight = preferences->getFloat("target_w", USER_DEFAULT_TARGET_WEIGHT_G);
+    target_time_s = preferences->getFloat("target_s", USER_DEFAULT_TARGET_TIME_S);
+
     int stored_mode = preferences->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
     current_grind_mode = static_cast<GrindMode>(stored_mode);
-    
-    if (current_profile < 0 || current_profile >= USER_PROFILE_COUNT) {
-        current_profile = 1;
+
+    int default_tab = (current_grind_mode == GrindMode::TIME) ? kTabTime : kTabWeight;
+    active_tab = preferences->getInt("active_tab", default_tab);
+    if (active_tab < kTabManual || active_tab > kTabWeight) {
+        active_tab = kTabWeight;
+    }
+    if (active_tab == kTabTime) {
+        current_grind_mode = GrindMode::TIME;
+    } else if (active_tab == kTabWeight) {
+        current_grind_mode = GrindMode::WEIGHT;
     }
 }
 
-void ProfileController::save_profiles() {
-    preferences->putFloat("weight0", profiles[0].weight);
-    preferences->putFloat("weight1", profiles[1].weight);
-    preferences->putFloat("weight2", profiles[2].weight);
-
-    preferences->putFloat("time0", profiles[0].time_seconds);
-    preferences->putFloat("time1", profiles[1].time_seconds);
-    preferences->putFloat("time2", profiles[2].time_seconds);
+void ProfileController::save_targets() {
+    preferences->putFloat("target_w", target_weight);
+    preferences->putFloat("target_s", target_time_s);
 }
 
-void ProfileController::save_current_profile() {
-    preferences->putInt("profile", current_profile);
-    save_profiles();
-}
-
-void ProfileController::set_current_profile(int index) {
-    if (index >= 0 && index < USER_PROFILE_COUNT) {
-        current_profile = index;
-        save_current_profile();
+void ProfileController::update_current_weight(float weight) {
+    if (is_weight_valid(weight)) {
+        target_weight = weight;
     }
 }
 
-void ProfileController::set_profile_weight(int index, float weight) {
-    if (index >= 0 && index < USER_PROFILE_COUNT && is_weight_valid(weight)) {
-        profiles[index].weight = weight;
-        save_profiles();
+void ProfileController::update_current_time(float seconds) {
+    if (is_time_valid(seconds)) {
+        target_time_s = seconds;
     }
 }
 
-float ProfileController::get_profile_weight(int index) const {
-    if (index >= 0 && index < USER_PROFILE_COUNT) {
-        return profiles[index].weight;
+void ProfileController::set_active_tab(int tab) {
+    // The menu tab is transient; the device never boots into it.
+    if (tab < kTabManual || tab > kTabWeight || tab == active_tab) {
+        return;
     }
-    return 0.0f;
-}
-
-const char* ProfileController::get_profile_name(int index) const {
-    if (index >= 0 && index < USER_PROFILE_COUNT) {
-        return profiles[index].name;
-    }
-    return "UNKNOWN";
-}
-
-void ProfileController::set_profile_time(int index, float seconds) {
-    if (index >= 0 && index < USER_PROFILE_COUNT && is_time_valid(seconds)) {
-        profiles[index].time_seconds = seconds;
-        save_profiles();
-    }
-}
-
-float ProfileController::get_profile_time(int index) const {
-    if (index >= 0 && index < USER_PROFILE_COUNT) {
-        return profiles[index].time_seconds;
-    }
-    return 0.0f;
+    active_tab = tab;
+    preferences->putInt("active_tab", active_tab);
 }
 
 bool ProfileController::is_weight_valid(float weight) const {
@@ -110,18 +119,6 @@ float ProfileController::clamp_weight(float weight) const {
     if (weight < USER_MIN_TARGET_WEIGHT_G) return USER_MIN_TARGET_WEIGHT_G;
     if (weight > USER_MAX_TARGET_WEIGHT_G) return USER_MAX_TARGET_WEIGHT_G;
     return weight;
-}
-
-void ProfileController::update_current_weight(float weight) {
-    if (is_weight_valid(weight)) {
-        profiles[current_profile].weight = weight;
-    }
-}
-
-void ProfileController::update_current_time(float seconds) {
-    if (is_time_valid(seconds)) {
-        profiles[current_profile].time_seconds = seconds;
-    }
 }
 
 bool ProfileController::is_time_valid(float seconds) const {
@@ -135,6 +132,9 @@ float ProfileController::clamp_time(float seconds) const {
 }
 
 void ProfileController::set_grind_mode(GrindMode mode) {
+    if (mode == current_grind_mode) {
+        return;
+    }
     current_grind_mode = mode;
     save_grind_mode();
 }

@@ -24,6 +24,17 @@
 #define THEME_COLOR_NEUTRAL 0x666666                                           // Neutral color (dark gray)
 #define THEME_COLOR_BACKGROUND_MOCK 0x035e03                                   // Background color when mock hardware is active (dark green)
 
+// Per-mode grind button colors
+#define THEME_COLOR_MODE_WEIGHT 0x7EC8E3                                       // Weight pane button (powder blue)
+#define THEME_COLOR_MODE_TIME 0x5C1224                                         // Time pane button (wine burgundy)
+#define THEME_COLOR_MODE_MANUAL 0xF8DE7E                                       // Manual pane button (butter yellow)
+#define THEME_COLOR_MODE_ICON_DARK 0x1A1A1A                                    // Icon color on light mode buttons
+
+// Screensaver ripple dot colors (dark -> bright brown ramp)
+#define THEME_COLOR_SCREENSAVER_DOT_DARK 0x1C0F06                              // Ripple trough (near-black brown)
+#define THEME_COLOR_SCREENSAVER_DOT 0x6F4E37                                   // Ripple midpoint (coffee brown)
+#define THEME_COLOR_SCREENSAVER_DOT_BRIGHT 0xC08948                            // Ripple crest (warm tan)
+
 // Status indication colors
 #define THEME_COLOR_SUCCESS 0x00AA00                                           // Success state color (green)
 #define THEME_COLOR_ERROR 0xFF0000                                             // Error state color (red)

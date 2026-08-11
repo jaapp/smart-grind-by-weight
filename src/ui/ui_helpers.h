@@ -12,6 +12,9 @@ lv_obj_t* create_button(lv_obj_t* parent, const char* text,
 
 void set_label_text_int(lv_obj_t* label, int32_t value, const char* unit = nullptr);
 
+// Color for a pulsing TARE indicator: fades text between bright and dim on a ~1s cycle
+lv_color_t tare_pulse_color(uint32_t now_ms);
+
 void set_label_text_float(lv_obj_t* label, float value, const char* unit = nullptr);
 
 lv_obj_t* create_profile_label(lv_obj_t* parent, lv_obj_t** profile_label, lv_obj_t** weight_label);

@@ -45,8 +45,7 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BLE_STARTUP_TOGGLE, [this](lv_event_t*) { handle_ble_startup_toggle(); });
     EventBridgeLVGL::register_handler(ET::LOGGING_TOGGLE, [this](lv_event_t*) { handle_logging_toggle(); });
 
-    EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
-    EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
+    EventBridgeLVGL::register_handler(ET::GRIND_FAST_MODE_TOGGLE, [this](lv_event_t*) { handle_grind_fast_mode_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grinder_purge_mode_radio_button(); });
@@ -59,6 +58,8 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_NORMAL_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_normal_slider_released(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER, [this](lv_event_t*) { handle_brightness_screensaver_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_TOGGLE, [this](lv_event_t*) { handle_screensaver_toggle(); });
+    EventBridgeLVGL::register_handler(ET::SCREENSAVER_PREVIEW, [this](lv_event_t*) { handle_screensaver_preview(); });
 
     // Note: Event registration for menu widgets is done in the page creation functions
     // (menu_screen.cpp) because the menu is created lazily and destroyed on hide.
@@ -302,45 +303,23 @@ void MenuUIController::handle_logging_toggle() {
     LOG_DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
 }
 
-void MenuUIController::handle_grind_mode_swipe_toggle() {
+void MenuUIController::handle_grind_fast_mode_toggle() {
     if (!ui_manager_) return;
 
-    auto* toggle = ui_manager_->menu_screen.get_grind_mode_swipe_toggle();
+    auto* toggle = ui_manager_->menu_screen.get_grind_fast_mode_toggle();
     if (!toggle) return;
 
-    bool swipe_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
 
-    Preferences prefs;
-    prefs.begin("swipe", false);
-    prefs.putBool("enabled", swipe_enabled);
-    prefs.end();
-
-    LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
-}
-
-void MenuUIController::handle_grind_mode_radio_button() {
-    if (!ui_manager_ || !ui_manager_->profile_controller) return;
-
-    lv_obj_t* radio_group = ui_manager_->menu_screen.get_grind_mode_radio_group();
-    if (!radio_group) return;
-
-    int selected_index = radio_button_group_get_selection(radio_group);
-    if (selected_index < 0) return;
-
-    GrindMode new_mode = (selected_index == 0) ? GrindMode::WEIGHT : GrindMode::TIME;
-    ui_manager_->profile_controller->set_grind_mode(new_mode);
-    ui_manager_->current_mode = new_mode;
-    if (ui_manager_->ready_controller_) {
-        ui_manager_->ready_controller_->refresh_profiles();
-    }
-    ui_manager_->edit_target = get_current_profile_target(*ui_manager_->profile_controller, new_mode);
-    if (ui_manager_->state_machine->is_state(UIState::EDIT)) {
-        if (ui_manager_->edit_controller_) {
-            ui_manager_->edit_controller_->update_display();
-        }
+    auto* hardware = ui_manager_->get_hardware_manager();
+    Preferences* prefs = hardware ? hardware->get_preferences() : nullptr;
+    if (prefs) {
+        prefs->putBool(GrindController::PREF_KEY_FAST_MODE, enabled);
     }
 
-    LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT via radio button" : "Grind mode set to TIME via radio button");
+    ui_manager_->refresh_auto_action_settings();
+
+    LOG_DEBUG_PRINTLN(enabled ? "Fast mode enabled" : "Fast mode disabled");
 }
 
 void MenuUIController::handle_auto_start_toggle() {
@@ -561,6 +540,27 @@ void MenuUIController::handle_brightness_screensaver_slider_released() {
     LOG_DEBUG_PRINTF("Touch released - restored normal brightness to %.2f\n", normal);
 }
 
+void MenuUIController::handle_screensaver_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->menu_screen.get_screensaver_toggle();
+    if (!toggle) return;
+
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin("screensaver", false);
+    prefs.putBool("enabled", enabled);
+    prefs.end();
+
+    LOG_DEBUG_PRINTLN(enabled ? "Screensaver enabled" : "Screensaver disabled");
+}
+
+void MenuUIController::handle_screensaver_preview() {
+    if (!ui_manager_ || !ui_manager_->screen_timeout_controller_) return;
+    ui_manager_->screen_timeout_controller_->start_screensaver_preview();
+}
+
 void MenuUIController::perform_factory_reset() {
     if (!ui_manager_) return;
 
@@ -659,6 +659,14 @@ float MenuUIController::get_screensaver_brightness() const {
         brightness = 0.15f;
     }
     return brightness;
+}
+
+bool MenuUIController::get_screensaver_enabled() const {
+    Preferences prefs;
+    prefs.begin("screensaver", true);
+    bool enabled = prefs.getBool("enabled", true);
+    prefs.end();
+    return enabled;
 }
 
 void MenuUIController::stop_motor_timer() {

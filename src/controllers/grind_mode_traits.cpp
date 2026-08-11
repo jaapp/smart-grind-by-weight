@@ -9,6 +9,7 @@ namespace {
 constexpr GrindModeTraits kModeTraits[] = {
     {
         "Weight",
+        "WEIGHT",
         "g",
         "Target: ",
         " / ",
@@ -16,6 +17,7 @@ constexpr GrindModeTraits kModeTraits[] = {
     },
     {
         "Time",
+        "TIME",
         "s",
         "Time: ",
         "Time: ",
@@ -35,21 +37,6 @@ const GrindModeTraits& get_grind_mode_traits(GrindMode mode) {
         return kModeTraits[0];
     }
     return kModeTraits[index];
-}
-
-float get_profile_target(const ProfileController& profiles, GrindMode mode, int index) {
-    if (mode == GrindMode::TIME) {
-        return profiles.get_profile_time(index);
-    }
-    return profiles.get_profile_weight(index);
-}
-
-void set_profile_target(ProfileController& profiles, GrindMode mode, int index, float value) {
-    if (mode == GrindMode::TIME) {
-        profiles.set_profile_time(index, value);
-        return;
-    }
-    profiles.set_profile_weight(index, value);
 }
 
 float get_current_profile_target(const ProfileController& profiles, GrindMode mode) {
