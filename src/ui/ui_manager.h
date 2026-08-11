@@ -151,6 +151,7 @@ private:
     struct AutoActionState {
         bool auto_start_enabled = false;
         bool auto_return_enabled = false;
+        bool fast_mode_enabled = false;
         uint32_t last_auto_start_ms = 0;
         uint32_t last_auto_return_ms = 0;
     } auto_actions_;

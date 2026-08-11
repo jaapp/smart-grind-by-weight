@@ -317,6 +317,8 @@ void MenuUIController::handle_grind_fast_mode_toggle() {
         prefs->putBool(GrindController::PREF_KEY_FAST_MODE, enabled);
     }
 
+    ui_manager_->refresh_auto_action_settings();
+
     LOG_DEBUG_PRINTLN(enabled ? "Fast mode enabled" : "Fast mode disabled");
 }
 
