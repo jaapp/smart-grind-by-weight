@@ -4,28 +4,41 @@
 #include "../../controllers/grind_mode.h"
 
 class ReadyScreen {
-private:
-    lv_obj_t* screen;
-    lv_obj_t* tabview;
-    lv_obj_t* profile_tabs[4];
-    lv_obj_t* weight_labels[3];
-    lv_obj_t* menu_tab;
-    bool visible;
-
 public:
+    static constexpr int TAB_WEIGHT = 0;  // == (int)GrindMode::WEIGHT
+    static constexpr int TAB_TIME = 1;    // == (int)GrindMode::TIME
+    static constexpr int TAB_MANUAL = 2;
+    static constexpr int TAB_MENU = 3;
+
     void create();
     void show();
     void hide();
-    void update_profile_values(const float values[3], GrindMode mode);
+    void update_target_values(float weight_g, float time_s);
+    void update_manual_time(float elapsed_s);
+    void update_manual_weight(float weight_g);
+    void update_manual_weight_text(const char* text);
+    void reset_manual_readouts();
     void set_active_tab(int tab);
-    void set_profile_long_press_handler(lv_event_cb_t handler);
-    
+    void set_target_long_press_handler(lv_event_cb_t handler);
+
     bool is_visible() const { return visible; }
     lv_obj_t* get_screen() const { return screen; }
     lv_obj_t* get_tabview() const { return tabview; }
     lv_obj_t* get_menu_tab() const { return menu_tab; }
-    
+    lv_obj_t* get_manual_time_label() const { return manual_time_label; }
+    lv_obj_t* get_manual_weight_label() const { return manual_weight_label; }
+
 private:
-    void create_profile_page(lv_obj_t* parent, int profile_index, const char* profile_name, float weight);
+    lv_obj_t* screen;
+    lv_obj_t* tabview;
+    lv_obj_t* mode_tabs[4];
+    lv_obj_t* target_labels[2];
+    lv_obj_t* manual_time_label;
+    lv_obj_t* manual_weight_label;
+    lv_obj_t* menu_tab;
+    bool visible;
+
+    void create_target_page(lv_obj_t* parent, GrindMode mode);
+    void create_manual_page(lv_obj_t* parent);
     void create_menu_page(lv_obj_t* parent);
 };

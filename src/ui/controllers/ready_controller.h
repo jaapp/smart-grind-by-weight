@@ -4,7 +4,7 @@
 
 class UIManager;
 
-// Handles profile tab navigation, long-press editing, and swipe mode switching
+// Handles mode pane navigation and long-press target editing
 
 class ReadyUIController {
 public:
@@ -12,10 +12,9 @@ public:
 
     void register_events();
     void update();
-    void refresh_profiles();
+    void refresh_targets();
     void handle_tab_change(int tab);
-    void handle_profile_long_press();
-    void toggle_mode();
+    void handle_target_long_press();
 
 private:
     UIManager* ui_manager_;

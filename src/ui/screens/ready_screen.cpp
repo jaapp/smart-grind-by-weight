@@ -11,14 +11,11 @@ void ReadyScreen::create() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_set_style_pad_all(screen, 0, 0);
-    lv_obj_add_flag(screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // Create tabview
     tabview = lv_tabview_create(screen);
     lv_obj_set_size(tabview, LV_PCT(100), LV_PCT(100));
     lv_obj_align(tabview, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_flag(tabview, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
-    lv_obj_add_flag(tabview, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // Hide tab buttons for swipe-only interface
     lv_obj_t* tab_btns = lv_tabview_get_tab_btns(tabview);
@@ -27,44 +24,66 @@ void ReadyScreen::create() {
     // Transparent background
     lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
 
-    // Add profile tabs
-    profile_tabs[0] = lv_tabview_add_tab(tabview, "Single");
-    profile_tabs[1] = lv_tabview_add_tab(tabview, "Double");
-    profile_tabs[2] = lv_tabview_add_tab(tabview, "Custom");
+    // Add mode tabs
+    mode_tabs[TAB_WEIGHT] = lv_tabview_add_tab(tabview, "Weight");
+    mode_tabs[TAB_TIME] = lv_tabview_add_tab(tabview, "Time");
+    mode_tabs[TAB_MANUAL] = lv_tabview_add_tab(tabview, "Manual");
     menu_tab = lv_tabview_add_tab(tabview, "MENU");
-    profile_tabs[3] = menu_tab;
+    mode_tabs[TAB_MENU] = menu_tab;
 
-    // Default weights
-    float default_weights[3] = {USER_SINGLE_ESPRESSO_WEIGHT_G, USER_DOUBLE_ESPRESSO_WEIGHT_G, USER_CUSTOM_PROFILE_WEIGHT_G};
-    const char* names[3] = {"SINGLE", "DOUBLE", "CUSTOM"};
-    
-    for (int i = 0; i < 3; i++) {
-        create_profile_page(profile_tabs[i], i, names[i], default_weights[i]);
-    }
-
-    // Create menu tab page
+    create_target_page(mode_tabs[TAB_WEIGHT], GrindMode::WEIGHT);
+    create_target_page(mode_tabs[TAB_TIME], GrindMode::TIME);
+    create_manual_page(mode_tabs[TAB_MANUAL]);
     create_menu_page(menu_tab);
-
-    update_profile_values(default_weights, GrindMode::WEIGHT);
 
     visible = false;
 }
 
-void ReadyScreen::create_profile_page(lv_obj_t* parent, int profile_index, const char* profile_name, float weight) {
+void ReadyScreen::create_target_page(lv_obj_t* parent, GrindMode mode) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(parent, 0, 0);
 
+    const GrindModeTraits& traits = get_grind_mode_traits(mode);
+    int index = static_cast<int>(mode);
+
     lv_obj_t* name_label;
-    (void)create_profile_label(parent, &name_label, &weight_labels[profile_index]);
-    lv_label_set_text(name_label, profile_name);
+    (void)create_profile_label(parent, &name_label, &target_labels[index]);
+    lv_label_set_text(name_label, traits.upper_name);
     lv_obj_add_flag(name_label, LV_OBJ_FLAG_CLICKABLE);
-    
-    char weight_text[16];
-    snprintf(weight_text, sizeof(weight_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
-    lv_label_set_text(weight_labels[profile_index], weight_text);
-    lv_obj_add_flag(weight_labels[profile_index], LV_OBJ_FLAG_CLICKABLE);
+
+    char value_text[24];
+    float default_value = (mode == GrindMode::TIME) ? USER_DEFAULT_TARGET_TIME_S : USER_DEFAULT_TARGET_WEIGHT_G;
+    format_ready_value(value_text, sizeof(value_text), mode, default_value);
+    lv_label_set_text(target_labels[index], value_text);
+    lv_obj_add_flag(target_labels[index], LV_OBJ_FLAG_CLICKABLE);
+}
+
+void ReadyScreen::create_manual_page(lv_obj_t* parent) {
+    lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(parent, 4, 0);
+
+    lv_obj_t* name_label = lv_label_create(parent);
+    lv_label_set_text(name_label, "MANUAL");
+    lv_obj_set_style_text_font(name_label, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_color(name_label, lv_color_hex(THEME_COLOR_SECONDARY), 0);
+
+    manual_time_label = lv_label_create(parent);
+    lv_label_set_text(manual_time_label, "0.0s");
+    lv_obj_set_style_text_font(manual_time_label, &lv_font_montserrat_60, 0);
+    lv_obj_set_style_text_color(manual_time_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_add_flag(manual_time_label, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(manual_time_label, 20);
+
+    manual_weight_label = lv_label_create(parent);
+    lv_label_set_text(manual_weight_label, "0.0g");
+    lv_obj_set_style_text_font(manual_weight_label, &lv_font_montserrat_56, 0);
+    lv_obj_set_style_text_color(manual_weight_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_add_flag(manual_weight_label, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(manual_weight_label, 20);
 }
 
 void ReadyScreen::create_menu_page(lv_obj_t* parent) {
@@ -91,14 +110,47 @@ void ReadyScreen::hide() {
     visible = false;
 }
 
-void ReadyScreen::update_profile_values(const float values[3], GrindMode mode) {
-    for (int i = 0; i < 3; i++) {
-        if (weight_labels[i]) {
-            char text[24];
-            format_ready_value(text, sizeof(text), mode, values[i]);
-            lv_label_set_text(weight_labels[i], text);
-        }
+void ReadyScreen::update_target_values(float weight_g, float time_s) {
+    char text[24];
+    if (target_labels[TAB_WEIGHT]) {
+        format_ready_value(text, sizeof(text), GrindMode::WEIGHT, weight_g);
+        lv_label_set_text(target_labels[TAB_WEIGHT], text);
     }
+    if (target_labels[TAB_TIME]) {
+        format_ready_value(text, sizeof(text), GrindMode::TIME, time_s);
+        lv_label_set_text(target_labels[TAB_TIME], text);
+    }
+}
+
+void ReadyScreen::update_manual_time(float elapsed_s) {
+    if (!manual_time_label) {
+        return;
+    }
+    char text[16];
+    snprintf(text, sizeof(text), "%.1fs", elapsed_s);
+    if (strcmp(lv_label_get_text(manual_time_label), text) != 0) {
+        lv_label_set_text(manual_time_label, text);
+    }
+}
+
+void ReadyScreen::update_manual_weight(float weight_g) {
+    char text[24];
+    snprintf(text, sizeof(text), SYS_WEIGHT_DISPLAY_FORMAT, weight_g);
+    update_manual_weight_text(text);
+}
+
+void ReadyScreen::update_manual_weight_text(const char* text) {
+    if (!manual_weight_label || !text) {
+        return;
+    }
+    if (strcmp(lv_label_get_text(manual_weight_label), text) != 0) {
+        lv_label_set_text(manual_weight_label, text);
+    }
+}
+
+void ReadyScreen::reset_manual_readouts() {
+    update_manual_time(0.0f);
+    update_manual_weight(0.0f);
 }
 
 void ReadyScreen::set_active_tab(int tab) {
@@ -107,10 +159,10 @@ void ReadyScreen::set_active_tab(int tab) {
     }
 }
 
-void ReadyScreen::set_profile_long_press_handler(lv_event_cb_t handler) {
-    for (int i = 0; i < 3; i++) {
-        if (weight_labels[i]) {
-            lv_obj_add_event_cb(weight_labels[i], handler, LV_EVENT_LONG_PRESSED, NULL);
+void ReadyScreen::set_target_long_press_handler(lv_event_cb_t handler) {
+    for (int i = 0; i < 2; i++) {
+        if (target_labels[i]) {
+            lv_obj_add_event_cb(target_labels[i], handler, LV_EVENT_LONG_PRESSED, NULL);
         }
     }
 }

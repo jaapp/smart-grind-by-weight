@@ -45,8 +45,6 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BLE_STARTUP_TOGGLE, [this](lv_event_t*) { handle_ble_startup_toggle(); });
     EventBridgeLVGL::register_handler(ET::LOGGING_TOGGLE, [this](lv_event_t*) { handle_logging_toggle(); });
 
-    EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
-    EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grinder_purge_mode_radio_button(); });
@@ -300,47 +298,6 @@ void MenuUIController::handle_logging_toggle() {
     prefs.end();
 
     LOG_DEBUG_PRINTLN(logging_enabled ? "Logging enabled" : "Logging disabled");
-}
-
-void MenuUIController::handle_grind_mode_swipe_toggle() {
-    if (!ui_manager_) return;
-
-    auto* toggle = ui_manager_->menu_screen.get_grind_mode_swipe_toggle();
-    if (!toggle) return;
-
-    bool swipe_enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
-
-    Preferences prefs;
-    prefs.begin("swipe", false);
-    prefs.putBool("enabled", swipe_enabled);
-    prefs.end();
-
-    LOG_DEBUG_PRINTLN(swipe_enabled ? "Grind mode swipe gestures enabled" : "Grind mode swipe gestures disabled");
-}
-
-void MenuUIController::handle_grind_mode_radio_button() {
-    if (!ui_manager_ || !ui_manager_->profile_controller) return;
-
-    lv_obj_t* radio_group = ui_manager_->menu_screen.get_grind_mode_radio_group();
-    if (!radio_group) return;
-
-    int selected_index = radio_button_group_get_selection(radio_group);
-    if (selected_index < 0) return;
-
-    GrindMode new_mode = (selected_index == 0) ? GrindMode::WEIGHT : GrindMode::TIME;
-    ui_manager_->profile_controller->set_grind_mode(new_mode);
-    ui_manager_->current_mode = new_mode;
-    if (ui_manager_->ready_controller_) {
-        ui_manager_->ready_controller_->refresh_profiles();
-    }
-    ui_manager_->edit_target = get_current_profile_target(*ui_manager_->profile_controller, new_mode);
-    if (ui_manager_->state_machine->is_state(UIState::EDIT)) {
-        if (ui_manager_->edit_controller_) {
-            ui_manager_->edit_controller_->update_display();
-        }
-    }
-
-    LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT via radio button" : "Grind mode set to TIME via radio button");
 }
 
 void MenuUIController::handle_auto_start_toggle() {

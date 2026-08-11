@@ -21,8 +21,8 @@ void EventBridgeLVGL::dispatch_event(lv_event_t* e) {
     handle_event(event_type, e);
 }
 
-void EventBridgeLVGL::profile_long_press_handler(lv_event_t* e) {
-    handle_event(EventType::PROFILE_LONG_PRESS, e);
+void EventBridgeLVGL::target_long_press_handler(lv_event_t* e) {
+    handle_event(EventType::TARGET_LONG_PRESS, e);
 }
 
 void EventBridgeLVGL::handle_event(EventType event_type, lv_event_t* e) {

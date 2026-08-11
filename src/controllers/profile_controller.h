@@ -3,47 +3,38 @@
 #include "../config/constants.h"
 #include "grind_mode.h"
 
-struct Profile {
-    char name[USER_PROFILE_NAME_MAX_LENGTH];
-    float weight;
-    float time_seconds;
-};
-
 class ProfileController {
 private:
-    Profile profiles[USER_PROFILE_COUNT];
-    int current_profile;
+    float target_weight;
+    float target_time_s;
     GrindMode current_grind_mode;
+    int active_tab;
     Preferences* preferences;
+
+    void migrate_legacy_profiles();
 
 public:
     void init(Preferences* prefs);
-    void load_profiles();
-    void save_profiles();
-    void save_current_profile();
-    
-    void set_current_profile(int index);
-    int get_current_profile() const { return current_profile; }
-    float get_current_weight() const { return profiles[current_profile].weight; }
-    float get_current_time() const { return profiles[current_profile].time_seconds; }
-    const char* get_current_name() const { return profiles[current_profile].name; }
-    
-    void set_profile_weight(int index, float weight);
-    float get_profile_weight(int index) const;
-    const char* get_profile_name(int index) const;
-    void set_profile_time(int index, float seconds);
-    float get_profile_time(int index) const;
-    
+    void load_targets();
+    void save_targets();
+
+    float get_current_weight() const { return target_weight; }
+    float get_current_time() const { return target_time_s; }
+
     void update_current_weight(float weight);
     void update_current_time(float seconds);
-    
+
+    // Active ready-screen tab persistence (menu tab is never persisted)
+    void set_active_tab(int tab);
+    int get_active_tab() const { return active_tab; }
+
     // Weight validation methods - single authority for all weight constraints
     bool is_weight_valid(float weight) const;
     float clamp_weight(float weight) const;
 
     bool is_time_valid(float seconds) const;
     float clamp_time(float seconds) const;
-    
+
     // Grind mode persistence methods
     void set_grind_mode(GrindMode mode);
     GrindMode get_grind_mode() const { return current_grind_mode; }

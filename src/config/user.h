@@ -8,14 +8,14 @@
 // settings that users might want to modify to customize their grinder.
 
 //------------------------------------------------------------------------------
-// COFFEE PROFILES
+// GRIND TARGETS
 //------------------------------------------------------------------------------
-#define USER_PROFILE_COUNT 3                                                   // Number of coffee profiles available
-#define USER_PROFILE_NAME_MAX_LENGTH 8                                         // Maximum characters in profile name
+#define USER_DEFAULT_TARGET_WEIGHT_G 18.0f                                     // Default weight-mode target
+#define USER_DEFAULT_TARGET_TIME_S 10.0f                                       // Default time-mode target
 
-// Default target weights for each profile
+// Legacy profile defaults, still used when migrating pre-carousel preferences
 #define USER_SINGLE_ESPRESSO_WEIGHT_G 9.0f                                     // Single espresso default weight
-#define USER_DOUBLE_ESPRESSO_WEIGHT_G 18.0f                                    // Double espresso default weight  
+#define USER_DOUBLE_ESPRESSO_WEIGHT_G 18.0f                                    // Double espresso default weight
 #define USER_CUSTOM_PROFILE_WEIGHT_G 21.5f                                     // Custom profile default weight
 
 #define USER_SINGLE_ESPRESSO_TIME_S 5.0f                                       // Single espresso default grind time
@@ -36,6 +36,11 @@
 #define USER_FINE_TIME_ADJUSTMENT_S 0.1f                                       // Fine adjustment step for time editing
 
 // USER_JOG parameters moved to system.h to be near SYS_JOG parameters
+
+//------------------------------------------------------------------------------
+// MANUAL GRIND
+//------------------------------------------------------------------------------
+#define USER_MANUAL_GRIND_MAX_RUNTIME_MS 90000                                 // Safety cap for a continuous manual run
 
 //------------------------------------------------------------------------------
 // SCALE CALIBRATION

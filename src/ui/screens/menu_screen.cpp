@@ -321,12 +321,6 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
 }
 
 
-// Callback for grind mode radio button selection
-static void grind_mode_callback(int selected_index, void* user_data) {
-    // Trigger the event system instead of handling directly
-    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::GRIND_MODE_RADIO_BUTTON, nullptr);
-}
-
 // Callback for grinder purge mode radio button selection
 static void grinder_purge_mode_callback(int selected_index, void* user_data) {
     // Trigger the event system instead of handling directly
@@ -341,34 +335,6 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     // Enable vertical scrolling on the grind mode page
     lv_obj_set_scroll_dir(parent, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_AUTO);
-
-    // Mode Selection separator/label
-    create_separator(parent, "Mode Selection");
-
-    // Radio button group for grind mode selection at top
-    const char* grind_modes[] = {"Weight", "Time"};
-    grind_mode_radio_group = create_radio_button_group(
-        parent,
-        grind_modes,
-        2,
-        LV_FLEX_FLOW_ROW,
-        0,  // Weight initially selected
-        135, 100,  // Width, Height
-        grind_mode_callback,
-        this
-    );
-
-    // Descriptive label for swipe functionality
-    lv_obj_t* swipe_desc_label = lv_label_create(parent);
-    lv_label_set_text(swipe_desc_label, "Enable swiping vertically to switch between Weight/Time modes");
-    lv_obj_set_style_text_font(swipe_desc_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(swipe_desc_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_set_style_margin_bottom(swipe_desc_label, 10, 0);
-    lv_label_set_long_mode(swipe_desc_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(swipe_desc_label, 260);
-
-    // Swipe toggle using existing pattern
-    create_toggle_row(parent, "Swipe", &grind_mode_swipe_toggle);
 
     // Automatic actions section
     create_separator(parent, "Automation");
@@ -410,10 +376,6 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Register events for the toggles (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
-    if (grind_mode_swipe_toggle) {
-        lv_obj_add_event_cb(grind_mode_swipe_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_MODE_SWIPE_TOGGLE)));
-    }
     if (auto_start_toggle) {
         lv_obj_add_event_cb(auto_start_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_START_TOGGLE)));
@@ -616,7 +578,7 @@ void MenuScreen::show() {
     update_brightness_sliders();
     update_bluetooth_startup_toggle();
     update_logging_toggle();
-    update_grind_mode_toggles();
+    update_grind_settings();
 
     LOG_BLE("[%lums MENU] Menu screen shown successfully\n", millis());
 }
@@ -1104,36 +1066,14 @@ void MenuScreen::update_scale_weight(float weight) {
     lv_label_set_text(scale_weight_label, buffer);
 }
 
-void MenuScreen::update_grind_mode_toggles() {
-    // Read swipe enabled from "swipe" namespace
-    Preferences swipe_prefs;
-    swipe_prefs.begin("swipe", true); // read-only
-    bool swipe_enabled = swipe_prefs.getBool("enabled", false);
-    swipe_prefs.end();
-
-    // Read current grind mode from main grinder preferences using hardware manager
-    int mode_index = 0; // Default to Weight (index 0)
+void MenuScreen::update_grind_settings() {
     int grinder_purge_mode_index = GRIND_PURGE_MODE_DEFAULT;  // Default to Purge
     float grinder_purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;  // Default to 1.0g
     if (hardware_manager) {
         Preferences* main_prefs = hardware_manager->get_preferences();
         if (main_prefs) {
-            int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
-            mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
             grinder_purge_mode_index = main_prefs->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
             grinder_purge_amount_g = main_prefs->getFloat(GrindController::PREF_KEY_GRINDER_AMOUNT_G, GRIND_PURGE_AMOUNT_DEFAULT_G);
-        }
-    }
-
-    if (grind_mode_radio_group) {
-        radio_button_group_set_selection(grind_mode_radio_group, mode_index);
-    }
-
-    if (grind_mode_swipe_toggle) {
-        if (swipe_enabled) {
-            lv_obj_add_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
-        } else {
-            lv_obj_clear_state(grind_mode_swipe_toggle, LV_STATE_CHECKED);
         }
     }
 

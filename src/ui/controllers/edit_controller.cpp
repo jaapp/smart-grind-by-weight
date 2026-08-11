@@ -69,9 +69,9 @@ void EditUIController::handle_save() {
     }
 
     update_current_profile_target(*ui_manager_->profile_controller, ui_manager_->current_mode, ui_manager_->edit_target);
-    ui_manager_->profile_controller->save_profiles();
+    ui_manager_->profile_controller->save_targets();
     if (ui_manager_->ready_controller_) {
-        ui_manager_->ready_controller_->refresh_profiles();
+        ui_manager_->ready_controller_->refresh_targets();
     }
     ui_manager_->switch_to_state(UIState::READY);
 }
