@@ -23,12 +23,14 @@ Complete build instructions, parts list, and usage guide for the Smart Grind-by-
     - [Auto-Tune Motor Response](#auto-tune-motor-response)
     - [Diagnostics System](#diagnostics-system)
   - [📱 Usage Guide](#-usage-guide)
-    - [Grinding Profiles](#grinding-profiles)
+    - [Grind Modes](#grind-modes)
     - [Navigation](#navigation)
+    - [Manual Mode](#manual-mode)
     - [Grind Settings](#grind-settings)
     - [Basic Operation](#basic-operation)
     - [Quick Scale View](#quick-scale-view)
     - [Display Modes](#display-modes)
+    - [Screensaver](#screensaver)
   - [🗺️ User Interface Navigation](#️-user-interface-navigation)
   - [⚡ Automated Grind Flow](#-automated-grind-flow)
   - [🔵 Bluetooth Connectivity](#-bluetooth-connectivity)
@@ -293,27 +295,36 @@ Access via **Menu → Diagnostics → Noise Floor**.
 
 ## 📱 Usage Guide
 
-### Grinding Profiles
-All profiles are fully customizable. Default grind-by-weight targets (fallback time values shown in parenthesis):
-- **Single**: 9 g (5 s)
-- **Double**: 18 g (10 s)  
-- **Custom**: 21.5 g (12 s)
+### Grind Modes
+The main screen is a swipe carousel with one pane per mode:
+- **Weight** (default): grinds to a target weight (default 18 g)
+- **Time**: grinds for a target duration (default 10 s)
+- **Manual**: free-running motor with live elapsed time and weight readouts
+- **Menu**: entry point to settings and tools
 
-> 💡 **Tip** – the target label always shows the active unit (`g` or `s`). Long-press to edit in whichever mode you are currently using.
+Each mode keeps a single target. The pane you leave active is restored after a reboot.
+
+> 💡 **Tip** – the target label always shows the active unit (`g` or `s`). Long-press to edit it.
 
 ### Navigation
-- **Swipe left/right** to navigate between menu tabs
-- **Swipe up/down** on the ready screen to toggle between grind-by-weight and grind-by-time modes (when enabled in Menu → Grind Settings)
-- **Tap** to select profiles or buttons
-- **Long press** on profile targets to edit/customize them
+- **Swipe left/right** to move between the Weight, Time, Manual, and Menu panes
+- **Tap** buttons and readouts
+- **Long press** on the Weight/Time target to edit it
 
-> **Color cues:** The GRIND button background turns **red** in weight mode and **blue** in time mode, so you always know which behaviour is armed.
+> **Color cues:** The GRIND button background turns **red** in weight mode, **blue** in time mode, and **orange** on the manual pane, so you always know which behaviour is armed.
+
+### Manual Mode
+Swipe to the **Manual** pane for direct motor control:
+- The scale tares automatically when you enter the pane
+- **START/STOP** runs and stops the motor; runs are capped at 90 s as a safety net
+- **Tap the elapsed time** to reset it to zero (works while running)
+- **Tap the weight** to tare the scale
+- **Swiping away** stops the motor and resets both readouts
+- Manual runs count toward lifetime motor runtime, but are not logged as grind sessions
 
 ### Grind Settings
 Access **Menu → Grind Settings** to configure:
-- **Swipe Gestures**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
-- **Time Mode**: Directly toggle between Weight and Time modes regardless of swipe setting
-- **Start on Cup**: Start the active profile automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
+- **Start on Cup**: Start the active mode automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
 - **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
 - **Purging** *(Advanced)*: Control how the grinder saturates itself before weight-mode grinding
   - **Prime mode**: Keeps the coffee used to saturate the grinder, continues immediately
@@ -325,8 +336,8 @@ Access **Menu → Grind Settings** to configure:
 
 ### Basic Operation
 These steps describe the default grind-by-weight workflow:
-1. Select profile by tapping on the main screen
-2. Long press the profile target to edit/customize the weight if needed
+1. Swipe to the Weight pane on the main screen
+2. Long press the target to edit/customize the weight if needed
 3. Place the dosing cup on the scale platform
 4. Press the GRIND button – the scale will tare automatically
 5. The system grinds to the precise target weight using the predictive algorithm
@@ -334,7 +345,7 @@ These steps describe the default grind-by-weight workflow:
 
 > Optional automation (Menu → Grind Settings): enable the new auto-start toggle to begin grinding as soon as the scale sees ~50 g arrive (no tare needed); the system waits for the load cell to gather enough quiet samples before arming itself, then auto-return jumps back to Ready whenever that cup is lifted off again.
 
-Need the stock timed run? Enable swipe gestures in **Menu → Grind Settings**, then swipe up or down on the ready screen before you start; the GRIND button background turns blue to confirm time mode is active (red = weight). Alternatively, use the direct **Time Mode** toggle in the menu.
+Need the stock timed run? Swipe to the **Time** pane before you start; the GRIND button background turns blue to confirm time mode is active (red = weight).
 
 > **Time mode pulse button:** In time mode completion, a "+" button appears next to OK for 100ms additional grinding pulses.
 
@@ -346,25 +357,34 @@ Need a simple live readout? Open **Menu → Scale** to jump into a full-screen w
 - **Nerdy Layout**: Detailed charts showing flow rates and real-time grinding analytics
 - **Switching**: Tap anywhere on grind screen to switch between layouts during grinding
 
+### Screensaver
+After 5 minutes without touch or scale activity, the screen dims and an animated screensaver appears. Configure it in **Menu → Display**:
+- **Enabled toggle**: when off, the screen only dims like before
+- **Style**: **Wave** (a brown dot-matrix ripple expanding from the center), **Cat** (a looping video clip), or **Flower** (a still image)
+- The screensaver brightness slider controls how dim the screen gets while it plays
+
+Touching the screen wakes it instantly (the touch is swallowed, so nothing underneath gets pressed), and placing a cup or portafilter on the scale wakes it too. The screensaver never appears while grinding, during a manual run, or during an OTA update.
+
 ---
 
 ## 🗺️ User Interface Navigation
 
 ```
-Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode if enabled)
+Main Screen (swipe left/right between mode panes)
 |
-+-- Single Profile 
-|   |-- Weight display (long press to edit)
-|   \-- GRIND button (red=weight, blue=time)
++-- Weight
+|   |-- Target weight (long press to edit)
+|   \-- GRIND button (red)
 |
-+-- Double Profile
-|   |-- Weight display (long press to edit)
-|   \-- GRIND button (red=weight, blue=time)
-|
-+-- Custom Profile
-|   |-- Weight display (long press to edit)
-|   \-- GRIND button (red=weight, blue=time)
++-- Time
+|   |-- Target time (long press to edit)
+|   |-- GRIND button (blue)
 |   \-- Time mode completion: OK + PULSE buttons
+|
++-- Manual
+|   |-- Elapsed time (tap to reset)
+|   |-- Live weight (tap to tare)
+|   \-- START/STOP button (orange, 90 s safety cap)
 |
 \-- Menu (scrollable hub)
     |
@@ -383,11 +403,11 @@ Main Screen (swipe left/right between tabs, up/down to toggle weight/time mode i
     |   |
     |   +-- Display
     |   |   |-- Normal brightness slider
-    |   |   \-- Screensaver brightness slider
+    |   |   |-- Screensaver brightness slider
+    |   |   |-- Screensaver enabled toggle
+    |   |   \-- Screensaver style (Wave / Cat / Flower)
     |   |
     |   \-- Grind Settings
-    |       |-- Swipe Gestures toggle (enable/disable vertical swipes)
-    |       |-- Time Mode toggle (direct weight/time mode selection)
     |       |-- Start on Cup toggle (start when ≈50 g arrives within ~2 s)
     |       |-- Return on Removal toggle (drop back to Ready when that weight leaves)
     |       |-- Purging (Prime/Purge radio buttons)

@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include "../components/screensaver.h"
 
 class UIManager;
 
-// Implements automatic screen dimming based on touch/weight activity
+// Implements automatic screen dimming and the idle screensaver overlay,
+// based on touch/weight activity
 
 class ScreenTimeoutController {
 public:
@@ -16,4 +19,5 @@ public:
 private:
     UIManager* ui_manager_;
     bool screen_dimmed_;
+    std::unique_ptr<ScreensaverOverlay> screensaver_;
 };

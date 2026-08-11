@@ -36,10 +36,12 @@ python3 tools/grinder.py analyze
 - **GrindController**: 9-phase state machine with predictive flow control, 10 pulse corrections, mechanical instability detection, and time mode additional pulses
 - **LoadCell (HX711)**: Multi-mode precision weight measurement (instant, smoothed, filtered), calibration flag, noise diagnostics
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
-- **UIManager**: 7 screens with LVGL integration; menu page surfaces quick Tools (Scale view, Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
+- **UIManager**: LVGL screens with a 4-pane ready carousel (Weight / Time / Manual / Menu, horizontal swipe = mode selection); menu page surfaces quick Tools (Scale view, Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
+- **ManualGrindUIController**: Drives the Manual pane - runs the grinder directly via `Grinder::start()/stop()` (no GrindController session, no grind logging), shows elapsed time (tap to reset) and live weight (tap to tare), auto-tares on pane entry, stops and resets on swipe-away or any state change, 90s safety cap (`USER_MANUAL_GRIND_MAX_RUNTIME_MS`), updates lifetime motor runtime
+- **ScreensaverOverlay**: Full-screen idle overlay on `lv_layer_top()` with three styles - Wave (brown dot-matrix ripple via custom draw callback), Cat (12 embedded JPEG frames looping at 8fps), Flower (single embedded JPEG); media decodes into PSRAM while visible; any press dismisses and is swallowed; assets regenerated with `tools/generate_screensaver_assets.py`
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
-**Update Intervals:** 20ms grind control, 25ms load cell (active), 50ms UI/hardware
+**Update Intervals:** 20ms grind control, 25ms load cell (active), 16ms UI/hardware (60Hz)
 
 **Grind Phases:**
 - Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PRIME, PRIME_SETTLING, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
@@ -58,13 +60,14 @@ python3 tools/grinder.py analyze
 
 **Time Mode Pulses:** Split-button completion screen (OK + PULSE), `TIME_ADDITIONAL_PULSE` phase, 100ms duration
 
+**Mode Carousel:** The ready screen's horizontal swipe selects the mode (Weight=0, Time=1, Manual=2, Menu=3). Weight and Time each keep a single target (long-press to edit). The active pane persists across reboots (`active_tab`, Menu never persisted). Legacy per-profile preferences (`profile`, `weight0..2`, `time0..2`) migrate to `target_w`/`target_s` on first boot.
+
 **Grind Settings:** Configurable through Menu → Grind Settings page
-- **Mode Selection**: Radio buttons for Weight/Time mode selection
-- **Swipe Gestures Toggle**: Enable/disable vertical swipe gestures for mode switching (default: disabled)
-- **Automation**: Start on Cup and Return on Removal toggles
+- **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu)
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
-- **Preferences**: `swipe.enabled` (boolean), `grind_mode` (0=Weight, 1=Time), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
-- **Behavior**: Swipe gestures only work when enabled; direct mode selection always works
+- **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
+
+**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, and screensaver style radio (Wave/Cat/Flower). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int 0=Wave, 1=Cat, 2=Flower). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color

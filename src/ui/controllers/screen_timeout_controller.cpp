@@ -8,7 +8,10 @@
 ScreenTimeoutController::ScreenTimeoutController(UIManager* manager)
     : ui_manager_(manager), screen_dimmed_(false) {}
 
-void ScreenTimeoutController::register_events() {}
+void ScreenTimeoutController::register_events() {
+    screensaver_ = std::make_unique<ScreensaverOverlay>();
+    screensaver_->create();
+}
 
 void ScreenTimeoutController::update() {
     if (!ui_manager_) {
@@ -31,6 +34,9 @@ void ScreenTimeoutController::update() {
     }
 
     if (ui_manager_->state_machine && ui_manager_->state_machine->is_state(UIState::GRINDING)) {
+        if (screensaver_) {
+            screensaver_->hide();
+        }
         if (screen_dimmed_) {
             float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
             if (ui_manager_->menu_controller_) {
@@ -42,13 +48,27 @@ void ScreenTimeoutController::update() {
         return;
     }
 
+    auto* grinder = hardware->get_grinder();
+    bool motor_running = grinder && grinder->is_grinding();
+
+    bool ota_active = false;
+    if (ui_manager_->state_machine) {
+        UIState state = ui_manager_->state_machine->get_current_state();
+        ota_active = (state == UIState::OTA_UPDATE) || (state == UIState::OTA_UPDATE_FAILED);
+    }
+
+    if (screensaver_ && screensaver_->is_visible() && (motor_running || ota_active)) {
+        screensaver_->hide();
+    }
+
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
     auto* sensor = hardware->get_weight_sensor();
     bool recent_weight_activity = sensor &&
                                   sensor->weight_range_exceeds(USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
                                                                USER_WEIGHT_ACTIVITY_THRESHOLD_G);
 
-    bool should_dim = (ms_since_touch >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS) && !recent_weight_activity;
+    bool should_dim = (ms_since_touch >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS) &&
+                      !recent_weight_activity && !motor_running;
 
     if (should_dim && !screen_dimmed_) {
         float dimmed = USER_SCREEN_BRIGHTNESS_DIMMED;
@@ -57,6 +77,11 @@ void ScreenTimeoutController::update() {
         }
         display->set_brightness(dimmed);
         screen_dimmed_ = true;
+
+        if (screensaver_ && !ota_active && ui_manager_->menu_controller_ &&
+            ui_manager_->menu_controller_->get_screensaver_enabled()) {
+            screensaver_->show(ui_manager_->menu_controller_->get_screensaver_style());
+        }
     } else if (!should_dim && screen_dimmed_) {
         float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
         if (ui_manager_->menu_controller_) {
@@ -64,5 +89,9 @@ void ScreenTimeoutController::update() {
         }
         display->set_brightness(normal);
         screen_dimmed_ = false;
+
+        if (screensaver_) {
+            screensaver_->hide();
+        }
     }
 }

@@ -24,6 +24,11 @@
 #define THEME_COLOR_NEUTRAL 0x666666                                           // Neutral color (dark gray)
 #define THEME_COLOR_BACKGROUND_MOCK 0x035e03                                   // Background color when mock hardware is active (dark green)
 
+// Screensaver ripple dot colors (dark -> bright brown ramp)
+#define THEME_COLOR_SCREENSAVER_DOT_DARK 0x1C0F06                              // Ripple trough (near-black brown)
+#define THEME_COLOR_SCREENSAVER_DOT 0x6F4E37                                   // Ripple midpoint (coffee brown)
+#define THEME_COLOR_SCREENSAVER_DOT_BRIGHT 0xC08948                            // Ripple crest (warm tan)
+
 // Status indication colors
 #define THEME_COLOR_SUCCESS 0x00AA00                                           // Success state color (green)
 #define THEME_COLOR_ERROR 0xFF0000                                             // Error state color (red)

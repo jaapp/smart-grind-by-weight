@@ -53,6 +53,8 @@ private:
     lv_obj_t* brightness_screensaver_slider;
     lv_obj_t* brightness_normal_label;
     lv_obj_t* brightness_screensaver_label;
+    lv_obj_t* screensaver_toggle;
+    lv_obj_t* screensaver_style_radio_group;
     lv_obj_t* purge_button;
     lv_obj_t* reset_button;
     
@@ -108,6 +110,7 @@ public:
     void update_bluetooth_startup_toggle();
     void update_logging_toggle();
     void update_grind_settings();
+    void update_screensaver_controls();
     void update_grinder_purge_amount_label(float amount_g);
     void update_grind_freshness_hours_label(float hours);
     void reset_scale_display();
@@ -130,6 +133,8 @@ public:
     lv_obj_t* get_diag_reset_button() const { return diag_reset_button; }
     lv_obj_t* get_brightness_normal_slider() const { return brightness_normal_slider; }
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
+    lv_obj_t* get_screensaver_toggle() const { return screensaver_toggle; }
+    lv_obj_t* get_screensaver_style_radio_group() const { return screensaver_style_radio_group; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
     lv_obj_t* get_grinder_purge_mode_radio_group() const { return grinder_purge_mode_radio_group; }

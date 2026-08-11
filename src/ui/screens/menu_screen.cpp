@@ -44,6 +44,8 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grinder_purge_mode_radio_group = nullptr;
     grinder_purge_amount_slider = nullptr;
     grinder_purge_amount_label = nullptr;
+    screensaver_toggle = nullptr;
+    screensaver_style_radio_group = nullptr;
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
     lv_obj_add_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -293,6 +295,11 @@ void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
     }
 }
 
+// Callback for screensaver style radio button selection
+static void screensaver_style_callback(int selected_index, void* user_data) {
+    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SCREENSAVER_STYLE_RADIO_BUTTON, nullptr);
+}
+
 void MenuScreen::create_display_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
@@ -304,8 +311,28 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
     create_slider_row(parent, "Brightness", &brightness_normal_label, &brightness_normal_slider);
     create_slider_row(parent, "Screensaver", &brightness_screensaver_label, &brightness_screensaver_slider, lv_color_hex(THEME_COLOR_WARNING));
 
+    create_separator(parent, "Screensaver");
+    create_description_label(parent, "Show an animation instead of only dimming when the screen is idle.");
+    create_toggle_row(parent, "Enabled", &screensaver_toggle);
+
+    const char* screensaver_styles[] = {"Wave", "Cat", "Flower"};
+    screensaver_style_radio_group = create_radio_button_group(
+        parent,
+        screensaver_styles,
+        3,
+        LV_FLEX_FLOW_ROW,
+        0,  // Wave initially selected
+        -1, 80,  // Auto width, Height
+        screensaver_style_callback,
+        this
+    );
+
     // Register events for the sliders (done here because widgets are created lazily)
     using ET = EventBridgeLVGL::EventType;
+    if (screensaver_toggle) {
+        lv_obj_add_event_cb(screensaver_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::SCREENSAVER_TOGGLE)));
+    }
     if (brightness_normal_slider) {
         lv_obj_add_event_cb(brightness_normal_slider, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::BRIGHTNESS_NORMAL_SLIDER)));
@@ -579,6 +606,7 @@ void MenuScreen::show() {
     update_bluetooth_startup_toggle();
     update_logging_toggle();
     update_grind_settings();
+    update_screensaver_controls();
 
     LOG_BLE("[%lums MENU] Menu screen shown successfully\n", millis());
 }
@@ -845,6 +873,26 @@ void MenuScreen::update_brightness_labels(int normal_percent, int screensaver_pe
         char screensaver_text[32];
         snprintf(screensaver_text, sizeof(screensaver_text), "Dimmed: %d%%", screensaver_percent);
         lv_label_set_text(brightness_screensaver_label, screensaver_text);
+    }
+}
+
+void MenuScreen::update_screensaver_controls() {
+    Preferences prefs;
+    prefs.begin("screensaver", true); // read-only
+    bool enabled = prefs.getBool("enabled", true);
+    int style = prefs.getInt("style", 0);
+    prefs.end();
+
+    if (screensaver_toggle) {
+        if (enabled) {
+            lv_obj_add_state(screensaver_toggle, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(screensaver_toggle, LV_STATE_CHECKED);
+        }
+    }
+
+    if (screensaver_style_radio_group && style >= 0 && style <= 2) {
+        radio_button_group_set_selection(screensaver_style_radio_group, style);
     }
 }
 
