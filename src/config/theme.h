@@ -25,7 +25,7 @@
 #define THEME_COLOR_BACKGROUND_MOCK 0x035e03                                   // Background color when mock hardware is active (dark green)
 
 // Per-mode grind button colors
-#define THEME_COLOR_MODE_WEIGHT 0xB0E0E6                                       // Weight pane button (powder blue)
+#define THEME_COLOR_MODE_WEIGHT 0x7EC8E3                                       // Weight pane button (powder blue)
 #define THEME_COLOR_MODE_TIME 0x800020                                         // Time pane button (burgundy)
 #define THEME_COLOR_MODE_MANUAL 0xF8DE7E                                       // Manual pane button (butter yellow)
 #define THEME_COLOR_MODE_ICON_DARK 0x1A1A1A                                    // Icon color on light mode buttons

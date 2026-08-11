@@ -21,9 +21,11 @@ public:
     bool is_visible() const { return visible_; }
 
 private:
+    // Odd counts on both axes place one dot exactly at screen center,
+    // so the ripple emanates from a single dot
     static constexpr int kDotSpacingPx = 16;
     static constexpr int kDotCols = 17;
-    static constexpr int kDotRows = 28;
+    static constexpr int kDotRows = 27;
     static constexpr int kShadeCount = 16;
     static constexpr int kGridOriginX =
         (SCREENSAVER_MEDIA_WIDTH_PX - (kDotCols - 1) * kDotSpacingPx) / 2;

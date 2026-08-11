@@ -321,17 +321,20 @@ void GrindingUIController::update_grind_button_icon() {
     if (ui_manager_->state_machine->is_state(UIState::PURGE_CONFIRM)) {
         // During purge confirm, show STOP icon (user can cancel the grind)
         lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
-        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_ERROR), 0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(mode_color), 0);
+        icon_color = mode_icon_color;
     } else if (ui_manager_->state_machine->is_state(UIState::GRINDING)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_STOP);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(mode_color), 0);
         icon_color = mode_icon_color;
     } else if (ui_manager_->state_machine->is_state(UIState::GRIND_COMPLETE)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_OK);
-        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(mode_color), 0);
+        icon_color = mode_icon_color;
     } else if (ui_manager_->state_machine->is_state(UIState::GRIND_TIMEOUT)) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_CLOSE);
-        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_WARNING), 0);
+        lv_obj_set_style_bg_color(grind_button_, lv_color_hex(mode_color), 0);
+        icon_color = mode_icon_color;
     } else if (ui_manager_->state_machine->is_state(UIState::READY) && ui_manager_->current_tab == ReadyScreen::TAB_MENU) {
         lv_img_set_src(grind_icon_, LV_SYMBOL_SETTINGS);
         lv_obj_set_style_bg_color(grind_button_, lv_color_hex(THEME_COLOR_NEUTRAL), 0);
@@ -363,29 +366,36 @@ void GrindingUIController::update_button_layout() {
     bool should_show_pulse = (ui_manager_->state_machine->is_state(UIState::GRIND_COMPLETE) &&
                               ui_manager_->current_mode == GrindMode::TIME);
 
+    // The secondary button follows the active mode's color like the main button
+    uint32_t mode_color = ui_manager_->current_mode == GrindMode::TIME
+                              ? THEME_COLOR_MODE_TIME
+                              : THEME_COLOR_MODE_WEIGHT;
+    uint32_t mode_icon_color = ui_manager_->current_mode == GrindMode::TIME
+                                   ? THEME_COLOR_TEXT_PRIMARY
+                                   : THEME_COLOR_MODE_ICON_DARK;
+
     if (in_purge_confirm || should_show_pulse) {
         // Dual button layout: left button at -60, right button at +60
         lv_obj_align(grind_button_, LV_ALIGN_BOTTOM_MID, -60, -10);
         if (pulse_button_) {
             lv_obj_align(pulse_button_, LV_ALIGN_BOTTOM_MID, 60, -10);
             lv_obj_clear_flag(pulse_button_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(mode_color), 0);
+            lv_obj_set_style_text_color(pulse_icon_, lv_color_hex(mode_icon_color), 0);
 
             if (in_purge_confirm) {
                 // Purge confirm: pulse button acts as CONTINUE (always enabled)
                 lv_img_set_src(pulse_icon_, LV_SYMBOL_OK);
-                lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_SUCCESS), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
             } else if (ui_manager_->grind_controller && ui_manager_->grind_controller->can_pulse()) {
                 // Time mode pulse: enable/disable based on can_pulse()
                 lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
-                lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_clear_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_COVER, 0);
             } else {
                 // Time mode pulse: disabled
                 lv_img_set_src(pulse_icon_, LV_SYMBOL_PLUS);
-                lv_obj_set_style_bg_color(pulse_button_, lv_color_hex(THEME_COLOR_ACCENT), 0);
                 lv_obj_add_state(pulse_button_, LV_STATE_DISABLED);
                 lv_obj_set_style_bg_opa(pulse_button_, LV_OPA_50, LV_STATE_DISABLED);
             }
