@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <esp_heap_caps.h>
-#include <lvgl_private.h>
+#include <src/libs/tjpgd/tjpgd.h>
 #include "../../config/constants.h"
 
 namespace {
@@ -13,6 +13,46 @@ constexpr float kWavePeriodS = 2.4f;                    // Time for one outward 
 constexpr float kWaveLengthPx = 96.0f;                  // Radial distance between crests
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
+
+constexpr size_t kJpegWorkBufferSize = 4096;            // Recommended by TJpgDec
+
+// TJpgDec streams input from the embedded array and emits RGB888 blocks,
+// which are packed into the RGB565 frame buffer
+struct JpegDecodeContext {
+    const uint8_t* data;
+    uint32_t size;
+    uint32_t position;
+    uint16_t* pixels;
+    int width;
+};
+
+size_t jpeg_input_cb(JDEC* jd, uint8_t* buffer, size_t length) {
+    auto* ctx = static_cast<JpegDecodeContext*>(jd->device);
+    uint32_t remaining = ctx->size - ctx->position;
+    if (length > remaining) {
+        length = remaining;
+    }
+    if (buffer) {
+        memcpy(buffer, ctx->data + ctx->position, length);
+    }
+    ctx->position += length;
+    return length;
+}
+
+int jpeg_output_cb(JDEC* jd, void* bitmap, JRECT* rect) {
+    auto* ctx = static_cast<JpegDecodeContext*>(jd->device);
+    const uint8_t* rgb = static_cast<const uint8_t*>(bitmap);
+    for (int y = rect->top; y <= rect->bottom; y++) {
+        uint16_t* row = ctx->pixels + y * ctx->width + rect->left;
+        for (int x = rect->left; x <= rect->right; x++) {
+            uint16_t r = *rgb++;
+            uint16_t g = *rgb++;
+            uint16_t b = *rgb++;
+            *row++ = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+        }
+    }
+    return 1;
+}
 
 } // namespace
 
@@ -194,33 +234,44 @@ bool ScreensaverOverlay::decode_media(ScreensaverStyle style) {
 }
 
 bool ScreensaverOverlay::decode_jpeg(const uint8_t* data, uint32_t len, DecodedFrame& frame) {
-    lv_image_dsc_t src;
-    lv_memzero(&src, sizeof(src));
-    src.header.magic = LV_IMAGE_HEADER_MAGIC;
-    src.header.cf = LV_COLOR_FORMAT_RAW;
-    src.header.w = SCREENSAVER_MEDIA_WIDTH_PX;
-    src.header.h = SCREENSAVER_MEDIA_HEIGHT_PX;
-    src.data = data;
-    src.data_size = len;
-
-    lv_image_decoder_dsc_t decoder_dsc;
-    if (lv_image_decoder_open(&decoder_dsc, &src, nullptr) != LV_RESULT_OK || !decoder_dsc.decoded) {
+    void* work_buffer = heap_caps_malloc(kJpegWorkBufferSize, MALLOC_CAP_INTERNAL);
+    if (!work_buffer) {
         return false;
     }
 
-    const lv_draw_buf_t* decoded = decoder_dsc.decoded;
-    frame.buffer = heap_caps_malloc(decoded->data_size, MALLOC_CAP_SPIRAM);
+    JpegDecodeContext ctx = {data, len, 0, nullptr, 0};
+    JDEC jd;
+    if (jd_prepare(&jd, jpeg_input_cb, work_buffer, kJpegWorkBufferSize, &ctx) != JDR_OK ||
+        jd.width != SCREENSAVER_MEDIA_WIDTH_PX || jd.height != SCREENSAVER_MEDIA_HEIGHT_PX) {
+        heap_caps_free(work_buffer);
+        return false;
+    }
+
+    uint32_t pixel_bytes = static_cast<uint32_t>(jd.width) * jd.height * 2;
+    frame.buffer = heap_caps_malloc(pixel_bytes, MALLOC_CAP_SPIRAM);
     if (!frame.buffer) {
-        lv_image_decoder_close(&decoder_dsc);
+        heap_caps_free(work_buffer);
         return false;
     }
 
-    memcpy(frame.buffer, decoded->data, decoded->data_size);
-    frame.dsc.header = decoded->header;
-    frame.dsc.data = static_cast<const uint8_t*>(frame.buffer);
-    frame.dsc.data_size = decoded->data_size;
+    ctx.pixels = static_cast<uint16_t*>(frame.buffer);
+    ctx.width = jd.width;
+    JRESULT result = jd_decomp(&jd, jpeg_output_cb, 0);
+    heap_caps_free(work_buffer);
+    if (result != JDR_OK) {
+        heap_caps_free(frame.buffer);
+        frame.buffer = nullptr;
+        return false;
+    }
 
-    lv_image_decoder_close(&decoder_dsc);
+    lv_memzero(&frame.dsc, sizeof(frame.dsc));
+    frame.dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    frame.dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    frame.dsc.header.w = jd.width;
+    frame.dsc.header.h = jd.height;
+    frame.dsc.header.stride = jd.width * 2;
+    frame.dsc.data = static_cast<const uint8_t*>(frame.buffer);
+    frame.dsc.data_size = pixel_bytes;
     return true;
 }
 
