@@ -137,7 +137,8 @@ public:
     
     // Core data acquisition and processing
     void update();
-    bool is_settled(uint32_t window_ms = GRIND_SCALE_PRECISION_SETTLING_TIME_MS);
+    bool is_settled(uint32_t window_ms = GRIND_SCALE_PRECISION_SETTLING_TIME_MS,
+                    float tolerance_g = GRIND_SCALE_SETTLING_TOLERANCE_G);
     
     // Non-blocking HX711 data acquisition (merged from HX711Core)
     bool data_waiting_async();

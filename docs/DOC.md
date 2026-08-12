@@ -458,7 +458,7 @@ During Grinding:
 
 Want the scale to run itself? Enable the automation toggles in **Menu → Grind Settings**:
 
-- **Start on Cup**: As soon as a recognized cup or portafilter lands on the load cell (≈50 g delta inside a 2 s window), the active profile tars and begins grinding automatically. Ideal when dosing cups dock directly under the chute.
+- **Start on Cup**: As soon as a recognized cup or portafilter lands on the load cell (≈50 g delta inside a 2 s window), the active profile tars and begins grinding automatically. Cup detection uses a relaxed 0.05 g settled tolerance so it fires quickly once the cup comes to rest while still ignoring a hand resting on it; the grind's own tare keeps the precision tolerance. Ideal when dosing cups dock directly under the chute.
 - **Return on Removal**: When the cup weight drops away after completion, the grinder exits the results screen and returns to Ready. Useful for keeping the workflow hands-free between shots.
 
 Both automation settings rely on the same smoothed weight deltas used for flow detection, so no extra calibration is required. Leave them disabled if you prefer manual control or experience false triggers with lighter accessories.

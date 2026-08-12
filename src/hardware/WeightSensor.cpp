@@ -338,15 +338,15 @@ void WeightSensor::update() {
     // the dedicated Core 0 sampling task; actual SPS depends on ADC hardware (e.g., 10 or 80 SPS)
 }
 
-bool WeightSensor::is_settled(uint32_t window_ms) {
+bool WeightSensor::is_settled(uint32_t window_ms, float tolerance_g) {
     // Convert grams threshold to raw threshold and use CircularBufferMath
-    int32_t raw_threshold = weight_to_raw_threshold(GRIND_SCALE_SETTLING_TOLERANCE_G);
-    
+    int32_t raw_threshold = weight_to_raw_threshold(tolerance_g);
+
     // Debug output for threshold conversion every 5s to avoid spam
     static uint32_t last_threshold_debug = 0;
     if (millis() - last_threshold_debug > 5000) {
         LOG_LOADCELL_DEBUG("[WeightSensor] Grams threshold: %.4fg -> Raw threshold: %ld (cal_factor: %.2f)\n",
-                         GRIND_SCALE_SETTLING_TOLERANCE_G, (long)raw_threshold, cal_factor);
+                         tolerance_g, (long)raw_threshold, cal_factor);
         last_threshold_debug = millis();
     }
     
