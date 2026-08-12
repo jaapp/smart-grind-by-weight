@@ -424,7 +424,7 @@ void UIManager::update_auto_actions() {
                 uint32_t settle_window_ms = auto_actions_.fast_mode_enabled
                                                 ? GRIND_FAST_SETTLING_TIME_MS
                                                 : GRIND_SCALE_PRECISION_SETTLING_TIME_MS;
-                if (sensor->is_settled(settle_window_ms)) {
+                if (sensor->is_settled(settle_window_ms, USER_AUTO_GRIND_SETTLE_TOLERANCE_G)) {
                     float delta_g = 0.0f;
                     int samples_used = 0;
                     uint32_t span_ms = 0;

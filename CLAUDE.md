@@ -63,7 +63,7 @@ python3 tools/grinder.py analyze
 **Mode Carousel:** The ready screen's horizontal swipe selects the mode (Manual=0, Time=1, Weight=2, Menu=3; Weight is the default pane). Grind button colors per pane: powder blue (Weight), burgundy (Time), butter yellow (Manual) - see `THEME_COLOR_MODE_*` in `src/config/theme.h`; light backgrounds use a dark icon glyph. Weight and Time each keep a single target (long-press to edit). The active pane persists across reboots (`active_tab`, Menu never persisted). Legacy per-profile preferences (`profile`, `weight0..2`, `time0..2`) migrate to `target_w`/`target_s` on first boot.
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
-- **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu)
+- **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu). Cup detection settles against a relaxed 0.05g tolerance (`USER_AUTO_GRIND_SETTLE_TOLERANCE_G`); grind tare/settling keeps the precision 0.010g tolerance
 - **Fast Mode**: Speed-over-accuracy toggle (default: disabled). Skips PRIME/PURGE phases, shortens tare (6 samples vs 18) and settling windows (200ms vs 500ms), widens tolerance to 0.1g, aims pulses at target minus half the tolerance to offset post-pulse dribble (normal mode aims at target minus tolerance), caps pulse corrections at 3, and shortens the Start-on-Cup settled check (200ms vs 500ms). Constants in `grind_control.h` (`GRIND_FAST_*`)
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `fast_mode` (boolean), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
