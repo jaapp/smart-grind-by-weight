@@ -45,6 +45,7 @@ The project has four build targets:
 ### V2 Production Target: `waveshare-esp32s3-touch-amoled-164-v2`
 - **Use case:** Waveshare 1.64-inch V2 hardware with load cell and grinder connected
 - **Display:** SH8601 using Waveshare's native `esp_lcd` QSPI driver
+- **External GPIO:** HX711 SCK on GPIO 1; grinder motor control on GPIO 16 (GPIO 18 is reserved by `TP_INT`)
 - **Important:** V1 and V2 display firmware is not interchangeable; the wrong target normally boots to a black screen
 
 ### Debug Target: `waveshare-esp32s3-touch-amoled-164-debug`

@@ -35,6 +35,8 @@ Build and flash the V2 target:
 python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164-v2
 ```
 
+For a complete V2 installation, wire HX711 SCK to GPIO 1 and the grinder motor-control lead to GPIO 16. GPIO 18 is connected to the V2 touchscreen interrupt (`TP_INT`) and must not be used for motor control. The V1 connections remain HX711 SCK on GPIO 2 and motor control on GPIO 18.
+
 Do not change only the chip-select pin in a V1 build. Hardware validation showed that an Arduino_GFX SH8601 attempt remained black; the working V2 target uses Waveshare's native Espressif `esp_lcd` SH8601 driver and initialization sequence.
 
 If using the Web Flasher, select an image explicitly labelled for the 1.64-inch V2 board. If no V2 image is listed, do not flash the V1 image; build the V2 target from source or wait for a V2 release artifact.
@@ -81,12 +83,12 @@ The motor control wire (Pin 3) is the wire that **starts the motor when briefly 
 ### Resolution
 
 **Swap the wire connections:**
-- The motor control wire (Pin 3) should connect to Waveshare **GPIO 18**
+- The motor control wire (Pin 3) should connect to Waveshare **GPIO 18 on V1** or **GPIO 16 on V2**
 - The button signal wire (Pin 2) can remain disconnected (unused in this project)
 
-If wires were reversed, swap them so Pin 3 connects to GPIO 18. The Waveshare board has reverse polarity protection for power connections, but the motor/button wires should be correctly identified for proper operation.
+If wires were reversed, swap them so Pin 3 connects to the correct GPIO for the board revision. On V2, never use GPIO 18 for motor control because it is shared with `TP_INT`. The Waveshare board has reverse polarity protection for power connections, but the motor/button wires should be correctly identified for proper operation.
 
-**Important:** Wire colors vary significantly between Eureka units - always refer to pin positions rather than wire colors when troubleshooting.
+**Important:** Wire colors vary significantly between Eureka units - always refer to pin positions rather than wire colors when troubleshooting. On the physically verified V2 Specialita, Pin 3 was the grey lead and Pin 2 was white, contrary to the earlier assumed assignment; the white Pin 2 lead was left disconnected and insulated.
 
 ---
 

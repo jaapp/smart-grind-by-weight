@@ -35,10 +35,18 @@
 
 // Load Cell ADC Pins
 #define HW_LOADCELL_DOUT_PIN 3                                                 // HX711 data output pin
-#define HW_LOADCELL_SCK_PIN 2                                                  // HX711 serial clock pin
+#if HW_DISPLAY_VARIANT_V2
+#define HW_LOADCELL_SCK_PIN 1                                                  // V2 wiring; GPIO2 is bypassed on this board revision
+#else
+#define HW_LOADCELL_SCK_PIN 2                                                  // V1 HX711 serial clock pin
+#endif
 
 // Motor Control
-#define HW_MOTOR_RELAY_PIN 18                                                  // GPIO pin for grinder motor control relay
+#if HW_DISPLAY_VARIANT_V2
+#define HW_MOTOR_RELAY_PIN 16                                                  // V2: GPIO18 is shared with TP_INT and must not drive the grinder
+#else
+#define HW_MOTOR_RELAY_PIN 18                                                  // V1 grinder motor control relay
+#endif
 #define HW_GRINDER_SETTLING_TIME_MS 500                                        // Startup transient immunity (tune based on mechanical rigidity, 0 to disable)
 
 //------------------------------------------------------------------------------
