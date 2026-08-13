@@ -18,6 +18,8 @@
 #include "../hardware/WeightSensor.h"
 #include "../controllers/grind_controller.h"
 
+extern HardwareManager hardware_manager;
+
 BluetoothManager::BluetoothManager()
     : ble_server(nullptr)
     , ota_service(nullptr)
@@ -951,22 +953,58 @@ void BluetoothManager::update_system_info() {
 
 void BluetoothManager::update_performance_info() {
     if (!sysinfo_performance_characteristic) return;
-    
-    // Get performance metrics from the performance monitor
+
     char buffer[BLE_SYSINFO_MAX_PAYLOAD_BYTES];
-    
-    // For now, create a simple performance summary
-    // In a full implementation, we'd extract actual performance data
+    DisplayPerformanceSnapshot display_metrics;
+    DisplayManager* display = hardware_manager.get_display();
+    if (display) {
+        display_metrics = display->get_performance_snapshot();
+    }
+
+    const uint32_t window_ms = display_metrics.window_ms;
+    const uint32_t ui_actual_hz = window_ms > 0
+        ? (display_metrics.ui_calls * 1000U) / window_ms : 0;
+    const uint32_t refresh_actual_hz = window_ms > 0
+        ? (display_metrics.refreshes * 1000U) / window_ms : 0;
+    const uint32_t render_actual_hz = window_ms > 0
+        ? (display_metrics.rendered_frames * 1000U) / window_ms : 0;
+    const uint32_t pixels_per_s = window_ms > 0
+        ? (display_metrics.pixels * 1000U) / window_ms : 0;
+    const uint32_t ui_avg_us = display_metrics.ui_calls > 0
+        ? display_metrics.ui_time_us / display_metrics.ui_calls : 0;
+    const uint32_t render_avg_us = display_metrics.rendered_frames > 0
+        ? display_metrics.render_time_us / display_metrics.rendered_frames : 0;
+    const uint32_t flush_avg_us = display_metrics.flushes > 0
+        ? display_metrics.flush_time_us / display_metrics.flushes : 0;
+
     snprintf(buffer, sizeof(buffer),
         "{"
         "\"tasks_registered\":6,"
         "\"system_healthy\":true,"
         "\"load_cell_freq_hz\":50,"
         "\"grind_control_freq_hz\":50,"
-        "\"ui_freq_hz\":10,"
-        "\"bluetooth_freq_hz\":20,"
+        "\"ui_configured_hz\":%u,"
+        "\"bluetooth_configured_hz\":%u,"
+        "\"ui_actual_hz\":%lu,"
+        "\"lvgl_refresh_hz\":%lu,"
+        "\"render_hz\":%lu,"
+        "\"flushes\":%lu,"
+        "\"pixels_per_s\":%lu,"
+        "\"ui_avg_us\":%lu,"
+        "\"render_avg_us\":%lu,"
+        "\"flush_avg_us\":%lu,"
         "\"debug_freq_hz\":1"
-        "}"
+        "}",
+        1000U / SYS_TASK_UI_INTERVAL_MS,
+        1000U / SYS_TASK_BLUETOOTH_INTERVAL_MS,
+        static_cast<unsigned long>(ui_actual_hz),
+        static_cast<unsigned long>(refresh_actual_hz),
+        static_cast<unsigned long>(render_actual_hz),
+        static_cast<unsigned long>(display_metrics.flushes),
+        static_cast<unsigned long>(pixels_per_s),
+        static_cast<unsigned long>(ui_avg_us),
+        static_cast<unsigned long>(render_avg_us),
+        static_cast<unsigned long>(flush_avg_us)
     );
     
     sysinfo_performance_characteristic->setValue(buffer);

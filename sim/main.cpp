@@ -19,8 +19,8 @@ constexpr int kDisplayHeight = 456;
 constexpr float kTargetWeight = USER_SINGLE_ESPRESSO_WEIGHT_G;
 constexpr uint64_t kArcPixelBudget = 800000;
 constexpr uint64_t kChartPixelBudget = 3500000;
-constexpr uint64_t kSwipePixelBudget = 600000;
-constexpr uint32_t kSwipeDurationBudgetMs = 250;
+constexpr uint64_t kSwipePixelBudget = 1000000;
+constexpr uint32_t kSwipeDurationBudgetMs = 300;
 
 ReadyScreen ready_screen;
 GrindingScreenArc arc_screen;

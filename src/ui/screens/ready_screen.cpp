@@ -6,7 +6,9 @@
 
 namespace {
 
-constexpr uint32_t READY_TAB_SWIPE_ANIMATION_MS = 120;
+// Long enough to show several frames on hardware while remaining much more
+// responsive than LVGL's 200-400 ms default scroll timing.
+constexpr uint32_t READY_TAB_SWIPE_ANIMATION_MS = 180;
 
 void shorten_tab_scroll_animation(lv_event_t* event) {
     lv_anim_t* animation = lv_event_get_scroll_anim(event);

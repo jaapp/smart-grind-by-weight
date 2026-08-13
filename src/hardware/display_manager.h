@@ -4,6 +4,18 @@
 #include "touch_driver.h"
 #include "../config/constants.h"
 
+struct DisplayPerformanceSnapshot {
+    uint32_t window_ms = 0;
+    uint32_t ui_calls = 0;
+    uint32_t refreshes = 0;
+    uint32_t rendered_frames = 0;
+    uint32_t flushes = 0;
+    uint32_t pixels = 0;
+    uint32_t ui_time_us = 0;
+    uint32_t render_time_us = 0;
+    uint32_t flush_time_us = 0;
+};
+
 class DisplayManager {
 private:
     Arduino_DataBus* bus;
@@ -20,6 +32,12 @@ private:
     uint32_t buffer_size;
     bool initialized;
 
+    portMUX_TYPE metrics_mux = portMUX_INITIALIZER_UNLOCKED;
+    DisplayPerformanceSnapshot metrics_window;
+    DisplayPerformanceSnapshot metrics_snapshot;
+    uint32_t metrics_window_started_ms = 0;
+    uint32_t render_started_us = 0;
+
 public:
     void init();
     void update();
@@ -29,10 +47,12 @@ public:
     uint32_t get_height() const { return screen_height; }
     bool is_initialized() const { return initialized; }
     TouchDriver* get_touch_driver() { return &touch_driver; }
+    DisplayPerformanceSnapshot get_performance_snapshot();
     
 private:
     static void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
     static void display_rounder_cb(lv_event_t* e);
+    static void display_metrics_cb(lv_event_t* e);
     static void touchpad_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
     static uint32_t millis_cb();
 };
