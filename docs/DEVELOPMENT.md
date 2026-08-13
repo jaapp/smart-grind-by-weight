@@ -8,12 +8,15 @@ This guide is for developers who want to build the Smart Grind-by-Weight firmwar
 
 ## 🛠️ Development Setup
 
-### Prerequisites
+### Firmware prerequisites
 
 - **Python 3.8+** with pip
 - **Git** for version control
 - **USB cable** for initial firmware flashing
 - **Hardware** (ESP32-S3 board, HX711, load cell) for testing
+
+Hardware is not required for desktop UI and simulated grind-flow development;
+see [Desktop Simulator](#desktop-simulator).
 
 ### Initial Setup
 
@@ -32,7 +35,30 @@ This automatically creates a virtual environment and installs all required depen
 
 ---
 
-## 🔧 Build Targets
+## 🖥️ Desktop Simulator
+
+On Windows, the native simulator runs the production LVGL Ready and Grinding
+screens at the real display resolution, with mouse input and a deterministic
+grinder/load-cell scenario. It requires Visual Studio 2022 with the Desktop
+development with C++ workload, but no ESP32, display, load cell, PlatformIO, or
+SDL installation.
+
+```powershell
+.\sim\run.ps1
+```
+
+Run its automated UI/grind smoke scenario with:
+
+```powershell
+.\sim\build.ps1 -Test
+```
+
+See [sim/README.md](../sim/README.md) for controls, capabilities, and the
+hardware-validation boundary.
+
+---
+
+## 🔧 Firmware Build Targets
 
 The project has three build targets:
 

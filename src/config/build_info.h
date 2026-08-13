@@ -1,7 +1,14 @@
 #pragma once
 
 #include <cstdio>
+
+#ifdef SMART_GRIND_SIM
+#define BUILD_NUMBER 0
+#define GIT_COMMIT_ID "desktop-simulator"
+#define GIT_BRANCH "desktop-simulator"
+#else
 #include "../../include/git_info.h"
+#endif
 
 // Build information - BUILD_FIRMWARE_VERSION is automatically updated by release scripts
 #define BUILD_FIRMWARE_VERSION "1.4.0"                                          // Firmware version string (updated by release automation)
