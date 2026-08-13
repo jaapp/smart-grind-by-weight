@@ -64,7 +64,7 @@ python3 tools/grinder.py analyze
 
 **Grind Settings:** Configurable through Menu → Grind Settings page
 - **Automation**: Start on Cup and Return on Removal toggles (weight/time panes only, never Manual/Menu). Cup detection settles against a relaxed 0.05g tolerance (`USER_AUTO_GRIND_SETTLE_TOLERANCE_G`); grind tare/settling keeps the precision 0.010g tolerance
-- **Fast Mode**: Speed-over-accuracy toggle (default: disabled). Skips PRIME/PURGE phases, shortens tare (6 samples vs 18) and settling windows (200ms vs 500ms), widens tolerance to 0.1g, aims pulses at target minus half the tolerance to offset post-pulse dribble (normal mode aims at target minus tolerance), caps pulse corrections at 3, and shortens the Start-on-Cup settled check (200ms vs 500ms). Constants in `grind_control.h` (`GRIND_FAST_*`)
+- **Fast Mode**: Speed-over-accuracy toggle (default: disabled). Skips PRIME/PURGE phases, shortens tare (6 samples vs 18) and settling windows (200ms vs 500ms), widens tolerance to 0.1g, stops the motor early by an extra dose-proportional margin (5% of target, clamped 0.2-1.0g) so the main grind lands under target instead of coasting past it, aims pulses at target minus half the tolerance to offset post-pulse dribble (normal mode aims at target minus tolerance), caps pulse corrections at 3, and shortens the Start-on-Cup settled check (200ms vs 500ms). Constants in `grind_control.h` (`GRIND_FAST_*`)
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `fast_mode` (boolean), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 
