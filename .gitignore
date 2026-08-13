@@ -25,3 +25,7 @@ failed_session_*.bin
 
 # Git worktrees
 .worktrees/
+
+# Claude Code local files
+.claude/worktrees/
+.claude/settings.local.json
