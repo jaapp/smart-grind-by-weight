@@ -276,9 +276,11 @@ static esp_err_t panel_sh8601_draw_bitmap(esp_lcd_panel_t *panel, int x_start, i
     }, 4), TAG, "send command failed");
     // transfer frame buffer
     size_t len = (x_end - x_start) * (y_end - y_start) * sh8601->fb_bits_per_pixel / 8;
-    tx_color(sh8601, io, LCD_CMD_RAMWR, color_data, len);
-
-    return ESP_OK;
+    // Propagate queue/transfer setup failures to the caller. The LVGL bridge
+    // marks a flush complete immediately on error; returning ESP_OK here when
+    // no transfer was queued would otherwise leave it waiting forever for a
+    // completion callback that can never arrive.
+    return tx_color(sh8601, io, LCD_CMD_RAMWR, color_data, len);
 }
 
 static esp_err_t panel_sh8601_invert_color(esp_lcd_panel_t *panel, bool invert_color_data)
