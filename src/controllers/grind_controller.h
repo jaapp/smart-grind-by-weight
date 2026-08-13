@@ -189,7 +189,8 @@ public:
         OVERSHOOT,
         MAX_PULSES,
         TIMEOUT,
-        ERROR
+        ERROR,
+        CUP_REMOVED
     };
 
 private:

@@ -573,7 +573,7 @@ void GrindController::update() {
         loop_data.current_weight < -1.0f) {
         timeout_phase = phase;
         grinder->stop();
-        last_session_result_ = GrindSessionResult::ERROR;
+        last_session_result_ = GrindSessionResult::CUP_REMOVED;
 
         queue_log_message("--- NEGATIVE WEIGHT FAILSAFE TRIGGERED: %.2fg in phase %s ---\n",
                          loop_data.current_weight, get_phase_name(timeout_phase));
