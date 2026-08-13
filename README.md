@@ -69,7 +69,7 @@ flowchart LR
 
 1. **Get the parts** - ESP32-S3 AMOLED display + HX711 + load cell (~€35 total) → See [Parts List](docs/DOC.md#-parts-list)
 2. **3D print the mounting parts** - All STL files included, no supports needed → See [3D Printed Parts](docs/DOC.md#3d-printed-parts) | [Community Designs](docs/3D_PRINTS.md)
-3. **Flash firmware & calibrate** - [Web Flasher](https://jaapp.github.io/smart-grind-by-weight) (Chrome/Edge desktop + Android only) or command line
+3. **Check your board revision, wiring, then flash & calibrate** - The 1.64-inch board has incompatible V1 and V2 display firmware and different external GPIO assignments. V2 uses GPIO 1 for HX711 SCK and GPIO 16 for motor control. See [Display stays black after flashing](docs/TROUBLESHOOTING.md#display-stays-black-after-flashing-waveshare-164-v2), then choose the matching V1/V2 image in the [Web Flasher](https://jaapp.github.io/smart-grind-by-weight) (Chrome/Edge desktop + Android only) or build the matching command-line target
 4. **Follow the assembly video** - [Complete Eureka build process](https://youtu.be/-kfKjiwJsGM)
 
 **Ready to build?** → See **[DOC.md](docs/DOC.md)** for complete build instructions, parts list, and usage guide.

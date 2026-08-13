@@ -6,7 +6,7 @@ on:
     paths:
       - 'tools/web-flasher/**'  # Deploy when web-flasher files change (after firmware commit)
   release:
-    types: [ unpublished, deleted ]
+    types: [ published, unpublished, deleted ]
   workflow_dispatch:
 
 permissions:
@@ -67,59 +67,42 @@ jobs:
           if True:
               import json
               import os
-              import time
-              import urllib.request
 
               firmware_root = "tools/web-flasher/firmware"
               entries = []
-
-              def wait_for(url, retries=30, delay=30):
-                  for attempt in range(retries):
-                      try:
-                          with urllib.request.urlopen(url) as response:
-                              if response.status == 200:
-                                  print(f"  [OK] {url} (attempt {attempt + 1})")
-                                  return True
-                      except Exception:
-                          print(f"  [WAIT] {url} (attempt {attempt + 1})")
-                      time.sleep(delay)
-                  total = retries * delay
-                  minutes = total // 60
-                  print(f"  [FAIL] {url} after {retries} attempts (~{minutes}m)")
-                  return False
 
               for tag in sorted(os.listdir(firmware_root), reverse=True):
                   tag_path = os.path.join(firmware_root, tag)
                   if not os.path.isdir(tag_path):
                       continue
 
-                  base = f"smart-grind-by-weight-{tag}"
-                  manifest_rel = f"firmware/{tag}/{base}.manifest.json"
-                  ota_rel = f"firmware/{tag}/{base}-web-ota.bin"
-
-                  manifest_abs = os.path.join(tag_path, f"{base}.manifest.json")
-                  ota_abs = os.path.join(tag_path, f"{base}-web-ota.bin")
-
-                  if not (os.path.isfile(manifest_abs) and os.path.isfile(ota_abs)):
-                      continue
-
                   prerelease = any(key in tag for key in ("-rc", "-beta", "-alpha"))
                   version = tag.lstrip('v')
+                  base = f"smart-grind-by-weight-{tag}"
+                  variants = (
+                      ("Waveshare 1.64 V1", base),
+                      ("Waveshare 1.64 V2", f"{base}-waveshare-164-v2"),
+                  )
 
-                  manifest_url = f"https://jaapp.github.io/smart-grind-by-weight/{manifest_rel}"
-                  ota_url = f"https://jaapp.github.io/smart-grind-by-weight/{ota_rel}"
+                  for board, artifact_base in variants:
+                      manifest_rel = f"firmware/{tag}/{artifact_base}.manifest.json"
+                      ota_rel = f"firmware/{tag}/{artifact_base}-web-ota.bin"
+                      manifest_abs = os.path.join(tag_path, f"{artifact_base}.manifest.json")
+                      ota_abs = os.path.join(tag_path, f"{artifact_base}-web-ota.bin")
 
-                  if not wait_for(manifest_url) or not wait_for(ota_url):
-                      continue
+                      # Older releases contain only the original V1 artifact.
+                      if not (os.path.isfile(manifest_abs) and os.path.isfile(ota_abs)):
+                          continue
 
-                  entries.append({
-                      "tag": tag,
-                      "version": version,
-                      "display": tag,
-                      "prerelease": prerelease,
-                      "manifest": manifest_rel,
-                      "ota": ota_rel,
-                  })
+                      entries.append({
+                          "tag": tag,
+                          "version": version,
+                          "board": board,
+                          "display": f"{tag} - {board}",
+                          "prerelease": prerelease,
+                          "manifest": manifest_rel,
+                          "ota": ota_rel,
+                      })
 
               index_path = os.path.join(firmware_root, "index.json")
               with open(index_path, "w", encoding="utf-8") as handle:

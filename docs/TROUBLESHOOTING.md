@@ -3,12 +3,43 @@
 ## Table of Contents
 
 - [Motor Does Not Start](#motor-does-not-start)
+- [Display Stays Black After Flashing (Waveshare 1.64 V2)](#display-stays-black-after-flashing-waveshare-164-v2)
 - [HX711 Not Detected / Wrong Sample Rate](#hx711-not-detected--wrong-sample-rate)
 - [Unknown board ID 'esp32-s3-devkitc-1'](#unknown-board-id-esp32-s3-devkitc-1)
 - [PlatformIO Project Initialization Issues](#platformio-project-initialization-issues)
 - [Grind Timeout Screen](#grind-timeout-screen)
 - [Unreliable Pulse Corrections](#unreliable-pulse-corrections)
 - [Getting Diagnostic Reports](#getting-diagnostic-reports)
+
+---
+
+## Display Stays Black After Flashing (Waveshare 1.64 V2)
+
+**Applies to:** ESP32-S3-Touch-AMOLED-1.64 boards that still accept firmware and produce serial/BLE diagnostics, but show no pixels after Smart Grind starts.
+
+### Symptoms
+- The display worked with the factory firmware, then became completely black after flashing Smart Grind.
+- The device still boots, connects, or produces a diagnostic report.
+- Reflashing the official V2 demo restores the display.
+
+### Root Cause
+Waveshare's V2 revision is not display-compatible with the original board. It uses an SH8601 panel controller, GPIO 46 for display chip select, a 40 MHz QSPI bus, and a 20-pixel X offset. The original V1 target uses a different display path and can boot successfully without lighting a V2 panel.
+
+### Confirm the Revision
+Flash Waveshare's [official V2 demo](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.64-v2). If that works but the V1 demo or normal Smart Grind image remains black, treat the board as V2. Do this test before connecting the grinder wiring so display compatibility is isolated from the rest of the installation.
+
+### Resolution
+Build and flash the V2 target:
+
+```bash
+python3 tools/venv/bin/python -m platformio run --target upload -e waveshare-esp32s3-touch-amoled-164-v2
+```
+
+For a complete V2 installation, wire HX711 SCK to GPIO 1 and the grinder motor-control lead to GPIO 16. GPIO 18 is connected to the V2 touchscreen interrupt (`TP_INT`) and must not be used for motor control. The V1 connections remain HX711 SCK on GPIO 2 and motor control on GPIO 18.
+
+Do not change only the chip-select pin in a V1 build. Hardware validation showed that an Arduino_GFX SH8601 attempt remained black; the working V2 target uses Waveshare's native Espressif `esp_lcd` SH8601 driver and initialization sequence.
+
+If using the Web Flasher, select an image explicitly labelled for the 1.64-inch V2 board. If no V2 image is listed, do not flash the V1 image; build the V2 target from source or wait for a V2 release artifact.
 
 ---
 
@@ -52,12 +83,12 @@ The motor control wire (Pin 3) is the wire that **starts the motor when briefly 
 ### Resolution
 
 **Swap the wire connections:**
-- The motor control wire (Pin 3) should connect to Waveshare **GPIO 18**
+- The motor control wire (Pin 3) should connect to Waveshare **GPIO 18 on V1** or **GPIO 16 on V2**
 - The button signal wire (Pin 2) can remain disconnected (unused in this project)
 
-If wires were reversed, swap them so Pin 3 connects to GPIO 18. The Waveshare board has reverse polarity protection for power connections, but the motor/button wires should be correctly identified for proper operation.
+If wires were reversed, swap them so Pin 3 connects to the correct GPIO for the board revision. On V2, never use GPIO 18 for motor control because it is shared with `TP_INT`. The Waveshare board has reverse polarity protection for power connections, but the motor/button wires should be correctly identified for proper operation.
 
-**Important:** Wire colors vary significantly between Eureka units - always refer to pin positions rather than wire colors when troubleshooting.
+**Important:** Wire colors vary significantly between Eureka units - always refer to pin positions rather than wire colors when troubleshooting. On the physically verified V2 Specialita, Pin 3 was the grey lead and Pin 2 was white, contrary to the earlier assumed assignment; the white Pin 2 lead was left disconnected and insulated.
 
 ---
 
