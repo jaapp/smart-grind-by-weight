@@ -465,10 +465,16 @@ void UIManager::update_auto_actions() {
         GrindController::GrindSessionResult session_result =
             grind_controller ? grind_controller->get_last_session_result()
                              : GrindController::GrindSessionResult::UNKNOWN;
-        const bool successful_result =
-            session_result == GrindController::GrindSessionResult::SUCCESS;
+        // Completed grinds auto-return regardless of accuracy; error screens stay up for
+        // acknowledgment except when the session ended because the cup was pulled early.
+        const bool removal_returnable =
+            state_machine->is_state(UIState::GRIND_COMPLETE)
+                ? (session_result == GrindController::GrindSessionResult::SUCCESS ||
+                   session_result == GrindController::GrindSessionResult::OVERSHOOT ||
+                   session_result == GrindController::GrindSessionResult::MAX_PULSES)
+                : session_result == GrindController::GrindSessionResult::CUP_REMOVED;
 
-        if (successful_result && live_weight <= kCompleteExitThresholdG && rearm_ready) {
+        if (removal_returnable && live_weight <= kCompleteExitThresholdG && rearm_ready) {
             LOG_BLE("[AUTO ACTION] Detected near-empty scale - returning to ready screen\n");
             auto_actions_.last_auto_return_ms = now;
             if (grind_controller) {

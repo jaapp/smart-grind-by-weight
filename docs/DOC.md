@@ -325,7 +325,7 @@ Swipe to the **Manual** pane for direct motor control:
 ### Grind Settings
 Access **Menu → Grind Settings** to configure:
 - **Start on Cup**: Start the active mode automatically when the scale gains ≈50 g within ~2 s (after a short post-boot warmup)
-- **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale
+- **Return on Removal**: Leave the completion screen as soon as that cup weight drops back off the scale. Works for any finished grind (in or out of tolerance), and also recovers if the cup is pulled during the final settling window; genuine timeout errors still wait for acknowledgment
 - **Fast Mode**: Trade accuracy for speed. Skips the purge/prime phase entirely, shortens the tare (6 samples instead of 18) and settling windows (200ms instead of 500ms), widens the target tolerance to 0.05g (a result within 0.05g of target ends the grind), stops the motor early by an extra dose-proportional margin (5% of target, clamped 0.2-0.6g) so the main grind deliberately lands under target instead of coasting past it, aims correction pulses half the tolerance below target (pulses over-deliver slightly, so results center on the target), allows at most 3 pulse corrections (instead of 10), and reacts faster to a cup landing when Start on Cup is enabled (200ms settled check instead of 500ms). Expect grinds to finish several seconds sooner with slightly more shot-to-shot variance (default: disabled)
 - **Purging** *(Advanced)*: Control how the grinder saturates itself before weight-mode grinding
   - **Prime mode**: Keeps the coffee used to saturate the grinder, continues immediately
@@ -459,7 +459,7 @@ During Grinding:
 Want the scale to run itself? Enable the automation toggles in **Menu → Grind Settings**:
 
 - **Start on Cup**: As soon as a recognized cup or portafilter lands on the load cell (≈50 g delta inside a 2 s window), the active profile tars and begins grinding automatically. Cup detection uses a relaxed 0.05 g settled tolerance so it fires quickly once the cup comes to rest while still ignoring a hand resting on it; the grind's own tare keeps the precision tolerance. Ideal when dosing cups dock directly under the chute.
-- **Return on Removal**: When the cup weight drops away after completion, the grinder exits the results screen and returns to Ready. Useful for keeping the workflow hands-free between shots.
+- **Return on Removal**: When the cup weight drops away after completion, the grinder exits the results screen and returns to Ready. This applies to any finished grind, including ones that end outside tolerance. Pulling the cup before settling finishes still stops the session safely (negative-weight failsafe), and with this toggle enabled that screen also returns to Ready on its own instead of waiting for a button press. Useful for keeping the workflow hands-free between shots.
 
 Both automation settings rely on the same smoothed weight deltas used for flow detection, so no extra calibration is required. Leave them disabled if you prefer manual control or experience false triggers with lighter accessories.
 
