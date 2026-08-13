@@ -47,6 +47,11 @@ The smoke scenario creates the production UI, starts a grind, verifies that the
 screen transitions to Grinding, and confirms that simulated load-cell weight
 advances.
 
+The test command also runs deterministic render-budget benchmarks for the arc
+and chart layouts and for an animated Ready-screen tab swipe. They count LVGL
+flushes and flushed pixels, protecting the UI from accidentally returning to
+excessive redraws or sluggish page transitions.
+
 The simulator does not execute built ESP32 `.bin` files; those contain Xtensa
 machine code and cannot run in a native Windows process. The complete
 compatibility gate is therefore:

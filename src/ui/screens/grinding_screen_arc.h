@@ -12,6 +12,8 @@ private:
     lv_obj_t* progress_arc;
     bool visible;
     bool time_mode;
+    char displayed_weight_text[16];
+    int displayed_progress;
 
 public:
     void create() override;

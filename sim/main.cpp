@@ -17,6 +17,10 @@ namespace {
 constexpr int kDisplayWidth = 280;
 constexpr int kDisplayHeight = 456;
 constexpr float kTargetWeight = USER_SINGLE_ESPRESSO_WEIGHT_G;
+constexpr uint64_t kArcPixelBudget = 800000;
+constexpr uint64_t kChartPixelBudget = 3500000;
+constexpr uint64_t kSwipePixelBudget = 600000;
+constexpr uint32_t kSwipeDurationBudgetMs = 250;
 
 ReadyScreen ready_screen;
 GrindingScreenArc arc_screen;
@@ -33,8 +37,61 @@ uint32_t grind_started_ms = 0;
 uint32_t last_update_ms = 0;
 HWND simulator_window = nullptr;
 
+struct RenderMetrics {
+    uint64_t flushed_pixels = 0;
+    uint64_t render_time_ms = 0;
+    uint32_t flush_count = 0;
+    uint32_t refresh_count = 0;
+    uint32_t render_started_ms = 0;
+};
+
+RenderMetrics render_metrics;
+
 uint32_t now_ms() {
     return static_cast<uint32_t>(GetTickCount64());
+}
+
+void reset_render_metrics() {
+    render_metrics = {};
+}
+
+void print_render_metrics(const char* layout, uint32_t duration_ms) {
+    std::printf(
+        "[benchmark] %s duration=%lums refreshes=%lu flushes=%lu pixels=%llu render=%llums\n",
+        layout,
+        static_cast<unsigned long>(duration_ms),
+        static_cast<unsigned long>(render_metrics.refresh_count),
+        static_cast<unsigned long>(render_metrics.flush_count),
+        static_cast<unsigned long long>(render_metrics.flushed_pixels),
+        static_cast<unsigned long long>(render_metrics.render_time_ms));
+    std::fflush(stdout);
+}
+
+void display_metrics_event(lv_event_t* event) {
+    switch (lv_event_get_code(event)) {
+        case LV_EVENT_RENDER_START:
+            render_metrics.render_started_ms = now_ms();
+            break;
+        case LV_EVENT_RENDER_READY:
+            if (render_metrics.render_started_ms != 0) {
+                render_metrics.render_time_ms += now_ms() - render_metrics.render_started_ms;
+                render_metrics.render_started_ms = 0;
+            }
+            break;
+        case LV_EVENT_FLUSH_START: {
+            const auto* area = static_cast<const lv_area_t*>(lv_event_get_param(event));
+            if (area) {
+                render_metrics.flushed_pixels += static_cast<uint64_t>(lv_area_get_size(area));
+                render_metrics.flush_count++;
+            }
+            break;
+        }
+        case LV_EVENT_REFR_READY:
+            render_metrics.refresh_count++;
+            break;
+        default:
+            break;
+    }
 }
 
 void set_status(const char* status) {
@@ -206,6 +263,8 @@ bool has_arg(int argc, char** argv, const char* expected) {
 
 int main(int argc, char** argv) {
     const bool smoke_test = has_arg(argc, argv, "--smoke");
+    const bool benchmark = has_arg(argc, argv, "--benchmark");
+    const bool swipe_benchmark = has_arg(argc, argv, "--swipe-benchmark");
 
     if (smoke_test) {
         std::puts("[smoke] starting simulator");
@@ -228,6 +287,10 @@ int main(int argc, char** argv) {
     }
 
     simulator_window = lv_windows_get_display_window_handle(display);
+    if (smoke_test || benchmark || swipe_benchmark) {
+        ShowWindow(simulator_window, SW_HIDE);
+    }
+    lv_display_add_event_cb(display, display_metrics_event, LV_EVENT_ALL, nullptr);
 
     // The Windows driver creates its framebuffer on the first LVGL timer pass.
     // Let that happen before sizing and styling the production screen objects.
@@ -253,13 +316,25 @@ int main(int argc, char** argv) {
     HWND window = simulator_window;
     const uint32_t smoke_started_ms = now_ms();
     bool smoke_scenario_started = false;
+    bool benchmark_switched_layout = false;
+    uint64_t benchmark_arc_pixels = 0;
+    bool swipe_started = false;
+    uint32_t swipe_started_ms = 0;
     bool view_key_down = false;
     bool tare_key_down = false;
 
     while (IsWindow(window)) {
-        if (smoke_test && !smoke_scenario_started && now_ms() - smoke_started_ms > 100) {
+        if (swipe_benchmark && !swipe_started && now_ms() - smoke_started_ms > 100) {
+            reset_render_metrics();
+            swipe_started_ms = now_ms();
+            lv_tabview_set_act(ready_screen.get_tabview(), 1, LV_ANIM_ON);
+            swipe_started = true;
+        }
+
+        if ((smoke_test || benchmark) && !smoke_scenario_started && now_ms() - smoke_started_ms > 100) {
             start_grind();
             smoke_scenario_started = true;
+            reset_render_metrics();
         }
 
         update_mock_grind();
@@ -278,6 +353,20 @@ int main(int argc, char** argv) {
         const uint32_t wait_ms = std::clamp<uint32_t>(lv_timer_handler(), 1, 16);
         Sleep(wait_ms);
 
+        if (swipe_benchmark && swipe_started &&
+            !lv_obj_is_scrolling(lv_tabview_get_content(ready_screen.get_tabview()))) {
+            const uint32_t duration_ms = now_ms() - swipe_started_ms;
+            print_render_metrics("swipe", duration_ms);
+            if (lv_tabview_get_tab_act(ready_screen.get_tabview()) != 1 ||
+                duration_ms > kSwipeDurationBudgetMs ||
+                render_metrics.flushed_pixels > kSwipePixelBudget) {
+                std::fprintf(stderr, "Simulator swipe budget exceeded.\n");
+                std::fflush(stderr);
+                ExitProcess(4);
+            }
+            ExitProcess(0);
+        }
+
         if (smoke_test && now_ms() - smoke_started_ms > 750) {
             if (!arc_screen.is_visible() || ready_screen.is_visible() || weight_g <= 0.0f) {
                 std::fprintf(stderr, "Simulator scenario did not advance.\n");
@@ -286,6 +375,25 @@ int main(int argc, char** argv) {
             }
             std::printf("[smoke] scenario advanced to %.2fg\n", weight_g);
             std::fflush(stdout);
+            ExitProcess(0);
+        }
+
+        if (benchmark && !benchmark_switched_layout && now_ms() - smoke_started_ms > 2600) {
+            print_render_metrics("arc", 2500);
+            benchmark_arc_pixels = render_metrics.flushed_pixels;
+            toggle_layout();
+            benchmark_switched_layout = true;
+            reset_render_metrics();
+        }
+
+        if (benchmark && benchmark_switched_layout && now_ms() - smoke_started_ms > 5100) {
+            print_render_metrics("chart", 2500);
+            if (benchmark_arc_pixels > kArcPixelBudget ||
+                render_metrics.flushed_pixels > kChartPixelBudget) {
+                std::fprintf(stderr, "Simulator render budget exceeded.\n");
+                std::fflush(stderr);
+                ExitProcess(3);
+            }
             ExitProcess(0);
         }
     }
