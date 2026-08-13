@@ -1089,7 +1089,15 @@ class GrinderBLETool:
         self.safe_print(f"   Tasks:        {performance.get('tasks_registered', 0)} registered")
         self.safe_print(f"   Load Cell:    {performance.get('load_cell_freq_hz', 0)} Hz")
         self.safe_print(f"   Grind Ctrl:   {performance.get('grind_control_freq_hz', 0)} Hz")
-        self.safe_print(f"   UI Updates:   {performance.get('ui_freq_hz', 0)} Hz")
+        ui_configured_hz = performance.get('ui_configured_hz', performance.get('ui_freq_hz', 0))
+        self.safe_print(f"   UI Configured:{ui_configured_hz:>5} Hz")
+        if 'ui_actual_hz' in performance:
+            self.safe_print(f"   UI Actual:    {performance.get('ui_actual_hz', 0):>5} Hz")
+            self.safe_print(f"   Rendered:     {performance.get('render_hz', 0):>5} FPS")
+            self.safe_print(f"   LVGL Refresh: {performance.get('lvgl_refresh_hz', 0):>5} Hz")
+            self.safe_print(f"   Pixels:       {performance.get('pixels_per_s', 0):>9,}/s")
+            self.safe_print(f"   Render Avg:   {performance.get('render_avg_us', 0):>9,} us")
+            self.safe_print(f"   Flush Avg:    {performance.get('flush_avg_us', 0):>9,} us")
         
         # Hardware Status
         self.safe_print(f"[HARDWARE]:")

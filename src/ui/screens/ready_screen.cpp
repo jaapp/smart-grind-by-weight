@@ -4,6 +4,21 @@
 #include "../../controllers/grind_mode_traits.h"
 #include "../ui_helpers.h"
 
+namespace {
+
+// Long enough to show several frames on hardware while remaining much more
+// responsive than LVGL's 200-400 ms default scroll timing.
+constexpr uint32_t READY_TAB_SWIPE_ANIMATION_MS = 180;
+
+void shorten_tab_scroll_animation(lv_event_t* event) {
+    lv_anim_t* animation = lv_event_get_scroll_anim(event);
+    if (animation) {
+        lv_anim_set_duration(animation, READY_TAB_SWIPE_ANIMATION_MS);
+    }
+}
+
+} // namespace
+
 void ReadyScreen::create() {
     screen = lv_obj_create(lv_scr_act());
     lv_obj_set_size(screen, LV_PCT(100), LV_PCT(80));
@@ -19,6 +34,11 @@ void ReadyScreen::create() {
     lv_obj_align(tabview, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(tabview, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
     lv_obj_add_flag(tabview, LV_OBJ_FLAG_GESTURE_BUBBLE);
+
+    // LVGL defaults scroll snapping to 200-400 ms. On the full-width AMOLED
+    // tabs that makes a completed swipe feel noticeably behind the finger.
+    lv_obj_t* tab_content = lv_tabview_get_content(tabview);
+    lv_obj_add_event_cb(tab_content, shorten_tab_scroll_animation, LV_EVENT_SCROLL_BEGIN, nullptr);
 
     // Hide tab buttons for swipe-only interface
     lv_obj_t* tab_btns = lv_tabview_get_tab_btns(tabview);

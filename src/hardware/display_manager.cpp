@@ -83,6 +83,7 @@ void DisplayManager::init() {
                           buffer_size , LV_DISPLAY_RENDER_MODE_PARTIAL);
 
     lv_display_add_event_cb(lvgl_display, display_rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
+    lv_display_add_event_cb(lvgl_display, display_metrics_cb, LV_EVENT_ALL, NULL);
     
     // Initialize touch
     touch_driver.init();
@@ -95,9 +96,31 @@ void DisplayManager::init() {
 
 void DisplayManager::update() {
     if (!initialized) return;
-    
+
+    const uint32_t started_us = micros();
     touch_driver.update();
     lv_timer_handler();
+
+    const uint32_t now_ms = millis();
+    metrics_window.ui_calls++;
+    metrics_window.ui_time_us += micros() - started_us;
+    if (metrics_window_started_ms == 0) {
+        metrics_window_started_ms = now_ms;
+    } else if (now_ms - metrics_window_started_ms >= 1000) {
+        metrics_window.window_ms = now_ms - metrics_window_started_ms;
+        portENTER_CRITICAL(&metrics_mux);
+        metrics_snapshot = metrics_window;
+        portEXIT_CRITICAL(&metrics_mux);
+        metrics_window = {};
+        metrics_window_started_ms = now_ms;
+    }
+}
+
+DisplayPerformanceSnapshot DisplayManager::get_performance_snapshot() {
+    portENTER_CRITICAL(&metrics_mux);
+    const DisplayPerformanceSnapshot snapshot = metrics_snapshot;
+    portEXIT_CRITICAL(&metrics_mux);
+    return snapshot;
 }
 
 // Update the refresh area to be full width
@@ -109,9 +132,33 @@ void DisplayManager::display_rounder_cb(lv_event_t* e) {
     area->x2 = g_display_manager->screen_width - 1;
 }
 
+void DisplayManager::display_metrics_cb(lv_event_t* e) {
+    if (!g_display_manager) return;
+
+    switch (lv_event_get_code(e)) {
+        case LV_EVENT_REFR_START:
+            g_display_manager->metrics_window.refreshes++;
+            break;
+        case LV_EVENT_RENDER_START:
+            g_display_manager->metrics_window.rendered_frames++;
+            g_display_manager->render_started_us = micros();
+            break;
+        case LV_EVENT_RENDER_READY:
+            if (g_display_manager->render_started_us != 0) {
+                g_display_manager->metrics_window.render_time_us +=
+                    micros() - g_display_manager->render_started_us;
+                g_display_manager->render_started_us = 0;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
     if (!g_display_manager || !g_display_manager->gfx_device) return;
-    
+
+    const uint32_t flush_started_us = micros();
     uint32_t w = lv_area_get_width(area);
     uint32_t h = lv_area_get_height(area);
 
@@ -147,7 +194,11 @@ void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area,
         src_row_offset += rows;
         current_y += rows;
     }
-    
+
+    g_display_manager->metrics_window.flushes++;
+    g_display_manager->metrics_window.pixels += w * h;
+    g_display_manager->metrics_window.flush_time_us += micros() - flush_started_us;
+
     lv_display_flush_ready(disp);
 }
 

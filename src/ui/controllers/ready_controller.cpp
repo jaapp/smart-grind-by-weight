@@ -119,13 +119,28 @@ void ReadyUIController::register_events() {
         if (lv_event_get_code(e) != LV_EVENT_GESTURE) {
             return;
         }
-        lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
-        if (dir != LV_DIR_TOP && dir != LV_DIR_BOTTOM) {
+        lv_indev_t* input = lv_indev_get_act();
+        lv_dir_t dir = lv_indev_get_gesture_dir(input);
+        UIManager* ui = static_cast<UIManager*>(lv_event_get_user_data(e));
+        if (!ui || !ui->state_machine->is_state(UIState::READY)) {
             return;
         }
-        UIManager* ui = static_cast<UIManager*>(lv_event_get_user_data(e));
-        if (ui && ui->state_machine->is_state(UIState::READY) && ui->ready_controller_) {
+
+        if ((dir == LV_DIR_LEFT || dir == LV_DIR_RIGHT) && ui->ready_screen.get_tabview()) {
+            lv_obj_t* ready_tabs = ui->ready_screen.get_tabview();
+            int target_tab = static_cast<int>(lv_tabview_get_tab_act(ready_tabs));
+            target_tab += dir == LV_DIR_LEFT ? 1 : -1;
+            if (target_tab >= 0 && target_tab < 4) {
+                lv_tabview_set_act(ready_tabs, static_cast<uint32_t>(target_tab), LV_ANIM_ON);
+                lv_indev_wait_release(input);
+            }
+            lv_event_stop_bubbling(e);
+            return;
+        }
+
+        if ((dir == LV_DIR_TOP || dir == LV_DIR_BOTTOM) && ui->ready_controller_) {
             ui->ready_controller_->toggle_mode();
+            lv_event_stop_bubbling(e);
         }
     };
 

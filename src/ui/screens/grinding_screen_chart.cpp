@@ -3,6 +3,7 @@
 #include "../../config/constants.h"
 #include <lvgl.h>
 #include <widgets/span/lv_span.h>
+#include <cstring>
 
 void GrindingScreenChart::create() {
     screen = lv_obj_create(lv_scr_act());
@@ -104,6 +105,8 @@ void GrindingScreenChart::create() {
     lv_style_set_text_font(lv_span_get_style(separator_span), &lv_font_montserrat_24);
     lv_style_set_text_color(lv_span_get_style(separator_span), lv_color_hex(THEME_COLOR_TEXT_SECONDARY));
     lv_span_set_text(separator_span, " / 18.0g");
+    std::snprintf(displayed_current_text, sizeof(displayed_current_text), "0.0g");
+    std::snprintf(displayed_secondary_text, sizeof(displayed_secondary_text), " / 18.0g");
     
     lv_spangroup_refresh(weight_spangroup);
     
@@ -141,15 +144,7 @@ void GrindingScreenChart::update_target_weight(float weight) {
         snprintf(current_text, sizeof(current_text), "0.0g");
         snprintf(target_text, sizeof(target_text), " / " SYS_WEIGHT_DISPLAY_FORMAT, weight);
 
-        // Update spans
-        lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
-        lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-
-        if (current_span && separator_span) {
-            lv_span_set_text(current_span, current_text);
-            lv_span_set_text(separator_span, target_text);
-            lv_spangroup_refresh(weight_spangroup);
-        }
+        update_weight_spans(current_text, target_text);
     }
     
     // Update chart configuration
@@ -161,34 +156,21 @@ void GrindingScreenChart::update_target_weight(float weight) {
 }
 
 void GrindingScreenChart::update_target_weight_text(const char* text) {
-    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
-    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-
-    if (current_span && separator_span) {
-        const char* target_text = text ? text : "";
-        char formatted_text[48];
-        if (target_text[0] && target_text[0] != ' ' && target_text[0] != '/' && target_text[0] != '\n') {
-            snprintf(formatted_text, sizeof(formatted_text), "\n%s", target_text);
-        } else {
-            snprintf(formatted_text, sizeof(formatted_text), "%s", target_text);
-        }
-        lv_span_set_text(separator_span, formatted_text);
-        lv_spangroup_refresh(weight_spangroup);
+    const char* target_text = text ? text : "";
+    char formatted_text[48];
+    if (target_text[0] && target_text[0] != ' ' && target_text[0] != '/' && target_text[0] != '\n') {
+        snprintf(formatted_text, sizeof(formatted_text), "\n%s", target_text);
+    } else {
+        snprintf(formatted_text, sizeof(formatted_text), "%s", target_text);
     }
+    update_weight_spans(displayed_current_text, formatted_text);
 }
 
 void GrindingScreenChart::update_target_time(float seconds) {
     target_time_seconds = seconds;
-    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
-    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-
-    if (current_span && separator_span) {
-        // Keep the current weight span untouched; show time on a new line without slash
-        char target_text[48];
-        snprintf(target_text, sizeof(target_text), "\nTime: %.1fs", seconds);
-        lv_span_set_text(separator_span, target_text);
-        lv_spangroup_refresh(weight_spangroup);
-    }
+    char target_text[48];
+    snprintf(target_text, sizeof(target_text), "\nTime: %.1fs", seconds);
+    update_weight_spans(displayed_current_text, target_text);
 
     uint32_t predicted_ms = (seconds > 0.0f) ? static_cast<uint32_t>(seconds * 1000.0f) : 0;
     set_chart_time_prediction(predicted_ms);
@@ -199,20 +181,12 @@ void GrindingScreenChart::update_current_weight(float weight) {
     snprintf(current_text, sizeof(current_text), SYS_WEIGHT_DISPLAY_FORMAT, weight);
     snprintf(target_text, sizeof(target_text), " / " SYS_WEIGHT_DISPLAY_FORMAT, target_weight_value);
     
-    // Update spans
-    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
-    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-    
-    if (current_span && separator_span) {
-        lv_span_set_text(current_span, current_text);
-        if (time_mode) {
-            char time_text[48];
-            snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
-            lv_span_set_text(separator_span, time_text);
-        } else {
-            lv_span_set_text(separator_span, target_text);
-        }
-        lv_spangroup_refresh(weight_spangroup);
+    if (time_mode) {
+        char time_text[48];
+        snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
+        update_weight_spans(current_text, time_text);
+    } else {
+        update_weight_spans(current_text, target_text);
     }
 }
 
@@ -220,20 +194,12 @@ void GrindingScreenChart::update_tare_display() {
     char target_text[16];
     snprintf(target_text, sizeof(target_text), " / " SYS_WEIGHT_DISPLAY_FORMAT, target_weight_value);
     
-    // Update spans for tare display
-    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
-    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
-    
-    if (current_span && separator_span) {
-        lv_span_set_text(current_span, "TARE");
-        if (time_mode) {
-            char time_text[48];
-            snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
-            lv_span_set_text(separator_span, time_text);
-        } else {
-            lv_span_set_text(separator_span, target_text);
-        }
-        lv_spangroup_refresh(weight_spangroup);
+    if (time_mode) {
+        char time_text[48];
+        snprintf(time_text, sizeof(time_text), "\nTime: %.1fs", target_time_seconds);
+        update_weight_spans("TARE", time_text);
+    } else {
+        update_weight_spans("TARE", target_text);
     }
 }
 
@@ -245,9 +211,12 @@ void GrindingScreenChart::update_progress(int percent) {
 void GrindingScreenChart::add_chart_data_point(float current_weight, float flow_rate, uint32_t current_time_ms) {
     if (chart_start_time_ms == 0) {
         chart_start_time_ms = current_time_ms;
-        last_data_point_time_ms = current_time_ms;
     }
-    
+
+    if (last_data_point_time_ms != 0 &&
+        current_time_ms - last_data_point_time_ms < DATA_POINT_INTERVAL_MS) {
+        return;
+    }
     last_data_point_time_ms = current_time_ms;
     
     // Scale weight and flow rate by 10 to handle decimals in LVGL chart
@@ -260,7 +229,29 @@ void GrindingScreenChart::add_chart_data_point(float current_weight, float flow_
     lv_chart_set_next_value(chart, weight_series, weight_value);
     lv_chart_set_next_value(chart, flow_rate_series, flow_rate_value);
     
-    lv_chart_refresh(chart);
+}
+
+void GrindingScreenChart::update_weight_spans(const char* current_text, const char* secondary_text) {
+    lv_span_t* current_span = lv_spangroup_get_child(weight_spangroup, 0);
+    lv_span_t* separator_span = lv_spangroup_get_child(weight_spangroup, 1);
+    if (!current_span || !separator_span) {
+        return;
+    }
+
+    bool changed = false;
+    if (std::strcmp(displayed_current_text, current_text) != 0) {
+        std::snprintf(displayed_current_text, sizeof(displayed_current_text), "%s", current_text);
+        lv_span_set_text(current_span, displayed_current_text);
+        changed = true;
+    }
+    if (std::strcmp(displayed_secondary_text, secondary_text) != 0) {
+        std::snprintf(displayed_secondary_text, sizeof(displayed_secondary_text), "%s", secondary_text);
+        lv_span_set_text(separator_span, displayed_secondary_text);
+        changed = true;
+    }
+    if (changed) {
+        lv_spangroup_refresh(weight_spangroup);
+    }
 }
 
 void GrindingScreenChart::set_chart_time_prediction(uint32_t predicted_time_ms) {
