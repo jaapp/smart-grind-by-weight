@@ -1,0 +1,29 @@
+name: Desktop simulator
+
+on:
+  pull_request:
+    paths:
+      - 'include/lv_conf.h'
+      - 'src/config/**'
+      - 'src/font/**'
+      - 'src/ui/**'
+      - 'sim/**'
+      - '.github/workflows/simulator.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'include/lv_conf.h'
+      - 'src/config/**'
+      - 'src/font/**'
+      - 'src/ui/**'
+      - 'sim/**'
+      - '.github/workflows/simulator.yml'
+
+jobs:
+  build-and-smoke-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test simulator
+        shell: pwsh
+        run: .\sim\build.ps1 -Test
