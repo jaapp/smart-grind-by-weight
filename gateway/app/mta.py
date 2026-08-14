@@ -33,7 +33,7 @@ ROUTE_COLORS: dict[str, tuple[str, str]] = {
     "7": ("B933AD", "FFFFFF"),
     **dict.fromkeys(["A", "C", "E"], ("0039A6", "FFFFFF")),
     **dict.fromkeys(["B", "D", "F", "M"], ("FF6319", "FFFFFF")),
-    "G": ("6CBE45", "FFFFFF"),
+    "G": ("A2D831", "000000"),
     **dict.fromkeys(["J", "Z"], ("996633", "FFFFFF")),
     "L": ("A7A9AC", "FFFFFF"),
     **dict.fromkeys(["N", "Q", "R", "W"], ("FCCC0A", "000000")),
