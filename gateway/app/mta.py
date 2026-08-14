@@ -8,6 +8,7 @@ interval, and parsed arrivals are served from cache.
 import asyncio
 import logging
 import time
+from collections import Counter
 
 import httpx
 from google.transit import gtfs_realtime_pb2
@@ -58,6 +59,8 @@ class FeedCache:
     def __init__(self) -> None:
         # (route, stop_id + direction) -> sorted list of epoch arrival times
         self.arrivals: dict[tuple[str, str], list[int]] = {}
+        # (route, stop_id + direction) -> most common terminal stop_id of upcoming trips
+        self.terminals: dict[tuple[str, str], str] = {}
         self.last_success: float = 0.0
         self.last_error: str | None = None
         self._task: asyncio.Task | None = None
@@ -89,6 +92,7 @@ class FeedCache:
         if not self._watched_feeds:
             return
         arrivals: dict[tuple[str, str], list[int]] = {}
+        terminal_counts: dict[tuple[str, str], Counter] = {}
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_S) as client:
             results = await asyncio.gather(
                 *(self._fetch_feed(client, f) for f in sorted(self._watched_feeds)),
@@ -101,32 +105,46 @@ class FeedCache:
                 logger.warning("feed fetch error: %s", result)
                 continue
             ok = True
-            for key, times in result.items():
+            feed_arrivals, feed_terminals = result
+            for key, times in feed_arrivals.items():
                 arrivals.setdefault(key, []).extend(times)
+            for key, terms in feed_terminals.items():
+                terminal_counts.setdefault(key, Counter()).update(terms)
         if ok:
             self.arrivals = {k: sorted(v) for k, v in arrivals.items()}
+            self.terminals = {
+                k: c.most_common(1)[0][0] for k, c in terminal_counts.items() if c
+            }
             self.last_success = time.time()
             self.last_error = None
 
     async def _fetch_feed(
         self, client: httpx.AsyncClient, suffix: str
-    ) -> dict[tuple[str, str], list[int]]:
+    ) -> tuple[dict[tuple[str, str], list[int]], dict[tuple[str, str], list[str]]]:
         resp = await client.get(FEED_BASE + suffix)
         resp.raise_for_status()
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(resp.content)
 
-        out: dict[tuple[str, str], list[int]] = {}
+        times: dict[tuple[str, str], list[int]] = {}
+        terminals: dict[tuple[str, str], list[str]] = {}
         for entity in feed.entity:
             if not entity.HasField("trip_update"):
                 continue
             route = entity.trip_update.trip.route_id
-            for stu in entity.trip_update.stop_time_update:
+            stops = entity.trip_update.stop_time_update
+            terminal = stops[-1].stop_id if stops else ""
+            for stu in stops:
                 event = stu.arrival if stu.HasField("arrival") else stu.departure
                 if not event.time:
                     continue
-                out.setdefault((route, stu.stop_id), []).append(event.time)
-        return out
+                times.setdefault((route, stu.stop_id), []).append(event.time)
+                if terminal and terminal != stu.stop_id:
+                    terminals.setdefault((route, stu.stop_id), []).append(terminal)
+        return times, terminals
+
+    def terminal_for(self, route: str, stop_id: str, direction: str) -> str | None:
+        return self.terminals.get((route, stop_id + direction))
 
     def upcoming_minutes(
         self, route: str, stop_id: str, direction: str, limit: int
