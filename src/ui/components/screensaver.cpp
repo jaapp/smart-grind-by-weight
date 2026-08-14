@@ -14,7 +14,8 @@ constexpr float kWaveLengthPx = 96.0f;                  // Radial distance betwe
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
 
-constexpr int kBadgeSizePx = 56;
+constexpr int kBadgeSizePx = 52;
+constexpr int kMaxMinsShown = 3;
 
 } // namespace
 
@@ -193,7 +194,8 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     lv_obj_align(trains_container_, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_set_style_bg_opa(trains_container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(trains_container_, 0, 0);
-    lv_obj_set_style_pad_all(trains_container_, 16, 0);
+    lv_obj_set_style_pad_ver(trains_container_, 16, 0);
+    lv_obj_set_style_pad_hor(trains_container_, 10, 0);
     lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -230,7 +232,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_obj_set_layout(row, LV_LAYOUT_FLEX);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_gap(row, 16, 0);
+        lv_obj_set_style_pad_gap(row, 12, 0);
         lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE);
 
@@ -252,6 +254,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
 
         lv_obj_t* text_column = lv_obj_create(row);
         lv_obj_set_size(text_column, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_grow(text_column, 1);
         lv_obj_set_style_bg_opa(text_column, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(text_column, 0, 0);
         lv_obj_set_style_pad_all(text_column, 0, 0);
@@ -263,16 +266,19 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_obj_clear_flag(text_column, LV_OBJ_FLAG_CLICKABLE);
 
         lv_obj_t* direction_label = lv_label_create(text_column);
-        lv_label_set_text_fmt(direction_label, LV_SYMBOL_RIGHT " %s", item.direction);
+        lv_label_set_text(direction_label, item.direction);
         lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_16, 0);
-        lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        lv_obj_set_width(direction_label, LV_PCT(100));
+        lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
 
         char mins_text[48];
         if (item.mins_count == 0) {
             snprintf(mins_text, sizeof(mins_text), "--");
         } else {
+            int shown = item.mins_count < kMaxMinsShown ? item.mins_count : kMaxMinsShown;
             size_t pos = 0;
-            for (int m = 0; m < item.mins_count && pos < sizeof(mins_text) - 8; m++) {
+            for (int m = 0; m < shown && pos < sizeof(mins_text) - 8; m++) {
                 pos += snprintf(mins_text + pos, sizeof(mins_text) - pos, "%s%u",
                                 m == 0 ? "" : ", ", item.mins[m]);
             }
@@ -280,8 +286,10 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         }
         lv_obj_t* mins_label = lv_label_create(text_column);
         lv_label_set_text(mins_label, mins_text);
-        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_28, 0);
+        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_24, 0);
         lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        lv_obj_set_width(mins_label, LV_PCT(100));
+        lv_label_set_long_mode(mins_label, LV_LABEL_LONG_DOT);
     }
 
     if (arrivals.gateway_stale) {
