@@ -31,8 +31,16 @@ def search(query: str, limit: int = 25) -> list[dict]:
     return hits[:limit]
 
 
+GENERIC_LABELS = {"", "Northbound", "Southbound", "Outbound", "Inbound", "Last Stop"}
+
+
 def direction_label(stop_id: str, direction: str) -> str:
     station = _by_stop_id.get(stop_id)
     if not station:
         return "Northbound" if direction == "N" else "Southbound"
     return station["north"] if direction == "N" else station["south"]
+
+
+def stop_name(directional_stop_id: str) -> str | None:
+    station = _by_stop_id.get(directional_stop_id.rstrip("NS"))
+    return station["name"] if station else None
