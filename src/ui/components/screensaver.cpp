@@ -21,7 +21,8 @@ constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative 
 constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 52;
-constexpr int kMaxWatchRows = 5;
+constexpr int kMaxWatchRows = 4;
+constexpr int kTextIndentPx = kBadgeSizePx + 12;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
@@ -281,7 +282,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_obj_set_style_pad_all(entry_box, 0, 0);
         lv_obj_set_layout(entry_box, LV_LAYOUT_FLEX);
         lv_obj_set_flex_flow(entry_box, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_gap(entry_box, 2, 0);
+        lv_obj_set_style_pad_gap(entry_box, 4, 0);
         lv_obj_clear_flag(entry_box, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_clear_flag(entry_box, LV_OBJ_FLAG_CLICKABLE);
 
@@ -341,33 +342,49 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
             lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
         }
 
-        char mins_text[16];
-        if (entry.mins[0] == 0) {
-            snprintf(mins_text, sizeof(mins_text), "Now");
-        } else {
-            snprintf(mins_text, sizeof(mins_text), "%um", entry.mins[0]);
-        }
-        lv_obj_t* mins_label = lv_label_create(row);
-        lv_label_set_text(mins_label, mins_text);
-        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
-        lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        lv_obj_t* pills_row = lv_obj_create(entry_box);
+        lv_obj_set_size(pills_row, LV_PCT(100), LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(pills_row, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(pills_row, 0, 0);
+        lv_obj_set_style_pad_all(pills_row, 0, 0);
+        lv_obj_set_style_pad_left(pills_row, kTextIndentPx, 0);
+        lv_obj_set_layout(pills_row, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(pills_row, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(pills_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_gap(pills_row, 6, 0);
+        lv_obj_clear_flag(pills_row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(pills_row, LV_OBJ_FLAG_CLICKABLE);
 
-        if (entry.count > 1) {
-            char then_text[32];
-            int len = snprintf(then_text, sizeof(then_text), "then");
-            for (int m = 1; m < entry.count; m++) {
-                len += snprintf(then_text + len, sizeof(then_text) - len, "%s %u",
-                                m > 1 ? "," : "", entry.mins[m]);
+        for (int m = 0; m < entry.count; m++) {
+            char pill_text[8];
+            if (entry.mins[m] == 0) {
+                snprintf(pill_text, sizeof(pill_text), "Now");
+            } else {
+                snprintf(pill_text, sizeof(pill_text), "%u", entry.mins[m]);
             }
-            snprintf(then_text + len, sizeof(then_text) - len, " min");
 
-            lv_obj_t* then_label = lv_label_create(entry_box);
-            lv_label_set_text(then_label, then_text);
-            lv_obj_set_size(then_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_16));
-            lv_obj_set_style_pad_left(then_label, kBadgeSizePx + 12, 0);
-            lv_obj_set_style_text_font(then_label, &lv_font_montserrat_16, 0);
-            lv_obj_set_style_text_color(then_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-            lv_label_set_long_mode(then_label, LV_LABEL_LONG_DOT);
+            lv_obj_t* pill = lv_obj_create(pills_row);
+            lv_obj_set_size(pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_obj_set_style_radius(pill, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_color(pill, lv_color_hex(THEME_COLOR_SCREENSAVER_PILL_BG), 0);
+            lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_width(pill, 0, 0);
+            lv_obj_set_style_pad_hor(pill, 10, 0);
+            lv_obj_set_style_pad_ver(pill, 2, 0);
+            lv_obj_clear_flag(pill, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(pill, LV_OBJ_FLAG_CLICKABLE);
+
+            lv_obj_t* pill_label = lv_label_create(pill);
+            lv_label_set_text(pill_label, pill_text);
+            lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_24, 0);
+            lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        }
+
+        if (entry.mins[entry.count - 1] > 0) {
+            lv_obj_t* unit_label = lv_label_create(pills_row);
+            lv_label_set_text(unit_label, "min");
+            lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_16, 0);
+            lv_obj_set_style_text_color(unit_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
         }
     }
 
