@@ -20,6 +20,7 @@ python3 tools/grinder.py analyze
 - `python3 tools/grinder.py export` - Export grind data to database
 - `python3 tools/grinder.py report` - Launch Streamlit report from existing data
 - `python3 tools/grinder.py scan` - Scan for BLE devices
+- `python3 tools/grinder.py wifi --ssid X --password Y --url http://host:8600` - Provision WiFi + train gateway over BLE (no args = status)
 - `python3 tools/grinder.py info` - Get device system information
 - `python3 tools/grinder.py clean` - Clean build artifacts
 
@@ -38,10 +39,11 @@ python3 tools/grinder.py analyze
 - **DiagnosticsController**: System health monitoring (calibration status, sustained noise, mechanical instability), state persistence, hysteresis, priority-based warnings
 - **UIManager**: LVGL screens with a 4-pane ready carousel (Weight / Time / Manual / Menu, horizontal swipe = mode selection); menu page surfaces quick Tools (Scale view, Calibrate, Tune Pulses, Motor Test) followed by Settings (Bluetooth, Display, Grind Settings) and Info sections (Diagnostics, System Info, Logs & Data, Lifetime Stats), warning icon indicator, split-button layout for time mode pulses
 - **ManualGrindUIController**: Drives the Manual pane - runs the grinder directly via `Grinder::start()/stop()` (no GrindController session, no grind logging), shows elapsed time (tap to reset) and live weight (tap to tare), auto-tares on pane entry, stops and resets on swipe-away or any state change, 90s safety cap (`USER_MANUAL_GRIND_MAX_RUNTIME_MS`), updates lifetime motor runtime
-- **ScreensaverOverlay**: Full-screen idle overlay on `lv_layer_top()` rendering a brown dot-matrix ripple (Wave) via a custom draw callback; any press dismisses and is swallowed
+- **ScreensaverOverlay**: Full-screen idle overlay on `lv_layer_top()` with two styles selected in Display Settings: Wave (brown dot-matrix ripple via a custom draw callback) and Trains (upcoming NYC subway arrivals from the MTA gateway: colored line badge, direction label, next arrival minutes; connect/loading/unreachable states and a stale-data marker). Any press dismisses and is swallowed. Swiping up/down on the ready screen starts the screensaver immediately (`ScreenTimeoutController::start_screensaver_now()`, held until touch)
+- **TrainDataClient** (`src/network/`): WiFi lifecycle + gateway polling on a dedicated low-priority FreeRTOS task (core 1, 250ms tick, suspended during OTA). Connects with NVS-stored credentials (`network` namespace: `ssid`, `pass`, `url`), polls `<url>/api/arrivals` every 30s only while the Trains screensaver is visible, parses with cJSON into a mutex-guarded snapshot. Provisioned via BLE debug opcodes 0x03 (set config) / 0x04 (status) from `tools/grinder.py wifi`
 - **StateMachine**: Central state coordination (READY → GRINDING → GRIND_COMPLETE)
 
-**Update Intervals:** 20ms grind control, 25ms load cell (active), 16ms UI/hardware (60Hz)
+**Update Intervals:** 20ms grind control, 25ms load cell (active), 16ms UI/hardware (60Hz), 250ms network tick (30s gateway polls)
 
 **Grind Phases:**
 - Standard phases: IDLE, INITIALIZING, SETUP, TARING, TARE_CONFIRM, PRIME, PRIME_SETTLING, PREDICTIVE, PULSE_DECISION, PULSE_EXECUTE, PULSE_SETTLING, FINAL_SETTLING, TIME_GRINDING, COMPLETED, TIMEOUT
@@ -68,7 +70,9 @@ python3 tools/grinder.py analyze
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `fast_mode` (boolean), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 
-**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_preview()`). Preferences namespace `screensaver`: `enabled` (bool, default true). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
+**Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, a Wave/Trains style radio, and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_now()`). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int: 0=Wave, 1=Trains, default 0). The screensaver appears after the 5-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
+
+**MTA Train Gateway (`gateway/`):** Dockerized FastAPI service that polls the MTA's public subway GTFS-realtime feeds and serves `GET /api/arrivals` (per watch: route, official color, friendly direction label, next arrival minutes) for the Trains screensaver, plus a web UI on port 8600 for picking station/line/direction watches. Auto-published to `ghcr.io/sebastienstdenis/mta-gateway` by `.github/workflows/gateway-image.yml` on pushes to main touching `gateway/`. See `gateway/README.md`.
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color
