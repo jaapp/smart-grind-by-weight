@@ -21,16 +21,17 @@ constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative 
 constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 52;
-constexpr int kMaxArrivalRows = 7;
+constexpr int kMaxWatchRows = 5;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
 // so the glyph is visually centered in the badge
 constexpr int kBadgeGlyphNudgePx = 4;
 
-struct ArrivalEntry {
+struct WatchEntry {
     const TrainArrivalItem* item;
-    uint8_t min;
+    uint8_t mins[NET_MAX_ARRIVAL_MINS];
+    uint8_t count;
 };
 
 } // namespace
@@ -230,15 +231,19 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
 
-    ArrivalEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
+    WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
     int entry_count = 0;
     for (int i = 0; i < arrivals.item_count; i++) {
         const TrainArrivalItem& item = arrivals.items[i];
+        WatchEntry entry = {&item, {}, 0};
         for (int m = 0; m < item.mins_count; m++) {
             if (item.mins[m] < elapsed_min) {
                 continue;
             }
-            entries[entry_count++] = {&item, static_cast<uint8_t>(item.mins[m] - elapsed_min)};
+            entry.mins[entry.count++] = static_cast<uint8_t>(item.mins[m] - elapsed_min);
+        }
+        if (entry.count > 0) {
+            entries[entry_count++] = entry;
         }
     }
 
@@ -261,15 +266,13 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     }
 
     std::stable_sort(entries, entries + entry_count,
-                     [](const ArrivalEntry& a, const ArrivalEntry& b) { return a.min < b.min; });
+                     [](const WatchEntry& a, const WatchEntry& b) { return a.mins[0] < b.mins[0]; });
 
     bool stale = arrivals.gateway_stale || device_stale;
-    int rows = entry_count < kMaxArrivalRows ? entry_count : kMaxArrivalRows;
-    if (stale && rows == kMaxArrivalRows) {
-        rows--;
-    }
+    int rows = entry_count < kMaxWatchRows ? entry_count : kMaxWatchRows;
     for (int i = 0; i < rows; i++) {
-        const TrainArrivalItem& item = *entries[i].item;
+        const WatchEntry& entry = entries[i];
+        const TrainArrivalItem& item = *entry.item;
 
         lv_obj_t* row = lv_obj_create(trains_container_);
         lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
@@ -327,11 +330,28 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
             lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
         }
 
+        if (entry.count > 1) {
+            char then_text[32];
+            int len = snprintf(then_text, sizeof(then_text), "then");
+            for (int m = 1; m < entry.count; m++) {
+                len += snprintf(then_text + len, sizeof(then_text) - len, "%s %u",
+                                m > 1 ? "," : "", entry.mins[m]);
+            }
+            snprintf(then_text + len, sizeof(then_text) - len, " min");
+
+            lv_obj_t* then_label = lv_label_create(text_col);
+            lv_label_set_text(then_label, then_text);
+            lv_obj_set_size(then_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_16));
+            lv_obj_set_style_text_font(then_label, &lv_font_montserrat_16, 0);
+            lv_obj_set_style_text_color(then_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+            lv_label_set_long_mode(then_label, LV_LABEL_LONG_DOT);
+        }
+
         char mins_text[16];
-        if (entries[i].min == 0) {
+        if (entry.mins[0] == 0) {
             snprintf(mins_text, sizeof(mins_text), "Now");
         } else {
-            snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
+            snprintf(mins_text, sizeof(mins_text), "%um", entry.mins[0]);
         }
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
