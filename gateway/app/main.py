@@ -42,27 +42,12 @@ class Watch(BaseModel):
     direction: str  # "N" or "S"
 
 
-def resolve_direction_label(w: dict) -> str:
-    """Dataset labels like "Manhattan" are kept; generic filler ("Southbound",
-    "Outbound") is replaced with the live trips' terminal station, matching
-    what NYC countdown clocks display."""
-    label = stations.direction_label(w["stop_id"], w["direction"])
-    if label not in stations.GENERIC_LABELS:
-        return label
-    terminal = cache.terminal_for(w["route"], w["stop_id"], w["direction"])
-    if terminal:
-        name = stations.stop_name(terminal)
-        if name:
-            return name
-    return label
-
-
 def watch_view(w: dict) -> dict:
     station = stations.get(w["stop_id"])
     return {
         **w,
         "station": station["name"] if station else w["stop_id"],
-        "direction_label": resolve_direction_label(w),
+        "direction_label": stations.direction_label(w["stop_id"], w["direction"]),
     }
 
 
@@ -77,7 +62,7 @@ def arrivals() -> dict:
             "color": color,
             "text_color": text_color,
             "station": station["name"] if station else w["stop_id"],
-            "direction": resolve_direction_label(w),
+            "direction": stations.direction_label(w["stop_id"], w["direction"]),
             "mins": cache.upcoming_minutes(
                 w["route"], w["stop_id"], w["direction"], config.ARRIVALS_PER_WATCH
             ),
