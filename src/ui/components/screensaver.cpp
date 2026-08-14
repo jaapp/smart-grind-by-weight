@@ -21,7 +21,7 @@ constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative 
 constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 52;
-constexpr int kMaxArrivalRows = 6;
+constexpr int kMaxArrivalRows = 7;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
@@ -221,11 +221,12 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     lv_obj_set_style_bg_opa(trains_container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(trains_container_, 0, 0);
     lv_obj_set_style_pad_ver(trains_container_, 16, 0);
-    lv_obj_set_style_pad_hor(trains_container_, 10, 0);
+    lv_obj_set_style_pad_left(trains_container_, 2, 0);
+    lv_obj_set_style_pad_right(trains_container_, 0, 0);
     lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(trains_container_, 10, 0);
+    lv_obj_set_style_pad_gap(trains_container_, 8, 0);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
 
@@ -334,7 +335,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         }
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
-        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
         lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     }
 

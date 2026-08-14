@@ -15,7 +15,7 @@ public:
     void refresh_targets();
     void handle_tab_change(int tab);
     void handle_target_long_press();
-    void handle_vertical_swipe();
+    void handle_swipe_down();
 
 private:
     static void gesture_cb(lv_event_t* e);
