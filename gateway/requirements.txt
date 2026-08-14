@@ -1,0 +1,4 @@
+fastapi~=0.115
+uvicorn~=0.32
+httpx~=0.28
+gtfs-realtime-bindings~=1.0
