@@ -15,6 +15,7 @@
 #include "theme.h"
 #include "debug.h"
 #include "grind_control.h"
+#include "network.h"
 #include "system.h"
 #include "user.h"
 #include "build_info.h"

@@ -30,6 +30,7 @@
 #define SYS_TASK_UI_INTERVAL_MS 16                                             // UI rendering frequency (60Hz) - Core 1  
 #define SYS_TASK_BLUETOOTH_INTERVAL_MS 20                                      // Bluetooth handling frequency (50Hz) - Core 1
 #define SYS_TASK_FILE_IO_INTERVAL_MS 100                                       // File I/O operations frequency (10Hz) - Core 1
+#define SYS_TASK_NETWORK_INTERVAL_MS 250                                       // Network manager tick (WiFi state + gateway polls) - Core 1
 
 // Task Stack Sizes (bytes) - Increased for BLE_LOG overhead and complex operations
 #define SYS_TASK_WEIGHT_SAMPLING_STACK_SIZE 4096                               // 4KB stack for weight sampling (was 2KB, increased for BLE_LOG)
@@ -37,6 +38,7 @@
 #define SYS_TASK_UI_STACK_SIZE 8192                                            // 8KB stack for LVGL rendering (unchanged)
 #define SYS_TASK_BLUETOOTH_STACK_SIZE 4096                                     // 4KB stack for BLE operations (unchanged)
 #define SYS_TASK_FILE_IO_STACK_SIZE 6144                                       // 6KB stack for LittleFS operations (was 4KB, increased for file operations)
+#define SYS_TASK_NETWORK_STACK_SIZE 8192                                       // 8KB stack for WiFi/HTTP/JSON work
 
 // Task Priorities (higher number = higher priority)
 #define SYS_TASK_PRIORITY_WEIGHT_SAMPLING 4                                    // Highest priority (real-time sampling)
@@ -45,6 +47,7 @@
 // Raise BLE above UI to prevent starvation during transfers
 #define SYS_TASK_PRIORITY_BLUETOOTH 3                                          // Higher priority (BLE operations)
 #define SYS_TASK_PRIORITY_FILE_IO 1                                            // Low priority (file operations)
+#define SYS_TASK_PRIORITY_NETWORK 1                                            // Low priority (background gateway polling)
 
 // Inter-Task Communication Queue Sizes
 #define SYS_QUEUE_UI_TO_GRIND_SIZE 5                                           // UI events to grind controller

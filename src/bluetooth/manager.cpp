@@ -17,6 +17,7 @@
 #include "../hardware/hardware_manager.h"
 #include "../hardware/WeightSensor.h"
 #include "../controllers/grind_controller.h"
+#include "../network/train_data_client.h"
 
 BluetoothManager::BluetoothManager()
     : ble_server(nullptr)
@@ -783,6 +784,28 @@ void BluetoothManager::handle_debug_command(BLECharacteristic* characteristic) {
                 log("BLE_DEBUG: Stream disabled\n");
                 debug_stream_active = false;
                 break;
+            case BLE_DEBUG_CMD_WIFI_CONFIG: {
+                // Payload after the opcode: "ssid\tpassword\tgateway_url"
+                String payload = value.substring(1);
+                int first_tab = payload.indexOf('\t');
+                int second_tab = first_tab >= 0 ? payload.indexOf('\t', first_tab + 1) : -1;
+                if (first_tab < 0 || second_tab < 0) {
+                    log("BLE_DEBUG: WIFI_CONFIG rejected - expected ssid\\tpassword\\turl\n");
+                    break;
+                }
+                String ssid = payload.substring(0, first_tab);
+                String password = payload.substring(first_tab + 1, second_tab);
+                String url = payload.substring(second_tab + 1);
+                train_data_client.set_config(ssid.c_str(), password.c_str(), url.c_str());
+                log("BLE_DEBUG: WIFI_CONFIG saved (ssid='%s', url='%s')\n", ssid.c_str(), url.c_str());
+                break;
+            }
+            case BLE_DEBUG_CMD_WIFI_STATUS: {
+                char status[192];
+                train_data_client.get_status_string(status, sizeof(status));
+                log("BLE_DEBUG: WIFI_STATUS %s\n", status);
+                break;
+            }
             case 0x00: // Keepalive from python script
                 break;
             default:
@@ -985,7 +1008,7 @@ void BluetoothManager::update_hardware_info() {
         "\"display_active\":true,"
         "\"touch_active\":true,"
         "\"ble_enabled\":true,"
-        "\"wifi_available\":false,"
+        "\"wifi_available\":true,"
         "\"flash_available\":true"
         "}"
     );

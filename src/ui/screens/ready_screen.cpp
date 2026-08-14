@@ -42,6 +42,8 @@ void ReadyScreen::create() {
 }
 
 void ReadyScreen::create_target_page(lv_obj_t* parent, GrindMode mode) {
+    // Non-scrollable so vertical drags register as screensaver gestures
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -63,6 +65,7 @@ void ReadyScreen::create_target_page(lv_obj_t* parent, GrindMode mode) {
 }
 
 void ReadyScreen::create_manual_page(lv_obj_t* parent) {
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -89,6 +92,7 @@ void ReadyScreen::create_manual_page(lv_obj_t* parent) {
 }
 
 void ReadyScreen::create_menu_page(lv_obj_t* parent) {
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);

@@ -2,6 +2,7 @@
 #include "weight_sampling_task.h"
 #include "grind_control_task.h"
 #include "file_io_task.h"
+#include "../network/train_data_client.h"
 #include "../hardware/hardware_manager.h"
 #include "../system/state_machine.h"
 #include "../controllers/profile_controller.h"
@@ -145,6 +146,12 @@ bool TaskManager::create_all_tasks() {
         return false;
     }
     
+    // Non-fatal: the grinder must stay fully functional without the trains
+    // screensaver's network task (e.g. when internal RAM is too fragmented)
+    if (!create_network_task()) {
+        LOG_BLE("WARNING: Network task unavailable - continuing without WiFi\n");
+    }
+
     return true;
 }
 
@@ -233,6 +240,26 @@ bool TaskManager::create_bluetooth_task() {
     return true;
 }
 
+bool TaskManager::create_network_task() {
+    BaseType_t result = xTaskCreatePinnedToCore(
+        network_task_wrapper,
+        "Network",
+        SYS_TASK_NETWORK_STACK_SIZE,
+        nullptr,
+        SYS_TASK_PRIORITY_NETWORK,
+        &task_handles.network_task,
+        1  // Pin to Core 1
+    );
+    
+    if (result != pdPASS) {
+        LOG_BLE("ERROR: Failed to create network task\n");
+        return false;
+    }
+    
+    LOG_BLE("✅ Network Task created (Core 1, Priority %d)\n", SYS_TASK_PRIORITY_NETWORK);
+    return true;
+}
+
 bool TaskManager::create_file_io_task() {
     BaseType_t result = xTaskCreatePinnedToCore(
         file_io_task_wrapper,
@@ -270,6 +297,10 @@ void TaskManager::suspend_hardware_tasks() {
     if (task_handles.file_io_task) {
         vTaskSuspend(task_handles.file_io_task);
     }
+
+    if (task_handles.network_task) {
+        vTaskSuspend(task_handles.network_task);
+    }
     
     ota_suspended = true;
 }
@@ -289,6 +320,10 @@ void TaskManager::resume_hardware_tasks() {
 
     if (task_handles.file_io_task) {
         vTaskResume(task_handles.file_io_task);
+    }
+
+    if (task_handles.network_task) {
+        vTaskResume(task_handles.network_task);
     }
     
     ota_suspended = false;
@@ -319,6 +354,11 @@ void TaskManager::delete_all_tasks() {
     if (task_handles.file_io_task) {
         vTaskDelete(task_handles.file_io_task);
         task_handles.file_io_task = nullptr;
+    }
+    
+    if (task_handles.network_task) {
+        vTaskDelete(task_handles.network_task);
+        task_handles.network_task = nullptr;
     }
     
     tasks_initialized = false;
@@ -397,6 +437,14 @@ void TaskManager::file_io_task_wrapper(void* parameter) {
     if (instance) {
         instance->file_io_task_impl();
         instance->task_handles.file_io_task = nullptr;
+    }
+    vTaskDelete(nullptr);
+}
+
+void TaskManager::network_task_wrapper(void* parameter) {
+    if (instance) {
+        instance->network_task_impl();
+        instance->task_handles.network_task = nullptr;
     }
     vTaskDelete(nullptr);
 }
@@ -483,6 +531,10 @@ void TaskManager::bluetooth_task_impl() {
 void TaskManager::file_io_task_impl() {
     // Delegate to dedicated FileIOTask implementation
     file_io_task.task_impl();
+}
+
+void TaskManager::network_task_impl() {
+    train_data_client.task_impl();
 }
 
 void TaskManager::record_task_timing(int task_index, uint32_t start_time, uint32_t end_time) {

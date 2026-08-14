@@ -15,11 +15,16 @@ public:
 
     void register_events();
     void update();
-    void start_screensaver_preview();
+    // Dims and shows the screensaver immediately, holding it until a touch
+    // dismisses it (used by the settings Preview button and the ready-screen
+    // vertical swipe)
+    void start_screensaver_now();
 
 private:
+    void apply_configured_style();
+
     UIManager* ui_manager_;
     bool screen_dimmed_;
-    bool preview_active_ = false;
+    bool held_until_touch_ = false;
     std::unique_ptr<ScreensaverOverlay> screensaver_;
 };
