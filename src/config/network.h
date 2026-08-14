@@ -22,6 +22,7 @@
 #define NET_DATA_EXPIRED_MS 300000                                             // Snapshot age after which arrivals are hidden in favor of the error state
 #define NET_HTTP_TIMEOUT_MS 5000                                               // HTTP request timeout
 #define NET_WIFI_RETRY_INTERVAL_MS 15000                                       // Delay between WiFi reconnect attempts
+#define NET_WIFI_TX_POWER WIFI_POWER_8_5dBm                                    // Cap radio TX power: shrinks supply current spikes (brownout mitigation); gateway is on the local LAN so range loss is acceptable
 #define NET_MAX_CONFIG_STRING_LEN 96                                           // Max stored length for SSID/password/URL
 
 #define NET_MAX_ARRIVAL_ITEMS 8                                                // Watches shown by the screensaver (matches gateway limit)
