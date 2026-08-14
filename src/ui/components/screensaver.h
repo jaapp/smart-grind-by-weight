@@ -1,16 +1,24 @@
 #pragma once
 #include <lvgl.h>
 #include "../../config/constants.h"
+#include "../../network/train_data_client.h"
 
-// Full-screen idle overlay rendering an animated dot-matrix ripple with a
-// custom draw callback. Any press dismisses the overlay and is swallowed
-// before it reaches the widgets underneath.
+// Full-screen idle overlay with two selectable styles: an animated dot-matrix
+// ripple (Wave) and a list of upcoming subway arrivals fetched from the train
+// gateway (Trains). Any press dismisses the overlay and is swallowed before it
+// reaches the widgets underneath.
+
+enum class ScreensaverStyle {
+    WAVE = 0,
+    TRAINS = 1,
+};
 
 class ScreensaverOverlay {
 public:
     void create();
     void show();
     void hide();
+    void set_style(ScreensaverStyle style);
     bool is_visible() const { return visible_; }
 
 private:
@@ -30,11 +38,17 @@ private:
     static void tick_cb(lv_timer_t* timer);
 
     void draw_wave(lv_layer_t* layer);
+    void refresh_trains(bool force);
+    void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data);
 
     lv_obj_t* overlay_ = nullptr;
+    lv_obj_t* trains_container_ = nullptr;
     lv_timer_t* timer_ = nullptr;
     bool visible_ = false;
+    ScreensaverStyle style_ = ScreensaverStyle::WAVE;
     float phase_ = 0.0f;
+    uint32_t rendered_fetch_ms_ = 0;
+    NetworkState rendered_state_ = NetworkState::UNCONFIGURED;
     uint16_t dot_distance_px_[kDotCols * kDotRows];
     lv_color_t shade_lut_[kShadeCount];
 };

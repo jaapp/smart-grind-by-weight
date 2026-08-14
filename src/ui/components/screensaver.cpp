@@ -1,15 +1,20 @@
 #include "screensaver.h"
 
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 #include "../../config/constants.h"
 
 namespace {
 
 constexpr uint32_t kWaveTickMs = 40;                    // 25 fps ripple animation
+constexpr uint32_t kTrainsTickMs = 1000;                // Arrivals list refresh check
 constexpr float kWavePeriodS = 2.4f;                    // Time for one outward wave cycle
 constexpr float kWaveLengthPx = 96.0f;                  // Radial distance between crests
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
+
+constexpr int kBadgeSizePx = 56;
 
 } // namespace
 
@@ -54,6 +59,13 @@ void ScreensaverOverlay::create() {
     }
 }
 
+void ScreensaverOverlay::set_style(ScreensaverStyle style) {
+    if (visible_) {
+        return;
+    }
+    style_ = style;
+}
+
 void ScreensaverOverlay::show() {
     if (!overlay_ || visible_) {
         return;
@@ -64,7 +76,13 @@ void ScreensaverOverlay::show() {
     lv_obj_move_foreground(overlay_);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
 
-    timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
+    if (style_ == ScreensaverStyle::TRAINS) {
+        train_data_client.set_polling_active(true);
+        refresh_trains(true);
+        timer_ = lv_timer_create(tick_cb, kTrainsTickMs, this);
+    } else {
+        timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
+    }
 }
 
 void ScreensaverOverlay::hide() {
@@ -77,12 +95,17 @@ void ScreensaverOverlay::hide() {
         lv_timer_del(timer_);
         timer_ = nullptr;
     }
+    if (trains_container_) {
+        lv_obj_del(trains_container_);
+        trains_container_ = nullptr;
+    }
+    train_data_client.set_polling_active(false);
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void ScreensaverOverlay::draw_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (!self || !self->visible_) {
+    if (!self || !self->visible_ || self->style_ != ScreensaverStyle::WAVE) {
         return;
     }
     self->draw_wave(lv_event_get_layer(e));
@@ -98,6 +121,11 @@ void ScreensaverOverlay::pressed_cb(lv_event_t* e) {
 void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_timer_get_user_data(timer));
     if (!self || !self->visible_) {
+        return;
+    }
+
+    if (self->style_ == ScreensaverStyle::TRAINS) {
+        self->refresh_trains(false);
         return;
     }
 
@@ -137,5 +165,129 @@ void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
             area.y2 = cy + radius;
             lv_draw_rect(layer, &dsc, &area);
         }
+    }
+}
+
+void ScreensaverOverlay::refresh_trains(bool force) {
+    TrainArrivals arrivals;
+    bool have_data = train_data_client.get_arrivals(arrivals);
+    NetworkState state = train_data_client.get_state();
+
+    if (!force && arrivals.fetched_at_ms == rendered_fetch_ms_ && state == rendered_state_) {
+        return;
+    }
+    rendered_fetch_ms_ = arrivals.fetched_at_ms;
+    rendered_state_ = state;
+
+    rebuild_trains_view(arrivals, have_data);
+}
+
+void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool have_data) {
+    if (trains_container_) {
+        lv_obj_del(trains_container_);
+        trains_container_ = nullptr;
+    }
+
+    trains_container_ = lv_obj_create(overlay_);
+    lv_obj_set_size(trains_container_, LV_PCT(100), LV_PCT(100));
+    lv_obj_align(trains_container_, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_style_bg_opa(trains_container_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(trains_container_, 0, 0);
+    lv_obj_set_style_pad_all(trains_container_, 16, 0);
+    lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(trains_container_, 22, 0);
+    lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
+
+    if (!have_data || arrivals.item_count == 0) {
+        const char* message = "No upcoming trains";
+        NetworkState state = train_data_client.get_state();
+        if (!train_data_client.has_config()) {
+            message = "WiFi not set up\n\nRun:\ngrinder.py wifi";
+        } else if (!have_data && state == NetworkState::ERROR) {
+            message = "Gateway\nunreachable";
+        } else if (!have_data) {
+            message = "Loading trains...";
+        }
+        lv_obj_t* label = lv_label_create(trains_container_);
+        lv_label_set_text(label, message);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+        return;
+    }
+
+    for (int i = 0; i < arrivals.item_count; i++) {
+        const TrainArrivalItem& item = arrivals.items[i];
+
+        lv_obj_t* row = lv_obj_create(trains_container_);
+        lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(row, 0, 0);
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_gap(row, 16, 0);
+        lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* badge = lv_obj_create(row);
+        lv_obj_set_size(badge, kBadgeSizePx, kBadgeSizePx);
+        lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(badge, lv_color_hex(item.color), 0);
+        lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(badge, 0, 0);
+        lv_obj_set_style_pad_all(badge, 0, 0);
+        lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* badge_label = lv_label_create(badge);
+        lv_label_set_text(badge_label, item.route);
+        lv_obj_set_style_text_font(badge_label, &lv_font_montserrat_32, 0);
+        lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
+        lv_obj_center(badge_label);
+
+        lv_obj_t* text_column = lv_obj_create(row);
+        lv_obj_set_size(text_column, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(text_column, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(text_column, 0, 0);
+        lv_obj_set_style_pad_all(text_column, 0, 0);
+        lv_obj_set_layout(text_column, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(text_column, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(text_column, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+        lv_obj_set_style_pad_gap(text_column, 2, 0);
+        lv_obj_clear_flag(text_column, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(text_column, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* direction_label = lv_label_create(text_column);
+        lv_label_set_text_fmt(direction_label, LV_SYMBOL_RIGHT " %s", item.direction);
+        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+
+        char mins_text[48];
+        if (item.mins_count == 0) {
+            snprintf(mins_text, sizeof(mins_text), "--");
+        } else {
+            size_t pos = 0;
+            for (int m = 0; m < item.mins_count && pos < sizeof(mins_text) - 8; m++) {
+                pos += snprintf(mins_text + pos, sizeof(mins_text) - pos, "%s%u",
+                                m == 0 ? "" : ", ", item.mins[m]);
+            }
+            snprintf(mins_text + pos, sizeof(mins_text) - pos, " min");
+        }
+        lv_obj_t* mins_label = lv_label_create(text_column);
+        lv_label_set_text(mins_label, mins_text);
+        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_28, 0);
+        lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    }
+
+    if (arrivals.gateway_stale) {
+        lv_obj_t* stale_label = lv_label_create(trains_container_);
+        lv_label_set_text(stale_label, LV_SYMBOL_WARNING " stale data");
+        lv_obj_set_style_text_font(stale_label, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(stale_label, lv_color_hex(THEME_COLOR_WARNING), 0);
     }
 }

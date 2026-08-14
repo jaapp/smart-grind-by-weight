@@ -13,7 +13,14 @@ void ScreenTimeoutController::register_events() {
     screensaver_->create();
 }
 
-void ScreenTimeoutController::start_screensaver_preview() {
+void ScreenTimeoutController::apply_configured_style() {
+    if (!screensaver_ || !ui_manager_ || !ui_manager_->menu_controller_) {
+        return;
+    }
+    screensaver_->set_style(ui_manager_->menu_controller_->get_screensaver_style());
+}
+
+void ScreenTimeoutController::start_screensaver_now() {
     if (!screensaver_ || !ui_manager_ || !ui_manager_->hardware_manager) {
         return;
     }
@@ -29,7 +36,8 @@ void ScreenTimeoutController::start_screensaver_preview() {
 
     display->set_brightness(dimmed);
     screen_dimmed_ = true;
-    preview_active_ = true;
+    held_until_touch_ = true;
+    apply_configured_style();
     screensaver_->show();
 }
 
@@ -81,12 +89,12 @@ void ScreenTimeoutController::update() {
         screensaver_->hide();
     }
 
-    // A preview holds the overlay regardless of idle state until a touch dismisses it
-    if (preview_active_) {
+    // A manual activation holds the overlay regardless of idle state until a touch dismisses it
+    if (held_until_touch_) {
         if (screensaver_ && screensaver_->is_visible()) {
             return;
         }
-        preview_active_ = false;
+        held_until_touch_ = false;
     }
 
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
@@ -108,6 +116,7 @@ void ScreenTimeoutController::update() {
 
         if (screensaver_ && !ota_active && ui_manager_->menu_controller_ &&
             ui_manager_->menu_controller_->get_screensaver_enabled()) {
+            apply_configured_style();
             screensaver_->show();
         }
     } else if (!should_dim && screen_dimmed_) {
