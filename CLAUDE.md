@@ -70,6 +70,8 @@ python3 tools/grinder.py analyze
 - **Purging**: Radio buttons (Prime/Purge) and Amount slider (0.1g-5.0g)
 - **Preferences**: `grind_mode` (0=Weight, 1=Time), `active_tab` (0-2), `target_w` (float), `target_s` (float), `fast_mode` (boolean), `chute_mode` (0=Prime, 1=Purge), `chute_amount_g` (float)
 
+**Bluetooth Settings:** Enabled toggle (manual enable, 30-min auto-disable while disconnected), Startup toggle (auto-enable at boot with 5-min timeout), and Always on toggle that suspends the auto-disable timeout entirely (`BluetoothManager::set_always_on()`, timer check skipped in `handle()`). Preferences namespace `bluetooth`: `startup` (bool, default true), `always_on` (bool, default false).
+
 **Display Settings:** Brightness sliders (normal + screensaver dim level), screensaver enable toggle, a Wave/Trains style radio, and a Preview button that shows the screensaver immediately (held until touch, via `ScreenTimeoutController::start_screensaver_now()`). Preferences namespace `screensaver`: `enabled` (bool, default true), `style` (int: 0=Wave, 1=Trains, default 0). The screensaver appears after the 2-minute idle dim, wakes on touch (swallowed) or scale activity, and never shows while grinding, during a manual run, or during OTA.
 
 **MTA Train Gateway (`gateway/`):** Dockerized FastAPI service that polls the MTA's public subway GTFS-realtime feeds and serves `GET /api/arrivals` (per watch: route, official color, friendly direction label, next arrival minutes) for the Trains screensaver, plus a web UI on port 8600 for picking station/line/direction watches. Auto-published to `ghcr.io/sebastienstdenis/mta-gateway` by `.github/workflows/gateway-image.yml` on pushes to main touching `gateway/`. See `gateway/README.md`.

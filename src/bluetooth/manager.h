@@ -88,6 +88,7 @@ private:
     // Connection state
     bool device_connected;
     bool ble_enabled;
+    bool always_on;
     bool debug_stream_active;
     unsigned long enable_time;
     unsigned long timeout_ms;
@@ -194,6 +195,12 @@ public:
      * General Bluetooth timeout information
      */
     unsigned long get_bluetooth_timeout_remaining_ms() const;
+
+    /**
+     * Always-on mode: suspends the auto-disable timeout entirely
+     */
+    void set_always_on(bool enabled);
+    bool is_always_on() const { return always_on; }
     
     /**
      * Data export methods

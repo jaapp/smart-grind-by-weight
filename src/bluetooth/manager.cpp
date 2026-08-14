@@ -41,7 +41,7 @@ BluetoothManager::BluetoothManager()
     , sysinfo_sessions_characteristic(nullptr)
     , sysinfo_diagnostics_characteristic(nullptr)
     , device_connected(false)
-    , ble_enabled(false), debug_stream_active(false)
+    , ble_enabled(false), always_on(false), debug_stream_active(false)
     , enable_time(0)
     , timeout_ms(BLE_AUTO_DISABLE_TIMEOUT_MS)
     , last_disconnect_time(0)
@@ -64,6 +64,10 @@ BluetoothManager::~BluetoothManager() {
 
 void BluetoothManager::init(Preferences* prefs) {
     log("Bluetooth: Manager initialized (enable via Developer Mode)\n");
+    Preferences ble_prefs;
+    ble_prefs.begin("bluetooth", true);
+    always_on = ble_prefs.getBool("always_on", false);
+    ble_prefs.end();
     ota_handler.init(prefs);
     // Create UI status queue to marshal UI updates to UI task
     if (!ui_status_queue) {
@@ -340,8 +344,8 @@ void BluetoothManager::disable() {
 void BluetoothManager::handle() {
     if (!ble_enabled) return;
     
-    // Only check timeout when no client is connected
-    if (!device_connected) {
+    // Only check timeout when no client is connected and always-on is off
+    if (!device_connected && !always_on) {
         unsigned long disconnected_elapsed = millis() - last_disconnect_time;
         
         if (disconnected_elapsed > timeout_ms) {
@@ -395,6 +399,15 @@ unsigned long BluetoothManager::get_remaining_time_ms() const {
     
     unsigned long total_estimated = elapsed * 100.0f / progress;
     return (total_estimated > elapsed) ? (total_estimated - elapsed) : 0;
+}
+
+void BluetoothManager::set_always_on(bool enabled) {
+    always_on = enabled;
+    if (!enabled) {
+        // Restart the countdown from now so a long always-on stretch
+        // doesn't trip the timeout immediately
+        last_disconnect_time = millis();
+    }
 }
 
 unsigned long BluetoothManager::get_bluetooth_timeout_remaining_ms() const {
