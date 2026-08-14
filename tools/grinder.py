@@ -394,6 +394,26 @@ class GrinderTool:
 
         return await self.run_async_command(cmd)
 
+    async def cmd_wifi(self, args: argparse.Namespace) -> int:
+        """Provision WiFi credentials and gateway URL over BLE."""
+        self.print_header("WiFi Provisioning")
+
+        if not self.check_venv():
+            return 1
+
+        cmd = [str(self.venv_python), str(self.ble_tool), "wifi"]
+
+        if getattr(args, 'ssid', None):
+            cmd.extend(["--ssid", args.ssid])
+        if getattr(args, 'password', None):
+            cmd.extend(["--password", args.password])
+        if getattr(args, 'url', None):
+            cmd.extend(["--url", args.url])
+        if getattr(args, 'device', None):
+            cmd.extend(["--device", args.device])
+
+        return await self.run_async_command(cmd)
+
     def cmd_install(self, args: argparse.Namespace) -> int:
         """Manually install Python dependencies."""
         self.print_header("Installing Dependencies")
@@ -506,6 +526,12 @@ def create_parser() -> argparse.ArgumentParser:
     info_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
 
     diagnostics_parser = subparsers.add_parser('diagnostics', help='Get comprehensive diagnostic report for GitHub issues')
+
+    wifi_parser = subparsers.add_parser('wifi', help='Provision WiFi + train gateway URL over BLE (no args = show status)')
+    wifi_parser.add_argument('--ssid', help='WiFi network name')
+    wifi_parser.add_argument('--password', default='', help='WiFi password')
+    wifi_parser.add_argument('--url', help='Train gateway base URL, e.g. http://192.168.1.50:8600')
+    wifi_parser.add_argument('--device', help='Device name to connect to')
     diagnostics_parser.add_argument('--device', default='GrindByWeight', help='Specify device name')
     diagnostics_parser.add_argument('--save', metavar='FILE', help='Save report to file (default: print to console)')
 
@@ -551,6 +577,8 @@ async def main():
             return await tool.cmd_info(args)
         elif args.command == 'diagnostics':
             return await tool.cmd_diagnostics(args)
+        elif args.command == 'wifi':
+            return await tool.cmd_wifi(args)
         elif args.command == 'install':
             return tool.cmd_install(args)
         elif args.command == 'clean':

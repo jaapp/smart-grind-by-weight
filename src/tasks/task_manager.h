@@ -20,6 +20,7 @@ struct TaskHandles {
     TaskHandle_t ui_render_task;
     TaskHandle_t bluetooth_task;
     TaskHandle_t file_io_task;
+    TaskHandle_t network_task;
 };
 
 // Inter-task communication queues
@@ -72,7 +73,7 @@ private:
     UIManager* ui_manager;
     
     // Task monitoring
-    TaskMetrics task_metrics[5]; // One for each task
+    TaskMetrics task_metrics[6]; // One for each task
     bool tasks_initialized;
     bool ota_suspended;
     
@@ -107,6 +108,7 @@ public:
     static void ui_render_task_wrapper(void* parameter);
     static void bluetooth_task_wrapper(void* parameter);
     static void file_io_task_wrapper(void* parameter);
+    static void network_task_wrapper(void* parameter);
     
 private:
     // Task creation helpers
@@ -115,6 +117,7 @@ private:
     bool create_ui_render_task();
     bool create_bluetooth_task();
     bool create_file_io_task();
+    bool create_network_task();
     
     // Queue creation
     bool create_inter_task_queues();
@@ -126,6 +129,7 @@ private:
     void ui_render_task_impl();
     void bluetooth_task_impl();
     void file_io_task_impl();
+    void network_task_impl();
     
     // Performance monitoring
     void record_task_timing(int task_index, uint32_t start_time, uint32_t end_time);

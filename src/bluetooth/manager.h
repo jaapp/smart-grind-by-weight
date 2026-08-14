@@ -27,7 +27,9 @@ struct UIStatusMessage {
 // Debug command enums
 enum BLEDebugCommand {
     BLE_DEBUG_CMD_ENABLE = 0x01,
-    BLE_DEBUG_CMD_DISABLE = 0x02
+    BLE_DEBUG_CMD_DISABLE = 0x02,
+    BLE_DEBUG_CMD_WIFI_CONFIG = 0x03,   // Payload: "ssid\tpassword\tgateway_url"
+    BLE_DEBUG_CMD_WIFI_STATUS = 0x04
 };
 
 // Data export enums

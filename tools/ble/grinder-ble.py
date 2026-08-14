@@ -116,6 +116,8 @@ BLE_DATA_CMD_GET_FILE_LIST = 0x14
 BLE_DATA_CMD_REQUEST_FILE = 0x15
 
 BLE_DEBUG_CMD_ENABLE = 0x01
+BLE_DEBUG_CMD_WIFI_CONFIG = 0x03
+BLE_DEBUG_CMD_WIFI_STATUS = 0x04
 BLE_DEBUG_CMD_DISABLE = 0x02
 
 BLE_OTA_IDLE = 0x00
@@ -1026,6 +1028,35 @@ class GrinderBLETool:
                 except BleakError as e:
                     self.safe_print(f"[WARNING] Could not disable debug stream cleanly: {e}")
     
+    # === WiFi Provisioning ===
+    async def wifi_command(self, ssid: str = None, password: str = None, url: str = None):
+        """Send WiFi credentials/gateway URL to the device, or query WiFi status."""
+        try:
+            await self.client.write_gatt_char(BLE_DEBUG_RX_CHAR_UUID, bytes([BLE_DEBUG_CMD_ENABLE]))
+            await asyncio.sleep(0.5)
+
+            if ssid is not None:
+                payload = f"{ssid}\t{password or ''}\t{url or ''}".encode('utf-8')
+                await self.client.write_gatt_char(BLE_DEBUG_RX_CHAR_UUID, bytes([BLE_DEBUG_CMD_WIFI_CONFIG]) + payload)
+                self.safe_print(f"[OK] Sent WiFi config (ssid='{ssid}', url='{url}')")
+                await asyncio.sleep(1.5)
+
+            await self.client.write_gatt_char(BLE_DEBUG_RX_CHAR_UUID, bytes([BLE_DEBUG_CMD_WIFI_STATUS]))
+            # Give the device time to connect and report status over the debug stream
+            await asyncio.sleep(6 if ssid is not None else 2)
+            await self.client.write_gatt_char(BLE_DEBUG_RX_CHAR_UUID, bytes([BLE_DEBUG_CMD_WIFI_STATUS]))
+            await asyncio.sleep(2)
+        finally:
+            if self.debug_buffer:
+                sys.stdout.write(self.debug_buffer)
+                sys.stdout.flush()
+                self.debug_buffer = ""
+            if self.client and self.client.is_connected:
+                try:
+                    await self.client.write_gatt_char(BLE_DEBUG_RX_CHAR_UUID, bytes([BLE_DEBUG_CMD_DISABLE]))
+                except BleakError:
+                    pass
+
     # === System Information Functions ===
     async def get_system_info(self) -> Dict:
         """Get comprehensive system information from the device."""
@@ -1213,8 +1244,12 @@ async def main():
     sysinfo_parser = subparsers.add_parser('info', help='Get comprehensive device system information')
     diagnostics_parser = subparsers.add_parser('diagnostics', help='Get comprehensive diagnostic report for GitHub issues')
     diagnostics_parser.add_argument('--save', metavar='FILE', help='Save report to file (default: print to console)')
+    wifi_parser = subparsers.add_parser('wifi', help='Provision WiFi credentials and gateway URL, or show WiFi status')
+    wifi_parser.add_argument('--ssid', help='WiFi network name')
+    wifi_parser.add_argument('--password', default='', help='WiFi password')
+    wifi_parser.add_argument('--url', help='Train gateway base URL, e.g. http://192.168.1.50:8600')
 
-    for p in [upload_parser, export_parser, analyse_parser, connect_parser, debug_parser, sysinfo_parser, diagnostics_parser]:
+    for p in [upload_parser, export_parser, analyse_parser, connect_parser, debug_parser, sysinfo_parser, diagnostics_parser, wifi_parser]:
         p.add_argument('--device', default=DEVICE_NAME, help='Device name to connect to')
 
     args = parser.parse_args()
@@ -1224,7 +1259,7 @@ async def main():
         if args.command == 'scan':
             await tool.scan_devices()
         
-        elif args.command in ['upload', 'export', 'analyse', 'connect', 'debug', 'info', 'diagnostics']:
+        elif args.command in ['upload', 'export', 'analyse', 'connect', 'debug', 'info', 'diagnostics', 'wifi']:
             if not await tool.connect_to_device(args.device): return 1
 
             if args.command == 'upload':
@@ -1243,6 +1278,11 @@ async def main():
                 tool.safe_print("[OK] Connected to device.")
             elif args.command == 'debug':
                 await tool.debug_monitor()
+            elif args.command == 'wifi':
+                if args.ssid and not args.url:
+                    tool.safe_print("[ERROR] --url is required when setting credentials")
+                    return 1
+                await tool.wifi_command(args.ssid, args.password, args.url)
             elif args.command == 'info':
                 info = await tool.get_system_info()
                 tool.print_system_info(info)

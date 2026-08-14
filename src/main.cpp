@@ -13,6 +13,7 @@
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
 #include "tasks/file_io_task.h"
+#include "network/train_data_client.h"
 
 HardwareManager hardware_manager;
 StateMachine state_machine;
@@ -116,6 +117,7 @@ void setup() {
     // Initialize individual task modules BEFORE TaskManager creates FreeRTOS tasks
     // This ensures all task dependencies are ready before tasks start running
     LOG_BLE("[STARTUP] Initializing task module dependencies...\n");
+    train_data_client.init();
     weight_sampling_task.init(hardware_manager.get_load_cell(), &grind_logger);
     grind_control_task.init(&grind_controller, hardware_manager.get_load_cell(), 
                            hardware_manager.get_grinder(), &grind_logger);
