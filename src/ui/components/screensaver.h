@@ -13,12 +13,20 @@ enum class ScreensaverStyle {
     TRAINS = 1,
 };
 
+// How the Trains style lays out arrivals: one entry per tracked watch with a
+// pill row of upcoming times, or a flat time-sorted board with one row per train
+enum class TrainsLayout {
+    GROUPED = 0,
+    BOARD = 1,
+};
+
 class ScreensaverOverlay {
 public:
     void create();
     void show();
     void hide();
     void set_style(ScreensaverStyle style);
+    void set_trains_layout(TrainsLayout layout);
     bool is_visible() const { return visible_; }
 
 private:
@@ -41,12 +49,15 @@ private:
     void refresh_trains(bool force);
     void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
                              uint32_t elapsed_min, bool device_stale);
+    int build_grouped_rows(const TrainArrivals& arrivals, uint32_t elapsed_min);
+    int build_board_rows(const TrainArrivals& arrivals, uint32_t elapsed_min, bool stale);
 
     lv_obj_t* overlay_ = nullptr;
     lv_obj_t* trains_container_ = nullptr;
     lv_timer_t* timer_ = nullptr;
     bool visible_ = false;
     ScreensaverStyle style_ = ScreensaverStyle::WAVE;
+    TrainsLayout trains_layout_ = TrainsLayout::GROUPED;
     float phase_ = 0.0f;
     uint32_t rendered_fetch_ms_ = 0;
     NetworkState rendered_state_ = NetworkState::UNCONFIGURED;

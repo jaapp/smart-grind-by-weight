@@ -47,6 +47,7 @@ void MenuScreen::create(BluetoothManager* bluetooth, GrindController* grind_ctrl
     grinder_purge_amount_label = nullptr;
     screensaver_toggle = nullptr;
     screensaver_style_radio_group = nullptr;
+    trains_layout_radio_group = nullptr;
     screensaver_preview_button = nullptr;
     grind_freshness_hours_slider = nullptr;
     grind_freshness_hours_label = nullptr;
@@ -306,6 +307,10 @@ static void screensaver_style_callback(int selected_index, void* user_data) {
     EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::SCREENSAVER_STYLE_RADIO_BUTTON, nullptr);
 }
 
+static void trains_layout_callback(int selected_index, void* user_data) {
+    EventBridgeLVGL::handle_event(EventBridgeLVGL::EventType::TRAINS_LAYOUT_RADIO_BUTTON, nullptr);
+}
+
 void MenuScreen::create_display_page(lv_obj_t* parent) {
     lv_obj_set_layout(parent, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
@@ -331,6 +336,19 @@ void MenuScreen::create_display_page(lv_obj_t* parent) {
         0,  // Wave initially selected
         135, 100,
         screensaver_style_callback,
+        this
+    );
+
+    create_description_label(parent, "Trains layout: times grouped per line, or a board with one row per train.");
+    const char* trains_layouts[] = {"Grouped", "Board"};
+    trains_layout_radio_group = create_radio_button_group(
+        parent,
+        trains_layouts,
+        2,
+        LV_FLEX_FLOW_ROW,
+        0,  // Grouped initially selected
+        135, 100,
+        trains_layout_callback,
         this
     );
 
@@ -910,6 +928,7 @@ void MenuScreen::update_screensaver_controls() {
     prefs.begin("screensaver", true); // read-only
     bool enabled = prefs.getBool("enabled", true);
     int style = prefs.getInt("style", 0);
+    int layout = prefs.getInt("layout", 0);
     prefs.end();
 
     if (screensaver_toggle) {
@@ -922,6 +941,10 @@ void MenuScreen::update_screensaver_controls() {
 
     if (screensaver_style_radio_group) {
         radio_button_group_set_selection(screensaver_style_radio_group, style);
+    }
+
+    if (trains_layout_radio_group) {
+        radio_button_group_set_selection(trains_layout_radio_group, layout);
     }
 }
 

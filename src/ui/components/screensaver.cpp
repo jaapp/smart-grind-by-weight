@@ -21,7 +21,8 @@ constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative 
 constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 52;
-constexpr int kMaxWatchRows = 4;
+constexpr int kMaxGroupedRows = 4;
+constexpr int kMaxBoardRows = 7;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
@@ -33,6 +34,68 @@ struct WatchEntry {
     uint8_t mins[NET_MAX_ARRIVAL_MINS];
     uint8_t count;
 };
+
+struct BoardEntry {
+    const TrainArrivalItem* item;
+    uint8_t min;
+};
+
+lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap) {
+    lv_obj_t* obj = lv_obj_create(parent);
+    lv_obj_set_size(obj, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_set_layout(obj, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(obj, flow);
+    lv_obj_set_flex_align(obj, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(obj, gap, 0);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    return obj;
+}
+
+void make_route_badge(lv_obj_t* parent, const TrainArrivalItem& item) {
+    lv_obj_t* badge = lv_obj_create(parent);
+    lv_obj_set_size(badge, kBadgeSizePx, kBadgeSizePx);
+    lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(badge, lv_color_hex(item.color), 0);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(badge, 0, 0);
+    lv_obj_set_style_pad_all(badge, 0, 0);
+    lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_t* badge_label = lv_label_create(badge);
+    lv_label_set_text(badge_label, item.route);
+    lv_obj_set_style_text_font(badge_label, &lv_font_bullet_40, 0);
+    lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
+    lv_obj_align(badge_label, LV_ALIGN_CENTER, 0, kBadgeGlyphNudgePx);
+}
+
+// Direction + optional station, stacked; grows to fill the space between the
+// badge and whatever sits at the row's right edge
+void make_watch_text_column(lv_obj_t* row, const TrainArrivalItem& item) {
+    lv_obj_t* text_col = make_flex_container(row, LV_FLEX_FLOW_COLUMN, 2);
+    lv_obj_set_width(text_col, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow(text_col, 1);
+
+    lv_obj_t* direction_label = lv_label_create(text_col);
+    lv_label_set_text(direction_label, item.direction);
+    lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_24));
+    lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
+
+    if (item.station[0] != '\0') {
+        lv_obj_t* station_label = lv_label_create(text_col);
+        lv_label_set_text(station_label, item.station);
+        lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
+        lv_obj_set_style_text_font(station_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
+    }
+}
 
 } // namespace
 
@@ -82,6 +145,13 @@ void ScreensaverOverlay::set_style(ScreensaverStyle style) {
         return;
     }
     style_ = style;
+}
+
+void ScreensaverOverlay::set_trains_layout(TrainsLayout layout) {
+    if (visible_) {
+        return;
+    }
+    trains_layout_ = layout;
 }
 
 void ScreensaverOverlay::show() {
@@ -227,27 +297,19 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(trains_container_, 8, 0);
+    lv_obj_set_style_pad_gap(trains_container_, trains_layout_ == TrainsLayout::BOARD ? 8 : 16, 0);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
 
-    WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
-    int entry_count = 0;
-    for (int i = 0; i < arrivals.item_count; i++) {
-        const TrainArrivalItem& item = arrivals.items[i];
-        WatchEntry entry = {&item, {}, 0};
-        for (int m = 0; m < item.mins_count; m++) {
-            if (item.mins[m] <= elapsed_min) {
-                continue;
-            }
-            entry.mins[entry.count++] = static_cast<uint8_t>(item.mins[m] - elapsed_min);
-        }
-        if (entry.count > 0) {
-            entries[entry_count++] = entry;
-        }
+    bool stale = arrivals.gateway_stale || device_stale;
+    int rows = 0;
+    if (have_data) {
+        rows = trains_layout_ == TrainsLayout::BOARD
+                   ? build_board_rows(arrivals, elapsed_min, stale)
+                   : build_grouped_rows(arrivals, elapsed_min);
     }
 
-    if (!have_data || entry_count == 0) {
+    if (rows == 0) {
         const char* message = "No upcoming trains";
         NetworkState state = train_data_client.get_state();
         if (!train_data_client.has_config()) {
@@ -265,94 +327,46 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         return;
     }
 
-    std::stable_sort(entries, entries + entry_count,
-                     [](const WatchEntry& a, const WatchEntry& b) { return a.mins[0] < b.mins[0]; });
+    if (stale) {
+        lv_obj_t* stale_label = lv_label_create(trains_container_);
+        lv_label_set_text(stale_label, LV_SYMBOL_WARNING " stale data");
+        lv_obj_set_style_text_font(stale_label, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(stale_label, lv_color_hex(THEME_COLOR_WARNING), 0);
+    }
+}
 
-    bool stale = arrivals.gateway_stale || device_stale;
-    int rows = entry_count < kMaxWatchRows ? entry_count : kMaxWatchRows;
+// One entry per watch, in gateway order: bullet + destination/station, then a
+// full-width pill row with every reachable arrival. Trains already due are
+// dropped since they can't be caught, and watches left empty are hidden.
+int ScreensaverOverlay::build_grouped_rows(const TrainArrivals& arrivals, uint32_t elapsed_min) {
+    WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
+    int entry_count = 0;
+    for (int i = 0; i < arrivals.item_count; i++) {
+        const TrainArrivalItem& item = arrivals.items[i];
+        WatchEntry entry = {&item, {}, 0};
+        for (int m = 0; m < item.mins_count; m++) {
+            if (item.mins[m] <= elapsed_min) {
+                continue;
+            }
+            entry.mins[entry.count++] = static_cast<uint8_t>(item.mins[m] - elapsed_min);
+        }
+        if (entry.count > 0) {
+            entries[entry_count++] = entry;
+        }
+    }
+
+    int rows = entry_count < kMaxGroupedRows ? entry_count : kMaxGroupedRows;
     for (int i = 0; i < rows; i++) {
         const WatchEntry& entry = entries[i];
         const TrainArrivalItem& item = *entry.item;
 
-        lv_obj_t* entry_box = lv_obj_create(trains_container_);
-        lv_obj_set_size(entry_box, LV_PCT(100), LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(entry_box, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(entry_box, 0, 0);
-        lv_obj_set_style_pad_all(entry_box, 0, 0);
-        lv_obj_set_layout(entry_box, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(entry_box, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_gap(entry_box, 4, 0);
-        lv_obj_clear_flag(entry_box, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(entry_box, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_t* entry_box = make_flex_container(trains_container_, LV_FLEX_FLOW_COLUMN, 4);
 
-        lv_obj_t* row = lv_obj_create(entry_box);
-        lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(row, 0, 0);
-        lv_obj_set_style_pad_all(row, 0, 0);
-        lv_obj_set_layout(row, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_gap(row, 12, 0);
-        lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_t* row = make_flex_container(entry_box, LV_FLEX_FLOW_ROW, 12);
+        make_route_badge(row, item);
+        make_watch_text_column(row, item);
 
-        lv_obj_t* badge = lv_obj_create(row);
-        lv_obj_set_size(badge, kBadgeSizePx, kBadgeSizePx);
-        lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(badge, lv_color_hex(item.color), 0);
-        lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(badge, 0, 0);
-        lv_obj_set_style_pad_all(badge, 0, 0);
-        lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
-
-        lv_obj_t* badge_label = lv_label_create(badge);
-        lv_label_set_text(badge_label, item.route);
-        lv_obj_set_style_text_font(badge_label, &lv_font_bullet_40, 0);
-        lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
-        lv_obj_align(badge_label, LV_ALIGN_CENTER, 0, kBadgeGlyphNudgePx);
-
-        lv_obj_t* text_col = lv_obj_create(row);
-        lv_obj_set_height(text_col, LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(text_col, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(text_col, 0, 0);
-        lv_obj_set_style_pad_all(text_col, 0, 0);
-        lv_obj_set_flex_grow(text_col, 1);
-        lv_obj_set_layout(text_col, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(text_col, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_gap(text_col, 2, 0);
-        lv_obj_clear_flag(text_col, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(text_col, LV_OBJ_FLAG_CLICKABLE);
-
-        lv_obj_t* direction_label = lv_label_create(text_col);
-        lv_label_set_text(direction_label, item.direction);
-        lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_24));
-        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_24, 0);
-        lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-        lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
-
-        if (item.station[0] != '\0') {
-            lv_obj_t* station_label = lv_label_create(text_col);
-            lv_label_set_text(station_label, item.station);
-            lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
-            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_20, 0);
-            lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-            lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
-        }
-
-        lv_obj_t* pills_row = lv_obj_create(entry_box);
-        lv_obj_set_size(pills_row, LV_PCT(100), LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(pills_row, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(pills_row, 0, 0);
-        lv_obj_set_style_pad_all(pills_row, 0, 0);
-        lv_obj_set_layout(pills_row, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(pills_row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(pills_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_gap(pills_row, 6, 0);
-        lv_obj_clear_flag(pills_row, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(pills_row, LV_OBJ_FLAG_CLICKABLE);
-
+        lv_obj_t* pills_row = make_flex_container(entry_box, LV_FLEX_FLOW_ROW, 6);
         for (int m = 0; m < entry.count; m++) {
             char pill_text[8];
             snprintf(pill_text, sizeof(pill_text), "%um", entry.mins[m]);
@@ -373,13 +387,50 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
             lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_24, 0);
             lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
         }
+    }
+    return rows;
+}
 
+// Flat departure board: one row per upcoming train sorted by arrival time,
+// with a big countdown on the right ("Now" when due)
+int ScreensaverOverlay::build_board_rows(const TrainArrivals& arrivals, uint32_t elapsed_min,
+                                         bool stale) {
+    BoardEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
+    int entry_count = 0;
+    for (int i = 0; i < arrivals.item_count; i++) {
+        const TrainArrivalItem& item = arrivals.items[i];
+        for (int m = 0; m < item.mins_count; m++) {
+            if (item.mins[m] < elapsed_min) {
+                continue;
+            }
+            entries[entry_count++] = {&item, static_cast<uint8_t>(item.mins[m] - elapsed_min)};
+        }
     }
 
-    if (stale) {
-        lv_obj_t* stale_label = lv_label_create(trains_container_);
-        lv_label_set_text(stale_label, LV_SYMBOL_WARNING " stale data");
-        lv_obj_set_style_text_font(stale_label, &lv_font_montserrat_16, 0);
-        lv_obj_set_style_text_color(stale_label, lv_color_hex(THEME_COLOR_WARNING), 0);
+    std::stable_sort(entries, entries + entry_count,
+                     [](const BoardEntry& a, const BoardEntry& b) { return a.min < b.min; });
+
+    int rows = entry_count < kMaxBoardRows ? entry_count : kMaxBoardRows;
+    if (stale && rows == kMaxBoardRows) {
+        rows--;
     }
+    for (int i = 0; i < rows; i++) {
+        const TrainArrivalItem& item = *entries[i].item;
+
+        lv_obj_t* row = make_flex_container(trains_container_, LV_FLEX_FLOW_ROW, 12);
+        make_route_badge(row, item);
+        make_watch_text_column(row, item);
+
+        char mins_text[16];
+        if (entries[i].min == 0) {
+            snprintf(mins_text, sizeof(mins_text), "Now");
+        } else {
+            snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
+        }
+        lv_obj_t* mins_label = lv_label_create(row);
+        lv_label_set_text(mins_label, mins_text);
+        lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
+        lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    }
+    return rows;
 }

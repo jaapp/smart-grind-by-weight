@@ -18,6 +18,7 @@ void ScreenTimeoutController::apply_configured_style() {
         return;
     }
     screensaver_->set_style(ui_manager_->menu_controller_->get_screensaver_style());
+    screensaver_->set_trains_layout(ui_manager_->menu_controller_->get_trains_layout());
 }
 
 void ScreenTimeoutController::start_screensaver_now() {
