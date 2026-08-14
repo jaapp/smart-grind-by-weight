@@ -274,7 +274,18 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         const WatchEntry& entry = entries[i];
         const TrainArrivalItem& item = *entry.item;
 
-        lv_obj_t* row = lv_obj_create(trains_container_);
+        lv_obj_t* entry_box = lv_obj_create(trains_container_);
+        lv_obj_set_size(entry_box, LV_PCT(100), LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(entry_box, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(entry_box, 0, 0);
+        lv_obj_set_style_pad_all(entry_box, 0, 0);
+        lv_obj_set_layout(entry_box, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(entry_box, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_gap(entry_box, 2, 0);
+        lv_obj_clear_flag(entry_box, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(entry_box, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* row = lv_obj_create(entry_box);
         lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
         lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(row, 0, 0);
@@ -330,23 +341,6 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
             lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
         }
 
-        if (entry.count > 1) {
-            char then_text[32];
-            int len = snprintf(then_text, sizeof(then_text), "then");
-            for (int m = 1; m < entry.count; m++) {
-                len += snprintf(then_text + len, sizeof(then_text) - len, "%s %u",
-                                m > 1 ? "," : "", entry.mins[m]);
-            }
-            snprintf(then_text + len, sizeof(then_text) - len, " min");
-
-            lv_obj_t* then_label = lv_label_create(text_col);
-            lv_label_set_text(then_label, then_text);
-            lv_obj_set_size(then_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_16));
-            lv_obj_set_style_text_font(then_label, &lv_font_montserrat_16, 0);
-            lv_obj_set_style_text_color(then_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-            lv_label_set_long_mode(then_label, LV_LABEL_LONG_DOT);
-        }
-
         char mins_text[16];
         if (entry.mins[0] == 0) {
             snprintf(mins_text, sizeof(mins_text), "Now");
@@ -357,6 +351,24 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
         lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+
+        if (entry.count > 1) {
+            char then_text[32];
+            int len = snprintf(then_text, sizeof(then_text), "then");
+            for (int m = 1; m < entry.count; m++) {
+                len += snprintf(then_text + len, sizeof(then_text) - len, "%s %u",
+                                m > 1 ? "," : "", entry.mins[m]);
+            }
+            snprintf(then_text + len, sizeof(then_text) - len, " min");
+
+            lv_obj_t* then_label = lv_label_create(entry_box);
+            lv_label_set_text(then_label, then_text);
+            lv_obj_set_size(then_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_16));
+            lv_obj_set_style_pad_left(then_label, kBadgeSizePx + 12, 0);
+            lv_obj_set_style_text_font(then_label, &lv_font_montserrat_16, 0);
+            lv_obj_set_style_text_color(then_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+            lv_label_set_long_mode(then_label, LV_LABEL_LONG_DOT);
+        }
     }
 
     if (stale) {
