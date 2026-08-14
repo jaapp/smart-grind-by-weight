@@ -1,5 +1,6 @@
 #include "screensaver.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -19,7 +20,12 @@ constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative 
 constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 60;
-constexpr int kMaxMinsShown = 3;
+constexpr int kMaxArrivalRows = 6;
+
+struct ArrivalEntry {
+    const TrainArrivalItem* item;
+    uint8_t min;
+};
 
 } // namespace
 
@@ -203,11 +209,20 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(trains_container_, 22, 0);
+    lv_obj_set_style_pad_gap(trains_container_, 10, 0);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
 
-    if (!have_data || arrivals.item_count == 0) {
+    ArrivalEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
+    int entry_count = 0;
+    for (int i = 0; i < arrivals.item_count; i++) {
+        const TrainArrivalItem& item = arrivals.items[i];
+        for (int m = 0; m < item.mins_count; m++) {
+            entries[entry_count++] = {&item, item.mins[m]};
+        }
+    }
+
+    if (!have_data || entry_count == 0) {
         const char* message = "No upcoming trains";
         NetworkState state = train_data_client.get_state();
         if (!train_data_client.has_config()) {
@@ -225,8 +240,15 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         return;
     }
 
-    for (int i = 0; i < arrivals.item_count; i++) {
-        const TrainArrivalItem& item = arrivals.items[i];
+    std::stable_sort(entries, entries + entry_count,
+                     [](const ArrivalEntry& a, const ArrivalEntry& b) { return a.min < b.min; });
+
+    int rows = entry_count < kMaxArrivalRows ? entry_count : kMaxArrivalRows;
+    if (arrivals.gateway_stale && rows == kMaxArrivalRows) {
+        rows--;
+    }
+    for (int i = 0; i < rows; i++) {
+        const TrainArrivalItem& item = *entries[i].item;
 
         lv_obj_t* row = lv_obj_create(trains_container_);
         lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
@@ -256,44 +278,19 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
         lv_obj_center(badge_label);
 
-        lv_obj_t* text_column = lv_obj_create(row);
-        lv_obj_set_size(text_column, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_flex_grow(text_column, 1);
-        lv_obj_set_style_bg_opa(text_column, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(text_column, 0, 0);
-        lv_obj_set_style_pad_all(text_column, 0, 0);
-        lv_obj_set_layout(text_column, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(text_column, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(text_column, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-        lv_obj_set_style_pad_gap(text_column, 2, 0);
-        lv_obj_clear_flag(text_column, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(text_column, LV_OBJ_FLAG_CLICKABLE);
-
-        lv_obj_t* direction_label = lv_label_create(text_column);
+        lv_obj_t* direction_label = lv_label_create(row);
         lv_label_set_text(direction_label, item.direction);
         lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_16, 0);
         lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-        lv_obj_set_width(direction_label, LV_PCT(100));
+        lv_obj_set_flex_grow(direction_label, 1);
         lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
 
-        char mins_text[48];
-        if (item.mins_count == 0) {
-            snprintf(mins_text, sizeof(mins_text), "--");
-        } else {
-            int shown = item.mins_count < kMaxMinsShown ? item.mins_count : kMaxMinsShown;
-            size_t pos = 0;
-            for (int m = 0; m < shown && pos < sizeof(mins_text) - 8; m++) {
-                pos += snprintf(mins_text + pos, sizeof(mins_text) - pos, "%s%u",
-                                m == 0 ? "" : ", ", item.mins[m]);
-            }
-            snprintf(mins_text + pos, sizeof(mins_text) - pos, " min");
-        }
-        lv_obj_t* mins_label = lv_label_create(text_column);
+        char mins_text[16];
+        snprintf(mins_text, sizeof(mins_text), "%u min", entries[i].min);
+        lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_24, 0);
         lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-        lv_obj_set_width(mins_label, LV_PCT(100));
-        lv_label_set_long_mode(mins_label, LV_LABEL_LONG_DOT);
     }
 
     if (arrivals.gateway_stale) {
