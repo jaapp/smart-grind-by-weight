@@ -146,11 +146,12 @@ bool TaskManager::create_all_tasks() {
         return false;
     }
     
+    // Non-fatal: the grinder must stay fully functional without the trains
+    // screensaver's network task (e.g. when internal RAM is too fragmented)
     if (!create_network_task()) {
-        LOG_BLE("ERROR: Failed to create network task\n");
-        return false;
+        LOG_BLE("WARNING: Network task unavailable - continuing without WiFi\n");
     }
-    
+
     return true;
 }
 

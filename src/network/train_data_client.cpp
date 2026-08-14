@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <cJSON.h>
+#include <esp_heap_caps.h>
 #include "../config/constants.h"
 #include "../config/logging.h"
 
@@ -23,6 +24,24 @@ void copy_string(char* dst, const char* src, size_t dst_len) {
 void TrainDataClient::init() {
     mutex_ = xSemaphoreCreateMutex();
     load_config();
+
+    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
+        switch (event) {
+            case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+                last_disconnect_reason_ = info.wifi_sta_disconnected.reason;
+                LOG_BLE("TrainDataClient: WiFi disconnected, reason=%d\n",
+                        static_cast<int>(info.wifi_sta_disconnected.reason));
+                break;
+            case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+                LOG_BLE("TrainDataClient: WiFi associated\n");
+                break;
+            case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+                LOG_BLE("TrainDataClient: WiFi got IP %s\n", WiFi.localIP().toString().c_str());
+                break;
+            default:
+                break;
+        }
+    });
     LOG_BLE("TrainDataClient: initialized (%s)\n",
             has_config_ ? "WiFi configured" : "WiFi not configured");
 }
@@ -83,10 +102,17 @@ void TrainDataClient::get_status_string(char* out, size_t out_len) {
         case NetworkState::ERROR: state_name = "ERROR"; break;
         default: break;
     }
-    snprintf(out, out_len, "state=%s ssid='%s' url='%s' ip=%s items=%u err='%s'",
+    snprintf(out, out_len,
+             "state=%s ssid='%s' url='%s' ip=%s items=%u err='%s' wl=%d reason=%d "
+             "mode_ok=%d begin=%d ticks=%lu heap=%u/%u",
              state_name, ssid_, gateway_url_,
              WiFi.isConnected() ? WiFi.localIP().toString().c_str() : "-",
-             arrivals_.item_count, last_error_);
+             arrivals_.item_count, last_error_,
+             static_cast<int>(WiFi.status()), static_cast<int>(last_disconnect_reason_),
+             last_mode_ok_ ? 1 : 0, static_cast<int>(last_begin_status_),
+             static_cast<unsigned long>(loop_ticks_),
+             heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 void TrainDataClient::task_impl() {
@@ -96,6 +122,7 @@ void TrainDataClient::task_impl() {
     LOG_BLE("Network Task started on Core %d\n", xPortGetCoreID());
 
     while (true) {
+        loop_ticks_++;
         if (config_changed_) {
             config_changed_ = false;
             wifi_started_ = false;
@@ -139,10 +166,11 @@ void TrainDataClient::update_wifi() {
         last_connect_attempt_ms_ = now;
         wifi_started_ = true;
         state_ = NetworkState::CONNECTING;
-        WiFi.mode(WIFI_STA);
+        last_mode_ok_ = WiFi.mode(WIFI_STA);
         WiFi.setAutoReconnect(true);
-        WiFi.begin(ssid_, password_);
-        LOG_BLE("TrainDataClient: connecting to '%s'...\n", ssid_);
+        last_begin_status_ = static_cast<int>(WiFi.begin(ssid_, password_));
+        LOG_BLE("TrainDataClient: connecting to '%s' (mode_ok=%d begin=%d)\n",
+                ssid_, last_mode_ok_ ? 1 : 0, last_begin_status_);
     }
 }
 

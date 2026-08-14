@@ -79,6 +79,10 @@ private:
 
     TrainArrivals arrivals_ = {};
     char last_error_[64] = {0};
+    volatile int last_disconnect_reason_ = 0;
+    volatile int last_begin_status_ = -1;
+    volatile bool last_mode_ok_ = false;
+    volatile uint32_t loop_ticks_ = 0;
     uint32_t last_connect_attempt_ms_ = 0;
     uint32_t last_fetch_ms_ = 0;
     bool wifi_started_ = false;
