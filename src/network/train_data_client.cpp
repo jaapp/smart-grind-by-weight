@@ -169,7 +169,6 @@ void TrainDataClient::update_wifi() {
         last_mode_ok_ = WiFi.mode(WIFI_STA);
         WiFi.setAutoReconnect(true);
         last_begin_status_ = static_cast<int>(WiFi.begin(ssid_, password_));
-        WiFi.setTxPower(NET_WIFI_TX_POWER);
         LOG_BLE("TrainDataClient: connecting to '%s' (mode_ok=%d begin=%d)\n",
                 ssid_, last_mode_ok_ ? 1 : 0, last_begin_status_);
     }
