@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <Arduino.h>
 #include <esp_system.h>
+#include <esp_heap_caps.h>
 #include <LittleFS.h>
 #include <nvs_flash.h>
 #include <nvs.h>
@@ -928,21 +929,36 @@ void BluetoothManager::refresh_system_info() {
 
 void BluetoothManager::update_system_info() {
     if (!sysinfo_system_characteristic) return;
-    
+
     // Create JSON-like structure for system info
     char buffer[BLE_SYSINFO_MAX_PAYLOAD_BYTES];
     unsigned long uptime_ms = millis();
     unsigned long uptime_seconds = uptime_ms / 1000;
     unsigned long uptime_minutes = uptime_seconds / 60;
     unsigned long uptime_hours = uptime_minutes / 60;
-    
+
     // Get ESP32 system information
     size_t heap_free = ESP.getFreeHeap();
     size_t heap_total = ESP.getHeapSize();
     size_t heap_used = heap_total - heap_free;
     uint32_t flash_size = ESP.getFlashChipSize();
     float heap_usage_percent = (float(heap_used) / float(heap_total)) * 100.0f;
-    
+
+    const char* reset_reason = "UNKNOWN";
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON: reset_reason = "POWERON"; break;
+        case ESP_RST_EXT: reset_reason = "EXT"; break;
+        case ESP_RST_SW: reset_reason = "SW"; break;
+        case ESP_RST_PANIC: reset_reason = "PANIC"; break;
+        case ESP_RST_INT_WDT: reset_reason = "INT_WDT"; break;
+        case ESP_RST_TASK_WDT: reset_reason = "TASK_WDT"; break;
+        case ESP_RST_WDT: reset_reason = "WDT"; break;
+        case ESP_RST_DEEPSLEEP: reset_reason = "DEEPSLEEP"; break;
+        case ESP_RST_BROWNOUT: reset_reason = "BROWNOUT"; break;
+        case ESP_RST_SDIO: reset_reason = "SDIO"; break;
+        default: break;
+    }
+
     snprintf(buffer, sizeof(buffer),
         "{"
         "\"version\":\"%s\","
@@ -953,6 +969,10 @@ void BluetoothManager::update_system_info() {
         "\"heap_free\":%u,"
         "\"heap_total\":%u,"
         "\"heap_used_pct\":%.1f,"
+        "\"heap_int_free\":%u,"
+        "\"heap_int_min\":%u,"
+        "\"heap_int_largest\":%u,"
+        "\"reset_reason\":\"%s\","
         "\"flash_size\":%u,"
         "\"cpu_freq\":%u"
         "}",
@@ -964,6 +984,10 @@ void BluetoothManager::update_system_info() {
         (unsigned int)heap_free,
         (unsigned int)heap_total,
         heap_usage_percent,
+        (unsigned int)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned int)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned int)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+        reset_reason,
         (unsigned int)flash_size,
         (unsigned int)ESP.getCpuFreqMHz()
     );

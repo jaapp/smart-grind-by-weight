@@ -1101,9 +1101,10 @@ class GrinderBLETool:
         self.safe_print(f"   Version:      {system.get('version', 'Unknown')}")
         self.safe_print(f"   Build:        #{system.get('build', 'Unknown')}")
         self.safe_print(f"   Uptime:       {system.get('uptime_h', 0):02d}:{system.get('uptime_m', 0):02d}:{system.get('uptime_s', 0):02d}")
+        self.safe_print(f"   Reset Reason: {system.get('reset_reason', 'Unknown')}")
         self.safe_print(f"   CPU Freq:     {system.get('cpu_freq', 'Unknown')} MHz")
-        
-        # Memory Information  
+
+        # Memory Information
         self.safe_print(f"[MEMORY]:")
         heap_free = system.get('heap_free', 0)
         heap_total = system.get('heap_total', 0)
@@ -1112,6 +1113,12 @@ class GrinderBLETool:
         self.safe_print(f"   Heap Free:    {heap_free//1024:,} KB")
         self.safe_print(f"   Heap Total:   {heap_total//1024:,} KB")
         self.safe_print(f"   Heap Used:    {heap_used_pct:.1f}%")
+        heap_int_free = system.get('heap_int_free')
+        if heap_int_free is not None:
+            heap_int_min = system.get('heap_int_min', 0)
+            heap_int_largest = system.get('heap_int_largest', 0)
+            self.safe_print(f"   Internal:     {heap_int_free//1024:,} KB free "
+                            f"(min ever {heap_int_min//1024:,} KB, largest block {heap_int_largest//1024:,} KB)")
         self.safe_print(f"   Flash Size:   {flash_size//1024//1024:,} MB")
         
         # Performance Information
