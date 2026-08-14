@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MTA Gateway</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚇</text></svg>">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    max-width: 640px; margin: 2rem auto; padding: 0 1rem;
+    background: #111; color: #eee;
+  }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1rem; margin-top: 2rem; color: #aaa; }
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 50%;
+    font-weight: 700; font-size: 1.1rem; flex: none;
+  }
+  ul { list-style: none; padding: 0; }
+  li.watch {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .6rem .5rem; border-bottom: 1px solid #333;
+  }
+  .mins { margin-left: auto; color: #8f8; font-variant-numeric: tabular-nums; }
+  .mins.empty { color: #666; }
+  button {
+    background: #333; color: #eee; border: 1px solid #555;
+    border-radius: .4rem; padding: .4rem .8rem; cursor: pointer; font-size: .95rem;
+  }
+  button:hover { background: #444; }
+  button.selected { background: #eee; color: #111; }
+  button.delete { border: none; background: none; color: #c66; font-size: 1.1rem; }
+  input {
+    width: 100%; box-sizing: border-box; padding: .5rem;
+    background: #222; color: #eee; border: 1px solid #555; border-radius: .4rem;
+    font-size: 1rem;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0; align-items: center; }
+  #status { color: #888; font-size: .85rem; margin-top: 2rem; }
+  .muted { color: #888; }
+</style>
+</head>
+<body>
+<h1>🚇 MTA Gateway</h1>
+
+<h2>Watching</h2>
+<ul id="watches"></ul>
+
+<h2>Add a watch</h2>
+<input id="search" placeholder="Search stations…" autocomplete="off">
+<div class="row" id="results"></div>
+<div class="row" id="routes"></div>
+<div class="row" id="directions"></div>
+<div class="row"><button id="add" hidden>Add watch</button></div>
+
+<p id="status"></p>
+
+<script>
+const COLORS = {
+  "1":["#EE352E","#fff"],"2":["#EE352E","#fff"],"3":["#EE352E","#fff"],
+  "4":["#00933C","#fff"],"5":["#00933C","#fff"],"6":["#00933C","#fff"],
+  "7":["#B933AD","#fff"],
+  "A":["#0039A6","#fff"],"C":["#0039A6","#fff"],"E":["#0039A6","#fff"],
+  "B":["#FF6319","#fff"],"D":["#FF6319","#fff"],"F":["#FF6319","#fff"],"M":["#FF6319","#fff"],
+  "G":["#6CBE45","#fff"],
+  "J":["#996633","#fff"],"Z":["#996633","#fff"],
+  "L":["#A7A9AC","#fff"],
+  "N":["#FCCC0A","#000"],"Q":["#FCCC0A","#000"],"R":["#FCCC0A","#000"],"W":["#FCCC0A","#000"],
+};
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, text = "") => {
+  const e = Object.assign(document.createElement(tag), props);
+  if (text) e.textContent = text;
+  return e;
+};
+const badge = route => {
+  const [bg, fg] = COLORS[route] || ["#808183", "#fff"];
+  return el("span", { className: "badge", style: `background:${bg};color:${fg}` }, route);
+};
+
+let pick = { station: null, route: null, direction: null };
+
+async function api(path, opts) {
+  const resp = await fetch(path, opts);
+  if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+  return resp.json();
+}
+
+async function refreshWatches() {
+  const [watches, arrivals] = await Promise.all([api("/api/watches"), api("/api/arrivals")]);
+  const list = $("watches");
+  list.replaceChildren();
+  if (!watches.length) list.append(el("li", { className: "muted" }, "Nothing yet — add a watch below."));
+  watches.forEach((w, i) => {
+    const li = el("li", { className: "watch" });
+    const mins = arrivals.items[i]?.mins || [];
+    const minsEl = el("span", { className: "mins" + (mins.length ? "" : " empty") },
+      mins.length ? mins.map(m => `${m}`).join(", ") + " min" : "no data");
+    const del = el("button", { className: "delete", title: "Remove" }, "✕");
+    del.onclick = async () => { await api(`/api/watches/${i}`, { method: "DELETE" }); refreshWatches(); };
+    li.append(badge(w.route), el("span", {}, `${w.station} → ${w.direction_label}`), minsEl, del);
+    list.append(li);
+  });
+  $("status").textContent = arrivals.stale
+    ? "⚠ MTA data is stale or not yet fetched"
+    : `MTA data updated ${arrivals.age_s}s ago`;
+}
+
+function renderPicker(stationsFound) {
+  const results = $("results");
+  results.replaceChildren();
+  stationsFound.forEach(s => {
+    const b = el("button", {}, `${s.name} (${s.routes.join(" ")})`);
+    if (pick.station?.stop_id === s.stop_id) b.classList.add("selected");
+    b.onclick = () => { pick = { station: s, route: null, direction: null }; renderPicker(stationsFound); };
+    results.append(b);
+  });
+  const routes = $("routes");
+  routes.replaceChildren();
+  const dirs = $("directions");
+  dirs.replaceChildren();
+  if (pick.station) {
+    pick.station.routes.forEach(r => {
+      const b = badge(r);
+      b.style.cursor = "pointer";
+      if (pick.route === r) b.style.outline = "3px solid #eee";
+      b.onclick = () => { pick.route = r; renderPicker(stationsFound); };
+      routes.append(b);
+    });
+    [["N", pick.station.north], ["S", pick.station.south]].forEach(([d, label]) => {
+      const b = el("button", {}, `→ ${label}`);
+      if (pick.direction === d) b.classList.add("selected");
+      b.onclick = () => { pick.direction = d; renderPicker(stationsFound); };
+      dirs.append(b);
+    });
+  }
+  $("add").hidden = !(pick.station && pick.route && pick.direction);
+}
+
+$("search").oninput = async e => {
+  pick = { station: null, route: null, direction: null };
+  renderPicker(e.target.value.trim() ? await api(`/api/stations?q=${encodeURIComponent(e.target.value)}`) : []);
+};
+
+$("add").onclick = async () => {
+  try {
+    await api("/api/watches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ route: pick.route, stop_id: pick.station.stop_id, direction: pick.direction }),
+    });
+    pick = { station: null, route: null, direction: null };
+    $("search").value = "";
+    renderPicker([]);
+    refreshWatches();
+  } catch (err) {
+    $("status").textContent = "⚠ " + err.message;
+  }
+};
+
+refreshWatches();
+setInterval(refreshWatches, 15000);
+</script>
+</body>
+</html>
