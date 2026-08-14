@@ -22,7 +22,6 @@ constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 52;
 constexpr int kMaxWatchRows = 4;
-constexpr int kTextIndentPx = kBadgeSizePx + 12;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
@@ -238,7 +237,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         const TrainArrivalItem& item = arrivals.items[i];
         WatchEntry entry = {&item, {}, 0};
         for (int m = 0; m < item.mins_count; m++) {
-            if (item.mins[m] < elapsed_min) {
+            if (item.mins[m] <= elapsed_min) {
                 continue;
             }
             entry.mins[entry.count++] = static_cast<uint8_t>(item.mins[m] - elapsed_min);
@@ -347,7 +346,6 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_obj_set_style_bg_opa(pills_row, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(pills_row, 0, 0);
         lv_obj_set_style_pad_all(pills_row, 0, 0);
-        lv_obj_set_style_pad_left(pills_row, kTextIndentPx, 0);
         lv_obj_set_layout(pills_row, LV_LAYOUT_FLEX);
         lv_obj_set_flex_flow(pills_row, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(pills_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -357,11 +355,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
 
         for (int m = 0; m < entry.count; m++) {
             char pill_text[8];
-            if (entry.mins[m] == 0) {
-                snprintf(pill_text, sizeof(pill_text), "Now");
-            } else {
-                snprintf(pill_text, sizeof(pill_text), "%u", entry.mins[m]);
-            }
+            snprintf(pill_text, sizeof(pill_text), "%um", entry.mins[m]);
 
             lv_obj_t* pill = lv_obj_create(pills_row);
             lv_obj_set_size(pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -380,12 +374,6 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
             lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
         }
 
-        if (entry.mins[entry.count - 1] > 0) {
-            lv_obj_t* unit_label = lv_label_create(pills_row);
-            lv_label_set_text(unit_label, "min");
-            lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_16, 0);
-            lv_obj_set_style_text_color(unit_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-        }
     }
 
     if (stale) {
