@@ -5,6 +5,10 @@
 #include <cstring>
 #include "../../config/constants.h"
 
+// Bold grotesque for route bullets (Arimo Bold, Helvetica-metric); the glyph
+// cap height is ~55% of the badge diameter, matching official MTA bullets
+LV_FONT_DECLARE(lv_font_bullet_46)
+
 namespace {
 
 constexpr uint32_t kWaveTickMs = 40;                    // 25 fps ripple animation
@@ -14,7 +18,7 @@ constexpr float kWaveLengthPx = 96.0f;                  // Radial distance betwe
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
 
-constexpr int kBadgeSizePx = 52;
+constexpr int kBadgeSizePx = 60;
 constexpr int kMaxMinsShown = 3;
 
 } // namespace
@@ -248,7 +252,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
 
         lv_obj_t* badge_label = lv_label_create(badge);
         lv_label_set_text(badge_label, item.route);
-        lv_obj_set_style_text_font(badge_label, &lv_font_montserrat_32, 0);
+        lv_obj_set_style_text_font(badge_label, &lv_font_bullet_46, 0);
         lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
         lv_obj_center(badge_label);
 
