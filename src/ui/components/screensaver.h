@@ -39,7 +39,8 @@ private:
 
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
-    void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data);
+    void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
+                             uint32_t elapsed_min, bool device_stale);
 
     lv_obj_t* overlay_ = nullptr;
     lv_obj_t* trains_container_ = nullptr;
@@ -49,6 +50,8 @@ private:
     float phase_ = 0.0f;
     uint32_t rendered_fetch_ms_ = 0;
     NetworkState rendered_state_ = NetworkState::UNCONFIGURED;
+    uint32_t rendered_elapsed_min_ = 0;
+    uint8_t rendered_staleness_ = 0;
     uint16_t dot_distance_px_[kDotCols * kDotRows];
     lv_color_t shade_lut_[kShadeCount];
 };

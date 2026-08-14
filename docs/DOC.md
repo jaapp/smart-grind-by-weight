@@ -359,10 +359,11 @@ Need a simple live readout? Open **Menu → Scale** to jump into a full-screen w
 - **Switching**: Tap anywhere on grind screen to switch between layouts during grinding
 
 ### Screensaver
-After 5 minutes without touch or scale activity, the screen dims and an animated screensaver appears. Configure it in **Menu → Display**:
+After 2 minutes without touch or scale activity, the screen dims and an animated screensaver appears. Configure it in **Menu → Display**:
 - **Enabled toggle**: when off, the screen only dims like before
-- **Style**: a brown dot-matrix ripple expanding from the center of the screen
+- **Style**: Wave (a brown dot-matrix ripple expanding from the center of the screen) or Trains (a departure board of upcoming NYC subway arrivals from the MTA gateway)
 - **Preview**: starts the screensaver immediately; touch to dismiss
+- The trains board sorts all upcoming arrivals by time; each row shows the route bullet, direction, station name, and minutes until arrival ("Now" when due). Minutes count down locally between the 30-second gateway polls; if no poll succeeds for 90 seconds a stale-data warning appears, and after 5 minutes the board is replaced by the connection error state
 - The screensaver brightness slider controls how dim the screen gets while it plays
 
 Touching the screen wakes it instantly (the touch is swallowed, so nothing underneath gets pressed), and placing a cup or portafilter on the scale wakes it too. The screensaver never appears while grinding, during a manual run, or during an OTA update.

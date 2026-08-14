@@ -56,10 +56,12 @@ def arrivals() -> dict:
     items = []
     for w in watches:
         color, text_color = mta.ROUTE_COLORS.get(w["route"], ("808183", "FFFFFF"))
+        station = stations.get(w["stop_id"])
         items.append({
             "route": w["route"],
             "color": color,
             "text_color": text_color,
+            "station": station["name"] if station else w["stop_id"],
             "direction": stations.direction_label(w["stop_id"], w["direction"]),
             "mins": cache.upcoming_minutes(
                 w["route"], w["stop_id"], w["direction"], config.ARRIVALS_PER_WATCH

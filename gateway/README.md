@@ -28,7 +28,7 @@ station, pick a line, pick a direction (shown with friendly labels like
   "stale": false,
   "items": [
     {"route": "N", "color": "FCCC0A", "text_color": "000000",
-     "direction": "Manhattan", "mins": [3, 9, 15]}
+     "station": "Queensboro Plaza", "direction": "Manhattan", "mins": [3, 9, 15]}
   ]
 }
 ```

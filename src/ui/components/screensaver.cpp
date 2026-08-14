@@ -1,5 +1,6 @@
 #include "screensaver.h"
 
+#include <Arduino.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -21,6 +22,11 @@ constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kBadgeSizePx = 60;
 constexpr int kMaxArrivalRows = 6;
+
+// The bullet font's glyphs are all cap-height and sit on the baseline, leaving
+// the font's 10px descent as empty space below them; shift down by half of it
+// so the glyph is visually centered in the badge
+constexpr int kBadgeGlyphNudgePx = 5;
 
 struct ArrivalEntry {
     const TrainArrivalItem* item;
@@ -184,16 +190,26 @@ void ScreensaverOverlay::refresh_trains(bool force) {
     bool have_data = train_data_client.get_arrivals(arrivals);
     NetworkState state = train_data_client.get_state();
 
-    if (!force && arrivals.fetched_at_ms == rendered_fetch_ms_ && state == rendered_state_) {
+    // Minutes are counted down locally between polls, and a snapshot the
+    // gateway stopped refreshing is first flagged as stale, then hidden
+    uint32_t age_ms = have_data ? millis() - arrivals.fetched_at_ms : 0;
+    uint32_t elapsed_min = age_ms / 60000;
+    uint8_t staleness = age_ms >= NET_DATA_EXPIRED_MS ? 2 : (age_ms >= NET_DATA_STALE_MS ? 1 : 0);
+
+    if (!force && arrivals.fetched_at_ms == rendered_fetch_ms_ && state == rendered_state_ &&
+        elapsed_min == rendered_elapsed_min_ && staleness == rendered_staleness_) {
         return;
     }
     rendered_fetch_ms_ = arrivals.fetched_at_ms;
     rendered_state_ = state;
+    rendered_elapsed_min_ = elapsed_min;
+    rendered_staleness_ = staleness;
 
-    rebuild_trains_view(arrivals, have_data);
+    rebuild_trains_view(arrivals, have_data && staleness < 2, elapsed_min, staleness == 1);
 }
 
-void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool have_data) {
+void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
+                                             uint32_t elapsed_min, bool device_stale) {
     if (trains_container_) {
         lv_obj_del(trains_container_);
         trains_container_ = nullptr;
@@ -218,7 +234,10 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     for (int i = 0; i < arrivals.item_count; i++) {
         const TrainArrivalItem& item = arrivals.items[i];
         for (int m = 0; m < item.mins_count; m++) {
-            entries[entry_count++] = {&item, item.mins[m]};
+            if (item.mins[m] < elapsed_min) {
+                continue;
+            }
+            entries[entry_count++] = {&item, static_cast<uint8_t>(item.mins[m] - elapsed_min)};
         }
     }
 
@@ -243,8 +262,9 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     std::stable_sort(entries, entries + entry_count,
                      [](const ArrivalEntry& a, const ArrivalEntry& b) { return a.min < b.min; });
 
+    bool stale = arrivals.gateway_stale || device_stale;
     int rows = entry_count < kMaxArrivalRows ? entry_count : kMaxArrivalRows;
-    if (arrivals.gateway_stale && rows == kMaxArrivalRows) {
+    if (stale && rows == kMaxArrivalRows) {
         rows--;
     }
     for (int i = 0; i < rows; i++) {
@@ -276,24 +296,49 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_label_set_text(badge_label, item.route);
         lv_obj_set_style_text_font(badge_label, &lv_font_bullet_46, 0);
         lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
-        lv_obj_center(badge_label);
+        lv_obj_align(badge_label, LV_ALIGN_CENTER, 0, kBadgeGlyphNudgePx);
 
-        lv_obj_t* direction_label = lv_label_create(row);
+        lv_obj_t* text_col = lv_obj_create(row);
+        lv_obj_set_height(text_col, LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_opa(text_col, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(text_col, 0, 0);
+        lv_obj_set_style_pad_all(text_col, 0, 0);
+        lv_obj_set_flex_grow(text_col, 1);
+        lv_obj_set_layout(text_col, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(text_col, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_gap(text_col, 2, 0);
+        lv_obj_clear_flag(text_col, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(text_col, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* direction_label = lv_label_create(text_col);
         lv_label_set_text(direction_label, item.direction);
+        lv_obj_set_width(direction_label, LV_PCT(100));
         lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_16, 0);
         lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-        lv_obj_set_flex_grow(direction_label, 1);
         lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
 
+        if (item.station[0] != '\0') {
+            lv_obj_t* station_label = lv_label_create(text_col);
+            lv_label_set_text(station_label, item.station);
+            lv_obj_set_width(station_label, LV_PCT(100));
+            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_14, 0);
+            lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+            lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
+        }
+
         char mins_text[16];
-        snprintf(mins_text, sizeof(mins_text), "%u min", entries[i].min);
+        if (entries[i].min == 0) {
+            snprintf(mins_text, sizeof(mins_text), "Now");
+        } else {
+            snprintf(mins_text, sizeof(mins_text), "%u min", entries[i].min);
+        }
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_24, 0);
         lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     }
 
-    if (arrivals.gateway_stale) {
+    if (stale) {
         lv_obj_t* stale_label = lv_label_create(trains_container_);
         lv_label_set_text(stale_label, LV_SYMBOL_WARNING " stale data");
         lv_obj_set_style_text_font(stale_label, &lv_font_montserrat_16, 0);
