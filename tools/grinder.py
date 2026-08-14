@@ -55,6 +55,20 @@ class GrinderTool:
         self.streamlit_dir = self.script_dir / "streamlit-reports"
         self.db_path = self.script_dir / "database" / "grinder_data.db"
         self.requirements_txt = self.script_dir / "requirements.txt"
+        self.env_file = self.project_dir / ".env"
+
+    def load_env_file(self) -> Dict[str, str]:
+        """Parse KEY=VALUE pairs from the repo-root .env file."""
+        values: Dict[str, str] = {}
+        if not self.env_file.exists():
+            return values
+        for line in self.env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, _, value = line.partition('=')
+            values[key.strip()] = value.strip().strip('"\'')
+        return values
     
     def safe_print(self, text: str):
         """Print text with proper encoding handling for all platforms."""
@@ -401,14 +415,28 @@ class GrinderTool:
         if not self.check_venv():
             return 1
 
+        ssid = getattr(args, 'ssid', None)
+        password = getattr(args, 'password', None)
+        url = getattr(args, 'url', None)
+
+        if getattr(args, 'set', False) or ssid or url:
+            env = self.load_env_file()
+            ssid = ssid or env.get('WIFI_SSID')
+            password = password or env.get('WIFI_PASSWORD', '')
+            url = url or env.get('GATEWAY_URL')
+            if not ssid or not url:
+                self.print_error("Missing WiFi settings: provide --ssid/--url or set "
+                                 "WIFI_SSID/GATEWAY_URL in .env (see .env.example)")
+                return 1
+
         cmd = [str(self.venv_python), str(self.ble_tool), "wifi"]
 
-        if getattr(args, 'ssid', None):
-            cmd.extend(["--ssid", args.ssid])
-        if getattr(args, 'password', None):
-            cmd.extend(["--password", args.password])
-        if getattr(args, 'url', None):
-            cmd.extend(["--url", args.url])
+        if ssid:
+            cmd.extend(["--ssid", ssid])
+        if password:
+            cmd.extend(["--password", password])
+        if url:
+            cmd.extend(["--url", url])
         if getattr(args, 'device', None):
             cmd.extend(["--device", args.device])
 
@@ -528,6 +556,7 @@ def create_parser() -> argparse.ArgumentParser:
     diagnostics_parser = subparsers.add_parser('diagnostics', help='Get comprehensive diagnostic report for GitHub issues')
 
     wifi_parser = subparsers.add_parser('wifi', help='Provision WiFi + train gateway URL over BLE (no args = show status)')
+    wifi_parser.add_argument('--set', action='store_true', help='Provision using values from .env (CLI flags override)')
     wifi_parser.add_argument('--ssid', help='WiFi network name')
     wifi_parser.add_argument('--password', default='', help='WiFi password')
     wifi_parser.add_argument('--url', help='Train gateway base URL, e.g. http://192.168.1.50:8600')
