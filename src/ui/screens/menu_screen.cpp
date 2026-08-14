@@ -270,6 +270,7 @@ void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
 
     create_toggle_row(parent, "Enabled", &ble_toggle);
     create_toggle_row(parent, "Startup", &ble_startup_toggle);
+    create_toggle_row(parent, "Always on", &ble_always_on_toggle);
 
     // BLE Status label
     ble_status_label = lv_label_create(parent);
@@ -294,6 +295,10 @@ void MenuScreen::create_bluetooth_page(lv_obj_t* parent) {
     if (ble_startup_toggle) {
         lv_obj_add_event_cb(ble_startup_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::BLE_STARTUP_TOGGLE)));
+    }
+    if (ble_always_on_toggle) {
+        lv_obj_add_event_cb(ble_always_on_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::BLE_ALWAYS_ON_TOGGLE)));
     }
 }
 
@@ -623,6 +628,7 @@ void MenuScreen::show() {
     update_ble_status();
     update_brightness_sliders();
     update_bluetooth_startup_toggle();
+    update_bluetooth_always_on_toggle();
     update_logging_toggle();
     update_grind_settings();
     update_screensaver_controls();
@@ -756,13 +762,17 @@ void MenuScreen::update_ble_status() {
         }
         lv_obj_clear_flag(ble_status_label, LV_OBJ_FLAG_HIDDEN);
         
-        // Show remaining time
-        unsigned long remaining_ms = bluetooth_manager->get_bluetooth_timeout_remaining_ms();
-        unsigned long remaining_min = remaining_ms / (60 * 1000);
-        char timer_text[64];
-        snprintf(timer_text, sizeof(timer_text), "Auto-disable in: %lu min", remaining_min);
-        lv_label_set_text(ble_timer_label, timer_text);
-        lv_obj_clear_flag(ble_timer_label, LV_OBJ_FLAG_HIDDEN);
+        if (bluetooth_manager->is_always_on()) {
+            lv_obj_add_flag(ble_timer_label, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            // Show remaining time
+            unsigned long remaining_ms = bluetooth_manager->get_bluetooth_timeout_remaining_ms();
+            unsigned long remaining_min = remaining_ms / (60 * 1000);
+            char timer_text[64];
+            snprintf(timer_text, sizeof(timer_text), "Auto-disable in: %lu min", remaining_min);
+            lv_label_set_text(ble_timer_label, timer_text);
+            lv_obj_clear_flag(ble_timer_label, LV_OBJ_FLAG_HIDDEN);
+        }
     } else {
         // When nothing to display hide the status labels
         lv_obj_add_flag(ble_status_label, LV_OBJ_FLAG_HIDDEN);
@@ -995,6 +1005,21 @@ void MenuScreen::update_bluetooth_startup_toggle() {
         lv_obj_add_state(ble_startup_toggle, LV_STATE_CHECKED);
     } else {
         lv_obj_clear_state(ble_startup_toggle, LV_STATE_CHECKED);
+    }
+}
+
+void MenuScreen::update_bluetooth_always_on_toggle() {
+    if (!ble_always_on_toggle) return;
+
+    Preferences prefs;
+    prefs.begin("bluetooth", true); // read-only
+    bool always_on = prefs.getBool("always_on", false);
+    prefs.end();
+
+    if (always_on) {
+        lv_obj_add_state(ble_always_on_toggle, LV_STATE_CHECKED);
+    } else {
+        lv_obj_clear_state(ble_always_on_toggle, LV_STATE_CHECKED);
     }
 }
 

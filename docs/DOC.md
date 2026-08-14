@@ -401,8 +401,9 @@ Main Screen (swipe left/right between mode panes)
     |   +-- Bluetooth
     |   |   |-- Bluetooth toggle (30m timer)
     |   |   |-- Bluetooth startup toggle (configurable auto-enable)
+    |   |   |-- Always on toggle (disables the auto-disable timeout)
     |   |   |-- Connection status display
-    |   |   \-- Auto-disable timer display
+    |   |   \-- Auto-disable timer display (hidden when Always on)
     |   |
     |   +-- Display
     |   |   |-- Normal brightness slider

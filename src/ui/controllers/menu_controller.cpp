@@ -43,6 +43,7 @@ void MenuUIController::register_events() {
 
     EventBridgeLVGL::register_handler(ET::BLE_TOGGLE, [this](lv_event_t*) { handle_ble_toggle(); });
     EventBridgeLVGL::register_handler(ET::BLE_STARTUP_TOGGLE, [this](lv_event_t*) { handle_ble_startup_toggle(); });
+    EventBridgeLVGL::register_handler(ET::BLE_ALWAYS_ON_TOGGLE, [this](lv_event_t*) { handle_ble_always_on_toggle(); });
     EventBridgeLVGL::register_handler(ET::LOGGING_TOGGLE, [this](lv_event_t*) { handle_logging_toggle(); });
 
     EventBridgeLVGL::register_handler(ET::GRIND_FAST_MODE_TOGGLE, [this](lv_event_t*) { handle_grind_fast_mode_toggle(); });
@@ -286,6 +287,27 @@ void MenuUIController::handle_ble_startup_toggle() {
     prefs.end();
 
     LOG_DEBUG_PRINTLN(startup_enabled ? "Bluetooth startup enabled" : "Bluetooth startup disabled");
+}
+
+void MenuUIController::handle_ble_always_on_toggle() {
+    if (!ui_manager_) return;
+
+    auto* toggle = ui_manager_->menu_screen.get_ble_always_on_toggle();
+    if (!toggle) return;
+
+    bool always_on = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+
+    Preferences prefs;
+    prefs.begin("bluetooth", false);
+    prefs.putBool("always_on", always_on);
+    prefs.end();
+
+    if (ui_manager_->bluetooth_manager) {
+        ui_manager_->bluetooth_manager->set_always_on(always_on);
+    }
+    ui_manager_->menu_screen.update_ble_status();
+
+    LOG_DEBUG_PRINTLN(always_on ? "Bluetooth always-on enabled" : "Bluetooth always-on disabled");
 }
 
 void MenuUIController::handle_logging_toggle() {

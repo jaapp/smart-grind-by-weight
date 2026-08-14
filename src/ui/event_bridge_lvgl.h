@@ -30,6 +30,7 @@ public:
         MENU_REFRESH_STATS,
         BLE_TOGGLE,
         BLE_STARTUP_TOGGLE,
+        BLE_ALWAYS_ON_TOGGLE,
         LOGGING_TOGGLE,
         GRIND_FAST_MODE_TOGGLE,
         AUTO_START_TOGGLE,

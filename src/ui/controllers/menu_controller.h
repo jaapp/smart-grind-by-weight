@@ -24,6 +24,7 @@ public:
     void handle_diagnostics_reset();
     void handle_ble_toggle();
     void handle_ble_startup_toggle();
+    void handle_ble_always_on_toggle();
     void handle_logging_toggle();
     void handle_grind_fast_mode_toggle();
     void handle_auto_start_toggle();

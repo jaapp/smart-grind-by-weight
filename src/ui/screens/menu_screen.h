@@ -46,6 +46,7 @@ private:
     // Menu toggle elements
     lv_obj_t* ble_toggle;
     lv_obj_t* ble_startup_toggle;
+    lv_obj_t* ble_always_on_toggle;
     lv_obj_t* ble_status_label;
     lv_obj_t* ble_timer_label;
     lv_obj_t* logging_toggle;
@@ -110,6 +111,7 @@ public:
     void update_brightness_labels(int normal_percent = -1, int screensaver_percent = -1); // Use negative value to leave unchanged
     void update_brightness_sliders();
     void update_bluetooth_startup_toggle();
+    void update_bluetooth_always_on_toggle();
     void update_logging_toggle();
     void update_grind_settings();
     void update_screensaver_controls();
@@ -130,6 +132,7 @@ public:
     bool is_scale_page_active() const { return scale_active; }
     lv_obj_t* get_ble_toggle() const { return ble_toggle; }
     lv_obj_t* get_ble_startup_toggle() const { return ble_startup_toggle; }
+    lv_obj_t* get_ble_always_on_toggle() const { return ble_always_on_toggle; }
     lv_obj_t* get_logging_toggle() const { return logging_toggle; }
     lv_obj_t* get_refresh_stats_button() const { return refresh_stats_button; }
     lv_obj_t* get_diag_reset_button() const { return diag_reset_button; }
