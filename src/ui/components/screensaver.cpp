@@ -312,16 +312,16 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
 
         lv_obj_t* direction_label = lv_label_create(text_col);
         lv_label_set_text(direction_label, item.direction);
-        lv_obj_set_width(direction_label, LV_PCT(100));
-        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_16, 0);
+        lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
+        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_20, 0);
         lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
         lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
 
         if (item.station[0] != '\0') {
             lv_obj_t* station_label = lv_label_create(text_col);
             lv_label_set_text(station_label, item.station);
-            lv_obj_set_width(station_label, LV_PCT(100));
-            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_14, 0);
+            lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_16));
+            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_16, 0);
             lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
             lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
         }
@@ -330,7 +330,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         if (entries[i].min == 0) {
             snprintf(mins_text, sizeof(mins_text), "Now");
         } else {
-            snprintf(mins_text, sizeof(mins_text), "%u min", entries[i].min);
+            snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
         }
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
