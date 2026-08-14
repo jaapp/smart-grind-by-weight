@@ -9,7 +9,7 @@
 
 // Bold grotesque for route bullets (Arimo Bold, Helvetica-metric); the glyph
 // cap height is ~55% of the badge diameter, matching official MTA bullets
-LV_FONT_DECLARE(lv_font_bullet_46)
+LV_FONT_DECLARE(lv_font_bullet_40)
 
 namespace {
 
@@ -20,13 +20,13 @@ constexpr float kWaveLengthPx = 96.0f;                  // Radial distance betwe
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
 
-constexpr int kBadgeSizePx = 60;
+constexpr int kBadgeSizePx = 52;
 constexpr int kMaxArrivalRows = 6;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
-// the font's 10px descent as empty space below them; shift down by half of it
+// the font's 8px descent as empty space below them; shift down by half of it
 // so the glyph is visually centered in the badge
-constexpr int kBadgeGlyphNudgePx = 5;
+constexpr int kBadgeGlyphNudgePx = 4;
 
 struct ArrivalEntry {
     const TrainArrivalItem* item;
@@ -294,7 +294,7 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
 
         lv_obj_t* badge_label = lv_label_create(badge);
         lv_label_set_text(badge_label, item.route);
-        lv_obj_set_style_text_font(badge_label, &lv_font_bullet_46, 0);
+        lv_obj_set_style_text_font(badge_label, &lv_font_bullet_40, 0);
         lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
         lv_obj_align(badge_label, LV_ALIGN_CENTER, 0, kBadgeGlyphNudgePx);
 
@@ -312,16 +312,16 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
 
         lv_obj_t* direction_label = lv_label_create(text_col);
         lv_label_set_text(direction_label, item.direction);
-        lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
-        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_24));
+        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_24, 0);
         lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
         lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
 
         if (item.station[0] != '\0') {
             lv_obj_t* station_label = lv_label_create(text_col);
             lv_label_set_text(station_label, item.station);
-            lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_16));
-            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_16, 0);
+            lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
+            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_20, 0);
             lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
             lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
         }
