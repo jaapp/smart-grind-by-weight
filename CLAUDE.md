@@ -20,7 +20,7 @@ python3 tools/grinder.py analyze
 - `python3 tools/grinder.py export` - Export grind data to database
 - `python3 tools/grinder.py report` - Launch Streamlit report from existing data
 - `python3 tools/grinder.py scan` - Scan for BLE devices
-- `python3 tools/grinder.py wifi --ssid X --password Y --url http://host:8600` - Provision WiFi + train gateway over BLE (no args = status)
+- `python3 tools/grinder.py wifi --ssid X --password Y --url http://host:8600` - Provision WiFi + train gateway over BLE (no args = status; `--set` provisions from repo-root `.env` with `WIFI_SSID`/`WIFI_PASSWORD`/`GATEWAY_URL`, see `.env.example`, CLI flags override)
 - `python3 tools/grinder.py info` - Get device system information
 - `python3 tools/grinder.py clean` - Clean build artifacts
 
