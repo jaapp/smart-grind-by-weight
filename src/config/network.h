@@ -18,6 +18,8 @@
 #define NET_ARRIVALS_PATH "/api/arrivals"                                      // Gateway endpoint appended to the base URL
 
 #define NET_POLL_INTERVAL_MS 30000                                             // Arrivals fetch interval while the trains screensaver is active
+#define NET_DATA_STALE_MS 90000                                                // Snapshot age (3 missed polls) before the screensaver flags arrivals as stale
+#define NET_DATA_EXPIRED_MS 300000                                             // Snapshot age after which arrivals are hidden in favor of the error state
 #define NET_HTTP_TIMEOUT_MS 5000                                               // HTTP request timeout
 #define NET_WIFI_RETRY_INTERVAL_MS 15000                                       // Delay between WiFi reconnect attempts
 #define NET_MAX_CONFIG_STRING_LEN 96                                           // Max stored length for SSID/password/URL

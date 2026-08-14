@@ -10,6 +10,7 @@
 struct TrainArrivalItem {
     char route[8];                      // Line name, e.g. "N"
     char direction[24];                 // Friendly direction label, e.g. "Manhattan"
+    char station[32];                   // Watched station name, e.g. "Queensboro Plaza"
     uint32_t color;                     // Badge color, 0xRRGGBB
     uint32_t text_color;                // Badge glyph color, 0xRRGGBB
     uint8_t mins_count;

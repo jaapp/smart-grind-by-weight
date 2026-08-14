@@ -238,6 +238,7 @@ bool TrainDataClient::parse_arrivals(const char* json, TrainArrivals& out) {
 
         cJSON* route = cJSON_GetObjectItem(item, "route");
         cJSON* direction = cJSON_GetObjectItem(item, "direction");
+        cJSON* station = cJSON_GetObjectItem(item, "station");
         cJSON* color = cJSON_GetObjectItem(item, "color");
         cJSON* text_color = cJSON_GetObjectItem(item, "text_color");
         cJSON* mins = cJSON_GetObjectItem(item, "mins");
@@ -248,6 +249,7 @@ bool TrainDataClient::parse_arrivals(const char* json, TrainArrivals& out) {
         TrainArrivalItem& dst = out.items[out.item_count];
         copy_string(dst.route, route->valuestring, sizeof(dst.route));
         copy_string(dst.direction, direction->valuestring, sizeof(dst.direction));
+        copy_string(dst.station, cJSON_IsString(station) ? station->valuestring : "", sizeof(dst.station));
         dst.color = cJSON_IsString(color) ? strtoul(color->valuestring, nullptr, 16) : 0x808183;
         dst.text_color = cJSON_IsString(text_color) ? strtoul(text_color->valuestring, nullptr, 16) : 0xFFFFFF;
 
