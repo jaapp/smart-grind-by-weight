@@ -56,16 +56,16 @@ void ReadyUIController::handle_tab_change(int tab) {
 
 void ReadyUIController::gesture_cb(lv_event_t* e) {
     lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
-    if (dir != LV_DIR_TOP && dir != LV_DIR_BOTTOM) {
+    if (dir != LV_DIR_BOTTOM) {
         return;
     }
     auto* self = static_cast<ReadyUIController*>(lv_event_get_user_data(e));
     if (self) {
-        self->handle_vertical_swipe();
+        self->handle_swipe_down();
     }
 }
 
-void ReadyUIController::handle_vertical_swipe() {
+void ReadyUIController::handle_swipe_down() {
     if (!ui_manager_ || !ui_manager_->state_machine ||
         !ui_manager_->state_machine->is_state(UIState::READY)) {
         return;
@@ -117,7 +117,7 @@ void ReadyUIController::register_events() {
     EventBridgeLVGL::register_handler(EventBridgeLVGL::EventType::TARGET_LONG_PRESS,
                                       [this](lv_event_t*) { handle_target_long_press(); });
 
-    // Swipe up/down anywhere on the ready screen starts the screensaver.
+    // Swipe down anywhere on the ready screen starts the screensaver.
     // Gestures bubble up to the active screen, so this also covers the grind
     // button strip below the tabview; the READY state gate keeps it inert on
     // every other screen.
