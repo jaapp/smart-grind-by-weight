@@ -16,7 +16,11 @@ docker run -d --name mta-gateway --restart unless-stopped \
 
 Open `http://localhost:8600` to configure which trains to watch: search a
 station, pick a line, pick a direction (shown with friendly labels like
-"→ Manhattan"). Watches persist in the `/data` volume.
+"→ Manhattan"). Each watch also takes an optional 🚶 walk time — how many
+minutes it takes to walk to that platform. When set, arrival times are
+color-coded (here and on the grinder): green when the train is reachable at a
+normal pace, yellow when only a rushed walk still makes it, red when it can't
+be caught. Watches persist in the `/data` volume.
 
 ## API
 
@@ -28,15 +32,19 @@ station, pick a line, pick a direction (shown with friendly labels like
   "stale": false,
   "items": [
     {"route": "N", "color": "FCCC0A", "text_color": "000000",
-     "station": "Queensboro Plaza", "direction": "Manhattan", "mins": [3, 9, 15]}
+     "station": "Queensboro Plaza", "direction": "Manhattan",
+     "walk_min": 7, "mins": [3, 9, 15]}
   ]
 }
 ```
 
 `mins` are minutes until arrival at the watched stop (up to 4 per watch).
-`stale` is true when the last successful MTA fetch is too old to trust.
+`walk_min` is the user-entered walk time to the platform in minutes (null when
+no estimate is set). `stale` is true when the last successful MTA fetch is too
+old to trust.
 
 Also: `GET /api/health`, `GET /api/stations?q=`, `GET/POST /api/watches`,
+`PATCH /api/watches/{index}` (set/clear `walk_min`),
 `DELETE /api/watches/{index}`.
 
 ## Development
