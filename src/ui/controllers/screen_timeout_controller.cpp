@@ -30,7 +30,7 @@ void ScreenTimeoutController::start_screensaver_now() {
     display->set_brightness(dimmed);
     screen_dimmed_ = true;
     held_until_touch_ = true;
-    screensaver_->show();
+    screensaver_->show(true);
 }
 
 void ScreenTimeoutController::update() {

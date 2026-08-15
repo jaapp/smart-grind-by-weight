@@ -7,8 +7,9 @@
 // dot-matrix ripple (Wave), subway arrivals from the train gateway grouped per
 // tracked watch (Trains grouped), and a flat time-sorted arrivals board
 // (Trains board). Swiping left/right on the overlay switches variants and
-// persists the choice; a tap dismisses the overlay. All touches are swallowed
-// before they reach the widgets underneath.
+// persists the choice; a tap dismisses the overlay immediately, while swiping
+// up slides it off the top to reveal the screen underneath. All touches are
+// swallowed before they reach the widgets underneath.
 
 enum class ScreensaverVariant {
     WAVE = 0,
@@ -19,7 +20,9 @@ enum class ScreensaverVariant {
 class ScreensaverOverlay {
 public:
     void create();
-    void show();
+    // animate slides the overlay down from the top (used for manual starts);
+    // otherwise it appears instantly (idle timeout)
+    void show(bool animate = false);
     void hide();
     bool is_visible() const { return visible_; }
 
@@ -44,6 +47,7 @@ private:
     void start_variant();
     void stop_variant();
     void switch_variant(int delta);
+    void dismiss_with_slide();
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
     void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
@@ -57,6 +61,7 @@ private:
     bool visible_ = false;
     ScreensaverVariant variant_ = ScreensaverVariant::WAVE;
     bool gesture_handled_ = false;
+    bool dismissing_ = false;
     float phase_ = 0.0f;
     uint32_t rendered_fetch_ms_ = 0;
     NetworkState rendered_state_ = NetworkState::UNCONFIGURED;
