@@ -46,6 +46,23 @@ struct BoardEntry {
     uint8_t min;
 };
 
+// Countdown color for an arrival, judged against the watch's walk-to-platform
+// estimate: green when reachable at a normal pace, yellow when only a rushed
+// walk (NET_WALK_RUSH_PERCENT of the normal time) still makes it, red when the
+// train can't be caught. Watches without an estimate keep the standard color.
+uint32_t arrival_countdown_color(uint8_t walk_min, uint8_t mins) {
+    if (walk_min == 0) {
+        return THEME_COLOR_TEXT_PRIMARY;
+    }
+    if (mins >= walk_min) {
+        return THEME_COLOR_SCREENSAVER_CATCH_OK;
+    }
+    uint8_t rushed_walk_min =
+        static_cast<uint8_t>((walk_min * NET_WALK_RUSH_PERCENT + 99) / 100);
+    return mins >= rushed_walk_min ? THEME_COLOR_SCREENSAVER_CATCH_RUSH
+                                   : THEME_COLOR_SCREENSAVER_CATCH_MISS;
+}
+
 lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap) {
     lv_obj_t* obj = lv_obj_create(parent);
     lv_obj_set_size(obj, LV_PCT(100), LV_SIZE_CONTENT);
@@ -502,7 +519,8 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
             lv_obj_t* pill_label = lv_label_create(pill);
             lv_label_set_text(pill_label, pill_text);
             lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_24, 0);
-            lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+            lv_obj_set_style_text_color(
+                pill_label, lv_color_hex(arrival_countdown_color(item.walk_min, entry.mins[m])), 0);
         }
     }
     return rows;
@@ -544,7 +562,8 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
-        lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        lv_obj_set_style_text_color(
+            mins_label, lv_color_hex(arrival_countdown_color(item.walk_min, entries[i].min)), 0);
     }
     return rows;
 }

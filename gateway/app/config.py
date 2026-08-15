@@ -9,6 +9,7 @@ CONFIG_FILE = DATA_DIR / "config.json"
 
 MAX_WATCHES = 8
 ARRIVALS_PER_WATCH = 4
+MAX_WALK_MIN = 60  # Upper bound for the walk-to-platform estimate (minutes)
 
 
 def load_watches() -> list[dict]:

@@ -26,6 +26,14 @@
   }
   .mins { margin-left: auto; color: #8f8; font-variant-numeric: tabular-nums; }
   .mins.empty { color: #666; }
+  .mins .ok { color: #4dd964; }
+  .mins .rush { color: #ffd60a; }
+  .mins .miss { color: #ff5b52; }
+  .walk-chip { display: inline-flex; align-items: center; gap: .25rem; flex: none; color: #888; }
+  input.walk {
+    width: 3.4rem; padding: .25rem .3rem; text-align: right;
+    -moz-appearance: textfield;
+  }
   button {
     background: #333; color: #eee; border: 1px solid #555;
     border-radius: .4rem; padding: .4rem .8rem; cursor: pointer; font-size: .95rem;
@@ -89,7 +97,55 @@ async function api(path, opts) {
   return resp.json();
 }
 
+// Same thresholds as the grinder: green when the train is reachable at a
+// normal pace, yellow only by rushing (walk covered in 75% of normal time),
+// red when it can't be made.
+const walkClass = (walkMin, m) => {
+  if (!walkMin) return "";
+  if (m >= walkMin) return "ok";
+  return m >= Math.ceil(walkMin * 0.75) ? "rush" : "miss";
+};
+
+function minsEl(watch, mins) {
+  const span = el("span", { className: "mins" + (mins.length ? "" : " empty") });
+  if (!mins.length) { span.textContent = "no data"; return span; }
+  mins.forEach((m, j) => {
+    if (j) span.append(", ");
+    span.append(el("span", { className: walkClass(watch.walk_min, m) }, `${m}`));
+  });
+  span.append(" min");
+  return span;
+}
+
+function walkChip(index, walkMin) {
+  const input = el("input", {
+    className: "walk", type: "number", min: 1, max: 60, placeholder: "–",
+    title: "Walk time to platform (minutes) — leave empty for no estimate",
+    value: walkMin ?? "",
+  });
+  input.onchange = async () => {
+    let v = input.value.trim() === "" ? null : Math.round(+input.value);
+    if (v !== null) v = Number.isFinite(v) ? Math.max(1, Math.min(60, v)) : null;
+    try {
+      await api(`/api/watches/${index}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walk_min: v }),
+      });
+      input.blur();  // Enter keeps focus; release it so the refresh isn't skipped
+      refreshWatches();
+    } catch (err) {
+      $("status").textContent = "⚠ " + err.message;
+    }
+  };
+  const chip = el("span", { className: "walk-chip", title: "Walk time to platform (minutes)" }, "🚶");
+  chip.append(input);
+  return chip;
+}
+
 async function refreshWatches() {
+  // Don't rebuild the list under the user's cursor mid-edit
+  if (document.activeElement?.classList?.contains("walk")) return;
   const [watches, arrivals] = await Promise.all([api("/api/watches"), api("/api/arrivals")]);
   const list = $("watches");
   list.replaceChildren();
@@ -97,11 +153,10 @@ async function refreshWatches() {
   watches.forEach((w, i) => {
     const li = el("li", { className: "watch" });
     const mins = arrivals.items[i]?.mins || [];
-    const minsEl = el("span", { className: "mins" + (mins.length ? "" : " empty") },
-      mins.length ? mins.map(m => `${m}`).join(", ") + " min" : "no data");
     const del = el("button", { className: "delete", title: "Remove" }, "✕");
     del.onclick = async () => { await api(`/api/watches/${i}`, { method: "DELETE" }); refreshWatches(); };
-    li.append(badge(w.route), el("span", {}, `${w.station} → ${w.direction_label}`), minsEl, del);
+    li.append(badge(w.route), el("span", {}, `${w.station} → ${w.direction_label}`),
+              minsEl(w, mins), walkChip(i, w.walk_min), del);
     list.append(li);
   });
   $("status").textContent = arrivals.stale

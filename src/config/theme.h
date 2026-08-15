@@ -36,6 +36,11 @@
 #define THEME_COLOR_SCREENSAVER_DOT_BRIGHT 0xC08948                            // Ripple crest (warm tan)
 #define THEME_COLOR_SCREENSAVER_PILL_BG 0x2A2A2A                               // Trains arrival-time pill background
 
+// Trains arrival catchability colors (vs. the watch's walk-to-platform time)
+#define THEME_COLOR_SCREENSAVER_CATCH_OK 0x4DD964                              // Reachable at a normal walking pace (green)
+#define THEME_COLOR_SCREENSAVER_CATCH_RUSH 0xFFD60A                            // Reachable only by rushing (yellow)
+#define THEME_COLOR_SCREENSAVER_CATCH_MISS 0xFF5B52                            // Can't be caught (red)
+
 // Status indication colors
 #define THEME_COLOR_SUCCESS 0x00AA00                                           // Success state color (green)
 #define THEME_COLOR_ERROR 0xFF0000                                             // Error state color (red)
