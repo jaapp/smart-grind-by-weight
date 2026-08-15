@@ -117,6 +117,9 @@ void ScreensaverOverlay::create() {
     lv_obj_set_style_pad_all(overlay_, 0, 0);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_CLICKABLE);
+    // Without this, LVGL bubbles gesture detection past the overlay up to
+    // lv_layer_top(), and the swipe events never reach gesture_cb
+    lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_add_event_cb(overlay_, draw_cb, LV_EVENT_DRAW_MAIN, this);
