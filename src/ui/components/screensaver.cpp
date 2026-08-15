@@ -439,9 +439,7 @@ void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, boo
         board_container_ = nullptr;
     }
 
-    // Taller pill rows in the grouped page leave less slack, so its entry gap
-    // is tighter than it looks; 4 rows + gaps must stay within the 456px screen
-    grouped_container_ = make_trains_page(grouped_tile_, 12);
+    grouped_container_ = make_trains_page(grouped_tile_, 16);
     board_container_ = make_trains_page(board_tile_, 8);
 
     bool stale = arrivals.gateway_stale || device_stale;
@@ -496,13 +494,13 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
             lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
             lv_obj_set_style_border_width(pill, 0, 0);
             lv_obj_set_style_pad_hor(pill, 10, 0);
-            lv_obj_set_style_pad_ver(pill, 1, 0);
+            lv_obj_set_style_pad_ver(pill, 2, 0);
             lv_obj_clear_flag(pill, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_clear_flag(pill, LV_OBJ_FLAG_CLICKABLE);
 
             lv_obj_t* pill_label = lv_label_create(pill);
             lv_label_set_text(pill_label, pill_text);
-            lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_32, 0);
+            lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_24, 0);
             lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
         }
     }
@@ -510,8 +508,7 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
 }
 
 // Flat departure board: one row per upcoming train sorted by arrival time,
-// with a big countdown on the right. Trains already due are dropped since
-// they can't be caught.
+// with a big countdown on the right ("Now" when due)
 int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                                          uint32_t elapsed_min, bool stale) {
     BoardEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
@@ -519,7 +516,7 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
     for (int i = 0; i < arrivals.item_count; i++) {
         const TrainArrivalItem& item = arrivals.items[i];
         for (int m = 0; m < item.mins_count; m++) {
-            if (item.mins[m] <= elapsed_min) {
+            if (item.mins[m] < elapsed_min) {
                 continue;
             }
             entries[entry_count++] = {&item, static_cast<uint8_t>(item.mins[m] - elapsed_min)};
@@ -541,7 +538,11 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
         make_watch_text_column(row, item);
 
         char mins_text[16];
-        snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
+        if (entries[i].min == 0) {
+            snprintf(mins_text, sizeof(mins_text), "Now");
+        } else {
+            snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
+        }
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
