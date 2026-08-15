@@ -37,6 +37,7 @@ private:
 
     static void draw_cb(lv_event_t* e);
     static void pressed_cb(lv_event_t* e);
+    static void released_cb(lv_event_t* e);
     static void clicked_cb(lv_event_t* e);
     static void gesture_cb(lv_event_t* e);
     static void tick_cb(lv_timer_t* timer);
@@ -57,6 +58,7 @@ private:
     bool visible_ = false;
     ScreensaverVariant variant_ = ScreensaverVariant::WAVE;
     bool gesture_handled_ = false;
+    lv_point_t press_point_ = {0, 0};
     float phase_ = 0.0f;
     uint32_t rendered_fetch_ms_ = 0;
     NetworkState rendered_state_ = NetworkState::UNCONFIGURED;

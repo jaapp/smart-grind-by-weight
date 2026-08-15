@@ -23,6 +23,10 @@ constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kVariantCount = 3;
 
+// A release that traveled further than this is a swipe attempt (successful or
+// not), never a tap
+constexpr int kTapSlopPx = 20;
+
 constexpr int kBadgeSizePx = 52;
 constexpr int kMaxGroupedRows = 4;
 constexpr int kMaxBoardRows = 7;
@@ -124,6 +128,7 @@ void ScreensaverOverlay::create() {
 
     lv_obj_add_event_cb(overlay_, draw_cb, LV_EVENT_DRAW_MAIN, this);
     lv_obj_add_event_cb(overlay_, pressed_cb, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(overlay_, released_cb, LV_EVENT_RELEASED, this);
     lv_obj_add_event_cb(overlay_, clicked_cb, LV_EVENT_CLICKED, this);
     lv_obj_add_event_cb(overlay_, gesture_cb, LV_EVENT_GESTURE, this);
 
@@ -226,10 +231,25 @@ void ScreensaverOverlay::draw_cb(lv_event_t* e) {
     self->draw_wave(lv_event_get_layer(e));
 }
 
+// The wave redraws the whole screen at 25fps, which starves touch sampling
+// enough to make swipe detection unreliable, so its animation pauses while a
+// finger is down and resumes on release
 void ScreensaverOverlay::pressed_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (self) {
-        self->gesture_handled_ = false;
+    if (!self) {
+        return;
+    }
+    self->gesture_handled_ = false;
+    lv_indev_get_point(lv_indev_active(), &self->press_point_);
+    if (self->variant_ == ScreensaverVariant::WAVE && self->timer_) {
+        lv_timer_pause(self->timer_);
+    }
+}
+
+void ScreensaverOverlay::released_cb(lv_event_t* e) {
+    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
+    if (self && self->visible_ && self->timer_) {
+        lv_timer_resume(self->timer_);
     }
 }
 
@@ -244,6 +264,16 @@ void ScreensaverOverlay::clicked_cb(lv_event_t* e) {
         self->gesture_handled_ = false;
         return;
     }
+
+    // A drag that LVGL didn't recognize as a gesture must not dismiss,
+    // otherwise a slightly-too-slow swipe closes the overlay
+    lv_point_t release_point;
+    lv_indev_get_point(lv_indev_active(), &release_point);
+    if (LV_ABS(release_point.x - self->press_point_.x) > kTapSlopPx ||
+        LV_ABS(release_point.y - self->press_point_.y) > kTapSlopPx) {
+        return;
+    }
+
     self->hide();
 }
 
