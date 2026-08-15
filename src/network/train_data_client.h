@@ -13,6 +13,7 @@ struct TrainArrivalItem {
     char station[32];                   // Watched station name, e.g. "Queensboro Plaza"
     uint32_t color;                     // Badge color, 0xRRGGBB
     uint32_t text_color;                // Badge glyph color, 0xRRGGBB
+    uint8_t walk_min;                   // Walk time to the platform in minutes (0 = no estimate)
     uint8_t mins_count;
     uint8_t mins[NET_MAX_ARRIVAL_MINS]; // Minutes until upcoming arrivals, ascending
 };

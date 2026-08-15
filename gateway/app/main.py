@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import config, mta, stations
 
@@ -40,12 +40,19 @@ class Watch(BaseModel):
     route: str
     stop_id: str
     direction: str  # "N" or "S"
+    walk_min: int | None = Field(None, ge=1, le=config.MAX_WALK_MIN)
+
+
+class WatchUpdate(BaseModel):
+    # Walk time to the platform in minutes; null clears the estimate
+    walk_min: int | None = Field(None, ge=1, le=config.MAX_WALK_MIN)
 
 
 def watch_view(w: dict) -> dict:
     station = stations.get(w["stop_id"])
     return {
         **w,
+        "walk_min": w.get("walk_min"),
         "station": station["name"] if station else w["stop_id"],
         "direction_label": stations.direction_label(w["stop_id"], w["direction"]),
     }
@@ -63,6 +70,7 @@ def arrivals() -> dict:
             "text_color": text_color,
             "station": station["name"] if station else w["stop_id"],
             "direction": stations.direction_label(w["stop_id"], w["direction"]),
+            "walk_min": w.get("walk_min"),
             "mins": cache.upcoming_minutes(
                 w["route"], w["stop_id"], w["direction"], config.ARRIVALS_PER_WATCH
             ),
@@ -102,13 +110,26 @@ async def add_watch(watch: Watch) -> list[dict]:
         raise HTTPException(400, f"route {watch.route} does not stop at {station['name']}")
     if len(watches) >= config.MAX_WATCHES:
         raise HTTPException(400, f"limit of {config.MAX_WATCHES} watches reached")
-    entry = watch.model_dump()
-    if entry in watches:
+    key = (watch.route, watch.stop_id, watch.direction)
+    if any((w["route"], w["stop_id"], w["direction"]) == key for w in watches):
         raise HTTPException(409, "already watching")
+    entry = watch.model_dump(exclude_none=True)
     watches.append(entry)
     config.save_watches(watches)
     cache.set_watched_routes({w["route"] for w in watches})
     await cache.refresh_now()
+    return [watch_view(w) for w in watches]
+
+
+@app.patch("/api/watches/{index}")
+def update_watch(index: int, update: WatchUpdate) -> list[dict]:
+    if not 0 <= index < len(watches):
+        raise HTTPException(404, "no such watch")
+    if update.walk_min is None:
+        watches[index].pop("walk_min", None)
+    else:
+        watches[index]["walk_min"] = update.walk_min
+    config.save_watches(watches)
     return [watch_view(w) for w in watches]
 
 
