@@ -508,7 +508,8 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
 }
 
 // Flat departure board: one row per upcoming train sorted by arrival time,
-// with a big countdown on the right ("Now" when due)
+// with a big countdown on the right. Trains already due are dropped since
+// they can't be caught.
 int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                                          uint32_t elapsed_min, bool stale) {
     BoardEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
@@ -516,7 +517,7 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
     for (int i = 0; i < arrivals.item_count; i++) {
         const TrainArrivalItem& item = arrivals.items[i];
         for (int m = 0; m < item.mins_count; m++) {
-            if (item.mins[m] < elapsed_min) {
+            if (item.mins[m] <= elapsed_min) {
                 continue;
             }
             entries[entry_count++] = {&item, static_cast<uint8_t>(item.mins[m] - elapsed_min)};
@@ -538,11 +539,7 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
         make_watch_text_column(row, item);
 
         char mins_text[16];
-        if (entries[i].min == 0) {
-            snprintf(mins_text, sizeof(mins_text), "Now");
-        } else {
-            snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
-        }
+        snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
         lv_obj_t* mins_label = lv_label_create(row);
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
