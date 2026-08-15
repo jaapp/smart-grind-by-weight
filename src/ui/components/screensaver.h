@@ -9,6 +9,9 @@
 // (Trains board). Dragging left/right pages between them interactively with
 // snapping, and the settled page is persisted; a tap dismisses the overlay.
 // All touches are swallowed before they reach the widgets underneath.
+// The grouped view fits four watches per screen; more than that are split
+// across balanced pages that auto-rotate every 5s with a fade, marked by
+// position dots - no manual scrolling.
 
 enum class ScreensaverVariant {
     WAVE = 0,
@@ -48,7 +51,8 @@ private:
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
     void rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
-                              uint32_t elapsed_min, bool device_stale);
+                              uint32_t elapsed_min, bool device_stale,
+                              bool fade_grouped);
     int build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                            uint32_t elapsed_min);
     int build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
@@ -69,6 +73,9 @@ private:
     NetworkState rendered_state_ = NetworkState::UNCONFIGURED;
     uint32_t rendered_elapsed_min_ = 0;
     uint8_t rendered_staleness_ = 0;
+    uint8_t grouped_page_ = 0;
+    uint8_t grouped_page_count_ = 1;
+    uint32_t grouped_page_shown_ms_ = 0;
     uint16_t dot_distance_px_[kDotCols * kDotRows];
     lv_color_t shade_lut_[kShadeCount];
 };
