@@ -3,12 +3,12 @@
 #include "../../config/constants.h"
 #include "../../network/train_data_client.h"
 
-// Full-screen idle overlay cycling through three variants: an animated
+// Full-screen idle overlay: a horizontal tileview of three pages - an animated
 // dot-matrix ripple (Wave), subway arrivals from the train gateway grouped per
 // tracked watch (Trains grouped), and a flat time-sorted arrivals board
-// (Trains board). Swiping left/right on the overlay switches variants and
-// persists the choice; a tap dismisses the overlay. All touches are swallowed
-// before they reach the widgets underneath.
+// (Trains board). Dragging left/right pages between them interactively with
+// snapping, and the settled page is persisted; a tap dismisses the overlay.
+// All touches are swallowed before they reach the widgets underneath.
 
 enum class ScreensaverVariant {
     WAVE = 0,
@@ -39,25 +39,30 @@ private:
     static void pressed_cb(lv_event_t* e);
     static void released_cb(lv_event_t* e);
     static void clicked_cb(lv_event_t* e);
-    static void gesture_cb(lv_event_t* e);
+    static void tile_changed_cb(lv_event_t* e);
     static void tick_cb(lv_timer_t* timer);
 
     void start_variant();
     void stop_variant();
-    void switch_variant(int delta);
+    void set_variant(ScreensaverVariant variant);
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
-    void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
-                             uint32_t elapsed_min, bool device_stale);
-    int build_grouped_rows(const TrainArrivals& arrivals, uint32_t elapsed_min);
-    int build_board_rows(const TrainArrivals& arrivals, uint32_t elapsed_min, bool stale);
+    void rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
+                              uint32_t elapsed_min, bool device_stale);
+    int build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
+                           uint32_t elapsed_min);
+    int build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
+                         uint32_t elapsed_min, bool stale);
 
-    lv_obj_t* overlay_ = nullptr;
-    lv_obj_t* trains_container_ = nullptr;
+    lv_obj_t* overlay_ = nullptr;           // lv_tileview
+    lv_obj_t* wave_tile_ = nullptr;
+    lv_obj_t* grouped_tile_ = nullptr;
+    lv_obj_t* board_tile_ = nullptr;
+    lv_obj_t* grouped_container_ = nullptr;
+    lv_obj_t* board_container_ = nullptr;
     lv_timer_t* timer_ = nullptr;
     bool visible_ = false;
     ScreensaverVariant variant_ = ScreensaverVariant::WAVE;
-    bool gesture_handled_ = false;
     lv_point_t press_point_ = {0, 0};
     float phase_ = 0.0f;
     uint32_t rendered_fetch_ms_ = 0;
