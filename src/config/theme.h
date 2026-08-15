@@ -34,6 +34,7 @@
 #define THEME_COLOR_SCREENSAVER_DOT_DARK 0x1C0F06                              // Ripple trough (near-black brown)
 #define THEME_COLOR_SCREENSAVER_DOT 0x6F4E37                                   // Ripple midpoint (coffee brown)
 #define THEME_COLOR_SCREENSAVER_DOT_BRIGHT 0xC08948                            // Ripple crest (warm tan)
+#define THEME_COLOR_SCREENSAVER_PILL_BG 0x2A2A2A                               // Trains arrival-time pill background
 
 // Status indication colors
 #define THEME_COLOR_SUCCESS 0x00AA00                                           // Success state color (green)

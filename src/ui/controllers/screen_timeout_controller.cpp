@@ -13,13 +13,6 @@ void ScreenTimeoutController::register_events() {
     screensaver_->create();
 }
 
-void ScreenTimeoutController::apply_configured_style() {
-    if (!screensaver_ || !ui_manager_ || !ui_manager_->menu_controller_) {
-        return;
-    }
-    screensaver_->set_style(ui_manager_->menu_controller_->get_screensaver_style());
-}
-
 void ScreenTimeoutController::start_screensaver_now() {
     if (!screensaver_ || !ui_manager_ || !ui_manager_->hardware_manager) {
         return;
@@ -37,7 +30,6 @@ void ScreenTimeoutController::start_screensaver_now() {
     display->set_brightness(dimmed);
     screen_dimmed_ = true;
     held_until_touch_ = true;
-    apply_configured_style();
     screensaver_->show();
 }
 
@@ -89,19 +81,24 @@ void ScreenTimeoutController::update() {
         screensaver_->hide();
     }
 
-    // A manual activation holds the overlay regardless of idle state until a touch dismisses it
-    if (held_until_touch_) {
-        if (screensaver_ && screensaver_->is_visible()) {
-            return;
-        }
-        held_until_touch_ = false;
-    }
-
-    uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
     auto* sensor = hardware->get_weight_sensor();
     bool recent_weight_activity = sensor &&
                                   sensor->weight_range_exceeds(USER_SCREEN_AUTO_DIM_TIMEOUT_MS,
                                                                USER_WEIGHT_ACTIVITY_THRESHOLD_G);
+
+    // While the overlay is up it owns touch input: taps dismiss it and
+    // horizontal swipes switch variants, so idle tracking pauses here.
+    // Scale activity still wakes an idle-started screensaver, but a manual
+    // activation is held until a tap dismisses it.
+    if (screensaver_ && screensaver_->is_visible()) {
+        if (!held_until_touch_ && recent_weight_activity) {
+            screensaver_->hide();
+        }
+        return;
+    }
+    held_until_touch_ = false;
+
+    uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
 
     bool should_dim = (ms_since_touch >= USER_SCREEN_AUTO_DIM_TIMEOUT_MS) &&
                       !recent_weight_activity && !motor_running;
@@ -116,7 +113,6 @@ void ScreenTimeoutController::update() {
 
         if (screensaver_ && !ota_active && ui_manager_->menu_controller_ &&
             ui_manager_->menu_controller_->get_screensaver_enabled()) {
-            apply_configured_style();
             screensaver_->show();
         }
     } else if (!should_dim && screen_dimmed_) {

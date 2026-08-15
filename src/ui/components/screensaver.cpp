@@ -1,6 +1,7 @@
 #include "screensaver.h"
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -20,18 +21,136 @@ constexpr float kWaveLengthPx = 96.0f;                  // Radial distance betwe
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
 
+constexpr int kVariantCount = 3;
+
+// A release that traveled further than this is a drag, never a tap
+constexpr int kTapSlopPx = 20;
+
 constexpr int kBadgeSizePx = 52;
-constexpr int kMaxArrivalRows = 7;
+constexpr int kMaxGroupedRows = 4;
+constexpr int kMaxBoardRows = 7;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
 // so the glyph is visually centered in the badge
 constexpr int kBadgeGlyphNudgePx = 4;
 
-struct ArrivalEntry {
+struct WatchEntry {
+    const TrainArrivalItem* item;
+    uint8_t mins[NET_MAX_ARRIVAL_MINS];
+    uint8_t count;
+};
+
+struct BoardEntry {
     const TrainArrivalItem* item;
     uint8_t min;
 };
+
+lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap) {
+    lv_obj_t* obj = lv_obj_create(parent);
+    lv_obj_set_size(obj, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_set_layout(obj, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(obj, flow);
+    lv_obj_set_flex_align(obj, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(obj, gap, 0);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    return obj;
+}
+
+// Full-tile column that holds one trains page; non-clickable so taps land on
+// the tile underneath
+lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
+    lv_obj_t* page = lv_obj_create(tile);
+    lv_obj_set_size(page, LV_PCT(100), LV_PCT(100));
+    lv_obj_align(page, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_style_bg_opa(page, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(page, 0, 0);
+    lv_obj_set_style_pad_ver(page, 16, 0);
+    lv_obj_set_style_pad_left(page, 2, 0);
+    lv_obj_set_style_pad_right(page, 0, 0);
+    lv_obj_set_layout(page, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(page, gap, 0);
+    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(page, LV_OBJ_FLAG_CLICKABLE);
+    return page;
+}
+
+void make_route_badge(lv_obj_t* parent, const TrainArrivalItem& item) {
+    lv_obj_t* badge = lv_obj_create(parent);
+    lv_obj_set_size(badge, kBadgeSizePx, kBadgeSizePx);
+    lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(badge, lv_color_hex(item.color), 0);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(badge, 0, 0);
+    lv_obj_set_style_pad_all(badge, 0, 0);
+    lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_t* badge_label = lv_label_create(badge);
+    lv_label_set_text(badge_label, item.route);
+    lv_obj_set_style_text_font(badge_label, &lv_font_bullet_40, 0);
+    lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
+    lv_obj_align(badge_label, LV_ALIGN_CENTER, 0, kBadgeGlyphNudgePx);
+}
+
+// Direction + optional station, stacked; grows to fill the space between the
+// badge and whatever sits at the row's right edge
+void make_watch_text_column(lv_obj_t* row, const TrainArrivalItem& item) {
+    lv_obj_t* text_col = make_flex_container(row, LV_FLEX_FLOW_COLUMN, 2);
+    lv_obj_set_width(text_col, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow(text_col, 1);
+
+    lv_obj_t* direction_label = lv_label_create(text_col);
+    lv_label_set_text(direction_label, item.direction);
+    lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_24));
+    lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
+
+    if (item.station[0] != '\0') {
+        lv_obj_t* station_label = lv_label_create(text_col);
+        lv_label_set_text(station_label, item.station);
+        lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
+        lv_obj_set_style_text_font(station_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
+    }
+}
+
+// Empty/loading/error message when a page has no rows, or the stale marker
+// beneath the rows it does have
+void add_trains_status(lv_obj_t* page, bool have_data, int rows, bool stale) {
+    if (rows == 0) {
+        const char* message = "No upcoming trains";
+        NetworkState state = train_data_client.get_state();
+        if (!train_data_client.has_config()) {
+            message = "WiFi not set up\n\nRun:\ngrinder.py wifi";
+        } else if (!have_data && state == NetworkState::ERROR) {
+            message = "Gateway\nunreachable";
+        } else if (!have_data) {
+            message = "Loading trains...";
+        }
+        lv_obj_t* label = lv_label_create(page);
+        lv_label_set_text(label, message);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+        return;
+    }
+
+    if (stale) {
+        lv_obj_t* stale_label = lv_label_create(page);
+        lv_label_set_text(stale_label, LV_SYMBOL_WARNING " stale data");
+        lv_obj_set_style_text_font(stale_label, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(stale_label, lv_color_hex(THEME_COLOR_WARNING), 0);
+    }
+}
 
 } // namespace
 
@@ -40,7 +159,7 @@ void ScreensaverOverlay::create() {
         return;
     }
 
-    overlay_ = lv_obj_create(lv_layer_top());
+    overlay_ = lv_tileview_create(lv_layer_top());
     lv_obj_set_size(overlay_, LV_PCT(100), LV_PCT(100));
     lv_obj_align(overlay_, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_set_style_bg_color(overlay_, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
@@ -48,12 +167,23 @@ void ScreensaverOverlay::create() {
     lv_obj_set_style_border_width(overlay_, 0, 0);
     lv_obj_set_style_radius(overlay_, 0, 0);
     lv_obj_set_style_pad_all(overlay_, 0, 0);
-    lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(overlay_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_scrollbar_mode(overlay_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(overlay_, tile_changed_cb, LV_EVENT_VALUE_CHANGED, this);
 
-    lv_obj_add_event_cb(overlay_, draw_cb, LV_EVENT_DRAW_MAIN, this);
-    lv_obj_add_event_cb(overlay_, pressed_cb, LV_EVENT_PRESSED, this);
+    lv_obj_t** tiles[] = {&wave_tile_, &grouped_tile_, &board_tile_};
+    for (int i = 0; i < kVariantCount; i++) {
+        lv_obj_t* tile = lv_tileview_add_tile(overlay_, i, 0, LV_DIR_HOR);
+        lv_obj_set_style_bg_opa(tile, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(tile, 0, 0);
+        lv_obj_set_style_pad_all(tile, 0, 0);
+        lv_obj_add_event_cb(tile, pressed_cb, LV_EVENT_PRESSED, this);
+        lv_obj_add_event_cb(tile, released_cb, LV_EVENT_RELEASED, this);
+        lv_obj_add_event_cb(tile, released_cb, LV_EVENT_PRESS_LOST, this);
+        lv_obj_add_event_cb(tile, clicked_cb, LV_EVENT_CLICKED, this);
+        *tiles[i] = tile;
+    }
+    lv_obj_add_event_cb(wave_tile_, draw_cb, LV_EVENT_DRAW_MAIN, this);
 
     for (int row = 0; row < kDotRows; row++) {
         for (int col = 0; col < kDotCols; col++) {
@@ -76,30 +206,29 @@ void ScreensaverOverlay::create() {
     }
 }
 
-void ScreensaverOverlay::set_style(ScreensaverStyle style) {
-    if (visible_) {
-        return;
-    }
-    style_ = style;
-}
-
 void ScreensaverOverlay::show() {
     if (!overlay_ || visible_) {
         return;
     }
 
-    phase_ = 0.0f;
+    Preferences prefs;
+    prefs.begin("screensaver", true);
+    // Devices provisioned before variants existed carry the legacy style/layout keys
+    int fallback = prefs.getInt("style", 0) == 1 ? 1 + prefs.getInt("layout", 0) : 0;
+    int variant = prefs.getInt("variant", fallback);
+    prefs.end();
+    if (variant < 0 || variant >= kVariantCount) {
+        variant = 0;
+    }
+    variant_ = static_cast<ScreensaverVariant>(variant);
+
     visible_ = true;
+    lv_tileview_set_tile_by_index(overlay_, variant, 0, LV_ANIM_OFF);
     lv_obj_move_foreground(overlay_);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
-
-    if (style_ == ScreensaverStyle::TRAINS) {
-        train_data_client.set_polling_active(true);
-        refresh_trains(true);
-        timer_ = lv_timer_create(tick_cb, kTrainsTickMs, this);
-    } else {
-        timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
-    }
+    // Build both trains pages up front so a drag never reveals a blank neighbor
+    refresh_trains(true);
+    start_variant();
 }
 
 void ScreensaverOverlay::hide() {
@@ -108,30 +237,114 @@ void ScreensaverOverlay::hide() {
     }
 
     visible_ = false;
+    stop_variant();
+    if (grouped_container_) {
+        lv_obj_del(grouped_container_);
+        grouped_container_ = nullptr;
+    }
+    if (board_container_) {
+        lv_obj_del(board_container_);
+        board_container_ = nullptr;
+    }
+    lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ScreensaverOverlay::start_variant() {
+    if (variant_ == ScreensaverVariant::WAVE) {
+        phase_ = 0.0f;
+        timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
+    } else {
+        train_data_client.set_polling_active(true);
+        refresh_trains(true);
+        timer_ = lv_timer_create(tick_cb, kTrainsTickMs, this);
+    }
+}
+
+void ScreensaverOverlay::stop_variant() {
     if (timer_) {
         lv_timer_del(timer_);
         timer_ = nullptr;
     }
-    if (trains_container_) {
-        lv_obj_del(trains_container_);
-        trains_container_ = nullptr;
-    }
     train_data_client.set_polling_active(false);
-    lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ScreensaverOverlay::set_variant(ScreensaverVariant variant) {
+    stop_variant();
+    variant_ = variant;
+
+    Preferences prefs;
+    prefs.begin("screensaver", false);
+    prefs.putInt("variant", static_cast<int>(variant));
+    prefs.end();
+
+    start_variant();
 }
 
 void ScreensaverOverlay::draw_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (!self || !self->visible_ || self->style_ != ScreensaverStyle::WAVE) {
+    if (!self || !self->visible_) {
         return;
     }
     self->draw_wave(lv_event_get_layer(e));
 }
 
+// The wave redraws its whole tile at 25fps, which is enough render load to
+// make drag tracking stutter, so the active timer pauses while a finger is
+// down and resumes on release
 void ScreensaverOverlay::pressed_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (self) {
-        self->hide();
+    if (!self) {
+        return;
+    }
+    lv_indev_get_point(lv_indev_active(), &self->press_point_);
+    if (self->timer_) {
+        lv_timer_pause(self->timer_);
+    }
+}
+
+void ScreensaverOverlay::released_cb(lv_event_t* e) {
+    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
+    if (self && self->visible_ && self->timer_) {
+        lv_timer_resume(self->timer_);
+    }
+}
+
+void ScreensaverOverlay::clicked_cb(lv_event_t* e) {
+    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
+    if (!self) {
+        return;
+    }
+
+    // LVGL suppresses clicks after a scroll, but a drag too small to scroll
+    // must not dismiss either
+    lv_point_t release_point;
+    lv_indev_get_point(lv_indev_active(), &release_point);
+    if (LV_ABS(release_point.x - self->press_point_.x) > kTapSlopPx ||
+        LV_ABS(release_point.y - self->press_point_.y) > kTapSlopPx) {
+        return;
+    }
+
+    self->hide();
+}
+
+// Fires when the tileview settles on a tile after a drag
+void ScreensaverOverlay::tile_changed_cb(lv_event_t* e) {
+    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
+    if (!self || !self->visible_) {
+        return;
+    }
+
+    lv_obj_t* tile = lv_tileview_get_tile_active(self->overlay_);
+    ScreensaverVariant variant = self->variant_;
+    if (tile == self->wave_tile_) {
+        variant = ScreensaverVariant::WAVE;
+    } else if (tile == self->grouped_tile_) {
+        variant = ScreensaverVariant::TRAINS_GROUPED;
+    } else if (tile == self->board_tile_) {
+        variant = ScreensaverVariant::TRAINS_BOARD;
+    }
+    if (variant != self->variant_) {
+        self->set_variant(variant);
     }
 }
 
@@ -141,7 +354,7 @@ void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
         return;
     }
 
-    if (self->style_ == ScreensaverStyle::TRAINS) {
+    if (self->variant_ != ScreensaverVariant::WAVE) {
         self->refresh_trains(false);
         return;
     }
@@ -150,11 +363,16 @@ void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
     if (self->phase_ >= kTwoPi) {
         self->phase_ -= kTwoPi;
     }
-    lv_obj_invalidate(self->overlay_);
+    lv_obj_invalidate(self->wave_tile_);
 }
 
 void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
     constexpr float kWaveNumber = kTwoPi / kWaveLengthPx;
+
+    // Anchor the grid to the tile's on-screen coordinates so the dots ride
+    // along while the tileview is dragged
+    lv_area_t coords;
+    lv_obj_get_coords(wave_tile_, &coords);
 
     lv_draw_rect_dsc_t dsc;
     lv_draw_rect_dsc_init(&dsc);
@@ -172,8 +390,8 @@ void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
 
             dsc.bg_color = shade_lut_[static_cast<int>(s * (kShadeCount - 1) + 0.5f)];
             int radius = 1 + static_cast<int>(s * 3.0f + 0.5f);
-            int cx = kGridOriginX + col * kDotSpacingPx;
-            int cy = kGridOriginY + row * kDotSpacingPx;
+            int cx = coords.x1 + kGridOriginX + col * kDotSpacingPx;
+            int cy = coords.y1 + kGridOriginY + row * kDotSpacingPx;
 
             lv_area_t area;
             area.x1 = cx - radius;
@@ -205,32 +423,95 @@ void ScreensaverOverlay::refresh_trains(bool force) {
     rendered_elapsed_min_ = elapsed_min;
     rendered_staleness_ = staleness;
 
-    rebuild_trains_view(arrivals, have_data && staleness < 2, elapsed_min, staleness == 1);
+    rebuild_trains_views(arrivals, have_data && staleness < 2, elapsed_min, staleness == 1);
 }
 
-void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
-                                             uint32_t elapsed_min, bool device_stale) {
-    if (trains_container_) {
-        lv_obj_del(trains_container_);
-        trains_container_ = nullptr;
+// Both trains pages are rebuilt together so whichever one a drag reveals is
+// already populated
+void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
+                                              uint32_t elapsed_min, bool device_stale) {
+    if (grouped_container_) {
+        lv_obj_del(grouped_container_);
+        grouped_container_ = nullptr;
+    }
+    if (board_container_) {
+        lv_obj_del(board_container_);
+        board_container_ = nullptr;
     }
 
-    trains_container_ = lv_obj_create(overlay_);
-    lv_obj_set_size(trains_container_, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(trains_container_, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_set_style_bg_opa(trains_container_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(trains_container_, 0, 0);
-    lv_obj_set_style_pad_ver(trains_container_, 16, 0);
-    lv_obj_set_style_pad_left(trains_container_, 2, 0);
-    lv_obj_set_style_pad_right(trains_container_, 0, 0);
-    lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(trains_container_, 8, 0);
-    lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
+    grouped_container_ = make_trains_page(grouped_tile_, 16);
+    board_container_ = make_trains_page(board_tile_, 8);
 
-    ArrivalEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
+    bool stale = arrivals.gateway_stale || device_stale;
+    int grouped_rows = have_data ? build_grouped_rows(grouped_container_, arrivals, elapsed_min) : 0;
+    int board_rows = have_data ? build_board_rows(board_container_, arrivals, elapsed_min, stale) : 0;
+
+    add_trains_status(grouped_container_, have_data, grouped_rows, stale);
+    add_trains_status(board_container_, have_data, board_rows, stale);
+}
+
+// One entry per watch, in gateway order: bullet + destination/station, then a
+// full-width pill row with every reachable arrival. Trains already due are
+// dropped since they can't be caught, and watches left empty are hidden.
+int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
+                                           uint32_t elapsed_min) {
+    WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
+    int entry_count = 0;
+    for (int i = 0; i < arrivals.item_count; i++) {
+        const TrainArrivalItem& item = arrivals.items[i];
+        WatchEntry entry = {&item, {}, 0};
+        for (int m = 0; m < item.mins_count; m++) {
+            if (item.mins[m] <= elapsed_min) {
+                continue;
+            }
+            entry.mins[entry.count++] = static_cast<uint8_t>(item.mins[m] - elapsed_min);
+        }
+        if (entry.count > 0) {
+            entries[entry_count++] = entry;
+        }
+    }
+
+    int rows = entry_count < kMaxGroupedRows ? entry_count : kMaxGroupedRows;
+    for (int i = 0; i < rows; i++) {
+        const WatchEntry& entry = entries[i];
+        const TrainArrivalItem& item = *entry.item;
+
+        lv_obj_t* entry_box = make_flex_container(parent, LV_FLEX_FLOW_COLUMN, 4);
+
+        lv_obj_t* row = make_flex_container(entry_box, LV_FLEX_FLOW_ROW, 12);
+        make_route_badge(row, item);
+        make_watch_text_column(row, item);
+
+        lv_obj_t* pills_row = make_flex_container(entry_box, LV_FLEX_FLOW_ROW, 6);
+        for (int m = 0; m < entry.count; m++) {
+            char pill_text[8];
+            snprintf(pill_text, sizeof(pill_text), "%um", entry.mins[m]);
+
+            lv_obj_t* pill = lv_obj_create(pills_row);
+            lv_obj_set_size(pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_obj_set_style_radius(pill, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_color(pill, lv_color_hex(THEME_COLOR_SCREENSAVER_PILL_BG), 0);
+            lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_width(pill, 0, 0);
+            lv_obj_set_style_pad_hor(pill, 10, 0);
+            lv_obj_set_style_pad_ver(pill, 2, 0);
+            lv_obj_clear_flag(pill, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(pill, LV_OBJ_FLAG_CLICKABLE);
+
+            lv_obj_t* pill_label = lv_label_create(pill);
+            lv_label_set_text(pill_label, pill_text);
+            lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_24, 0);
+            lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+        }
+    }
+    return rows;
+}
+
+// Flat departure board: one row per upcoming train sorted by arrival time,
+// with a big countdown on the right ("Now" when due)
+int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
+                                         uint32_t elapsed_min, bool stale) {
+    BoardEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
     int entry_count = 0;
     for (int i = 0; i < arrivals.item_count; i++) {
         const TrainArrivalItem& item = arrivals.items[i];
@@ -242,90 +523,19 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         }
     }
 
-    if (!have_data || entry_count == 0) {
-        const char* message = "No upcoming trains";
-        NetworkState state = train_data_client.get_state();
-        if (!train_data_client.has_config()) {
-            message = "WiFi not set up\n\nRun:\ngrinder.py wifi";
-        } else if (!have_data && state == NetworkState::ERROR) {
-            message = "Gateway\nunreachable";
-        } else if (!have_data) {
-            message = "Loading trains...";
-        }
-        lv_obj_t* label = lv_label_create(trains_container_);
-        lv_label_set_text(label, message);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
-        lv_obj_set_style_text_color(label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-        return;
-    }
-
     std::stable_sort(entries, entries + entry_count,
-                     [](const ArrivalEntry& a, const ArrivalEntry& b) { return a.min < b.min; });
+                     [](const BoardEntry& a, const BoardEntry& b) { return a.min < b.min; });
 
-    bool stale = arrivals.gateway_stale || device_stale;
-    int rows = entry_count < kMaxArrivalRows ? entry_count : kMaxArrivalRows;
-    if (stale && rows == kMaxArrivalRows) {
+    int rows = entry_count < kMaxBoardRows ? entry_count : kMaxBoardRows;
+    if (stale && rows == kMaxBoardRows) {
         rows--;
     }
     for (int i = 0; i < rows; i++) {
         const TrainArrivalItem& item = *entries[i].item;
 
-        lv_obj_t* row = lv_obj_create(trains_container_);
-        lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(row, 0, 0);
-        lv_obj_set_style_pad_all(row, 0, 0);
-        lv_obj_set_layout(row, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_gap(row, 12, 0);
-        lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE);
-
-        lv_obj_t* badge = lv_obj_create(row);
-        lv_obj_set_size(badge, kBadgeSizePx, kBadgeSizePx);
-        lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(badge, lv_color_hex(item.color), 0);
-        lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(badge, 0, 0);
-        lv_obj_set_style_pad_all(badge, 0, 0);
-        lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
-
-        lv_obj_t* badge_label = lv_label_create(badge);
-        lv_label_set_text(badge_label, item.route);
-        lv_obj_set_style_text_font(badge_label, &lv_font_bullet_40, 0);
-        lv_obj_set_style_text_color(badge_label, lv_color_hex(item.text_color), 0);
-        lv_obj_align(badge_label, LV_ALIGN_CENTER, 0, kBadgeGlyphNudgePx);
-
-        lv_obj_t* text_col = lv_obj_create(row);
-        lv_obj_set_height(text_col, LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(text_col, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(text_col, 0, 0);
-        lv_obj_set_style_pad_all(text_col, 0, 0);
-        lv_obj_set_flex_grow(text_col, 1);
-        lv_obj_set_layout(text_col, LV_LAYOUT_FLEX);
-        lv_obj_set_flex_flow(text_col, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_gap(text_col, 2, 0);
-        lv_obj_clear_flag(text_col, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(text_col, LV_OBJ_FLAG_CLICKABLE);
-
-        lv_obj_t* direction_label = lv_label_create(text_col);
-        lv_label_set_text(direction_label, item.direction);
-        lv_obj_set_size(direction_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_24));
-        lv_obj_set_style_text_font(direction_label, &lv_font_montserrat_24, 0);
-        lv_obj_set_style_text_color(direction_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
-        lv_label_set_long_mode(direction_label, LV_LABEL_LONG_DOT);
-
-        if (item.station[0] != '\0') {
-            lv_obj_t* station_label = lv_label_create(text_col);
-            lv_label_set_text(station_label, item.station);
-            lv_obj_set_size(station_label, LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_20));
-            lv_obj_set_style_text_font(station_label, &lv_font_montserrat_20, 0);
-            lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
-            lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
-        }
+        lv_obj_t* row = make_flex_container(parent, LV_FLEX_FLOW_ROW, 12);
+        make_route_badge(row, item);
+        make_watch_text_column(row, item);
 
         char mins_text[16];
         if (entries[i].min == 0) {
@@ -338,11 +548,5 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
         lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     }
-
-    if (stale) {
-        lv_obj_t* stale_label = lv_label_create(trains_container_);
-        lv_label_set_text(stale_label, LV_SYMBOL_WARNING " stale data");
-        lv_obj_set_style_text_font(stale_label, &lv_font_montserrat_16, 0);
-        lv_obj_set_style_text_color(stale_label, lv_color_hex(THEME_COLOR_WARNING), 0);
-    }
+    return rows;
 }
