@@ -3,21 +3,17 @@
 #include "../../config/constants.h"
 #include "../../network/train_data_client.h"
 
-// Full-screen idle overlay with two selectable styles: an animated dot-matrix
-// ripple (Wave) and a list of upcoming subway arrivals fetched from the train
-// gateway (Trains). Any press dismisses the overlay and is swallowed before it
-// reaches the widgets underneath.
+// Full-screen idle overlay cycling through three variants: an animated
+// dot-matrix ripple (Wave), subway arrivals from the train gateway grouped per
+// tracked watch (Trains grouped), and a flat time-sorted arrivals board
+// (Trains board). Swiping left/right on the overlay switches variants and
+// persists the choice; a tap dismisses the overlay. All touches are swallowed
+// before they reach the widgets underneath.
 
-enum class ScreensaverStyle {
+enum class ScreensaverVariant {
     WAVE = 0,
-    TRAINS = 1,
-};
-
-// How the Trains style lays out arrivals: one entry per tracked watch with a
-// pill row of upcoming times, or a flat time-sorted board with one row per train
-enum class TrainsLayout {
-    GROUPED = 0,
-    BOARD = 1,
+    TRAINS_GROUPED = 1,
+    TRAINS_BOARD = 2,
 };
 
 class ScreensaverOverlay {
@@ -25,8 +21,6 @@ public:
     void create();
     void show();
     void hide();
-    void set_style(ScreensaverStyle style);
-    void set_trains_layout(TrainsLayout layout);
     bool is_visible() const { return visible_; }
 
 private:
@@ -43,8 +37,13 @@ private:
 
     static void draw_cb(lv_event_t* e);
     static void pressed_cb(lv_event_t* e);
+    static void clicked_cb(lv_event_t* e);
+    static void gesture_cb(lv_event_t* e);
     static void tick_cb(lv_timer_t* timer);
 
+    void start_variant();
+    void stop_variant();
+    void switch_variant(int delta);
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
     void rebuild_trains_view(const TrainArrivals& arrivals, bool have_data,
@@ -56,8 +55,8 @@ private:
     lv_obj_t* trains_container_ = nullptr;
     lv_timer_t* timer_ = nullptr;
     bool visible_ = false;
-    ScreensaverStyle style_ = ScreensaverStyle::WAVE;
-    TrainsLayout trains_layout_ = TrainsLayout::GROUPED;
+    ScreensaverVariant variant_ = ScreensaverVariant::WAVE;
+    bool gesture_handled_ = false;
     float phase_ = 0.0f;
     uint32_t rendered_fetch_ms_ = 0;
     NetworkState rendered_state_ = NetworkState::UNCONFIGURED;

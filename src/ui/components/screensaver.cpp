@@ -1,6 +1,7 @@
 #include "screensaver.h"
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -19,6 +20,8 @@ constexpr float kWavePeriodS = 2.4f;                    // Time for one outward 
 constexpr float kWaveLengthPx = 96.0f;                  // Radial distance between crests
 constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative frequency
 constexpr float kTwoPi = 6.28318530f;
+
+constexpr int kVariantCount = 3;
 
 constexpr int kBadgeSizePx = 52;
 constexpr int kMaxGroupedRows = 4;
@@ -118,6 +121,8 @@ void ScreensaverOverlay::create() {
 
     lv_obj_add_event_cb(overlay_, draw_cb, LV_EVENT_DRAW_MAIN, this);
     lv_obj_add_event_cb(overlay_, pressed_cb, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(overlay_, clicked_cb, LV_EVENT_CLICKED, this);
+    lv_obj_add_event_cb(overlay_, gesture_cb, LV_EVENT_GESTURE, this);
 
     for (int row = 0; row < kDotRows; row++) {
         for (int col = 0; col < kDotCols; col++) {
@@ -140,37 +145,27 @@ void ScreensaverOverlay::create() {
     }
 }
 
-void ScreensaverOverlay::set_style(ScreensaverStyle style) {
-    if (visible_) {
-        return;
-    }
-    style_ = style;
-}
-
-void ScreensaverOverlay::set_trains_layout(TrainsLayout layout) {
-    if (visible_) {
-        return;
-    }
-    trains_layout_ = layout;
-}
-
 void ScreensaverOverlay::show() {
     if (!overlay_ || visible_) {
         return;
     }
 
-    phase_ = 0.0f;
+    Preferences prefs;
+    prefs.begin("screensaver", true);
+    // Devices provisioned before variants existed carry the legacy style/layout keys
+    int fallback = prefs.getInt("style", 0) == 1 ? 1 + prefs.getInt("layout", 0) : 0;
+    int variant = prefs.getInt("variant", fallback);
+    prefs.end();
+    if (variant < 0 || variant >= kVariantCount) {
+        variant = 0;
+    }
+    variant_ = static_cast<ScreensaverVariant>(variant);
+
     visible_ = true;
+    gesture_handled_ = false;
     lv_obj_move_foreground(overlay_);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
-
-    if (style_ == ScreensaverStyle::TRAINS) {
-        train_data_client.set_polling_active(true);
-        refresh_trains(true);
-        timer_ = lv_timer_create(tick_cb, kTrainsTickMs, this);
-    } else {
-        timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
-    }
+    start_variant();
 }
 
 void ScreensaverOverlay::hide() {
@@ -179,6 +174,23 @@ void ScreensaverOverlay::hide() {
     }
 
     visible_ = false;
+    stop_variant();
+    lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ScreensaverOverlay::start_variant() {
+    if (variant_ == ScreensaverVariant::WAVE) {
+        phase_ = 0.0f;
+        timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
+    } else {
+        train_data_client.set_polling_active(true);
+        refresh_trains(true);
+        timer_ = lv_timer_create(tick_cb, kTrainsTickMs, this);
+    }
+    lv_obj_invalidate(overlay_);
+}
+
+void ScreensaverOverlay::stop_variant() {
     if (timer_) {
         lv_timer_del(timer_);
         timer_ = nullptr;
@@ -188,12 +200,24 @@ void ScreensaverOverlay::hide() {
         trains_container_ = nullptr;
     }
     train_data_client.set_polling_active(false);
-    lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ScreensaverOverlay::switch_variant(int delta) {
+    stop_variant();
+    int variant = (static_cast<int>(variant_) + delta + kVariantCount) % kVariantCount;
+    variant_ = static_cast<ScreensaverVariant>(variant);
+
+    Preferences prefs;
+    prefs.begin("screensaver", false);
+    prefs.putInt("variant", variant);
+    prefs.end();
+
+    start_variant();
 }
 
 void ScreensaverOverlay::draw_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (!self || !self->visible_ || self->style_ != ScreensaverStyle::WAVE) {
+    if (!self || !self->visible_ || self->variant_ != ScreensaverVariant::WAVE) {
         return;
     }
     self->draw_wave(lv_event_get_layer(e));
@@ -202,8 +226,35 @@ void ScreensaverOverlay::draw_cb(lv_event_t* e) {
 void ScreensaverOverlay::pressed_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
     if (self) {
-        self->hide();
+        self->gesture_handled_ = false;
     }
+}
+
+// A tap dismisses; a horizontal swipe was already consumed by gesture_cb and
+// must not also dismiss the overlay on release
+void ScreensaverOverlay::clicked_cb(lv_event_t* e) {
+    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
+    if (!self) {
+        return;
+    }
+    if (self->gesture_handled_) {
+        self->gesture_handled_ = false;
+        return;
+    }
+    self->hide();
+}
+
+void ScreensaverOverlay::gesture_cb(lv_event_t* e) {
+    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
+    if (!self || !self->visible_) {
+        return;
+    }
+    lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+    if (dir != LV_DIR_LEFT && dir != LV_DIR_RIGHT) {
+        return;
+    }
+    self->gesture_handled_ = true;
+    self->switch_variant(dir == LV_DIR_LEFT ? 1 : -1);
 }
 
 void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
@@ -212,7 +263,7 @@ void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
         return;
     }
 
-    if (self->style_ == ScreensaverStyle::TRAINS) {
+    if (self->variant_ != ScreensaverVariant::WAVE) {
         self->refresh_trains(false);
         return;
     }
@@ -297,14 +348,14 @@ void ScreensaverOverlay::rebuild_trains_view(const TrainArrivals& arrivals, bool
     lv_obj_set_layout(trains_container_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(trains_container_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(trains_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(trains_container_, trains_layout_ == TrainsLayout::BOARD ? 8 : 16, 0);
+    lv_obj_set_style_pad_gap(trains_container_, variant_ == ScreensaverVariant::TRAINS_BOARD ? 8 : 16, 0);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(trains_container_, LV_OBJ_FLAG_CLICKABLE);
 
     bool stale = arrivals.gateway_stale || device_stale;
     int rows = 0;
     if (have_data) {
-        rows = trains_layout_ == TrainsLayout::BOARD
+        rows = variant_ == ScreensaverVariant::TRAINS_BOARD
                    ? build_board_rows(arrivals, elapsed_min, stale)
                    : build_grouped_rows(arrivals, elapsed_min);
     }

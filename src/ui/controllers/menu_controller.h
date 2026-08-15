@@ -39,15 +39,11 @@ public:
     void handle_brightness_screensaver_slider();
     void handle_brightness_screensaver_slider_released();
     void handle_screensaver_toggle();
-    void handle_screensaver_style_radio_button();
-    void handle_trains_layout_radio_button();
     void handle_screensaver_preview();
 
     float get_normal_brightness() const;
     float get_screensaver_brightness() const;
     bool get_screensaver_enabled() const;
-    ScreensaverStyle get_screensaver_style() const;
-    TrainsLayout get_trains_layout() const;
 
 private:
     UIManager* ui_manager_;

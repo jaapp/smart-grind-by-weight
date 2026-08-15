@@ -60,8 +60,6 @@ void MenuUIController::register_events() {
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER, [this](lv_event_t*) { handle_brightness_screensaver_slider(); });
     EventBridgeLVGL::register_handler(ET::BRIGHTNESS_SCREENSAVER_SLIDER_RELEASED, [this](lv_event_t*) { handle_brightness_screensaver_slider_released(); });
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_TOGGLE, [this](lv_event_t*) { handle_screensaver_toggle(); });
-    EventBridgeLVGL::register_handler(ET::SCREENSAVER_STYLE_RADIO_BUTTON, [this](lv_event_t*) { handle_screensaver_style_radio_button(); });
-    EventBridgeLVGL::register_handler(ET::TRAINS_LAYOUT_RADIO_BUTTON, [this](lv_event_t*) { handle_trains_layout_radio_button(); });
     EventBridgeLVGL::register_handler(ET::SCREENSAVER_PREVIEW, [this](lv_event_t*) { handle_screensaver_preview(); });
 
     // Note: Event registration for menu widgets is done in the page creation functions
@@ -580,38 +578,6 @@ void MenuUIController::handle_screensaver_toggle() {
     LOG_DEBUG_PRINTLN(enabled ? "Screensaver enabled" : "Screensaver disabled");
 }
 
-void MenuUIController::handle_screensaver_style_radio_button() {
-    if (!ui_manager_) return;
-
-    auto* radio_group = ui_manager_->menu_screen.get_screensaver_style_radio_group();
-    if (!radio_group) return;
-
-    int selected_index = radio_button_group_get_selection(radio_group);
-
-    Preferences prefs;
-    prefs.begin("screensaver", false);
-    prefs.putInt("style", selected_index);
-    prefs.end();
-
-    LOG_DEBUG_PRINTLN(selected_index == 0 ? "Screensaver style: Wave" : "Screensaver style: Trains");
-}
-
-void MenuUIController::handle_trains_layout_radio_button() {
-    if (!ui_manager_) return;
-
-    auto* radio_group = ui_manager_->menu_screen.get_trains_layout_radio_group();
-    if (!radio_group) return;
-
-    int selected_index = radio_button_group_get_selection(radio_group);
-
-    Preferences prefs;
-    prefs.begin("screensaver", false);
-    prefs.putInt("layout", selected_index);
-    prefs.end();
-
-    LOG_DEBUG_PRINTLN(selected_index == 0 ? "Trains layout: Grouped" : "Trains layout: Board");
-}
-
 void MenuUIController::handle_screensaver_preview() {
     if (!ui_manager_ || !ui_manager_->screen_timeout_controller_) return;
     ui_manager_->screen_timeout_controller_->start_screensaver_now();
@@ -723,22 +689,6 @@ bool MenuUIController::get_screensaver_enabled() const {
     bool enabled = prefs.getBool("enabled", true);
     prefs.end();
     return enabled;
-}
-
-ScreensaverStyle MenuUIController::get_screensaver_style() const {
-    Preferences prefs;
-    prefs.begin("screensaver", true);
-    int style = prefs.getInt("style", 0);
-    prefs.end();
-    return style == 1 ? ScreensaverStyle::TRAINS : ScreensaverStyle::WAVE;
-}
-
-TrainsLayout MenuUIController::get_trains_layout() const {
-    Preferences prefs;
-    prefs.begin("screensaver", true);
-    int layout = prefs.getInt("layout", 0);
-    prefs.end();
-    return layout == 1 ? TrainsLayout::BOARD : TrainsLayout::GROUPED;
 }
 
 void MenuUIController::stop_motor_timer() {
