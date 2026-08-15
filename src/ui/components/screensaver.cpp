@@ -22,7 +22,6 @@ constexpr float kSecondWaveFrequency = 1.7f;            // Detail wave relative 
 constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kVariantCount = 3;
-constexpr uint32_t kSlideMs = 300;
 
 constexpr int kBadgeSizePx = 52;
 constexpr int kMaxGroupedRows = 4;
@@ -146,7 +145,7 @@ void ScreensaverOverlay::create() {
     }
 }
 
-void ScreensaverOverlay::show(bool animate) {
+void ScreensaverOverlay::show() {
     if (!overlay_ || visible_) {
         return;
     }
@@ -164,23 +163,9 @@ void ScreensaverOverlay::show(bool animate) {
 
     visible_ = true;
     gesture_handled_ = false;
-    lv_obj_set_y(overlay_, animate ? -HW_DISPLAY_HEIGHT_PX : 0);
     lv_obj_move_foreground(overlay_);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
     start_variant();
-
-    if (animate) {
-        lv_anim_t anim;
-        lv_anim_init(&anim);
-        lv_anim_set_var(&anim, overlay_);
-        lv_anim_set_values(&anim, -HW_DISPLAY_HEIGHT_PX, 0);
-        lv_anim_set_duration(&anim, kSlideMs);
-        lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
-        lv_anim_set_exec_cb(&anim, [](void* var, int32_t value) {
-            lv_obj_set_y(static_cast<lv_obj_t*>(var), value);
-        });
-        lv_anim_start(&anim);
-    }
 }
 
 void ScreensaverOverlay::hide() {
@@ -189,36 +174,8 @@ void ScreensaverOverlay::hide() {
     }
 
     visible_ = false;
-    dismissing_ = false;
-    lv_anim_delete(overlay_, nullptr);
     stop_variant();
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_y(overlay_, 0);
-}
-
-// Slides the overlay off the top of the screen, then hides it. The variant
-// keeps rendering during the slide so the sheet stays filled while it moves.
-void ScreensaverOverlay::dismiss_with_slide() {
-    if (!overlay_ || !visible_ || dismissing_) {
-        return;
-    }
-    dismissing_ = true;
-    lv_anim_delete(overlay_, nullptr);
-
-    lv_anim_t anim;
-    lv_anim_init(&anim);
-    lv_anim_set_var(&anim, overlay_);
-    lv_anim_set_user_data(&anim, this);
-    lv_anim_set_values(&anim, lv_obj_get_y(overlay_), -HW_DISPLAY_HEIGHT_PX);
-    lv_anim_set_duration(&anim, kSlideMs);
-    lv_anim_set_path_cb(&anim, lv_anim_path_ease_in);
-    lv_anim_set_exec_cb(&anim, [](void* var, int32_t value) {
-        lv_obj_set_y(static_cast<lv_obj_t*>(var), value);
-    });
-    lv_anim_set_completed_cb(&anim, [](lv_anim_t* a) {
-        static_cast<ScreensaverOverlay*>(lv_anim_get_user_data(a))->hide();
-    });
-    lv_anim_start(&anim);
 }
 
 void ScreensaverOverlay::start_variant() {
@@ -277,7 +234,7 @@ void ScreensaverOverlay::pressed_cb(lv_event_t* e) {
 // must not also dismiss the overlay on release
 void ScreensaverOverlay::clicked_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (!self || self->dismissing_) {
+    if (!self) {
         return;
     }
     if (self->gesture_handled_) {
@@ -289,15 +246,10 @@ void ScreensaverOverlay::clicked_cb(lv_event_t* e) {
 
 void ScreensaverOverlay::gesture_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (!self || !self->visible_ || self->dismissing_) {
+    if (!self || !self->visible_) {
         return;
     }
     lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
-    if (dir == LV_DIR_TOP) {
-        self->gesture_handled_ = true;
-        self->dismiss_with_slide();
-        return;
-    }
     if (dir != LV_DIR_LEFT && dir != LV_DIR_RIGHT) {
         return;
     }
@@ -326,11 +278,6 @@ void ScreensaverOverlay::tick_cb(lv_timer_t* timer) {
 void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
     constexpr float kWaveNumber = kTwoPi / kWaveLengthPx;
 
-    // Anchor the grid to the overlay's coordinates so the dots ride along
-    // during the slide-up dismissal instead of being wiped in place
-    lv_area_t coords;
-    lv_obj_get_coords(overlay_, &coords);
-
     lv_draw_rect_dsc_t dsc;
     lv_draw_rect_dsc_init(&dsc);
     dsc.radius = LV_RADIUS_CIRCLE;
@@ -347,8 +294,8 @@ void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
 
             dsc.bg_color = shade_lut_[static_cast<int>(s * (kShadeCount - 1) + 0.5f)];
             int radius = 1 + static_cast<int>(s * 3.0f + 0.5f);
-            int cx = coords.x1 + kGridOriginX + col * kDotSpacingPx;
-            int cy = coords.y1 + kGridOriginY + row * kDotSpacingPx;
+            int cx = kGridOriginX + col * kDotSpacingPx;
+            int cy = kGridOriginY + row * kDotSpacingPx;
 
             lv_area_t area;
             area.x1 = cx - radius;
