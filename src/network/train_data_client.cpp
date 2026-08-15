@@ -254,6 +254,11 @@ bool TrainDataClient::parse_arrivals(const char* json, TrainArrivals& out) {
         dst.color = cJSON_IsString(color) ? strtoul(color->valuestring, nullptr, 16) : 0x808183;
         dst.text_color = cJSON_IsString(text_color) ? strtoul(text_color->valuestring, nullptr, 16) : 0xFFFFFF;
 
+        // Optional walk-to-platform estimate; the gateway sends null when unset
+        cJSON* walk_min = cJSON_GetObjectItem(item, "walk_min");
+        int walk_value = cJSON_IsNumber(walk_min) ? walk_min->valueint : 0;
+        dst.walk_min = static_cast<uint8_t>(walk_value < 0 ? 0 : (walk_value > 255 ? 255 : walk_value));
+
         dst.mins_count = 0;
         cJSON* min_entry = nullptr;
         cJSON_ArrayForEach(min_entry, mins) {
