@@ -6,9 +6,10 @@
 // Full-screen idle overlay: a horizontal tileview of three pages - an animated
 // dot-matrix ripple (Wave), subway arrivals from the train gateway grouped per
 // tracked watch (Trains grouped), and a flat time-sorted arrivals board
-// (Trains board). Dragging left/right pages between them interactively with
-// snapping, and the settled page is persisted; a tap dismisses the overlay.
-// All touches are swallowed before they reach the widgets underneath.
+// (Trains board). Tapping the screen's left or right edge slides to the
+// neighboring page (the shown page is persisted); a tap anywhere else
+// dismisses the overlay. All touches are swallowed before they reach the
+// widgets underneath.
 // The grouped view fits four watches per screen; more than that are split
 // across balanced pages that auto-rotate every 5s with a fade, marked by
 // position dots - no manual scrolling.
@@ -40,14 +41,13 @@ private:
 
     static void draw_cb(lv_event_t* e);
     static void pressed_cb(lv_event_t* e);
-    static void released_cb(lv_event_t* e);
     static void clicked_cb(lv_event_t* e);
-    static void tile_changed_cb(lv_event_t* e);
     static void tick_cb(lv_timer_t* timer);
 
     void start_variant();
     void stop_variant();
     void set_variant(ScreensaverVariant variant);
+    void step_variant(int direction);
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
     void rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
