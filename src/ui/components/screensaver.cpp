@@ -30,6 +30,12 @@ constexpr int kBadgeSizePx = 52;
 constexpr int kMaxGroupedRows = 4;
 constexpr int kMaxBoardRows = 7;
 
+// Watches beyond one grouped page rotate through automatically; no manual
+// scrolling since horizontal drags already switch screensaver variants
+constexpr uint32_t kGroupedPageHoldMs = 5000;
+constexpr uint32_t kGroupedPageFadeMs = 200;
+constexpr int kPageDotSizePx = 7;
+
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
 // so the glyph is visually centered in the badge
@@ -140,6 +146,28 @@ void make_watch_text_column(lv_obj_t* row, const TrainArrivalItem& item) {
     }
 }
 
+// Page-position dots for the grouped view's rotation, pinned inside the page's
+// bottom padding and excluded from the flex layout so a full 4-row page plus
+// the stale marker still fits above them
+void make_page_dots(lv_obj_t* page, int page_index, int page_count) {
+    lv_obj_t* dots = make_flex_container(page, LV_FLEX_FLOW_ROW, 7);
+    lv_obj_set_width(dots, LV_SIZE_CONTENT);
+    lv_obj_add_flag(dots, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, 12);
+
+    for (int i = 0; i < page_count; i++) {
+        lv_obj_t* dot = lv_obj_create(dots);
+        lv_obj_set_size(dot, kPageDotSizePx, kPageDotSizePx);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+        uint32_t color = i == page_index ? THEME_COLOR_TEXT_PRIMARY : THEME_COLOR_SCREENSAVER_PILL_BG;
+        lv_obj_set_style_bg_color(dot, lv_color_hex(color), 0);
+        lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(dot, 0, 0);
+        lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+    }
+}
+
 // Empty/loading/error message when a page has no rows, or the stale marker
 // beneath the rows it does have
 void add_trains_status(lv_obj_t* page, bool have_data, int rows, bool stale) {
@@ -240,6 +268,8 @@ void ScreensaverOverlay::show() {
     variant_ = static_cast<ScreensaverVariant>(variant);
 
     visible_ = true;
+    grouped_page_ = 0;
+    grouped_page_shown_ms_ = millis();
     lv_tileview_set_tile_by_index(overlay_, variant, 0, LV_ANIM_OFF);
     lv_obj_move_foreground(overlay_);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
@@ -272,6 +302,7 @@ void ScreensaverOverlay::start_variant() {
         timer_ = lv_timer_create(tick_cb, kWaveTickMs, this);
     } else {
         train_data_client.set_polling_active(true);
+        grouped_page_shown_ms_ = millis();
         refresh_trains(true);
         timer_ = lv_timer_create(tick_cb, kTrainsTickMs, this);
     }
@@ -431,7 +462,17 @@ void ScreensaverOverlay::refresh_trains(bool force) {
     uint32_t elapsed_min = age_ms / 60000;
     uint8_t staleness = age_ms >= NET_DATA_EXPIRED_MS ? 2 : (age_ms >= NET_DATA_STALE_MS ? 1 : 0);
 
-    if (!force && arrivals.fetched_at_ms == rendered_fetch_ms_ && state == rendered_state_ &&
+    // The grouped view rotates through its pages on a fixed cadence; a flip
+    // forces a rebuild even when the data itself hasn't changed. The timer
+    // driving this pauses while a finger is down, so pages never flip mid-drag.
+    bool flip = grouped_page_count_ > 1 &&
+                millis() - grouped_page_shown_ms_ >= kGroupedPageHoldMs;
+    if (flip) {
+        grouped_page_++;
+        grouped_page_shown_ms_ = millis();
+    }
+
+    if (!force && !flip && arrivals.fetched_at_ms == rendered_fetch_ms_ && state == rendered_state_ &&
         elapsed_min == rendered_elapsed_min_ && staleness == rendered_staleness_) {
         return;
     }
@@ -440,13 +481,14 @@ void ScreensaverOverlay::refresh_trains(bool force) {
     rendered_elapsed_min_ = elapsed_min;
     rendered_staleness_ = staleness;
 
-    rebuild_trains_views(arrivals, have_data && staleness < 2, elapsed_min, staleness == 1);
+    rebuild_trains_views(arrivals, have_data && staleness < 2, elapsed_min, staleness == 1, flip);
 }
 
 // Both trains pages are rebuilt together so whichever one a drag reveals is
 // already populated
 void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
-                                              uint32_t elapsed_min, bool device_stale) {
+                                              uint32_t elapsed_min, bool device_stale,
+                                              bool fade_grouped) {
     if (grouped_container_) {
         lv_obj_del(grouped_container_);
         grouped_container_ = nullptr;
@@ -460,17 +502,29 @@ void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, boo
     board_container_ = make_trains_page(board_tile_, 8);
 
     bool stale = arrivals.gateway_stale || device_stale;
+    // With no data there is nothing to page through, so stop the rotation
+    // rather than letting a stale page count force rebuilds every cadence
+    if (!have_data) {
+        grouped_page_ = 0;
+        grouped_page_count_ = 1;
+    }
     int grouped_rows = have_data ? build_grouped_rows(grouped_container_, arrivals, elapsed_min) : 0;
     int board_rows = have_data ? build_board_rows(board_container_, arrivals, elapsed_min, stale) : 0;
 
     add_trains_status(grouped_container_, have_data, grouped_rows, stale);
     add_trains_status(board_container_, have_data, board_rows, stale);
+
+    if (fade_grouped) {
+        lv_obj_fade_in(grouped_container_, kGroupedPageFadeMs, 0);
+    }
 }
 
 // One entry per watch, in gateway order: bullet + destination/station, then a
 // full-width pill row with every arrival. Trains arriving right now show as
 // 0m; only trains the local countdown has pushed past due are dropped, and
 // watches left empty are hidden.
+// Watches beyond one screenful are split across pages that refresh_trains
+// rotates through automatically, with dots marking the current page.
 int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                                            uint32_t elapsed_min) {
     WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
@@ -489,8 +543,18 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         }
     }
 
-    int rows = entry_count < kMaxGroupedRows ? entry_count : kMaxGroupedRows;
-    for (int i = 0; i < rows; i++) {
+    // Pages are balanced so five watches show as 3+2 rather than 4+1; the page
+    // index wraps here both on rotation and when watches drop out of the feed
+    int pages = entry_count > 0 ? (entry_count + kMaxGroupedRows - 1) / kMaxGroupedRows : 1;
+    grouped_page_count_ = static_cast<uint8_t>(pages);
+    if (grouped_page_ >= pages) {
+        grouped_page_ = 0;
+    }
+    int per_page = (entry_count + pages - 1) / pages;
+    int first = grouped_page_ * per_page;
+    int last = std::min(entry_count, first + per_page);
+
+    for (int i = first; i < last; i++) {
         const WatchEntry& entry = entries[i];
         const TrainArrivalItem& item = *entry.item;
 
@@ -523,7 +587,11 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
                 pill_label, lv_color_hex(arrival_countdown_color(item.walk_min, entry.mins[m])), 0);
         }
     }
-    return rows;
+
+    if (pages > 1) {
+        make_page_dots(parent, grouped_page_, pages);
+    }
+    return last - first;
 }
 
 // Flat departure board: one row per upcoming train sorted by arrival time,
