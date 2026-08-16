@@ -11,8 +11,8 @@
 // dismisses the overlay. All touches are swallowed before they reach the
 // widgets underneath.
 // The grouped view fits four watches per screen; more than that are split
-// across balanced pages that auto-rotate every 5s with a fade, marked by
-// position dots - no manual scrolling.
+// across balanced pages that auto-rotate every 5s with a fade - no manual
+// scrolling.
 
 enum class ScreensaverVariant {
     WAVE = 0,
