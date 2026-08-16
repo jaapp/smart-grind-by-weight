@@ -45,6 +45,18 @@ bool OtaDataExportController::update() {
         return true;
     }
 
+    // An update that ended without a restart failed or was aborted; a
+    // successful one restarts the device from the OTA screen
+    if (!data_export_active_ && ui_manager_->state_machine->is_state(UIState::OTA_UPDATE)) {
+        String expected_build;
+        if (bluetooth->take_ota_failure(expected_build)) {
+            show_failure_warning(expected_build.c_str());
+        } else {
+            ui_manager_->switch_to_state(UIState::READY);
+        }
+        return true;
+    }
+
     if (bluetooth->is_data_export_active()) {
         if (!data_export_active_) {
             start_data_export_ui();

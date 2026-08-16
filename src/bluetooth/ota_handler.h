@@ -54,7 +54,11 @@ private:
     uint32_t received_size;
     BLEOTAStatus current_status;
     String current_firmware_build_number;
+    String firmware_id;
+    String expected_build_number;
     bool is_full_update;
+    bool failure_pending;
+    char last_error[BLE_OTA_ERROR_MESSAGE_MAX_BYTES];
     
     // OTA tracking
     Preferences* preferences;
@@ -70,6 +74,10 @@ private:
     void restore_normal_power();
     bool start_update();
     bool finalize_update();
+    void set_error(const char* format, ...);
+    void fail_ota();
+    void clear_expected_build();
+    void release_system();
     
 public:
     OTAHandler();
@@ -84,11 +92,11 @@ public:
     /**
      * Start OTA update process
      * @param size Size of the patch data to receive
-     * @param expected_build_number Build number we expect after successful update
+     * @param expected_build_number_arg Build number we expect after successful update
      * @param is_full_update True for full update, false for delta update
      * @return true if successfully started
      */
-    bool start_ota(uint32_t size, const String& expected_build_number = "", bool is_full_update = false, const String& expected_firmware_version = "");
+    bool start_ota(uint32_t size, const String& expected_build_number_arg = "", bool is_full_update = false, const String& expected_firmware_version = "");
     
     /**
      * Process received OTA data chunk
@@ -99,15 +107,32 @@ public:
     bool process_data_chunk(const uint8_t* data, size_t size);
     
     /**
-     * Finalize OTA update and restart device
-     * @return true if finalization successful
+     * Apply the received patch to the inactive app partition and mark it bootable.
+     * Blocks for the duration of the flash work; does not restart.
+     * @return true if the new image is ready to boot
      */
     bool complete_ota();
+
+    /**
+     * Restart into the image prepared by complete_ota()
+     */
+    void restart_into_new_firmware();
     
     /**
      * Abort OTA update
      */
     void abort_ota();
+
+    /**
+     * One-shot: reports whether the last OTA ended in a failure the UI should show.
+     * @param expected_build Receives the build number the failed update targeted
+     */
+    bool take_failure(String& expected_build);
+
+    /**
+     * Human-readable reason for the last OTA failure
+     */
+    const char* get_last_error() const { return last_error; }
     
     /**
      * Get current OTA status
@@ -128,6 +153,11 @@ public:
      * Get current firmware build number
      */
     const String& get_build_number() const { return current_firmware_build_number; }
+
+    /**
+     * Hex SHA-256 of the running image's ELF, unique per build regardless of build number
+     */
+    const String& get_firmware_id() const { return firmware_id; }
     
     /**
      * Enable reduced power mode for BLE operations

@@ -30,6 +30,7 @@ BluetoothManager::BluetoothManager()
     , ota_control_characteristic(nullptr)
     , ota_status_characteristic(nullptr)
     , build_number_characteristic(nullptr)
+    , firmware_id_characteristic(nullptr)
     , data_control_characteristic(nullptr)
     , data_transfer_characteristic(nullptr)
     , data_status_characteristic(nullptr)
@@ -55,7 +56,9 @@ BluetoothManager::BluetoothManager()
     , last_reported_export_state(false)
     , ui_status_queue(nullptr)
     , diagnostic_report_pending(false)
-    , diagnostic_report_in_progress(false) {
+    , diagnostic_report_in_progress(false)
+    , ota_complete_pending(false)
+    , ota_finalizing(false) {
 }
 
 BluetoothManager::~BluetoothManager() {
@@ -165,6 +168,13 @@ void BluetoothManager::enable(unsigned long timeout_ms) {
         BLECharacteristic::PROPERTY_READ
     );
     build_number_characteristic->setValue(ota_handler.get_build_number().c_str());
+    delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
+
+    firmware_id_characteristic = ota_service->createCharacteristic(
+        BLE_OTA_FIRMWARE_ID_CHAR_UUID,
+        BLECharacteristic::PROPERTY_READ
+    );
+    firmware_id_characteristic->setValue(ota_handler.get_firmware_id().c_str());
     delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
     
     // Create measurement data service
@@ -325,6 +335,7 @@ void BluetoothManager::disable() {
     ota_control_characteristic = nullptr;
     ota_status_characteristic = nullptr;
     build_number_characteristic = nullptr;
+    firmware_id_characteristic = nullptr;
     data_control_characteristic = nullptr;
     data_transfer_characteristic = nullptr;
     data_status_characteristic = nullptr;
@@ -358,6 +369,11 @@ void BluetoothManager::handle() {
         timeout_ms = BLE_AUTO_DISABLE_TIMEOUT_MS;
     }
     
+    if (ota_complete_pending) {
+        ota_complete_pending = false;
+        finish_ota();
+    }
+
     // Handle data export updates
     update_data_export();
     process_sessions_info_updates();
@@ -668,11 +684,38 @@ void BluetoothManager::log(const char* format, ...) {
     }
 }
 
-void BluetoothManager::set_ota_status(BLEOTAStatus status) {
-    if (ota_status_characteristic) {
-        uint8_t status_value = static_cast<uint8_t>(status);
-        ota_status_characteristic->setValue(&status_value, 1);
-        ota_status_characteristic->notify();
+void BluetoothManager::set_ota_status(BLEOTAStatus status, const char* message) {
+    if (!ota_status_characteristic) return;
+
+    uint8_t payload[1 + BLE_OTA_ERROR_MESSAGE_MAX_BYTES];
+    payload[0] = static_cast<uint8_t>(status);
+    size_t length = 1;
+    if (message && message[0] != '\0') {
+        length += strlcpy((char*)&payload[1], message, sizeof(payload) - 1);
+    }
+    ota_status_characteristic->setValue(payload, length);
+    ota_status_characteristic->notify();
+}
+
+void BluetoothManager::finish_ota() {
+    if (!ota_handler.is_ota_active()) {
+        LOG_OTA_DEBUG("finish_ota() called with no active OTA - ignoring\n");
+        return;
+    }
+
+    ota_finalizing = true;
+    update_ui_status("Applying patch...");
+    bool success = ota_handler.complete_ota();
+    ota_finalizing = false;
+
+    if (success) {
+        set_ota_status(BLE_OTA_SUCCESS);
+        update_ui_status("Restarting...");
+        delay(BLE_OTA_RESTART_DELAY_MS);
+        ota_handler.restart_into_new_firmware();
+    } else {
+        log("Bluetooth OTA: %s\n", ota_handler.get_last_error());
+        set_ota_status(BLE_OTA_ERROR, ota_handler.get_last_error());
     }
 }
 
@@ -729,37 +772,30 @@ void BluetoothManager::handle_ota_control_command(BLECharacteristic* characteris
                 if (ota_handler.start_ota(patch_size, expected_build, is_full_update, expected_firmware_version)) {
                     set_ota_status(BLE_OTA_RECEIVING);
                 } else {
-                    set_ota_status(BLE_OTA_ERROR);
+                    log("Bluetooth OTA: %s\n", ota_handler.get_last_error());
+                    set_ota_status(BLE_OTA_ERROR, ota_handler.get_last_error());
                 }
             } else {
                 log("Bluetooth OTA: ❌ Invalid start command format (need at least 6 bytes)\n");
-                set_ota_status(BLE_OTA_ERROR);
+                set_ota_status(BLE_OTA_ERROR, "Invalid start command");
             }
             break;
             
         case BLE_OTA_CMD_END:            
             log("Bluetooth OTA: Received END command\n");
-            LOG_OTA_DEBUG("BLE_OTA_CMD_END received, checking if OTA active...\n");
             if (ota_handler.is_ota_active()) {
-                LOG_OTA_DEBUG("OTA is active, updating UI status...\n");
-                update_ui_status("Applying patch...");
-                LOG_OTA_DEBUG("UI status updated, calling complete_ota()...\n");
-                if (ota_handler.complete_ota()) {
-                    LOG_OTA_DEBUG("complete_ota() returned SUCCESS\n");
-                    set_ota_status(BLE_OTA_SUCCESS);
-                    update_ui_status("Restarting...");
-                } else {
-                    LOG_OTA_DEBUG("complete_ota() returned FAILED\n");
-                    set_ota_status(BLE_OTA_ERROR);
-                }
+                // The patch apply blocks for tens of seconds; run it from the
+                // bluetooth task so the NimBLE host keeps servicing the link
+                ota_complete_pending = true;
             } else {
                 LOG_OTA_DEBUG("OTA is NOT active - ignoring END command\n");
             }
             break;
             
         case BLE_OTA_CMD_ABORT:
+            ota_complete_pending = false;
             ota_handler.abort_ota();
-            set_ota_status(BLE_OTA_ERROR);
+            set_ota_status(BLE_OTA_ERROR, "Aborted by client");
             break;
     }
 }
@@ -772,7 +808,8 @@ void BluetoothManager::handle_ota_data_chunk(BLECharacteristic* characteristic) 
     if (chunk_size == 0) return;
     
     if (!ota_handler.process_data_chunk((const uint8_t*)data.c_str(), chunk_size)) {
-        set_ota_status(BLE_OTA_ERROR);
+        log("Bluetooth OTA: %s\n", ota_handler.get_last_error());
+        set_ota_status(BLE_OTA_ERROR, ota_handler.get_last_error());
     }
 }
 
@@ -890,7 +927,8 @@ void BluetoothManager::onDisconnect(BLEServer* server) {
     
     log("BLE: Client disconnected - timeout countdown resumed\n");
     
-    if (ota_handler.is_ota_active()) {
+    // A fully received update is applied even if the client drops mid-apply
+    if (ota_handler.is_ota_active() && !ota_complete_pending && !ota_finalizing) {
         ota_handler.abort_ota();
     }
     

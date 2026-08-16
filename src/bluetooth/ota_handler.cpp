@@ -4,8 +4,11 @@
 #include "../hardware/touch_driver.h"
 #include "../hardware/hardware_manager.h"
 #include "../tasks/task_manager.h"
+#include "../network/train_data_client.h"
 #include <Arduino.h>
 #include <BLEDevice.h>
+#include <esp_app_desc.h>
+#include <cstdarg>
 
 OTAHandler::OTAHandler() 
     : ota_in_progress(false)
@@ -13,9 +16,13 @@ OTAHandler::OTAHandler()
     , received_size(0)
     , current_status(BLE_OTA_IDLE)
     , current_firmware_build_number("")
+    , firmware_id("")
+    , expected_build_number("")
     , is_full_update(false)
+    , failure_pending(false)
     , power_state(NORMAL_POWER)
     , normal_cpu_freq_mhz(BLE_NORMAL_CPU_FREQ_MHZ) {
+    last_error[0] = '\0';
 }
 
 OTAHandler::~OTAHandler() {
@@ -31,6 +38,14 @@ void OTAHandler::init(Preferences* prefs) {
     
     // Get current firmware build number
     current_firmware_build_number = String(BUILD_NUMBER);
+
+    const esp_app_desc_t* app_desc = esp_app_get_description();
+    char hex[sizeof(app_desc->app_elf_sha256) * 2 + 1];
+    for (size_t i = 0; i < sizeof(app_desc->app_elf_sha256); i++) {
+        snprintf(&hex[i * 2], 3, "%02x", app_desc->app_elf_sha256[i]);
+    }
+    firmware_id = String(hex);
+    LOG_BLE("OTA: Firmware id %s\n", hex);
     
     // Log initial power state
     LOG_BLE("OTA Power: Initial state - CPU: %luMHz, Power mode: %s\n",
@@ -97,9 +112,9 @@ void OTAHandler::restore_normal_power() {
     LOG_BLE("OTA Power: Normal power mode restored\n");
 }
 
-bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, bool is_full_update, const String& expected_firmware_version) {
+bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number_arg, bool is_full_update, const String& expected_firmware_version) {
     LOG_OTA_DEBUG("start_ota() called - size=%lu, build=%s, full=%d\n", 
-                  (unsigned long)size, expected_build_number.c_str(), is_full_update);
+                  (unsigned long)size, expected_build_number_arg.c_str(), is_full_update);
     
     if (ota_in_progress) {
         LOG_BLE("OTA: Update already in progress\n");
@@ -110,6 +125,9 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     patch_size = size;
     received_size = 0;
     this->is_full_update = is_full_update;
+    expected_build_number = expected_build_number_arg;
+    failure_pending = false;
+    last_error[0] = '\0';
     
     LOG_BLE("OTA: Starting %s update (%lu KB)\n", is_full_update ? "full" : "delta", (unsigned long)patch_size / 1024);
     LOG_OTA_DEBUG("patch_size=%lu, received_size=%lu, is_full_update=%d\n", 
@@ -142,18 +160,19 @@ bool OTAHandler::start_ota(uint32_t size, const String& expected_build_number, b
     esp_task_wdt_reconfigure(&wdt_config);
     LOG_OTA_DEBUG("Watchdog reconfigured successfully\n");
 
-    // Suspend hardware tasks to prevent watchdog timeouts during OTA
-    LOG_BLE("OTA: Suspending hardware tasks...\n");
+    // Free the shared radio and quiet the supply for the transfer, then park
+    // the hardware tasks so flash writes don't trip their watchdogs
+    LOG_BLE("OTA: Pausing WiFi and suspending hardware tasks...\n");
+    train_data_client.pause_wifi();
     task_manager.suspend_hardware_tasks();
 
     LOG_OTA_DEBUG("Calling start_update()...\n");
     if (!start_update()) {
-        current_status = BLE_OTA_ERROR;
         LOG_OTA_DEBUG("start_update() FAILED\n");
-        
-        // Resume hardware tasks on failure
-        LOG_BLE("OTA: Resuming hardware tasks after failed start\n");
-        task_manager.resume_hardware_tasks();
+        set_error("Failed to prepare patch partition");
+        current_status = BLE_OTA_ERROR;
+        clear_expected_build();
+        release_system();
         return false;
     }
     LOG_OTA_DEBUG("start_update() SUCCESS\n");
@@ -171,8 +190,8 @@ bool OTAHandler::process_data_chunk(const uint8_t* data, size_t size) {
     
     // Write patch data to patch partition
     if (delta_partition_write(&patch_writer, (const char*)data, size) != ESP_OK) {
-        LOG_BLE("OTA: Patch write failed at offset %lu\n", (unsigned long)received_size);
-        current_status = BLE_OTA_ERROR;
+        set_error("Patch write failed at offset %lu", (unsigned long)received_size);
+        fail_ota();
         return false;
     }
     
@@ -201,65 +220,36 @@ bool OTAHandler::complete_ota() {
     LOG_OTA_DEBUG("patch_size=%lu, received_size=%lu\n", 
                   (unsigned long)patch_size, (unsigned long)received_size);
     
-    // Kamikaze mode: Disable all non-essential systems before flash operations
-    LOG_BLE("OTA: Entering kamikaze mode - disabling non-essential systems...\n");
-    LOG_OTA_DEBUG("Starting kamikaze mode shutdown sequence...\n");
-    
-    // Disable I2C operations (TouchDriver) - access through hardware_manager
+    // Kamikaze mode: keep the touch controller's I2C traffic away from the
+    // long flash operations that follow. BLE stays up so the client can be
+    // told how it went.
     extern HardwareManager hardware_manager;
+    TouchDriver* touch = hardware_manager.get_display()->get_touch_driver();
     LOG_OTA_DEBUG("Disabling TouchDriver I2C operations...\n");
-    hardware_manager.get_display()->get_touch_driver()->disable();
-    LOG_OTA_DEBUG("TouchDriver disabled\n");
-    
-    // Skip BLE deinitialization - causes hang in kamikaze mode
-    // BLE stack will be destroyed during system restart anyway
-    // BLEDevice::deinit(true);
-    LOG_OTA_DEBUG("Skipping BLE deinit (causes hang) - kamikaze restart will handle cleanup\n");
+    touch->disable();
     
     LOG_OTA_DEBUG("Calling finalize_update()...\n");
+    // On success the update stays "active" until the restart so the UI keeps
+    // showing the OTA screen instead of bouncing back to the ready screen
     bool success = finalize_update();
     if (success) {
         current_status = BLE_OTA_SUCCESS;
         LOG_OTA_DEBUG("finalize_update() SUCCESS\n");
-        LOG_BLE("OTA: Update complete (%lu KB)\n", (unsigned long)received_size / 1024);
-        LOG_BLE("OTA: Starting restart sequence...\n");
-        
-        // Restart device
-        LOG_OTA_DEBUG("Flushing Serial before restart...\n");
-        Serial.flush();
-        delay(100);
-        
-        // Kamikaze restart - no graceful cleanup needed
-        LOG_BLE("OTA: Kamikaze restart in 3...2...1\n");
-        LOG_OTA_DEBUG("Final countdown before esp_restart()...\n");
-        Serial.flush();
-        delay(100);
-        
-        LOG_OTA_DEBUG("Calling esp_restart()...\n");
-        Serial.flush();
-        esp_restart();
-        
-        // Fallback restart methods
-        LOG_OTA_DEBUG("esp_restart() failed, trying ESP.restart()...\n");
-        Serial.flush();
-        ESP.restart();
-        
-        LOG_OTA_DEBUG("ESP.restart() failed, entering infinite loop...\n");
-        Serial.flush();
-        while(true) delay(1000);
+        LOG_BLE("OTA: Update complete (%lu KB), new image ready to boot\n", (unsigned long)received_size / 1024);
     } else {
-        current_status = BLE_OTA_ERROR;
-        LOG_BLE("OTA: Finalization failed\n");
         LOG_OTA_DEBUG("finalize_update() FAILED\n");
-
-        // Resume hardware tasks on failure
-        LOG_BLE("OTA: Resuming hardware tasks after failed finalization\n");
-        task_manager.resume_hardware_tasks();
+        touch->enable();
+        fail_ota();
     }
     
-    ota_in_progress = false;
     LOG_OTA_DEBUG("complete_ota() returning %s\n", success ? "SUCCESS" : "FAILED");
     return success;
+}
+
+void OTAHandler::restart_into_new_firmware() {
+    LOG_BLE("OTA: Restarting into new firmware\n");
+    Serial.flush();
+    esp_restart();
 }
 
 void OTAHandler::abort_ota() {
@@ -269,11 +259,44 @@ void OTAHandler::abort_ota() {
         received_size = 0;
         patch_size = 0;
         current_status = BLE_OTA_ERROR;
-
-        // Resume hardware tasks on abort
-        LOG_BLE("OTA: Resuming hardware tasks after abort\n");
-        task_manager.resume_hardware_tasks();
+        clear_expected_build();
+        release_system();
     }
+}
+
+void OTAHandler::fail_ota() {
+    LOG_BLE("OTA: Update failed: %s\n", last_error);
+    ota_in_progress = false;
+    current_status = BLE_OTA_ERROR;
+    failure_pending = true;
+    clear_expected_build();
+    release_system();
+}
+
+bool OTAHandler::take_failure(String& expected_build) {
+    if (!failure_pending) return false;
+    failure_pending = false;
+    expected_build = expected_build_number;
+    return true;
+}
+
+void OTAHandler::set_error(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsnprintf(last_error, sizeof(last_error), format, args);
+    va_end(args);
+}
+
+void OTAHandler::clear_expected_build() {
+    if (!preferences) return;
+    preferences->remove("new_build_nr");
+    preferences->remove("new_fw_ver");
+}
+
+void OTAHandler::release_system() {
+    LOG_BLE("OTA: Resuming hardware tasks and WiFi\n");
+    task_manager.resume_hardware_tasks();
+    train_data_client.resume_wifi();
 }
 
 float OTAHandler::get_progress() const {
@@ -297,8 +320,8 @@ bool OTAHandler::finalize_update() {
     LOG_OTA_DEBUG("Verifying received size: expected=%lu, got=%lu\n", 
                   (unsigned long)patch_size, (unsigned long)received_size);
     if (received_size != patch_size) {
-        LOG_BLE("OTA: Size mismatch - expected %lu, got %lu\n", 
-                     (unsigned long)patch_size, (unsigned long)received_size);
+        set_error("Size mismatch: expected %lu bytes, got %lu",
+                  (unsigned long)patch_size, (unsigned long)received_size);
         LOG_OTA_DEBUG("Size verification FAILED\n");
         return false;
     }
@@ -308,7 +331,7 @@ bool OTAHandler::finalize_update() {
     LOG_OTA_DEBUG("Getting running partition...\n");
     const esp_partition_t* running_partition = esp_ota_get_running_partition();
     if (!running_partition) {
-        LOG_BLE("❌ Could not get running partition!\n");
+        set_error("Could not get running partition");
         LOG_OTA_DEBUG("esp_ota_get_running_partition() FAILED\n");
         return false;
     }
@@ -319,7 +342,7 @@ bool OTAHandler::finalize_update() {
     LOG_OTA_DEBUG("Getting next update partition...\n");
     const esp_partition_t* update_partition = esp_ota_get_next_update_partition(NULL);
     if (!update_partition) {
-        LOG_BLE("❌ Could not find a valid OTA update partition!\n");
+        set_error("Could not find a valid OTA update partition");
         LOG_OTA_DEBUG("esp_ota_get_next_update_partition() FAILED\n");
         return false;
     }
@@ -346,7 +369,7 @@ bool OTAHandler::finalize_update() {
     int result = delta_check_and_apply(patch_size, &opts);
     LOG_OTA_DEBUG("delta_check_and_apply() returned: %d\n", result);
     if (result < 0) {
-        LOG_BLE("Delta patch failed: %s\n", delta_error_as_string(result));
+        set_error("Delta patch failed (%d): %s", result, delta_error_as_string(result));
         LOG_OTA_DEBUG("Delta patch FAILED with error: %s\n", delta_error_as_string(result));
         return false;
     }

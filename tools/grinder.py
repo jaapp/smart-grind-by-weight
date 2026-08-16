@@ -169,19 +169,22 @@ class GrinderTool:
     async def run_async_command(self, cmd: List[str], cwd: Optional[Path] = None) -> int:
         """Run an async command (for BLE operations)."""
         try:
+            # Unbuffered child + raw passthrough so carriage-return progress
+            # lines show up live instead of arriving all at once at the end
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 cwd=cwd or self.project_dir,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stderr=asyncio.subprocess.STDOUT,
+                env={**os.environ, "PYTHONUNBUFFERED": "1"}
             )
             
-            # Stream output in real-time
             while True:
-                line = await process.stdout.readline()
-                if not line:
+                data = await process.stdout.read(4096)
+                if not data:
                     break
-                print(line.decode().rstrip())
+                sys.stdout.write(data.decode(errors="replace"))
+                sys.stdout.flush()
             
             await process.wait()
             return process.returncode

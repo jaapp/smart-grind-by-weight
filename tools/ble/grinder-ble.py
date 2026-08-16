@@ -85,6 +85,7 @@ BLE_OTA_DATA_CHAR_UUID = "87654321-4321-4321-4321-cba987654321"
 BLE_OTA_CONTROL_CHAR_UUID = "11111111-2222-3333-4444-555555555555"
 BLE_OTA_STATUS_CHAR_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 BLE_OTA_BUILD_NUMBER_CHAR_UUID = "66666666-7777-8888-9999-000000000000"
+BLE_OTA_FIRMWARE_ID_CHAR_UUID = "77777777-8888-9999-aaaa-111111111111"
 
 BLE_DATA_SERVICE_UUID = "22334455-6677-8899-aabb-ccddeeffffaa"
 BLE_DATA_CONTROL_CHAR_UUID = "33445566-7788-99aa-bbcc-ddeeffaabbcc"
@@ -140,6 +141,13 @@ BLE_DATA_ERROR = 0x23
 DEVICE_NAME = "GrindByWeight"
 CHUNK_SIZE = 512
 DATA_CHUNK_SIZE = 500
+OTA_APPLY_TIMEOUT_S = 180
+
+# esp_app_desc_t sits right after the 24-byte image header and the first
+# 8-byte segment header; app_elf_sha256 is its last field.
+APP_DESC_OFFSET = 0x20
+APP_DESC_MAGIC = 0xABCD5432
+APP_DESC_ELF_SHA256_OFFSET = APP_DESC_OFFSET + 4 + 4 + 8 + 32 + 32 + 16 + 16 + 32
 
 class GrinderBLETool:
     """Unified BLE tool for all grinder operations."""
@@ -148,8 +156,10 @@ class GrinderBLETool:
         self.client: Optional[BleakClient] = None
         self.connected = False
         self.current_ota_status = BLE_OTA_IDLE
+        self.ota_error_message = ""
         self.current_data_status = BLE_DATA_IDLE
         self.status_updated = asyncio.Event()
+        self.disconnected = asyncio.Event()
         self.data_chunks = []
         self.session_count = 0
         self.receiving_data = False
@@ -246,7 +256,8 @@ class GrinderBLETool:
             return False
         
         try:
-            self.client = BleakClient(address)
+            self.disconnected.clear()
+            self.client = BleakClient(address, disconnected_callback=self._on_disconnected)
             await asyncio.wait_for(self.client.connect(), timeout=10)
             
             if not self.client.is_connected:
@@ -267,6 +278,11 @@ class GrinderBLETool:
             self.safe_print(f"[ERROR] Connection error: {e}")
             return False
     
+    def _on_disconnected(self, _: BleakClient):
+        self.connected = False
+        self.disconnected.set()
+        self.status_updated.set()
+
     async def disconnect(self):
         if self.client and self.connected:
             try:
@@ -280,6 +296,7 @@ class GrinderBLETool:
     async def on_ota_status(self, _: BleakGATTCharacteristic, data: bytearray):
         if len(data) > 0:
             self.current_ota_status = data[0]
+            self.ota_error_message = data[1:].decode('utf-8', errors='replace') if len(data) > 1 else ""
             self.status_updated.set()
     
     def on_data_received(self, _: BleakGATTCharacteristic, data: bytearray):
@@ -325,18 +342,25 @@ class GrinderBLETool:
             self.session_count = data[0] | (data[1] << 8)
             self.safe_print(f"[INFO] Grinder has {self.session_count} sessions stored.")
     
-    async def wait_for_ota_status(self, expected_status: int, timeout: int = 30) -> bool:
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if self.current_ota_status == expected_status:
-                return True
-        
+    async def wait_for_ota_outcome(self, statuses: set, timeout: float) -> Optional[int]:
+        """Wait until the device reports one of `statuses`, or None on timeout/disconnect."""
+        deadline = time.time() + timeout
+        while True:
+            if self.current_ota_status in statuses:
+                return self.current_ota_status
+            if self.disconnected.is_set():
+                return None
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
             self.status_updated.clear()
             try:
-                await asyncio.wait_for(self.status_updated.wait(), timeout=1)
+                await asyncio.wait_for(self.status_updated.wait(), timeout=min(remaining, 1))
             except asyncio.TimeoutError:
                 pass
-        return False
+
+    def _ota_error_text(self) -> str:
+        return self.ota_error_message or "device reported an error"
     
     # === OTA Upload Functions (Unchanged) ===
     async def get_device_build_number(self) -> Optional[str]:
@@ -347,9 +371,37 @@ class GrinderBLETool:
         except Exception:
             return None
 
-    def find_cached_firmware(self, build_number: str) -> Optional[Path]:
-        firmware_file = self.firmware_cache_dir / f"build_{int(build_number):03d}.bin"
-        return firmware_file if firmware_file.exists() else None
+    async def get_device_firmware_id(self) -> Optional[str]:
+        """ELF SHA-256 of the running image; None on firmware that predates the characteristic."""
+        try:
+            data = await self.client.read_gatt_char(BLE_OTA_FIRMWARE_ID_CHAR_UUID)
+            firmware_id = data.decode('utf-8').strip().lower()
+            return firmware_id if len(firmware_id) == 64 else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def embedded_firmware_id(firmware_path: Path) -> Optional[str]:
+        """ELF SHA-256 stored in an ESP32 app image's esp_app_desc_t."""
+        try:
+            with open(firmware_path, 'rb') as f:
+                header = f.read(APP_DESC_ELF_SHA256_OFFSET + 32)
+        except OSError:
+            return None
+        if len(header) < APP_DESC_ELF_SHA256_OFFSET + 32:
+            return None
+        if struct.unpack_from('<I', header, APP_DESC_OFFSET)[0] != APP_DESC_MAGIC:
+            return None
+        return header[APP_DESC_ELF_SHA256_OFFSET:APP_DESC_ELF_SHA256_OFFSET + 32].hex()
+
+    def find_cached_firmware(self, firmware_id: str) -> Optional[Path]:
+        """The cached image whose embedded ELF SHA-256 matches what the device is running."""
+        if not self.firmware_cache_dir.is_dir():
+            return None
+        for candidate in sorted(self.firmware_cache_dir.glob("build_*.bin"), reverse=True):
+            if self.embedded_firmware_id(candidate) == firmware_id:
+                return candidate
+        return None
 
     def _get_firmware_build_number(self, firmware_path: str) -> Optional[str]:
         """Extract build number from git_info.h in project directory."""
@@ -415,7 +467,9 @@ class GrinderBLETool:
 
     async def upload_firmware(self, firmware_path: str, force_full: bool = False) -> bool:
         firmware_file = Path(firmware_path)
-        if not firmware_file.exists(): return False
+        if not firmware_file.exists():
+            self.safe_print(f"[ERROR] Firmware file not found: {firmware_path}")
+            return False
         
         with open(firmware_file, 'rb') as f: firmware_data = f.read()
         original_size = len(firmware_data)
@@ -430,19 +484,22 @@ class GrinderBLETool:
             device_build = await self.get_device_build_number()
             if device_build:
                 self.safe_print(f"[INFO] Current device build: #{device_build}")
-                if new_build:
-                    self.safe_print(f"[INFO] Upgrading to build: #{new_build}")
-                cached_firmware = self.find_cached_firmware(device_build)
+            if new_build:
+                self.safe_print(f"[INFO] Upgrading to build: #{new_build}")
+            # Build numbers restart in every checkout, so the delta base is
+            # matched by the image's embedded ELF hash instead
+            device_firmware_id = await self.get_device_firmware_id()
+            if device_firmware_id:
+                cached_firmware = self.find_cached_firmware(device_firmware_id)
                 if cached_firmware:
+                    self.safe_print(f"[INFO] Delta base: {cached_firmware.name} (matches running image)")
                     patch_data = self.generate_delta_patch(cached_firmware, firmware_data)
                     if patch_data and len(patch_data) < original_size * 0.8:
                         use_delta = True
                     else: full_reason = "delta not beneficial"
-                else: full_reason = "no cached firmware"
-            else: 
-                full_reason = "no device build info"
-                if new_build:
-                    self.safe_print(f"[INFO] Installing build: #{new_build}")
+                else: full_reason = "running image not in firmware_cache"
+            else:
+                full_reason = "device firmware predates delta base check"
         else: 
             full_reason = "forced full update"
             if new_build:
@@ -451,7 +508,9 @@ class GrinderBLETool:
         if not use_delta:
             with tempfile.NamedTemporaryFile() as empty_file:
                 patch_data = self.generate_delta_patch(Path(empty_file.name), firmware_data)
-            if not patch_data: return False
+            if not patch_data:
+                self.safe_print("[ERROR] Could not build the full-update patch")
+                return False
         
         self.update_method = "delta" if use_delta else "full"
         self.full_reason = full_reason if not use_delta else None
@@ -486,30 +545,59 @@ class GrinderBLETool:
             start_data += struct.pack('<B', 0)
             
         self.safe_print(f"[INFO] Sending {'full' if is_full_update else 'delta'} update flag")
+        self.current_ota_status = BLE_OTA_IDLE
+        self.ota_error_message = ""
         await self.client.write_gatt_char(BLE_OTA_CONTROL_CHAR_UUID, bytes([BLE_OTA_CMD_START]) + start_data)
         
-        if not await self.wait_for_ota_status(BLE_OTA_RECEIVING, timeout=15): return False
+        outcome = await self.wait_for_ota_outcome({BLE_OTA_RECEIVING, BLE_OTA_ERROR}, timeout=15)
+        if outcome != BLE_OTA_RECEIVING:
+            reason = self._ota_error_text() if outcome == BLE_OTA_ERROR else "no response to start command"
+            self.safe_print(f"[ERROR] Device refused the update: {reason}")
+            return False
         
         start_time = time.time()
+        last_progress = -1
         try:
             for i in range(0, len(patch_data), CHUNK_SIZE):
+                if self.current_ota_status == BLE_OTA_ERROR:
+                    self.safe_print(f"\n[ERROR] Device aborted the transfer: {self._ota_error_text()}")
+                    return False
                 chunk = patch_data[i:i + CHUNK_SIZE]
                 await self.client.write_gatt_char(BLE_OTA_DATA_CHAR_UUID, chunk)
                 progress = int(((i + len(chunk)) / patch_size) * 100)
-                if progress % 5 == 0:
+                if progress % 5 == 0 and progress != last_progress:
+                    last_progress = progress
                     self._update_status(f"[UPLOAD] Uploading: {progress}%")
                 await asyncio.sleep(0.01)
-        except Exception:
-            await self.client.write_gatt_char(BLE_OTA_CONTROL_CHAR_UUID, bytes([BLE_OTA_CMD_ABORT]))
+        except Exception as e:
+            self.safe_print(f"\n[ERROR] Transfer failed: {e}")
+            try:
+                await self.client.write_gatt_char(BLE_OTA_CONTROL_CHAR_UUID, bytes([BLE_OTA_CMD_ABORT]))
+            except Exception:
+                pass
             return False
         
         self.safe_print(f"\n[OK] Upload complete in {time.time() - start_time:.1f}s")
-        self.safe_print("[INFO] Applying update...")
+        self.safe_print("[INFO] Applying update on device (this can take a minute)...")
         try:
             await self.client.write_gatt_char(BLE_OTA_CONTROL_CHAR_UUID, bytes([BLE_OTA_CMD_END]))
-            return await self.wait_for_ota_status(BLE_OTA_SUCCESS, timeout=30)
-        except BleakError:
+        except BleakError as e:
+            # Older firmware applies the patch inside the write callback and
+            # restarts before acknowledging, so the write itself can fail
+            self.safe_print(f"[INFO] END not acknowledged ({e}); waiting for the device to report or restart...")
+
+        outcome = await self.wait_for_ota_outcome({BLE_OTA_SUCCESS, BLE_OTA_ERROR}, timeout=OTA_APPLY_TIMEOUT_S)
+        if outcome == BLE_OTA_SUCCESS:
+            self.safe_print("[OK] Update applied, device is restarting")
             return True
+        if outcome == BLE_OTA_ERROR:
+            self.safe_print(f"[ERROR] Update failed on device: {self._ota_error_text()}")
+            return False
+        if self.disconnected.is_set():
+            self.safe_print("[WARN] Device disconnected while applying; if it rebooted into the new build the update succeeded")
+            return True
+        self.safe_print(f"[ERROR] No result from device after {OTA_APPLY_TIMEOUT_S}s")
+        return False
 
     # === Data Export Functions (Refactored) ===
     async def get_session_count(self) -> int:
@@ -1274,7 +1362,9 @@ async def main():
                 if not firmware_path:
                     tool.safe_print("[ERROR] No firmware file found.")
                     return 1
-                await tool.upload_firmware(firmware_path, args.force_full)
+                if not await tool.upload_firmware(firmware_path, args.force_full):
+                    tool.safe_print("[ERROR] Firmware update failed")
+                    return 1
             elif args.command == 'export':
                 await tool.export_data(args.db)
             elif args.command == 'analyse':

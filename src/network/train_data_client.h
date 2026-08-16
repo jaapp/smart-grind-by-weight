@@ -50,6 +50,13 @@ public:
     // Called by the screensaver on show/hide to start/stop polling
     void set_polling_active(bool active);
 
+    // Take the WiFi radio down for the duration of a BLE OTA transfer (frees the
+    // shared 2.4GHz radio and avoids supply spikes) and bring it back afterwards.
+    // Safe to call from the BLE task; pause must run before the network task
+    // is suspended so the WiFi driver lock is never held by a frozen task.
+    void pause_wifi();
+    void resume_wifi();
+
     bool has_config() const { return has_config_; }
     NetworkState get_state() const { return state_; }
 
@@ -69,6 +76,7 @@ private:
     bool parse_arrivals(const char* json, TrainArrivals& out);
 
     SemaphoreHandle_t mutex_ = nullptr;
+    SemaphoreHandle_t wifi_control_mutex_ = nullptr;
 
     char ssid_[NET_MAX_CONFIG_STRING_LEN] = {0};
     char password_[NET_MAX_CONFIG_STRING_LEN] = {0};
@@ -77,6 +85,7 @@ private:
     volatile bool has_config_ = false;
     volatile bool config_changed_ = false;
     volatile bool polling_active_ = false;
+    volatile bool wifi_paused_ = false;
     volatile NetworkState state_ = NetworkState::UNCONFIGURED;
 
     TrainArrivals arrivals_ = {};

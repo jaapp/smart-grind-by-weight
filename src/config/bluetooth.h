@@ -15,6 +15,9 @@
 #define BLE_OTA_CONTROL_CHAR_UUID "11111111-2222-3333-4444-555555555555"      // Characteristic for OTA commands (start/end/abort)
 #define BLE_OTA_STATUS_CHAR_UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"       // Characteristic for OTA status notifications
 #define BLE_OTA_BUILD_NUMBER_CHAR_UUID "66666666-7777-8888-9999-000000000000" // Characteristic for current firmware build number
+#define BLE_OTA_FIRMWARE_ID_CHAR_UUID "77777777-8888-9999-aaaa-111111111111"  // Characteristic for the running image's ELF SHA-256 (hex), used to pick the delta base
+#define BLE_OTA_ERROR_MESSAGE_MAX_BYTES 96                                     // Error text appended to BLE_OTA_ERROR status notifications
+#define BLE_OTA_RESTART_DELAY_MS 300                                           // Time for the BLE_OTA_SUCCESS notification to leave the radio before restarting
 
 // Device Settings
 #define BLE_DEVICE_NAME "GrindByWeight"                                       // Bluetooth device name (GATT + advertising)
