@@ -27,3 +27,5 @@
 
 #define NET_MAX_ARRIVAL_ITEMS 8                                                // Watches shown by the screensaver (matches gateway limit)
 #define NET_MAX_ARRIVAL_MINS 4                                                 // Upcoming arrival times kept per watch
+
+#define NET_WALK_RUSH_PERCENT 75                                               // Rushing covers the walk-to-platform in this % of the normal walk time; arrivals between the rushed and normal walk time are shown yellow
