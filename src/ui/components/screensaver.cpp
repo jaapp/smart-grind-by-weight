@@ -35,6 +35,7 @@ constexpr int kMaxBoardRows = 7;
 constexpr uint32_t kGroupedPageHoldMs = 5000;
 constexpr uint32_t kGroupedPageFadeMs = 200;
 constexpr int kPageDotSizePx = 7;
+constexpr int kCatchDotSizePx = 8;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
@@ -52,21 +53,39 @@ struct BoardEntry {
     uint8_t min;
 };
 
-// Countdown color for an arrival, judged against the watch's walk-to-platform
-// estimate: green when reachable at a normal pace, yellow when only a rushed
-// walk (NET_WALK_RUSH_PERCENT of the normal time) still makes it, red when the
-// train can't be caught. Watches without an estimate keep the standard color.
-uint32_t arrival_countdown_color(uint8_t walk_min, uint8_t mins) {
-    if (walk_min == 0) {
-        return THEME_COLOR_TEXT_PRIMARY;
-    }
-    if (mins >= walk_min) {
-        return THEME_COLOR_SCREENSAVER_CATCH_OK;
+// Warning-dot color for an arrival, judged against the watch's walk-to-platform
+// estimate: yellow when only a rushed walk (NET_WALK_RUSH_PERCENT of the normal
+// time) still makes it, red when the train can't be caught. Trains reachable at
+// a normal pace and watches without an estimate get no dot.
+constexpr uint32_t kNoCatchDot = 0;
+
+uint32_t arrival_catch_dot_color(uint8_t walk_min, uint8_t mins) {
+    if (walk_min == 0 || mins >= walk_min) {
+        return kNoCatchDot;
     }
     uint8_t rushed_walk_min =
         static_cast<uint8_t>((walk_min * NET_WALK_RUSH_PERCENT + 99) / 100);
     return mins >= rushed_walk_min ? THEME_COLOR_SCREENSAVER_CATCH_RUSH
                                    : THEME_COLOR_SCREENSAVER_CATCH_MISS;
+}
+
+void make_dot(lv_obj_t* parent, int size, uint32_t color) {
+    lv_obj_t* dot = lv_obj_create(parent);
+    lv_obj_set_size(dot, size, size);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(dot, lv_color_hex(color), 0);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(dot, 0, 0);
+    lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+}
+
+// Small dot left of a countdown flagging a rushed or missed catch
+void make_catch_dot(lv_obj_t* parent, uint8_t walk_min, uint8_t mins) {
+    uint32_t color = arrival_catch_dot_color(walk_min, mins);
+    if (color != kNoCatchDot) {
+        make_dot(parent, kCatchDotSizePx, color);
+    }
 }
 
 lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap) {
@@ -156,15 +175,8 @@ void make_page_dots(lv_obj_t* page, int page_index, int page_count) {
     lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, 12);
 
     for (int i = 0; i < page_count; i++) {
-        lv_obj_t* dot = lv_obj_create(dots);
-        lv_obj_set_size(dot, kPageDotSizePx, kPageDotSizePx);
-        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
         uint32_t color = i == page_index ? THEME_COLOR_TEXT_PRIMARY : THEME_COLOR_SCREENSAVER_PILL_BG;
-        lv_obj_set_style_bg_color(dot, lv_color_hex(color), 0);
-        lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(dot, 0, 0);
-        lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+        make_dot(dots, kPageDotSizePx, color);
     }
 }
 
@@ -569,22 +581,19 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
             char pill_text[8];
             snprintf(pill_text, sizeof(pill_text), "%um", entry.mins[m]);
 
-            lv_obj_t* pill = lv_obj_create(pills_row);
+            lv_obj_t* pill = make_flex_container(pills_row, LV_FLEX_FLOW_ROW, 5);
             lv_obj_set_size(pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_radius(pill, LV_RADIUS_CIRCLE, 0);
             lv_obj_set_style_bg_color(pill, lv_color_hex(THEME_COLOR_SCREENSAVER_PILL_BG), 0);
             lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
-            lv_obj_set_style_border_width(pill, 0, 0);
             lv_obj_set_style_pad_hor(pill, 10, 0);
             lv_obj_set_style_pad_ver(pill, 2, 0);
-            lv_obj_clear_flag(pill, LV_OBJ_FLAG_SCROLLABLE);
-            lv_obj_clear_flag(pill, LV_OBJ_FLAG_CLICKABLE);
 
+            make_catch_dot(pill, item.walk_min, entry.mins[m]);
             lv_obj_t* pill_label = lv_label_create(pill);
             lv_label_set_text(pill_label, pill_text);
             lv_obj_set_style_text_font(pill_label, &lv_font_montserrat_24, 0);
-            lv_obj_set_style_text_color(
-                pill_label, lv_color_hex(arrival_countdown_color(item.walk_min, entry.mins[m])), 0);
+            lv_obj_set_style_text_color(pill_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
         }
     }
 
@@ -627,11 +636,13 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
 
         char mins_text[16];
         snprintf(mins_text, sizeof(mins_text), "%um", entries[i].min);
-        lv_obj_t* mins_label = lv_label_create(row);
+        lv_obj_t* countdown = make_flex_container(row, LV_FLEX_FLOW_ROW, 6);
+        lv_obj_set_width(countdown, LV_SIZE_CONTENT);
+        make_catch_dot(countdown, item.walk_min, entries[i].min);
+        lv_obj_t* mins_label = lv_label_create(countdown);
         lv_label_set_text(mins_label, mins_text);
         lv_obj_set_style_text_font(mins_label, &lv_font_montserrat_32, 0);
-        lv_obj_set_style_text_color(
-            mins_label, lv_color_hex(arrival_countdown_color(item.walk_min, entries[i].min)), 0);
+        lv_obj_set_style_text_color(mins_label, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
     }
     return rows;
 }
