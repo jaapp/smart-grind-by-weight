@@ -34,7 +34,6 @@ constexpr int kMaxBoardRows = 7;
 // scrolling since horizontal drags already switch screensaver variants
 constexpr uint32_t kGroupedPageHoldMs = 5000;
 constexpr uint32_t kGroupedPageFadeMs = 200;
-constexpr int kPageDotSizePx = 7;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
 // the font's 8px descent as empty space below them; shift down by half of it
@@ -144,28 +143,6 @@ void make_watch_text_column(lv_obj_t* row, const TrainArrivalItem& item) {
         lv_obj_set_style_text_font(station_label, &lv_font_montserrat_20, 0);
         lv_obj_set_style_text_color(station_label, lv_color_hex(THEME_COLOR_TEXT_SECONDARY), 0);
         lv_label_set_long_mode(station_label, LV_LABEL_LONG_DOT);
-    }
-}
-
-// Page-position dots for the grouped view's rotation, pinned inside the page's
-// bottom padding and excluded from the flex layout so a full 4-row page plus
-// the stale marker still fits above them
-void make_page_dots(lv_obj_t* page, int page_index, int page_count) {
-    lv_obj_t* dots = make_flex_container(page, LV_FLEX_FLOW_ROW, 7);
-    lv_obj_set_width(dots, LV_SIZE_CONTENT);
-    lv_obj_add_flag(dots, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, 12);
-
-    for (int i = 0; i < page_count; i++) {
-        lv_obj_t* dot = lv_obj_create(dots);
-        lv_obj_set_size(dot, kPageDotSizePx, kPageDotSizePx);
-        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-        uint32_t color = i == page_index ? THEME_COLOR_TEXT_PRIMARY : THEME_COLOR_SCREENSAVER_PILL_BG;
-        lv_obj_set_style_bg_color(dot, lv_color_hex(color), 0);
-        lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(dot, 0, 0);
-        lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
     }
 }
 
@@ -526,7 +503,7 @@ void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, boo
 // 0m; only trains the local countdown has pushed past due are dropped, and
 // watches left empty are hidden.
 // Watches beyond one screenful are split across pages that refresh_trains
-// rotates through automatically, with dots marking the current page.
+// rotates through automatically.
 int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                                            uint32_t elapsed_min) {
     WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
@@ -590,9 +567,6 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         }
     }
 
-    if (pages > 1) {
-        make_page_dots(parent, grouped_page_, pages);
-    }
     return last - first;
 }
 
