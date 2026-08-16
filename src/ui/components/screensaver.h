@@ -10,9 +10,9 @@
 // neighboring page (the shown page is persisted); a tap anywhere else
 // dismisses the overlay. All touches are swallowed before they reach the
 // widgets underneath.
-// The grouped view fits four watches per screen; more than that are split
-// across balanced pages that auto-rotate every 5s with a fade - no manual
-// scrolling.
+// Both trains views split rows that don't fit one screen across fixed pages:
+// swiping up/down on the screensaver renders the next/previous page outright
+// (no scrolling animation) and a dot column on the right marks the pages.
 
 enum class ScreensaverVariant {
     WAVE = 0,
@@ -48,11 +48,11 @@ private:
     void stop_variant();
     void set_variant(ScreensaverVariant variant);
     void step_variant(int direction);
+    void step_trains_page(int direction);
     void draw_wave(lv_layer_t* layer);
     void refresh_trains(bool force);
     void rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
-                              uint32_t elapsed_min, bool device_stale,
-                              bool fade_grouped);
+                              uint32_t elapsed_min, bool device_stale);
     int build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                            uint32_t elapsed_min);
     int build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
@@ -75,7 +75,8 @@ private:
     uint8_t rendered_staleness_ = 0;
     uint8_t grouped_page_ = 0;
     uint8_t grouped_page_count_ = 1;
-    uint32_t grouped_page_shown_ms_ = 0;
+    uint8_t board_page_ = 0;
+    uint8_t board_page_count_ = 1;
     uint16_t dot_distance_px_[kDotCols * kDotRows];
     lv_color_t shade_lut_[kShadeCount];
 };

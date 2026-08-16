@@ -35,6 +35,7 @@
 #define THEME_COLOR_SCREENSAVER_DOT 0x6F4E37                                   // Ripple midpoint (coffee brown)
 #define THEME_COLOR_SCREENSAVER_DOT_BRIGHT 0xC08948                            // Ripple crest (warm tan)
 #define THEME_COLOR_SCREENSAVER_PILL_BG 0x2A2A2A                               // Trains arrival-time pill background
+#define THEME_COLOR_SCREENSAVER_PAGE_DOT 0x555555                              // Trains page indicator, inactive page (active uses text primary)
 
 // Trains arrival catchability warnings (vs. the watch's walk-to-platform time):
 // pill ring on the grouped view, countdown text on the board view
