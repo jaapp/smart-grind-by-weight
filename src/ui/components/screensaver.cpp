@@ -83,8 +83,9 @@ lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap
     return obj;
 }
 
-// Full-tile column that holds one trains page; non-clickable so taps land on
-// the tile underneath
+// Full-tile column that holds one trains page, rows stacked from the top so
+// the list starts at the same place however many rows it has; non-clickable
+// so taps land on the tile underneath
 lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
     lv_obj_t* page = lv_obj_create(tile);
     lv_obj_set_size(page, LV_PCT(100), LV_PCT(100));
@@ -96,7 +97,7 @@ lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
     lv_obj_set_style_pad_right(page, 0, 0);
     lv_obj_set_layout(page, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(page, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(page, gap, 0);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_CLICKABLE);
@@ -145,10 +146,11 @@ void make_watch_text_column(lv_obj_t* row, const TrainArrivalItem& item) {
     }
 }
 
-// Empty/loading/error message when a page has no rows, or the stale marker
-// beneath the rows it does have
+// Empty/loading/error message centered on a page with no rows, or the stale
+// marker beneath the rows it does have
 void add_trains_status(lv_obj_t* page, bool have_data, int rows, bool stale) {
     if (rows == 0) {
+        lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         const char* message = "No upcoming trains";
         NetworkState state = train_data_client.get_state();
         if (!train_data_client.has_config()) {
@@ -520,16 +522,16 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         }
     }
 
-    // Pages are balanced so five watches show as 3+2 rather than 4+1; the page
-    // index wraps here both on rotation and when watches drop out of the feed
+    // Pages fill to capacity in order (five watches show as 4+1) so a watch
+    // stays on the same page as the count changes; the page index wraps here
+    // both on rotation and when watches drop out of the feed
     int pages = entry_count > 0 ? (entry_count + kMaxGroupedRows - 1) / kMaxGroupedRows : 1;
     grouped_page_count_ = static_cast<uint8_t>(pages);
     if (grouped_page_ >= pages) {
         grouped_page_ = 0;
     }
-    int per_page = (entry_count + pages - 1) / pages;
-    int first = grouped_page_ * per_page;
-    int last = std::min(entry_count, first + per_page);
+    int first = grouped_page_ * kMaxGroupedRows;
+    int last = std::min(entry_count, first + kMaxGroupedRows);
 
     for (int i = first; i < last; i++) {
         const WatchEntry& entry = entries[i];
