@@ -34,7 +34,6 @@ constexpr int kMaxBoardRows = 7;
 // scrolling since horizontal drags already switch screensaver variants
 constexpr uint32_t kGroupedPageHoldMs = 5000;
 constexpr uint32_t kGroupedPageFadeMs = 200;
-constexpr int kPageDotSizePx = 7;
 constexpr int kCatchDotSizePx = 8;
 
 // The bullet font's glyphs are all cap-height and sit on the baseline, leaving
@@ -69,23 +68,20 @@ uint32_t arrival_catch_dot_color(uint8_t walk_min, uint8_t mins) {
                                    : THEME_COLOR_SCREENSAVER_CATCH_MISS;
 }
 
-void make_dot(lv_obj_t* parent, int size, uint32_t color) {
+// Small dot left of a countdown flagging a rushed or missed catch
+void make_catch_dot(lv_obj_t* parent, uint8_t walk_min, uint8_t mins) {
+    uint32_t color = arrival_catch_dot_color(walk_min, mins);
+    if (color == kNoCatchDot) {
+        return;
+    }
     lv_obj_t* dot = lv_obj_create(parent);
-    lv_obj_set_size(dot, size, size);
+    lv_obj_set_size(dot, kCatchDotSizePx, kCatchDotSizePx);
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(dot, lv_color_hex(color), 0);
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(dot, 0, 0);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
-}
-
-// Small dot left of a countdown flagging a rushed or missed catch
-void make_catch_dot(lv_obj_t* parent, uint8_t walk_min, uint8_t mins) {
-    uint32_t color = arrival_catch_dot_color(walk_min, mins);
-    if (color != kNoCatchDot) {
-        make_dot(parent, kCatchDotSizePx, color);
-    }
 }
 
 lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap) {
@@ -103,8 +99,9 @@ lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap
     return obj;
 }
 
-// Full-tile column that holds one trains page; non-clickable so taps land on
-// the tile underneath
+// Full-tile column that holds one trains page, rows stacked from the top so
+// the list starts at the same place however many rows it has; non-clickable
+// so taps land on the tile underneath
 lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
     lv_obj_t* page = lv_obj_create(tile);
     lv_obj_set_size(page, LV_PCT(100), LV_PCT(100));
@@ -116,7 +113,7 @@ lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
     lv_obj_set_style_pad_right(page, 0, 0);
     lv_obj_set_layout(page, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(page, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(page, gap, 0);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_CLICKABLE);
@@ -165,25 +162,11 @@ void make_watch_text_column(lv_obj_t* row, const TrainArrivalItem& item) {
     }
 }
 
-// Page-position dots for the grouped view's rotation, pinned inside the page's
-// bottom padding and excluded from the flex layout so a full 4-row page plus
-// the stale marker still fits above them
-void make_page_dots(lv_obj_t* page, int page_index, int page_count) {
-    lv_obj_t* dots = make_flex_container(page, LV_FLEX_FLOW_ROW, 7);
-    lv_obj_set_width(dots, LV_SIZE_CONTENT);
-    lv_obj_add_flag(dots, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, 12);
-
-    for (int i = 0; i < page_count; i++) {
-        uint32_t color = i == page_index ? THEME_COLOR_TEXT_PRIMARY : THEME_COLOR_SCREENSAVER_PILL_BG;
-        make_dot(dots, kPageDotSizePx, color);
-    }
-}
-
-// Empty/loading/error message when a page has no rows, or the stale marker
-// beneath the rows it does have
+// Empty/loading/error message centered on a page with no rows, or the stale
+// marker beneath the rows it does have
 void add_trains_status(lv_obj_t* page, bool have_data, int rows, bool stale) {
     if (rows == 0) {
+        lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         const char* message = "No upcoming trains";
         NetworkState state = train_data_client.get_state();
         if (!train_data_client.has_config()) {
@@ -536,7 +519,7 @@ void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, boo
 // 0m; only trains the local countdown has pushed past due are dropped, and
 // watches left empty are hidden.
 // Watches beyond one screenful are split across pages that refresh_trains
-// rotates through automatically, with dots marking the current page.
+// rotates through automatically.
 int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                                            uint32_t elapsed_min) {
     WatchEntry entries[NET_MAX_ARRIVAL_ITEMS];
@@ -555,16 +538,16 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         }
     }
 
-    // Pages are balanced so five watches show as 3+2 rather than 4+1; the page
-    // index wraps here both on rotation and when watches drop out of the feed
+    // Pages fill to capacity in order (five watches show as 4+1) so a watch
+    // stays on the same page as the count changes; the page index wraps here
+    // both on rotation and when watches drop out of the feed
     int pages = entry_count > 0 ? (entry_count + kMaxGroupedRows - 1) / kMaxGroupedRows : 1;
     grouped_page_count_ = static_cast<uint8_t>(pages);
     if (grouped_page_ >= pages) {
         grouped_page_ = 0;
     }
-    int per_page = (entry_count + pages - 1) / pages;
-    int first = grouped_page_ * per_page;
-    int last = std::min(entry_count, first + per_page);
+    int first = grouped_page_ * kMaxGroupedRows;
+    int last = std::min(entry_count, first + kMaxGroupedRows);
 
     for (int i = first; i < last; i++) {
         const WatchEntry& entry = entries[i];
@@ -597,9 +580,6 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         }
     }
 
-    if (pages > 1) {
-        make_page_dots(parent, grouped_page_, pages);
-    }
     return last - first;
 }
 
