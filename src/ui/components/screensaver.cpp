@@ -520,8 +520,9 @@ void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, boo
 }
 
 // One entry per watch, in gateway order: bullet + destination/station, then a
-// full-width pill row with every reachable arrival. Trains already due are
-// dropped since they can't be caught, and watches left empty are hidden.
+// full-width pill row with every arrival. Trains arriving right now show as
+// 0m; only trains the local countdown has pushed past due are dropped, and
+// watches left empty are hidden.
 // Watches beyond one screenful are split across pages that refresh_trains
 // rotates through automatically, with dots marking the current page.
 int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
@@ -532,7 +533,7 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         const TrainArrivalItem& item = arrivals.items[i];
         WatchEntry entry = {&item, {}, 0};
         for (int m = 0; m < item.mins_count; m++) {
-            if (item.mins[m] <= elapsed_min) {
+            if (item.mins[m] < elapsed_min) {
                 continue;
             }
             entry.mins[entry.count++] = static_cast<uint8_t>(item.mins[m] - elapsed_min);
@@ -594,8 +595,8 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
 }
 
 // Flat departure board: one row per upcoming train sorted by arrival time,
-// with a big countdown on the right. Trains already due are dropped since
-// they can't be caught.
+// with a big countdown on the right. Trains arriving right now show as 0m;
+// only trains the local countdown has pushed past due are dropped.
 int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& arrivals,
                                          uint32_t elapsed_min, bool stale) {
     BoardEntry entries[NET_MAX_ARRIVAL_ITEMS * NET_MAX_ARRIVAL_MINS];
@@ -603,7 +604,7 @@ int ScreensaverOverlay::build_board_rows(lv_obj_t* parent, const TrainArrivals& 
     for (int i = 0; i < arrivals.item_count; i++) {
         const TrainArrivalItem& item = arrivals.items[i];
         for (int m = 0; m < item.mins_count; m++) {
-            if (item.mins[m] <= elapsed_min) {
+            if (item.mins[m] < elapsed_min) {
                 continue;
             }
             entries[entry_count++] = {&item, static_cast<uint8_t>(item.mins[m] - elapsed_min)};
