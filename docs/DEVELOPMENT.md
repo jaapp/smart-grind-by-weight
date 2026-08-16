@@ -141,6 +141,10 @@ python3 tools/grinder.py scan
 python3 tools/grinder.py info
 ```
 
+**How delta updates pick their base:** every build is copied to `firmware_cache/build_NNN.bin`. The upload tool reads the running image's ELF SHA-256 from the device (`BLE_OTA_FIRMWARE_ID_CHAR_UUID`) and only uses a cached image whose embedded hash matches as the delta base; otherwise it sends a full update. Build numbers are not used for this because `.build_number` and `firmware_cache/` are per-checkout (each worktree/clone restarts at #1). Devices running firmware older than this characteristic always get a full update.
+
+**While an update runs** the firmware pauses WiFi and the hardware tasks, receives the patch, and applies it from the bluetooth task; the client sees `BLE_OTA_SUCCESS` right before the restart, or `BLE_OTA_ERROR` followed by a reason string (also shown as the "Update Failed" screen on the device).
+
 ---
 
 ## 📦 Release Process

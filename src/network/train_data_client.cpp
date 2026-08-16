@@ -23,6 +23,7 @@ void copy_string(char* dst, const char* src, size_t dst_len) {
 
 void TrainDataClient::init() {
     mutex_ = xSemaphoreCreateMutex();
+    wifi_control_mutex_ = xSemaphoreCreateMutex();
     load_config();
 
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -86,6 +87,27 @@ void TrainDataClient::set_polling_active(bool active) {
     }
 }
 
+void TrainDataClient::pause_wifi() {
+    if (wifi_control_mutex_) xSemaphoreTake(wifi_control_mutex_, portMAX_DELAY);
+    wifi_paused_ = true;
+    if (wifi_started_) {
+        WiFi.disconnect(true);
+        LOG_BLE("TrainDataClient: WiFi paused\n");
+    }
+    if (wifi_control_mutex_) xSemaphoreGive(wifi_control_mutex_);
+}
+
+void TrainDataClient::resume_wifi() {
+    if (wifi_control_mutex_) xSemaphoreTake(wifi_control_mutex_, portMAX_DELAY);
+    if (wifi_paused_) {
+        wifi_paused_ = false;
+        wifi_started_ = false;
+        if (has_config_) state_ = NetworkState::CONNECTING;
+        LOG_BLE("TrainDataClient: WiFi resumed\n");
+    }
+    if (wifi_control_mutex_) xSemaphoreGive(wifi_control_mutex_);
+}
+
 bool TrainDataClient::get_arrivals(TrainArrivals& out) {
     if (!mutex_) return false;
     xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -123,6 +145,11 @@ void TrainDataClient::task_impl() {
 
     while (true) {
         loop_ticks_++;
+        if (wifi_paused_) {
+            vTaskDelayUntil(&last_wake_time, frequency);
+            continue;
+        }
+
         if (config_changed_) {
             config_changed_ = false;
             wifi_started_ = false;
@@ -163,15 +190,19 @@ void TrainDataClient::update_wifi() {
 
     uint32_t now = millis();
     if (!wifi_started_ || now - last_connect_attempt_ms_ >= NET_WIFI_RETRY_INTERVAL_MS) {
-        last_connect_attempt_ms_ = now;
-        wifi_started_ = true;
-        state_ = NetworkState::CONNECTING;
-        last_mode_ok_ = WiFi.mode(WIFI_STA);
-        WiFi.setAutoReconnect(true);
-        last_begin_status_ = static_cast<int>(WiFi.begin(ssid_, password_));
-        WiFi.setTxPower(NET_WIFI_TX_POWER);
-        LOG_BLE("TrainDataClient: connecting to '%s' (mode_ok=%d begin=%d)\n",
-                ssid_, last_mode_ok_ ? 1 : 0, last_begin_status_);
+        if (wifi_control_mutex_) xSemaphoreTake(wifi_control_mutex_, portMAX_DELAY);
+        if (!wifi_paused_) {
+            last_connect_attempt_ms_ = now;
+            wifi_started_ = true;
+            state_ = NetworkState::CONNECTING;
+            last_mode_ok_ = WiFi.mode(WIFI_STA);
+            WiFi.setAutoReconnect(true);
+            last_begin_status_ = static_cast<int>(WiFi.begin(ssid_, password_));
+            WiFi.setTxPower(NET_WIFI_TX_POWER);
+            LOG_BLE("TrainDataClient: connecting to '%s' (mode_ok=%d begin=%d)\n",
+                    ssid_, last_mode_ok_ ? 1 : 0, last_begin_status_);
+        }
+        if (wifi_control_mutex_) xSemaphoreGive(wifi_control_mutex_);
     }
 }
 

@@ -68,6 +68,7 @@ private:
     BLECharacteristic* ota_control_characteristic;
     BLECharacteristic* ota_status_characteristic;
     BLECharacteristic* build_number_characteristic;
+    BLECharacteristic* firmware_id_characteristic;
     
     // Data export characteristics
     BLECharacteristic* data_control_characteristic;
@@ -118,10 +119,15 @@ private:
     bool diagnostic_report_pending;
     bool diagnostic_report_in_progress;
 
+    // OTA END is acknowledged on the NimBLE thread and applied from handle()
+    bool ota_complete_pending;
+    bool ota_finalizing;
+
     // Private methods
     void update_ui_status(const char* status);
     void enqueue_ui_status(const char* status);
-    void set_ota_status(BLEOTAStatus status);
+    void set_ota_status(BLEOTAStatus status, const char* message = nullptr);
+    void finish_ota();
     void set_data_status(BLEDataStatus status);
     void handle_ota_control_command(BLECharacteristic* characteristic);
     void handle_ota_data_chunk(BLECharacteristic* characteristic);
@@ -190,6 +196,11 @@ public:
      */
     float get_ota_progress() const { return ota_handler.get_progress(); }
     unsigned long get_remaining_time_ms() const;
+
+    /**
+     * One-shot: true if the last OTA failed without a restart; fills the targeted build
+     */
+    bool take_ota_failure(String& expected_build) { return ota_handler.take_failure(expected_build); }
     
     /**
      * General Bluetooth timeout information
