@@ -84,8 +84,9 @@ lv_obj_t* make_flex_container(lv_obj_t* parent, lv_flex_flow_t flow, int32_t gap
     return obj;
 }
 
-// Full-tile column that holds one trains page; non-clickable so taps land on
-// the tile underneath
+// Full-tile column that holds one trains page, rows stacked from the top so
+// the list starts at the same place however many rows it has; non-clickable
+// so taps land on the tile underneath
 lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
     lv_obj_t* page = lv_obj_create(tile);
     lv_obj_set_size(page, LV_PCT(100), LV_PCT(100));
@@ -97,7 +98,7 @@ lv_obj_t* make_trains_page(lv_obj_t* tile, int32_t gap) {
     lv_obj_set_style_pad_right(page, 0, 0);
     lv_obj_set_layout(page, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(page, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(page, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(page, gap, 0);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_CLICKABLE);
@@ -168,10 +169,11 @@ void make_page_dots(lv_obj_t* page, int page_index, int page_count) {
     }
 }
 
-// Empty/loading/error message when a page has no rows, or the stale marker
-// beneath the rows it does have
+// Empty/loading/error message centered on a page with no rows, or the stale
+// marker beneath the rows it does have
 void add_trains_status(lv_obj_t* page, bool have_data, int rows, bool stale) {
     if (rows == 0) {
+        lv_obj_set_flex_align(page, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         const char* message = "No upcoming trains";
         NetworkState state = train_data_client.get_state();
         if (!train_data_client.has_config()) {
