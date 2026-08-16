@@ -36,7 +36,8 @@
 #define THEME_COLOR_SCREENSAVER_DOT_BRIGHT 0xC08948                            // Ripple crest (warm tan)
 #define THEME_COLOR_SCREENSAVER_PILL_BG 0x2A2A2A                               // Trains arrival-time pill background
 
-// Trains arrival catchability dots (vs. the watch's walk-to-platform time)
+// Trains arrival catchability warnings (vs. the watch's walk-to-platform time):
+// pill ring on the grouped view, countdown text on the board view
 #define THEME_COLOR_SCREENSAVER_CATCH_RUSH 0xFFD60A                            // Reachable only by rushing (yellow)
 #define THEME_COLOR_SCREENSAVER_CATCH_MISS 0xFF5B52                            // Can't be caught (red)
 
