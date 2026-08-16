@@ -23,15 +23,16 @@ constexpr float kTwoPi = 6.28318530f;
 
 constexpr int kVariantCount = 3;
 
-// A release that traveled further than this is a drag, never a tap
-constexpr int kTapSlopPx = 20;
+// Taps starting within this distance of the screen's left/right edge switch
+// pages instead of dismissing
+constexpr int kEdgeTapZonePx = 48;
 
 constexpr int kBadgeSizePx = 52;
 constexpr int kMaxGroupedRows = 4;
 constexpr int kMaxBoardRows = 7;
 
 // Watches beyond one grouped page rotate through automatically; no manual
-// scrolling since horizontal drags already switch screensaver variants
+// scrolling since the screensaver only takes taps
 constexpr uint32_t kGroupedPageHoldMs = 5000;
 constexpr uint32_t kGroupedPageFadeMs = 200;
 constexpr int kCatchRingWidthPx = 2;
@@ -207,17 +208,15 @@ void ScreensaverOverlay::create() {
     lv_obj_set_style_pad_all(overlay_, 0, 0);
     lv_obj_set_scrollbar_mode(overlay_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(overlay_, tile_changed_cb, LV_EVENT_VALUE_CHANGED, this);
 
+    // Tiles are not draggable; edge taps slide between them programmatically
     lv_obj_t** tiles[] = {&wave_tile_, &grouped_tile_, &board_tile_};
     for (int i = 0; i < kVariantCount; i++) {
-        lv_obj_t* tile = lv_tileview_add_tile(overlay_, i, 0, LV_DIR_HOR);
+        lv_obj_t* tile = lv_tileview_add_tile(overlay_, i, 0, LV_DIR_NONE);
         lv_obj_set_style_bg_opa(tile, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(tile, 0, 0);
         lv_obj_set_style_pad_all(tile, 0, 0);
         lv_obj_add_event_cb(tile, pressed_cb, LV_EVENT_PRESSED, this);
-        lv_obj_add_event_cb(tile, released_cb, LV_EVENT_RELEASED, this);
-        lv_obj_add_event_cb(tile, released_cb, LV_EVENT_PRESS_LOST, this);
         lv_obj_add_event_cb(tile, clicked_cb, LV_EVENT_CLICKED, this);
         *tiles[i] = tile;
     }
@@ -266,7 +265,7 @@ void ScreensaverOverlay::show() {
     lv_tileview_set_tile_by_index(overlay_, variant, 0, LV_ANIM_OFF);
     lv_obj_move_foreground(overlay_);
     lv_obj_clear_flag(overlay_, LV_OBJ_FLAG_HIDDEN);
-    // Build both trains pages up front so a drag never reveals a blank neighbor
+    // Build both trains pages up front so a page slide never reveals a blank neighbor
     refresh_trains(true);
     start_variant();
 }
@@ -321,6 +320,16 @@ void ScreensaverOverlay::set_variant(ScreensaverVariant variant) {
     start_variant();
 }
 
+// Slides one page left (-1) or right (+1); taps past either end do nothing
+void ScreensaverOverlay::step_variant(int direction) {
+    int index = static_cast<int>(variant_) + direction;
+    if (index < 0 || index >= kVariantCount) {
+        return;
+    }
+    set_variant(static_cast<ScreensaverVariant>(index));
+    lv_tileview_set_tile_by_index(overlay_, index, 0, LV_ANIM_ON);
+}
+
 void ScreensaverOverlay::draw_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
     if (!self || !self->visible_) {
@@ -329,63 +338,28 @@ void ScreensaverOverlay::draw_cb(lv_event_t* e) {
     self->draw_wave(lv_event_get_layer(e));
 }
 
-// The wave redraws its whole tile at 25fps, which is enough render load to
-// make drag tracking stutter, so the active timer pauses while a finger is
-// down and resumes on release
 void ScreensaverOverlay::pressed_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
     if (!self) {
         return;
     }
     lv_indev_get_point(lv_indev_active(), &self->press_point_);
-    if (self->timer_) {
-        lv_timer_pause(self->timer_);
-    }
 }
 
-void ScreensaverOverlay::released_cb(lv_event_t* e) {
-    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (self && self->visible_ && self->timer_) {
-        lv_timer_resume(self->timer_);
-    }
-}
-
+// Where the finger first landed decides the action, like a button, so a
+// touch that wanders after pressing an edge still pages
 void ScreensaverOverlay::clicked_cb(lv_event_t* e) {
-    auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
-    if (!self) {
-        return;
-    }
-
-    // LVGL suppresses clicks after a scroll, but a drag too small to scroll
-    // must not dismiss either
-    lv_point_t release_point;
-    lv_indev_get_point(lv_indev_active(), &release_point);
-    if (LV_ABS(release_point.x - self->press_point_.x) > kTapSlopPx ||
-        LV_ABS(release_point.y - self->press_point_.y) > kTapSlopPx) {
-        return;
-    }
-
-    self->hide();
-}
-
-// Fires when the tileview settles on a tile after a drag
-void ScreensaverOverlay::tile_changed_cb(lv_event_t* e) {
     auto* self = static_cast<ScreensaverOverlay*>(lv_event_get_user_data(e));
     if (!self || !self->visible_) {
         return;
     }
 
-    lv_obj_t* tile = lv_tileview_get_tile_active(self->overlay_);
-    ScreensaverVariant variant = self->variant_;
-    if (tile == self->wave_tile_) {
-        variant = ScreensaverVariant::WAVE;
-    } else if (tile == self->grouped_tile_) {
-        variant = ScreensaverVariant::TRAINS_GROUPED;
-    } else if (tile == self->board_tile_) {
-        variant = ScreensaverVariant::TRAINS_BOARD;
-    }
-    if (variant != self->variant_) {
-        self->set_variant(variant);
+    if (self->press_point_.x < kEdgeTapZonePx) {
+        self->step_variant(-1);
+    } else if (self->press_point_.x >= HW_DISPLAY_WIDTH_PX - kEdgeTapZonePx) {
+        self->step_variant(1);
+    } else {
+        self->hide();
     }
 }
 
@@ -411,7 +385,7 @@ void ScreensaverOverlay::draw_wave(lv_layer_t* layer) {
     constexpr float kWaveNumber = kTwoPi / kWaveLengthPx;
 
     // Anchor the grid to the tile's on-screen coordinates so the dots ride
-    // along while the tileview is dragged
+    // along while the tileview slides between pages
     lv_area_t coords;
     lv_obj_get_coords(wave_tile_, &coords);
 
@@ -456,8 +430,7 @@ void ScreensaverOverlay::refresh_trains(bool force) {
     uint8_t staleness = age_ms >= NET_DATA_EXPIRED_MS ? 2 : (age_ms >= NET_DATA_STALE_MS ? 1 : 0);
 
     // The grouped view rotates through its pages on a fixed cadence; a flip
-    // forces a rebuild even when the data itself hasn't changed. The timer
-    // driving this pauses while a finger is down, so pages never flip mid-drag.
+    // forces a rebuild even when the data itself hasn't changed
     bool flip = grouped_page_count_ > 1 &&
                 millis() - grouped_page_shown_ms_ >= kGroupedPageHoldMs;
     if (flip) {
@@ -477,8 +450,8 @@ void ScreensaverOverlay::refresh_trains(bool force) {
     rebuild_trains_views(arrivals, have_data && staleness < 2, elapsed_min, staleness == 1, flip);
 }
 
-// Both trains pages are rebuilt together so whichever one a drag reveals is
-// already populated
+// Both trains pages are rebuilt together so whichever one a page slide
+// reveals is already populated
 void ScreensaverOverlay::rebuild_trains_views(const TrainArrivals& arrivals, bool have_data,
                                               uint32_t elapsed_min, bool device_stale,
                                               bool fade_grouped) {
