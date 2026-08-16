@@ -522,16 +522,16 @@ int ScreensaverOverlay::build_grouped_rows(lv_obj_t* parent, const TrainArrivals
         }
     }
 
-    // Pages are balanced so five watches show as 3+2 rather than 4+1; the page
-    // index wraps here both on rotation and when watches drop out of the feed
+    // Pages fill to capacity in order (five watches show as 4+1) so a watch
+    // stays on the same page as the count changes; the page index wraps here
+    // both on rotation and when watches drop out of the feed
     int pages = entry_count > 0 ? (entry_count + kMaxGroupedRows - 1) / kMaxGroupedRows : 1;
     grouped_page_count_ = static_cast<uint8_t>(pages);
     if (grouped_page_ >= pages) {
         grouped_page_ = 0;
     }
-    int per_page = (entry_count + pages - 1) / pages;
-    int first = grouped_page_ * per_page;
-    int last = std::min(entry_count, first + per_page);
+    int first = grouped_page_ * kMaxGroupedRows;
+    int last = std::min(entry_count, first + kMaxGroupedRows);
 
     for (int i = first; i < last; i++) {
         const WatchEntry& entry = entries[i];
