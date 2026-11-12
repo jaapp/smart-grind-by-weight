@@ -2,6 +2,7 @@
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
 #include "touch_driver.h"
+#include "pixel_shift.h"
 #include "../config/constants.h"
 
 class DisplayManager {
@@ -19,11 +20,14 @@ private:
     uint32_t screen_height;
     uint32_t buffer_size;
     bool initialized;
+    oled::PixelShift pixel_shift_;
+    bool pixel_shift_allowed_ = false;
 
 public:
     void init();
     void update();
     void set_brightness(float brightness);
+    void allow_pixel_shift(bool allowed) { pixel_shift_allowed_ = allowed; }
     
     uint32_t get_width() const { return screen_width; }
     uint32_t get_height() const { return screen_height; }

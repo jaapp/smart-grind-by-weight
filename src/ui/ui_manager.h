@@ -139,6 +139,7 @@ public:
 private:
     void create_ui();
     void update_auto_actions();
+    bool can_shift_display() const;
     
     // State-specific update methods
 
