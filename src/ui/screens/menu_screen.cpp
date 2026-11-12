@@ -372,6 +372,14 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
 
     // Automatic actions section
     create_separator(parent, "Automation");
+    create_description_label(parent, "Auto select");
+    auto_select_dropdown = lv_dropdown_create(parent);
+    lv_dropdown_set_options(auto_select_dropdown, "Off\nSINGLE\nDOUBLE\nCUSTOM");
+    lv_obj_set_width(auto_select_dropdown, 260);
+    lv_obj_set_style_text_font(auto_select_dropdown, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(auto_select_dropdown, lv_color_hex(THEME_COLOR_TEXT_PRIMARY), 0);
+    lv_obj_set_style_bg_color(auto_select_dropdown, lv_color_hex(THEME_COLOR_BACKGROUND), 0);
+    create_description_label(parent, "Profile selected at startup and idle-screen wake.");
     create_description_label(parent, "Start the selected profile as soon as the cup lands on the scale.");
     create_toggle_row(parent, "Start", &auto_start_toggle);
     create_description_label(parent, "Exit the completion screen once that cup weight drops away.");
@@ -413,6 +421,10 @@ void MenuScreen::create_grind_mode_page(lv_obj_t* parent) {
     if (grind_mode_swipe_toggle) {
         lv_obj_add_event_cb(grind_mode_swipe_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
                            reinterpret_cast<void*>(static_cast<intptr_t>(ET::GRIND_MODE_SWIPE_TOGGLE)));
+    }
+    if (auto_select_dropdown) {
+        lv_obj_add_event_cb(auto_select_dropdown, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
+                           reinterpret_cast<void*>(static_cast<intptr_t>(ET::AUTO_SELECT_PROFILE)));
     }
     if (auto_start_toggle) {
         lv_obj_add_event_cb(auto_start_toggle, EventBridgeLVGL::dispatch_event, LV_EVENT_VALUE_CHANGED,
@@ -626,6 +638,7 @@ void MenuScreen::hide() {
         return; // Already hidden, nothing to do
     }
 
+    if (auto_select_dropdown) lv_dropdown_close(auto_select_dropdown);
     LOG_BLE("[%lums MENU] Hiding menu screen\n", millis());
 
     // Keep the menu in memory for instant access next time
@@ -1112,12 +1125,14 @@ void MenuScreen::update_grind_mode_toggles() {
     swipe_prefs.end();
 
     // Read current grind mode from main grinder preferences using hardware manager
+    int auto_profile = -1;
     int mode_index = 0; // Default to Weight (index 0)
     int grinder_purge_mode_index = GRIND_PURGE_MODE_DEFAULT;  // Default to Purge
     float grinder_purge_amount_g = GRIND_PURGE_AMOUNT_DEFAULT_G;  // Default to 1.0g
     if (hardware_manager) {
         Preferences* main_prefs = hardware_manager->get_preferences();
         if (main_prefs) {
+            auto_profile = main_prefs->getInt("auto_profile", -1);
             int stored_mode = main_prefs->getInt("grind_mode", static_cast<int>(GrindMode::WEIGHT));
             mode_index = (stored_mode == static_cast<int>(GrindMode::TIME)) ? 1 : 0;
             grinder_purge_mode_index = main_prefs->getInt(GrindController::PREF_KEY_GRINDER_MODE, GRIND_PURGE_MODE_DEFAULT);
@@ -1125,6 +1140,10 @@ void MenuScreen::update_grind_mode_toggles() {
         }
     }
 
+    if (auto_select_dropdown) {
+        if (auto_profile < -1 || auto_profile >= USER_PROFILE_COUNT) auto_profile = -1;
+        lv_dropdown_set_selected(auto_select_dropdown, auto_profile + 1);
+    }
     if (grind_mode_radio_group) {
         radio_button_group_set_selection(grind_mode_radio_group, mode_index);
     }

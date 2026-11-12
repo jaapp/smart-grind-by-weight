@@ -139,6 +139,9 @@ public:
 private:
     void create_ui();
     void update_auto_actions();
+    bool can_switch_profile(bool allow_wake_touch = false) const;
+    void show_selected_profile();
+    void update_profile_selection(bool screen_woke);
     
     // State-specific update methods
 

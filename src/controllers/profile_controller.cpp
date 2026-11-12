@@ -43,6 +43,26 @@ void ProfileController::load_profiles() {
     if (current_profile < 0 || current_profile >= USER_PROFILE_COUNT) {
         current_profile = 1;
     }
+    auto_select_profile = preferences->getInt("auto_profile", -1);
+    if (auto_select_profile < -1 || auto_select_profile >= USER_PROFILE_COUNT) {
+        auto_select_profile = -1;
+    }
+    select_auto_profile();
+}
+
+void ProfileController::set_auto_select_profile(int index) {
+    if (index < -1 || index >= USER_PROFILE_COUNT || index == auto_select_profile) return;
+    auto_select_profile = index;
+    preferences->putInt("auto_profile", index);
+}
+
+bool ProfileController::select_auto_profile() {
+    if (auto_select_profile < 0) return false;
+    if (current_profile != auto_select_profile) {
+        current_profile = auto_select_profile;
+        preferences->putInt("profile", current_profile);
+    }
+    return true;
 }
 
 void ProfileController::save_profiles() {

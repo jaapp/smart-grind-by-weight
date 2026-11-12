@@ -156,6 +156,11 @@ void DisplayManager::touchpad_read_cb(lv_indev_t* indev, lv_indev_data_t* data) 
     
     TouchData touch = g_display_manager->touch_driver.get_touch_data();
     
+    if (!g_display_manager->wake_touch_guard_.allow(touch.pressed)) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
     if (touch.pressed) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->point.x = touch.x;

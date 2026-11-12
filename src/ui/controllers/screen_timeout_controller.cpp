@@ -1,4 +1,5 @@
 #include "screen_timeout_controller.h"
+#include <Arduino.h>
 
 #include "../../config/constants.h"
 #include "../../hardware/display_manager.h"
@@ -10,24 +11,28 @@ ScreenTimeoutController::ScreenTimeoutController(UIManager* manager)
 
 void ScreenTimeoutController::register_events() {}
 
-void ScreenTimeoutController::update() {
+bool ScreenTimeoutController::update() {
     if (!ui_manager_) {
-        return;
+        return false;
     }
 
     auto* hardware = ui_manager_->hardware_manager;
     if (!hardware) {
-        return;
+        return false;
     }
 
     auto* display = hardware->get_display();
     if (!display) {
-        return;
+        return false;
     }
+
+    const bool auto_select = ui_manager_->profile_controller &&
+        ui_manager_->profile_controller->get_auto_select_profile() >= 0;
+    display->set_dimmed(screen_dimmed_, auto_select);
 
     auto* touch_driver = display->get_touch_driver();
     if (!touch_driver) {
-        return;
+        return false;
     }
 
     if (ui_manager_->state_machine && ui_manager_->state_machine->is_state(UIState::GRINDING)) {
@@ -38,8 +43,9 @@ void ScreenTimeoutController::update() {
             }
             display->set_brightness(normal);
             screen_dimmed_ = false;
+            display->set_dimmed(false, auto_select);
         }
-        return;
+        return false;
     }
 
     uint32_t ms_since_touch = touch_driver->get_ms_since_last_touch();
@@ -57,6 +63,7 @@ void ScreenTimeoutController::update() {
         }
         display->set_brightness(dimmed);
         screen_dimmed_ = true;
+        display->set_dimmed(true, auto_select);
     } else if (!should_dim && screen_dimmed_) {
         float normal = USER_SCREEN_BRIGHTNESS_NORMAL;
         if (ui_manager_->menu_controller_) {
@@ -64,5 +71,8 @@ void ScreenTimeoutController::update() {
         }
         display->set_brightness(normal);
         screen_dimmed_ = false;
+        display->set_dimmed(false, auto_select);
+        return true;
     }
+    return false;
 }

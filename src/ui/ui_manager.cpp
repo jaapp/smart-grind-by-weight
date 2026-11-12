@@ -59,6 +59,9 @@ void UIManager::init(HardwareManager* hw_mgr, StateMachine* sm,
     grind_controller->set_ui_event_callback(GrindingUIController::dispatch_event);
     
     
+    if (profile_controller->get_auto_select_profile() >= 0) {
+        hardware_manager->get_display()->suppress_current_touch();
+    }
     initialized = true;
 }
 
@@ -122,9 +125,8 @@ void UIManager::update() {
         diagnostics_controller_->update(hardware_manager, grind_controller, millis());
     }
 
-    if (screen_timeout_controller_) {
-        screen_timeout_controller_->update();
-    }
+    const bool screen_woke = screen_timeout_controller_ && screen_timeout_controller_->update();
+    update_profile_selection(screen_woke);
 
     bool ota_cycle_consumed = false;
     if (ota_data_export_controller_) {
@@ -177,6 +179,33 @@ void UIManager::update() {
 
     if (status_indicator_controller_) {
         status_indicator_controller_->update();
+    }
+}
+
+bool UIManager::can_switch_profile(bool allow_wake_touch) const {
+    if (!state_machine || !profile_controller || !grind_controller || !hardware_manager) return false;
+    const auto state = state_machine->get_current_state();
+    if (state != UIState::READY && state != UIState::MENU &&
+        state != UIState::GRIND_COMPLETE && state != UIState::GRIND_TIMEOUT) return false;
+    if (!grind_controller->allows_idle_ui_updates()) return false;
+    auto* motor = hardware_manager->get_grinder();
+    if ((motor && motor->is_grinding()) || (bluetooth_manager && bluetooth_manager->is_updating())) return false;
+    auto* display = hardware_manager->get_display();
+    return display && (allow_wake_touch || !display->get_touch_driver()->is_pressed());
+}
+
+void UIManager::show_selected_profile() {
+    // All callers first check idle state. Acknowledge a finished grind without starting one.
+    grind_controller->return_to_idle();
+    hardware_manager->get_display()->suppress_current_touch();
+    current_tab = profile_controller->get_current_profile();
+    switch_to_state(UIState::READY);
+}
+
+void UIManager::update_profile_selection(bool screen_woke) {
+    // Selection is idle-only and consumes the wake gesture; it never starts a grind.
+    if (screen_woke && can_switch_profile(true) && profile_controller->select_auto_profile()) {
+        show_selected_profile();
     }
 }
 

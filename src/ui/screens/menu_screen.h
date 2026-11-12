@@ -59,6 +59,7 @@ private:
     // Grind mode tab elements
     lv_obj_t* grind_mode_radio_group;
     lv_obj_t* grind_mode_swipe_toggle;
+    lv_obj_t* auto_select_dropdown = nullptr;
     lv_obj_t* auto_start_toggle;
     lv_obj_t* auto_return_toggle;
     lv_obj_t* grinder_purge_mode_radio_group;
@@ -134,6 +135,7 @@ public:
     lv_obj_t* get_brightness_screensaver_slider() const { return brightness_screensaver_slider; }
     lv_obj_t* get_grind_mode_radio_group() const { return grind_mode_radio_group; }
     lv_obj_t* get_grind_mode_swipe_toggle() const { return grind_mode_swipe_toggle; }
+    lv_obj_t* get_auto_select_dropdown() const { return auto_select_dropdown; }
     lv_obj_t* get_auto_start_toggle() const { return auto_start_toggle; }
     lv_obj_t* get_auto_return_toggle() const { return auto_return_toggle; }
     lv_obj_t* get_grinder_purge_mode_radio_group() const { return grinder_purge_mode_radio_group; }
