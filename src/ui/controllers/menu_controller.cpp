@@ -47,6 +47,7 @@ void MenuUIController::register_events() {
 
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_SWIPE_TOGGLE, [this](lv_event_t*) { handle_grind_mode_swipe_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRIND_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grind_mode_radio_button(); });
+    EventBridgeLVGL::register_handler(ET::AUTO_SELECT_PROFILE, [this](lv_event_t*) { handle_auto_select_profile(); });
     EventBridgeLVGL::register_handler(ET::AUTO_START_TOGGLE, [this](lv_event_t*) { handle_auto_start_toggle(); });
     EventBridgeLVGL::register_handler(ET::AUTO_RETURN_TOGGLE, [this](lv_event_t*) { handle_auto_return_toggle(); });
     EventBridgeLVGL::register_handler(ET::GRINDER_PURGE_MODE_RADIO_BUTTON, [this](lv_event_t*) { handle_grinder_purge_mode_radio_button(); });
@@ -343,11 +344,20 @@ void MenuUIController::handle_grind_mode_radio_button() {
     LOG_DEBUG_PRINTLN(selected_index == 0 ? "Grind mode set to WEIGHT via radio button" : "Grind mode set to TIME via radio button");
 }
 
+void MenuUIController::handle_auto_select_profile() {
+    if (!ui_manager_ || !ui_manager_->profile_controller) return;
+    auto* dropdown = ui_manager_->menu_screen.get_auto_select_dropdown();
+    if (!dropdown) return;
+    ui_manager_->profile_controller->set_auto_select_profile(
+        static_cast<int>(lv_dropdown_get_selected(dropdown)) - 1);
+}
+
 void MenuUIController::handle_auto_start_toggle() {
     if (!ui_manager_) return;
 
     auto* toggle = ui_manager_->menu_screen.get_auto_start_toggle();
     if (!toggle) return;
+
 
     bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
 

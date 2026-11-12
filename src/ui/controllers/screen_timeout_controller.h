@@ -11,7 +11,7 @@ public:
     explicit ScreenTimeoutController(UIManager* manager);
 
     void register_events();
-    void update();
+    bool update(); // True only on an idle dim-to-awake transition.
 
 private:
     UIManager* ui_manager_;

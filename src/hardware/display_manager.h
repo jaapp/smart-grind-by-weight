@@ -2,6 +2,7 @@
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
 #include "touch_driver.h"
+#include "wake_touch_guard.h"
 #include "../config/constants.h"
 
 class DisplayManager {
@@ -19,11 +20,14 @@ private:
     uint32_t screen_height;
     uint32_t buffer_size;
     bool initialized;
+    WakeTouchGuard wake_touch_guard_;
 
 public:
     void init();
     void update();
     void set_brightness(float brightness);
+    void set_dimmed(bool dimmed, bool protect_wake) { wake_touch_guard_.set_dimmed(dimmed, protect_wake); }
+    void suppress_current_touch() { wake_touch_guard_.suppress_current_touch(); }
     
     uint32_t get_width() const { return screen_width; }
     uint32_t get_height() const { return screen_height; }

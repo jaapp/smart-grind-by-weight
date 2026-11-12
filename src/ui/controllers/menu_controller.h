@@ -26,6 +26,7 @@ public:
     void handle_logging_toggle();
     void handle_grind_mode_swipe_toggle();
     void handle_grind_mode_radio_button();
+    void handle_auto_select_profile();
     void handle_auto_start_toggle();
     void handle_auto_return_toggle();
     void handle_grinder_purge_mode_radio_button();

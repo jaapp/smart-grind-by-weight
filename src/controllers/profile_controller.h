@@ -13,6 +13,7 @@ class ProfileController {
 private:
     Profile profiles[USER_PROFILE_COUNT];
     int current_profile;
+    int auto_select_profile = -1; // Off, or a profile index. Independent of the last selected tab.
     GrindMode current_grind_mode;
     Preferences* preferences;
 
@@ -24,6 +25,9 @@ public:
     
     void set_current_profile(int index);
     int get_current_profile() const { return current_profile; }
+    int get_auto_select_profile() const { return auto_select_profile; }
+    void set_auto_select_profile(int index);
+    bool select_auto_profile();
     float get_current_weight() const { return profiles[current_profile].weight; }
     float get_current_time() const { return profiles[current_profile].time_seconds; }
     const char* get_current_name() const { return profiles[current_profile].name; }
