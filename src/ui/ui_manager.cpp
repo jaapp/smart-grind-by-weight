@@ -117,6 +117,8 @@ void UIManager::create_ui() {
 void UIManager::update() {
     if (!initialized) return;
 
+    hardware_manager->get_display()->allow_pixel_shift(can_shift_display());
+
     // Update diagnostics controller
     if (diagnostics_controller_) {
         diagnostics_controller_->update(hardware_manager, grind_controller, millis());
@@ -178,6 +180,17 @@ void UIManager::update() {
     if (status_indicator_controller_) {
         status_indicator_controller_->update();
     }
+}
+
+bool UIManager::can_shift_display() const {
+    if (!state_machine || !grind_controller || !hardware_manager) return false;
+    const auto state = state_machine->get_current_state();
+    if (state != UIState::READY && state != UIState::MENU &&
+        state != UIState::GRIND_COMPLETE && state != UIState::GRIND_TIMEOUT) return false;
+    if (!grind_controller->allows_idle_ui_updates()) return false;
+    auto* motor = hardware_manager->get_grinder();
+    return !(motor && motor->is_grinding()) &&
+        !(bluetooth_manager && bluetooth_manager->is_updating());
 }
 
 void UIManager::switch_to_state(UIState new_state) {

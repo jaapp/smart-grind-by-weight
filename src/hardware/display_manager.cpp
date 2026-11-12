@@ -1,4 +1,5 @@
 #include "display_manager.h"
+#include "pixel_shift.h"
 #include "../config/constants.h"
 #include "../config/logging.h"
 #include <Arduino.h>
@@ -90,6 +91,7 @@ void DisplayManager::init() {
     lv_indev_set_type(lvgl_input, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(lvgl_input, touchpad_read_cb);
     
+    pixel_shift_.reset(millis());
     initialized = true;
 }
 
@@ -97,6 +99,16 @@ void DisplayManager::update() {
     if (!initialized) return;
     
     touch_driver.update();
+    const auto touch = touch_driver.get_touch_data();
+    if (pixel_shift_.update(millis(), pixel_shift_allowed_ && !touch.pressed &&
+                            touch_driver.get_ms_since_last_touch() >= 1000)) {
+        const auto shift = pixel_shift_.offset();
+        if (shift.x > 0) gfx_device->fillRect(0, 0, shift.x, screen_height, RGB565_BLACK);
+        if (shift.x < 0) gfx_device->fillRect(screen_width + shift.x, 0, -shift.x, screen_height, RGB565_BLACK);
+        if (shift.y > 0) gfx_device->fillRect(0, 0, screen_width, shift.y, RGB565_BLACK);
+        if (shift.y < 0) gfx_device->fillRect(0, screen_height + shift.y, screen_width, -shift.y, RGB565_BLACK);
+        lv_obj_invalidate(lv_screen_active());
+    }
     lv_timer_handler();
 }
 
@@ -112,42 +124,31 @@ void DisplayManager::display_rounder_cb(lv_event_t* e) {
 void DisplayManager::display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
     if (!g_display_manager || !g_display_manager->gfx_device) return;
     
-    uint32_t w = lv_area_get_width(area);
-    uint32_t h = lv_area_get_height(area);
-
-    uint32_t remaining_rows = h;
-    uint32_t current_y = area->y1;
-    uint32_t src_row_offset = 0;
-    uint16_t* staging = g_display_manager->dma_staging_buffer;
-    uint32_t staging_rows = g_display_manager->dma_staging_rows ? g_display_manager->dma_staging_rows : h;
-    const uint16_t* src_pixels = reinterpret_cast<const uint16_t*>(px_map);
-
-    while (remaining_rows > 0) {
-        uint32_t rows = std::min<uint32_t>(remaining_rows, staging_rows);
-        size_t copy_pixels = static_cast<size_t>(w) * rows;
-        const uint16_t* chunk_src = src_pixels + (static_cast<size_t>(src_row_offset) * w);
-
-        if (staging) {
-            memcpy(staging, chunk_src, copy_pixels * sizeof(uint16_t));
-
-            if (LV_COLOR_16_SWAP) {
-                g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, current_y, staging, w, rows);
-            } else {
-                g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, current_y, staging, w, rows);
+    const int source_width = lv_area_get_width(area);
+    oled::Point offset{};
+    offset = g_display_manager->pixel_shift_.offset();
+    const auto clip = oled::clip(area->x1, area->y1, source_width,
+        lv_area_get_height(area), offset, g_display_manager->screen_width,
+        g_display_manager->screen_height);
+    auto* staging = g_display_manager->dma_staging_buffer;
+    const auto* pixels = reinterpret_cast<const uint16_t*>(px_map);
+    if (staging && clip.width > 0 && clip.height > 0) {
+        for (int row = 0; row < clip.height;) {
+            const int rows = std::min<int>(g_display_manager->dma_staging_rows, clip.height - row);
+            for (int i = 0; i < rows; ++i) {
+                memcpy(staging + i * clip.width,
+                       pixels + (clip.source_y + row + i) * source_width + clip.source_x,
+                       clip.width * sizeof(uint16_t));
             }
-        } else {
             if (LV_COLOR_16_SWAP) {
-                g_display_manager->gfx_device->draw16bitBeRGBBitmap(area->x1, current_y, const_cast<uint16_t*>(chunk_src), w, rows);
+                g_display_manager->gfx_device->draw16bitBeRGBBitmap(clip.x, clip.y + row, staging, clip.width, rows);
             } else {
-                g_display_manager->gfx_device->draw16bitRGBBitmap(area->x1, current_y, const_cast<uint16_t*>(chunk_src), w, rows);
+                g_display_manager->gfx_device->draw16bitRGBBitmap(clip.x, clip.y + row, staging, clip.width, rows);
             }
+            row += rows;
         }
-
-        remaining_rows -= rows;
-        src_row_offset += rows;
-        current_y += rows;
     }
-    
+
     lv_display_flush_ready(disp);
 }
 
@@ -155,11 +156,17 @@ void DisplayManager::touchpad_read_cb(lv_indev_t* indev, lv_indev_data_t* data) 
     if (!g_display_manager) return;
     
     TouchData touch = g_display_manager->touch_driver.get_touch_data();
-    
     if (touch.pressed) {
         data->state = LV_INDEV_STATE_PRESSED;
-        data->point.x = touch.x;
-        data->point.y = touch.y;
+        oled::Point shift{}, point{};
+        shift = g_display_manager->pixel_shift_.offset();
+        if (oled::logical_touch(touch.x, touch.y, shift,
+                g_display_manager->screen_width, g_display_manager->screen_height, point)) {
+            data->point.x = point.x;
+            data->point.y = point.y;
+        } else {
+            data->state = LV_INDEV_STATE_RELEASED;
+        }
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
