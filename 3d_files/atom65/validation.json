@@ -1,0 +1,137 @@
+{
+  "reported_by": "Sabotage1",
+  "owner_report_date": "2026-11-12",
+  "owner_report": "Working Atom Speciality 65 conversion; two M3x18 screws used for adapter-to-metal-bracket attachment",
+  "scope": "220V unit purchased in 2022; not an all-Atom compatibility claim",
+  "latest_panel_revision": "0.43",
+  "adapter_revision": "0.9",
+  "moving_cradle_revision": "0.8",
+  "latest_export_reprint_separately_confirmed": false,
+  "quantitative_dose_accuracy_claim": null,
+  "fasteners": {
+    "M3x18_adapter": 2,
+    "M3x10_load_cell": 4,
+    "M2x5_screen_nominal": 4,
+    "original_grinder_panel_screws": 2
+  },
+  "files": [
+    {
+      "path": "front_panel_v043.stl",
+      "watertight": true,
+      "positive_volume": true,
+      "body_count": 1,
+      "bounds_mm": [
+        104.75907135009766,
+        145.33448791503906,
+        37.3760871887189
+      ]
+    },
+    {
+      "path": "optional_two_piece_front_panel/base_v043.stl",
+      "watertight": true,
+      "positive_volume": true,
+      "body_count": 1,
+      "bounds_mm": [
+        104.75907135009766,
+        144.35899353027344,
+        37.37608718871778
+      ]
+    },
+    {
+      "path": "optional_two_piece_front_panel/collar_v043.stl",
+      "watertight": true,
+      "positive_volume": true,
+      "body_count": 1,
+      "bounds_mm": [
+        101.5904769897461,
+        6.4344940185546875,
+        17.190881729125977
+      ]
+    },
+    {
+      "path": "portafilter_cradle_73mm_v08.stl",
+      "watertight": true,
+      "positive_volume": true,
+      "body_count": 1,
+      "bounds_mm": [
+        126.5,
+        133.5,
+        40.0
+      ]
+    },
+    {
+      "path": "scale_adapter_v09.stl",
+      "watertight": true,
+      "positive_volume": true,
+      "body_count": 1,
+      "bounds_mm": [
+        123.0,
+        58.0,
+        24.0
+      ]
+    }
+  ],
+  "panel_checks": {
+    "top_relief": {
+      "flat_top_Y_mm": 145.33448680149658,
+      "rise_over_base_mm": 2.4344868014965755,
+      "protruding_front_step_removed": true,
+      "roof_nominal_thickness_mm": 2.6
+    },
+    "HX711_revision": {
+      "outside_authorized_regions_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "rail_widths_mm": [
+        5.0,
+        5.0,
+        15.5
+      ],
+      "rail_gaps_mm": [
+        4,
+        4
+      ],
+      "rail_centres_X_mm": [
+        -14.25,
+        0,
+        14.25
+      ],
+      "original_rail_length_mm": 33,
+      "new_rail_length_mm": 18.0,
+      "top_Y_mm": 55.0,
+      "bottom_rail_Y_mm": 37,
+      "shortening_from_v42_mm": 4.11,
+      "crossbar_Y_limits_mm": [
+        33,
+        37.2
+      ],
+      "top_crossbar_removed": true,
+      "holder_only_vertical_board_path_clear": true,
+      "other_fitted_components": "Exact geometry outside holder region, capacitor section moved to X+38 (inside-view left); upper tabs retained"
+    },
+    "capacitor_revision": {
+      "center_X_mm": 38,
+      "side": "left in inside/back view",
+      "entry_notch_follows_holder": true,
+      "cable_eye_relocated_XY_mm": [
+        -36,
+        66
+      ]
+    },
+    "head_channels_clear": true,
+    "rear_stop": {
+      "datum": "Existing sloped side-wall rear profile, extrapolated upward",
+      "A_material_beyond_mm3": 0.0,
+      "B_material_beyond_mm3": 0.0,
+      "top_rear_Z_mm": 17.058529411764702,
+      "extra_rear_overhang_mm": 0
+    }
+  },
+  "adapter_checks": {
+    "new_drop_mm": 18.0,
+    "forward_projection_mm": 12,
+    "minimum_moving_fixed_gap_mm": 2.0,
+    "compatible_cradle_unchanged_sha256": "1bb2bc1e98a7956c3101d819460afdc4cf3306e6aa8b132f39b75463b73727c6"
+  }
+}

@@ -1,0 +1,36 @@
+Smart Grind by Weight - ESP32-S3 intelligent coffee scale with grind-by-weight functionality
+Copyright (C) 2025  Grind-by-Weight Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+## Hardware Designs
+
+Hardware designs, schematics, and mechanical drawings in this repository are licensed under the CERN Open Hardware Licence Version 2 - Strongly Reciprocal (CERN-OHL-S v2).
+
+You may redistribute and modify these designs under the terms of the CERN-OHL-S v2. A copy of the licence is available at https://cern-ohl.web.cern.ch/
+
+The hardware designs are provided "as-is" without any warranty. Users are responsible for ensuring safety and compliance with local electrical codes and regulations when building and installing the hardware.
+
+## Third-Party Components
+
+This project incorporates several third-party libraries and components:
+
+- LVGL: MIT License (https://github.com/lvgl/lvgl)
+- Arduino_GFX: BSD License (https://github.com/moononournation/Arduino_GFX)  
+- esp32-flashz: MIT License (https://github.com/vortigont/esp32-flashz)
+- ESP-IDF: Apache 2.0 License (https://github.com/espressif/esp-idf)
+
+See individual component documentation for complete license information.

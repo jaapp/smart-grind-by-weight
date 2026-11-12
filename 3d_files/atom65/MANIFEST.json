@@ -1,0 +1,78 @@
+{
+  "revision": "atom65-community-0.43",
+  "default_printed_parts": 3,
+  "optional_two_piece_panel_total_parts": 4,
+  "fasteners": {
+    "M3x18_adapter": 2,
+    "M3x10_load_cell": 4,
+    "M2x5_screen_nominal": 4,
+    "original_grinder_panel_screws": 2
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "bytes": 1761,
+      "sha256": "7d466488353c0dd232b6f25bd31dc1be3f6de90d0fa64ef99100504d6d5cacad"
+    },
+    {
+      "path": "README.md",
+      "bytes": 8534,
+      "sha256": "6d5c55167fd72de308cdc38f9233a52f6863dc56856254cefe0e14b8035cbfed"
+    },
+    {
+      "path": "front_panel_v043.step",
+      "bytes": 1196602,
+      "sha256": "09c6413be08033f8e4df748df1949ce3fb1391c1898e78d5bf3774f894cfc3bf"
+    },
+    {
+      "path": "front_panel_v043.stl",
+      "bytes": 475084,
+      "sha256": "9216c258ed05c8bf1e4524224acc1bb4df5794e0fffec524aea9ec3c499ee7ce"
+    },
+    {
+      "path": "optional_two_piece_front_panel/base_v043.step",
+      "bytes": 1164665,
+      "sha256": "048a139a84c7cd69cf3dcb38a94846932bfac99e18ef23652ddc02fc8a99be6f"
+    },
+    {
+      "path": "optional_two_piece_front_panel/base_v043.stl",
+      "bytes": 473284,
+      "sha256": "10e189ceaef4f263c3823eb14e06e6f9694eb7d701f47d563845abe13723a7e6"
+    },
+    {
+      "path": "optional_two_piece_front_panel/collar_v043.step",
+      "bytes": 156763,
+      "sha256": "faad152eb41dc8a4c2e917a9854698ee2d71516cf85a57e1841f2cfd5be776bb"
+    },
+    {
+      "path": "optional_two_piece_front_panel/collar_v043.stl",
+      "bytes": 7384,
+      "sha256": "410e8ca0bcf5b48d5a2205aa371aca3eb03236f8aa2aede8027d42332007ccb2"
+    },
+    {
+      "path": "portafilter_cradle_73mm_v08.step",
+      "bytes": 129737,
+      "sha256": "76738ec7750c0146139ff22cdb5ba9ae08f9535377e01f54eac07d5eb15de93e"
+    },
+    {
+      "path": "portafilter_cradle_73mm_v08.stl",
+      "bytes": 470784,
+      "sha256": "1bb2bc1e98a7956c3101d819460afdc4cf3306e6aa8b132f39b75463b73727c6"
+    },
+    {
+      "path": "scale_adapter_v09.step",
+      "bytes": 182991,
+      "sha256": "1219533188227bbfea849b5a892f0d77b1abe3dd635089b76de89cd7b7ca965f"
+    },
+    {
+      "path": "scale_adapter_v09.stl",
+      "bytes": 427884,
+      "sha256": "bd7d3c15abab2ee070de7335115357eb8ff81d220f1e928b7ecee95076b4a8dd"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 3565,
+      "sha256": "964b67562ac01457614252659222545d5916dc4f7f43154cf4357a1224598678"
+    }
+  ]
+}
