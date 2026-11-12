@@ -15,7 +15,8 @@ Compatibility guide for Smart Grind-by-Weight modification across grinder models
 | [**Mignon Manuale**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/evolution+range/27.aspx) | 🔧 **Step-down required (WIP)** | Custom mount + pins + 5V buck | ✅ **MakerWorld T70 mount** ([link](https://makerworld.com/en/models/2157431-eureka-mignon-manuale-smart-grinder-case#profileId-2338828)) | Manuale board feeds ~18V on header; add a 5V buck to protect ESP/display. Progress tracked in [issue #86](https://github.com/jaapp/smart-grind-by-weight/issues/86) |
 | [**Mignon Zero**](https://www.eureka.co.it/en/products/eureka+1920/mignon+grinders/zero+range/74.aspx) | 🔧 **Extra hardware** | Custom mount + relay | 🏗️ **WIP design** | Requires 230V optocoupler relay (3.3V logic) + external USB power |
 | [**Gaggia MDF55**](https://www.gaggia.com/product/g-grinder/) | 🔄 **Likely compatible** | Screen replacement | ✅ **Ready** | Untested. Rebranded Specialita with same screen |
-| [**Atom series**](https://www.eureka.co.it/en/products/eureka+1920/commercial+grinders/atom+range/8.aspx) | ❓ **Unknown** | Research needed | ❌ **None** | Internals unknown |
+| **Atom Speciality 65 (220 V; purchased 2022)** | ✅ **Owner-confirmed working** | Custom front panel + T70 scale/cradle | ✅ [STL + STEP package](../3d_files/atom65/README.md) | Waveshare V1.1 / GPIO1 build; 73 mm Decent portafilter cradle; two M3×18 bracket screws. See firmware and revision scope in the guide. |
+| Other **Atom-series models** | ❓ **Unknown** | Model-specific verification needed | — | Atom 65 report does not establish compatibility for Atom W/GBW or other revisions. |
 
 ## Methods Explained
 
@@ -30,7 +31,7 @@ See: **[3D PRINTS](3D_PRINTS.md)** for a couple designs that adds a Waveshare sc
 
 ## How to adapt this mod for a not yet supported grinder
 
-Bringing the Smart Grind-by-Weight setup to a new grinder mostly means recreating the mechanical interface and ensuring safe motor control.
+Bringing the Smart Grind-by-Weight setup to a new grinder mostly means recreating the mechanical interface and ensuring safe motor control. The [Atom 65 build](../3d_files/atom65/README.md) reuses its existing power-board relay/control interface; the generic additional-relay method below is not its model-specific wiring guide.
 
 - Design and print a new 3D mount that secures the load cell inside the grinder without interfering with the chute or burr carrier.
 - Integrate the SSR-40DA (or equivalent) so the ESP32 can switch the grinder motor safely, tapping into the grinder's existing on/off path while keeping mains fully isolated.
